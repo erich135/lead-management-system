@@ -8,7 +8,131 @@ interface DiaryProps {
 }
 
 export function Diary({ users }: DiaryProps) {
-  const [bookings, setBookings] = useState<TechBooking[]>([]);
+  // Demo data for customer presentation
+  const demoBookings: any[] = [
+    {
+      id: '1',
+      lead_id: 'demo-1',
+      technician_id: 'tech-1',
+      booking_date: '2025-11-01',
+      start_time: '08:00:00',
+      end_time: '12:00:00',
+      location: '123 Factory Road, Industrial Park',
+      notes: 'Initial site assessment and equipment measurements',
+      status: 'scheduled',
+      created_at: '2025-10-26T14:45:00Z',
+      updated_at: '2025-10-26T14:45:00Z',
+      technician: { id: 'tech-1', full_name: 'Tom Technician', email: 'tom@ars.com', role: 'user', is_active: true, created_at: '', updated_at: '' },
+      lead: { id: 'demo-1', lead_number: 'LEAD-20251012-0001', client_name: 'Cust Seven', created_at: '', updated_at: '' }
+    },
+    {
+      id: '2',
+      lead_id: 'demo-2',
+      technician_id: 'tech-1',
+      booking_date: '2025-11-01',
+      start_time: '13:00:00',
+      end_time: '17:00:00',
+      location: '456 Medical Plaza, Suite 200',
+      notes: 'HVAC installation - Phase 1',
+      status: 'scheduled',
+      created_at: '2025-10-29T13:40:00Z',
+      updated_at: '2025-10-29T13:40:00Z',
+      technician: { id: 'tech-1', full_name: 'Tom Technician', email: 'tom@ars.com', role: 'user', is_active: true, created_at: '', updated_at: '' },
+      lead: { id: 'demo-2', lead_number: 'LEAD-20251001-0001', client_name: 'Cust Ten', created_at: '', updated_at: '' }
+    },
+    {
+      id: '3',
+      lead_id: 'demo-3',
+      technician_id: 'tech-1',
+      booking_date: '2025-11-02',
+      start_time: '09:00:00',
+      end_time: '15:00:00',
+      location: '789 Shopping Lane',
+      notes: 'Continue Phase 2 - Storefront installations',
+      status: 'scheduled',
+      created_at: '2025-10-28T08:30:00Z',
+      updated_at: '2025-10-28T08:30:00Z',
+      technician: { id: 'tech-1', full_name: 'Tom Technician', email: 'tom@ars.com', role: 'user', is_active: true, created_at: '', updated_at: '' },
+      lead: { id: 'demo-3', lead_number: 'LEAD-20251008-0001', client_name: 'Cust Eight', created_at: '', updated_at: '' }
+    },
+    {
+      id: '4',
+      lead_id: 'demo-1',
+      technician_id: 'tech-1',
+      booking_date: '2025-11-04',
+      start_time: '08:00:00',
+      end_time: '16:00:00',
+      location: '123 Factory Road, Industrial Park',
+      notes: 'Main compressor installation',
+      status: 'scheduled',
+      created_at: '2025-10-26T14:45:00Z',
+      updated_at: '2025-10-26T14:45:00Z',
+      technician: { id: 'tech-1', full_name: 'Tom Technician', email: 'tom@ars.com', role: 'user', is_active: true, created_at: '', updated_at: '' },
+      lead: { id: 'demo-1', lead_number: 'LEAD-20251012-0001', client_name: 'Cust Seven', created_at: '', updated_at: '' }
+    },
+    {
+      id: '5',
+      lead_id: 'demo-4',
+      technician_id: 'tech-2',
+      booking_date: '2025-11-05',
+      start_time: '07:00:00',
+      end_time: '11:00:00',
+      location: '321 Warehouse Dr',
+      notes: 'Industrial dryer setup and testing',
+      status: 'scheduled',
+      created_at: '2025-10-24T11:20:00Z',
+      updated_at: '2025-10-24T11:20:00Z',
+      technician: { id: 'tech-2', full_name: 'Sarah Engineer', email: 'sarah@ars.com', role: 'user', is_active: true, created_at: '', updated_at: '' },
+      lead: { id: 'demo-4', lead_number: 'LEAD-20251015-0001', client_name: 'Cust Six', created_at: '', updated_at: '' }
+    },
+    {
+      id: '6',
+      lead_id: 'demo-2',
+      technician_id: 'tech-1',
+      booking_date: '2025-11-06',
+      start_time: '08:00:00',
+      end_time: '12:00:00',
+      location: '456 Medical Plaza, Suite 200',
+      notes: 'HVAC installation - Phase 2, final testing',
+      status: 'scheduled',
+      created_at: '2025-10-29T13:40:00Z',
+      updated_at: '2025-10-29T13:40:00Z',
+      technician: { id: 'tech-1', full_name: 'Tom Technician', email: 'tom@ars.com', role: 'user', is_active: true, created_at: '', updated_at: '' },
+      lead: { id: 'demo-2', lead_number: 'LEAD-20251001-0001', client_name: 'Cust Ten', created_at: '', updated_at: '' }
+    },
+    {
+      id: '7',
+      lead_id: 'demo-3',
+      technician_id: 'tech-2',
+      booking_date: '2025-11-08',
+      start_time: '18:00:00',
+      end_time: '23:00:00',
+      location: '789 Shopping Lane',
+      notes: 'Night shift - Final installations and commissioning',
+      status: 'scheduled',
+      created_at: '2025-10-28T08:30:00Z',
+      updated_at: '2025-10-28T08:30:00Z',
+      technician: { id: 'tech-2', full_name: 'Sarah Engineer', email: 'sarah@ars.com', role: 'user', is_active: true, created_at: '', updated_at: '' },
+      lead: { id: 'demo-3', lead_number: 'LEAD-20251008-0001', client_name: 'Cust Eight', created_at: '', updated_at: '' }
+    },
+    {
+      id: '8',
+      lead_id: 'demo-1',
+      technician_id: 'tech-1',
+      booking_date: '2025-11-11',
+      start_time: '08:00:00',
+      end_time: '12:00:00',
+      location: '123 Factory Road, Industrial Park',
+      notes: 'Final testing and commissioning',
+      status: 'scheduled',
+      created_at: '2025-10-26T14:45:00Z',
+      updated_at: '2025-10-26T14:45:00Z',
+      technician: { id: 'tech-1', full_name: 'Tom Technician', email: 'tom@ars.com', role: 'user', is_active: true, created_at: '', updated_at: '' },
+      lead: { id: 'demo-1', lead_number: 'LEAD-20251012-0001', client_name: 'Cust Seven', created_at: '', updated_at: '' }
+    }
+  ];
+
+  const [bookings, setBookings] = useState<TechBooking[]>(demoBookings);
   const [loading, setLoading] = useState(false);
   const [techFilter, setTechFilter] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState<string>('');
@@ -26,7 +150,11 @@ export function Diary({ users }: DiaryProps) {
         .select(`*, technician:profiles!tech_bookings_technician_id_fkey(*), lead:leads(*)`)
         .order('booking_date', { ascending: true })
         .order('start_time', { ascending: true });
-      if (data) setBookings(data as any);
+      // If we get real data, use it; otherwise stick with demo data
+      if (data && data.length > 0) setBookings(data as any);
+    } catch (error) {
+      // If database not set up yet, just use demo data (already set)
+      console.log('Using demo data for presentation');
     } finally {
       setLoading(false);
     }

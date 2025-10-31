@@ -30,51 +30,51 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO leads (id, lead_number, client_name, contact_person, contact_email, contact_phone, description, branch_id, current_status_id, assigned_to, created_by, quote_number, order_number, invoice_number, estimated_value, created_at, updated_at) VALUES 
 
 -- Recent leads (New Lead status) - should trigger alerts soon
-('l1e7d123-4567-8901-2345-678901234567', 'LEAD-20251028-0001', 'Acme Manufacturing Corp', 'Robert Johnson', 'robert.johnson@acme.com', '(555) 123-4567', 'Industrial lighting upgrade - 50,000 sq ft warehouse', 'b1e7d123-4567-8901-2345-678901234567', (SELECT id FROM lead_statuses WHERE name = 'New Lead'), 'u2e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', NULL, NULL, NULL, 85000.00, '2025-10-28 09:30:00', '2025-10-28 09:30:00'),
+('l1e7d123-4567-8901-2345-678901234567', 'LEAD-20251028-0001', 'Cust One', 'Robert Johnson', 'robert.johnson@custone.com', '(555) 123-4567', 'Industrial compressor upgrade - 50,000 sq ft warehouse', 'b1e7d123-4567-8901-2345-678901234567', (SELECT id FROM lead_statuses WHERE name = 'New Lead'), 'u2e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', NULL, NULL, NULL, 85000.00, '2025-10-28 09:30:00', '2025-10-28 09:30:00'),
 
-('l2e7d123-4567-8901-2345-678901234567', 'LEAD-20251029-0001', 'Green Valley Restaurant', 'Maria Rodriguez', 'maria@greenvalley.com', '(555) 234-5678', 'Kitchen ventilation system installation', 'b2e7d123-4567-8901-2345-678901234568', (SELECT id FROM lead_statuses WHERE name = 'New Lead'), 'u3e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', NULL, NULL, NULL, 25000.00, '2025-10-29 14:15:00', '2025-10-29 14:15:00'),
+('l2e7d123-4567-8901-2345-678901234567', 'LEAD-20251029-0001', 'Cust Two', 'Maria Rodriguez', 'maria@custtwo.com', '(555) 234-5678', 'Kitchen ventilation system installation', 'b2e7d123-4567-8901-2345-678901234568', (SELECT id FROM lead_statuses WHERE name = 'New Lead'), 'u3e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', NULL, NULL, NULL, 25000.00, '2025-10-29 14:15:00', '2025-10-29 14:15:00'),
 
 -- Overdue quotes (should show as alerts)
-('l3e7d123-4567-8901-2345-678901234567', 'LEAD-20251020-0001', 'City Medical Center', 'Dr. James Wilson', 'jwilson@citymed.org', '(555) 345-6789', 'Emergency lighting system for new wing', 'b1e7d123-4567-8901-2345-678901234567', (SELECT id FROM lead_statuses WHERE name = 'New Lead'), 'u2e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', NULL, NULL, NULL, 65000.00, '2025-10-20 11:00:00', '2025-10-20 11:00:00'),
+('l3e7d123-4567-8901-2345-678901234567', 'LEAD-20251020-0001', 'Cust Three', 'Dr. James Wilson', 'jwilson@custthree.com', '(555) 345-6789', 'Emergency generator system for new wing', 'b1e7d123-4567-8901-2345-678901234567', (SELECT id FROM lead_statuses WHERE name = 'New Lead'), 'u2e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', NULL, NULL, NULL, 65000.00, '2025-10-20 11:00:00', '2025-10-20 11:00:00'),
 
 -- Quoted leads
-('l4e7d123-4567-8901-2345-678901234567', 'LEAD-20251025-0001', 'Sunshine Retail Plaza', 'Jennifer Chen', 'jchen@sunshineretail.com', '(555) 456-7890', 'Parking lot LED lighting conversion', 'b3e7d123-4567-8901-2345-678901234569', (SELECT id FROM lead_statuses WHERE name = 'Quoted'), 'u4e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0142', NULL, NULL, 42000.00, '2025-10-25 10:20:00', '2025-10-27 16:30:00'),
+('l4e7d123-4567-8901-2345-678901234567', 'LEAD-20251025-0001', 'Cust Four', 'Jennifer Chen', 'jchen@custfour.com', '(555) 456-7890', 'Compressed air system upgrade', 'b3e7d123-4567-8901-2345-678901234569', (SELECT id FROM lead_statuses WHERE name = 'Quoted'), 'u4e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0142', NULL, NULL, 42000.00, '2025-10-25 10:20:00', '2025-10-27 16:30:00'),
 
-('l5e7d123-4567-8901-2345-678901234567', 'LEAD-20251018-0001', 'Metro Office Complex', 'David Thompson', 'dthompson@metrooffice.com', '(555) 567-8901', 'Office building smart lighting upgrade', 'b1e7d123-4567-8901-2345-678901234567', (SELECT id FROM lead_statuses WHERE name = 'Quoted'), 'u2e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0138', NULL, NULL, 125000.00, '2025-10-18 13:45:00', '2025-10-22 09:15:00'),
+('l5e7d123-4567-8901-2345-678901234567', 'LEAD-20251018-0001', 'Cust Five', 'David Thompson', 'dthompson@custfive.com', '(555) 567-8901', 'Office building HVAC upgrade', 'b1e7d123-4567-8901-2345-678901234567', (SELECT id FROM lead_statuses WHERE name = 'Quoted'), 'u2e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0138', NULL, NULL, 125000.00, '2025-10-18 13:45:00', '2025-10-22 09:15:00'),
 
 -- Order received
-('l6e7d123-4567-8901-2345-678901234567', 'LEAD-20251015-0001', 'Coastal Warehouse LLC', 'Amanda Foster', 'afoster@coastalwh.com', '(555) 678-9012', 'High-bay LED lighting installation', 'b2e7d123-4567-8901-2345-678901234568', (SELECT id FROM lead_statuses WHERE name = 'Order Received'), 'u3e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0135', 'PO-78459', NULL, 78000.00, '2025-10-15 08:30:00', '2025-10-24 11:20:00'),
+('l6e7d123-4567-8901-2345-678901234567', 'LEAD-20251015-0001', 'Cust Six', 'Amanda Foster', 'afoster@custsix.com', '(555) 678-9012', 'Industrial dryer installation', 'b2e7d123-4567-8901-2345-678901234568', (SELECT id FROM lead_statuses WHERE name = 'Order Received'), 'u3e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0135', 'PO-78459', NULL, 78000.00, '2025-10-15 08:30:00', '2025-10-24 11:20:00'),
 
 -- Job scheduled
-('l7e7d123-4567-8901-2345-678901234567', 'LEAD-20251012-0001', 'Riverside Manufacturing', 'Carlos Martinez', 'cmartinez@riverside.com', '(555) 789-0123', 'Factory floor lighting modernization', 'b1e7d123-4567-8901-2345-678901234567', (SELECT id FROM lead_statuses WHERE name = 'Job Scheduled'), 'u5e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0131', 'PO-67834', NULL, 95000.00, '2025-10-12 15:10:00', '2025-10-26 14:45:00'),
+('l7e7d123-4567-8901-2345-678901234567', 'LEAD-20251012-0001', 'Cust Seven', 'Carlos Martinez', 'cmartinez@custseven.com', '(555) 789-0123', 'Factory floor compressor modernization', 'b1e7d123-4567-8901-2345-678901234567', (SELECT id FROM lead_statuses WHERE name = 'Job Scheduled'), 'u5e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0131', 'PO-67834', NULL, 95000.00, '2025-10-12 15:10:00', '2025-10-26 14:45:00'),
 
 -- In progress
-('l8e7d123-4567-8901-2345-678901234567', 'LEAD-20251008-0001', 'Downtown Shopping Center', 'Patricia Williams', 'pwilliams@downtownsc.com', '(555) 890-1234', 'Common area and storefront lighting', 'b3e7d123-4567-8901-2345-678901234569', (SELECT id FROM lead_statuses WHERE name = 'In Progress'), 'u4e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0128', 'PO-56723', NULL, 55000.00, '2025-10-08 12:00:00', '2025-10-28 08:30:00'),
+('l8e7d123-4567-8901-2345-678901234567', 'LEAD-20251008-0001', 'Cust Eight', 'Patricia Williams', 'pwilliams@custeight.com', '(555) 890-1234', 'Shopping center air handling equipment', 'b3e7d123-4567-8901-2345-678901234569', (SELECT id FROM lead_statuses WHERE name = 'In Progress'), 'u4e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0128', 'PO-56723', NULL, 55000.00, '2025-10-08 12:00:00', '2025-10-28 08:30:00'),
 
 -- Awaiting materials (should trigger alert)
-('l9e7d123-4567-8901-2345-678901234567', 'LEAD-20251005-0001', 'Tech Startup Hub', 'Michael Chang', 'mchang@techstartup.com', '(555) 901-2345', 'Modern office lighting design implementation', 'b2e7d123-4567-8901-2345-678901234568', (SELECT id FROM lead_statuses WHERE name = 'Awaiting Materials'), 'u3e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0125', 'PO-45612', NULL, 32000.00, '2025-10-05 09:45:00', '2025-10-25 10:15:00'),
+('l9e7d123-4567-8901-2345-678901234567', 'LEAD-20251005-0001', 'Cust Nine', 'Michael Chang', 'mchang@custnine.com', '(555) 901-2345', 'Modern office climate control system', 'b2e7d123-4567-8901-2345-678901234568', (SELECT id FROM lead_statuses WHERE name = 'Awaiting Materials'), 'u3e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0125', 'PO-45612', NULL, 32000.00, '2025-10-05 09:45:00', '2025-10-25 10:15:00'),
 
 -- Ready for installation
-('l10e7d123-4567-8901-2345-678901234567', 'LEAD-20251001-0001', 'Family Health Clinic', 'Dr. Susan Taylor', 'staylor@familyhealth.com', '(555) 012-3456', 'Medical facility lighting compliance upgrade', 'b1e7d123-4567-8901-2345-678901234567', (SELECT id FROM lead_statuses WHERE name = 'Ready for Installation'), 'u5e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0120', 'PO-34501', NULL, 38000.00, '2025-10-01 11:20:00', '2025-10-29 13:40:00'),
+('l10e7d123-4567-8901-2345-678901234567', 'LEAD-20251001-0001', 'Cust Ten', 'Dr. Susan Taylor', 'staylor@custten.com', '(555) 012-3456', 'Medical facility HVAC compliance upgrade', 'b1e7d123-4567-8901-2345-678901234567', (SELECT id FROM lead_statuses WHERE name = 'Ready for Installation'), 'u5e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0120', 'PO-34501', NULL, 38000.00, '2025-10-01 11:20:00', '2025-10-29 13:40:00'),
 
 -- Installed
-('l11e7d123-4567-8901-2345-678901234567', 'LEAD-20250925-0001', 'Elite Fitness Center', 'Brian Cooper', 'bcooper@elitefitness.com', '(555) 123-4567', 'Gym lighting optimization project', 'b3e7d123-4567-8901-2345-678901234569', (SELECT id FROM lead_statuses WHERE name = 'Installed'), 'u4e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0115', 'PO-23490', 'INST-2025-089', 28000.00, '2025-09-25 14:30:00', '2025-10-15 16:20:00'),
+('l11e7d123-4567-8901-2345-678901234567', 'LEAD-20250925-0001', 'Cust Eleven', 'Brian Cooper', 'bcooper@custeleven.com', '(555) 123-4567', 'Gym ventilation optimization project', 'b3e7d123-4567-8901-2345-678901234569', (SELECT id FROM lead_statuses WHERE name = 'Installed'), 'u4e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0115', 'PO-23490', 'INST-2025-089', 28000.00, '2025-09-25 14:30:00', '2025-10-15 16:20:00'),
 
 -- Invoiced (some overdue)
-('l12e7d123-4567-8901-2345-678901234567', 'LEAD-20250920-0001', 'Premier Auto Dealership', 'Nancy Robinson', 'nrobinson@premierauto.com', '(555) 234-5678', 'Showroom and service bay lighting', 'b2e7d123-4567-8901-2345-678901234568', (SELECT id FROM lead_statuses WHERE name = 'Invoiced'), 'u3e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0108', 'PO-12389', 'INV-2025-234', 72000.00, '2025-09-20 10:15:00', '2025-10-10 09:30:00'),
+('l12e7d123-4567-8901-2345-678901234567', 'LEAD-20250920-0001', 'Cust Twelve', 'Nancy Robinson', 'nrobinson@custtwelve.com', '(555) 234-5678', 'Showroom and service bay climate control', 'b2e7d123-4567-8901-2345-678901234568', (SELECT id FROM lead_statuses WHERE name = 'Invoiced'), 'u3e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0108', 'PO-12389', 'INV-2025-234', 72000.00, '2025-09-20 10:15:00', '2025-10-10 09:30:00'),
 
-('l13e7d123-4567-8901-2345-678901234567', 'LEAD-20250905-0001', 'Golden Years Retirement Home', 'Helen Davis', 'hdavis@goldenyears.com', '(555) 345-6789', 'Senior living facility lighting safety upgrade', 'b1e7d123-4567-8901-2345-678901234567', (SELECT id FROM lead_statuses WHERE name = 'Invoiced'), 'u2e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0095', 'PO-01278', 'INV-2025-198', 45000.00, '2025-09-05 16:45:00', '2025-09-28 11:10:00'),
+('l13e7d123-4567-8901-2345-678901234567', 'LEAD-20250905-0001', 'Cust Thirteen', 'Helen Davis', 'hdavis@custthirteen.com', '(555) 345-6789', 'Senior living facility HVAC safety upgrade', 'b1e7d123-4567-8901-2345-678901234567', (SELECT id FROM lead_statuses WHERE name = 'Invoiced'), 'u2e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0095', 'PO-01278', 'INV-2025-198', 45000.00, '2025-09-05 16:45:00', '2025-09-28 11:10:00'),
 
 -- Paid (completed successfully)
-('l14e7d123-4567-8901-2345-678901234567', 'LEAD-20250815-0001', 'Mountain View Resort', 'Richard Adams', 'radams@mountainview.com', '(555) 456-7890', 'Resort common areas and pathways lighting', 'b3e7d123-4567-8901-2345-678901234569', (SELECT id FROM lead_statuses WHERE name = 'Paid'), 'u4e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0082', 'PO-98765', 'INV-2025-145', 89000.00, '2025-08-15 12:00:00', '2025-09-25 14:30:00'),
+('l14e7d123-4567-8901-2345-678901234567', 'LEAD-20250815-0001', 'Cust Fourteen', 'Richard Adams', 'radams@custfourteen.com', '(555) 456-7890', 'Resort common areas climate control', 'b3e7d123-4567-8901-2345-678901234569', (SELECT id FROM lead_statuses WHERE name = 'Paid'), 'u4e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0082', 'PO-98765', 'INV-2025-145', 89000.00, '2025-08-15 12:00:00', '2025-09-25 14:30:00'),
 
-('l15e7d123-4567-8901-2345-678901234567', 'LEAD-20250801-0001', 'Innovation Tech Park', 'Lisa Wang', 'lwang@innovationpark.com', '(555) 567-8901', 'Campus-wide smart lighting infrastructure', 'b1e7d123-4567-8901-2345-678901234567', (SELECT id FROM lead_statuses WHERE name = 'Paid'), 'u2e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0075', 'PO-87654', 'INV-2025-132', 156000.00, '2025-08-01 09:20:00', '2025-09-18 10:45:00'),
+('l15e7d123-4567-8901-2345-678901234567', 'LEAD-20250801-0001', 'Cust Fifteen', 'Lisa Wang', 'lwang@custfifteen.com', '(555) 567-8901', 'Campus-wide compressed air infrastructure', 'b1e7d123-4567-8901-2345-678901234567', (SELECT id FROM lead_statuses WHERE name = 'Paid'), 'u2e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0075', 'PO-87654', 'INV-2025-132', 156000.00, '2025-08-01 09:20:00', '2025-09-18 10:45:00'),
 
 -- On hold
-('l16e7d123-4567-8901-2345-678901234567', 'LEAD-20251010-0001', 'City School District', 'Principal Johnson', 'pjohnson@cityschools.edu', '(555) 678-9012', 'Elementary school classroom lighting upgrade', 'b2e7d123-4567-8901-2345-678901234568', (SELECT id FROM lead_statuses WHERE name = 'On Hold'), 'u3e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0129', NULL, NULL, 68000.00, '2025-10-10 13:30:00', '2025-10-20 15:45:00'),
+('l16e7d123-4567-8901-2345-678901234567', 'LEAD-20251010-0001', 'Cust Sixteen', 'Principal Johnson', 'pjohnson@custsixteen.com', '(555) 678-9012', 'School classroom HVAC upgrade', 'b2e7d123-4567-8901-2345-678901234568', (SELECT id FROM lead_statuses WHERE name = 'On Hold'), 'u3e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0129', NULL, NULL, 68000.00, '2025-10-10 13:30:00', '2025-10-20 15:45:00'),
 
 -- Lost
-('l17e7d123-4567-8901-2345-678901234567', 'LEAD-20251003-0001', 'Budget Store Chain', 'Kevin Brown', 'kbrown@budgetstore.com', '(555) 789-0123', 'Store lighting cost reduction project', 'b3e7d123-4567-8901-2345-678901234569', (SELECT id FROM lead_statuses WHERE name = 'Lost'), 'u4e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0126', NULL, NULL, 35000.00, '2025-10-03 11:10:00', '2025-10-18 09:20:00');
+('l17e7d123-4567-8901-2345-678901234567', 'LEAD-20251003-0001', 'Cust Seventeen', 'Kevin Brown', 'kbrown@custseventeen.com', '(555) 789-0123', 'Store compressed air cost reduction', 'b3e7d123-4567-8901-2345-678901234569', (SELECT id FROM lead_statuses WHERE name = 'Lost'), 'u4e7d123-4567-8901-2345-678901234567', 'u1e7d123-4567-8901-2345-678901234567', 'QT-2025-0126', NULL, NULL, 35000.00, '2025-10-03 11:10:00', '2025-10-18 09:20:00');
 
 -- Insert status history for leads to show progression
 INSERT INTO lead_status_history (lead_id, status_id, changed_by, notes, reference_number, alert_date, created_at) VALUES 
@@ -109,13 +109,13 @@ INSERT INTO lead_status_history (lead_id, status_id, changed_by, notes, referenc
 INSERT INTO notifications (user_id, lead_id, type, message, is_read, created_at) VALUES 
 
 -- Overdue alerts
-('u2e7d123-4567-8901-2345-678901234567', 'l3e7d123-4567-8901-2345-678901234567', 'alert', 'OVERDUE: Lead LEAD-20251020-0001 (City Medical Center) has been in status "New Lead" for too long', false, '2025-10-30 08:00:00'),
-('u3e7d123-4567-8901-2345-678901234567', 'l9e7d123-4567-8901-2345-678901234567', 'alert', 'OVERDUE: Lead LEAD-20251005-0001 (Tech Startup Hub) has been in status "Awaiting Materials" for too long', false, '2025-10-29 08:00:00'),
-('u3e7d123-4567-8901-2345-678901234567', 'l12e7d123-4567-8901-2345-678901234567', 'alert', 'OVERDUE: Lead LEAD-20250920-0001 (Premier Auto Dealership) has been in status "Invoiced" for too long', false, '2025-10-28 08:00:00'),
+('u2e7d123-4567-8901-2345-678901234567', 'l3e7d123-4567-8901-2345-678901234567', 'alert', 'OVERDUE: Lead LEAD-20251020-0001 (Cust Three) has been in status "New Lead" for too long', false, '2025-10-30 08:00:00'),
+('u3e7d123-4567-8901-2345-678901234567', 'l9e7d123-4567-8901-2345-678901234567', 'alert', 'OVERDUE: Lead LEAD-20251005-0001 (Cust Nine) has been in status "Awaiting Materials" for too long', false, '2025-10-29 08:00:00'),
+('u3e7d123-4567-8901-2345-678901234567', 'l12e7d123-4567-8901-2345-678901234567', 'alert', 'OVERDUE: Lead LEAD-20250920-0001 (Cust Twelve) has been in status "Invoiced" for too long', false, '2025-10-28 08:00:00'),
 
 -- Assignment notifications
-('u2e7d123-4567-8901-2345-678901234567', 'l1e7d123-4567-8901-2345-678901234567', 'assignment', 'You have been assigned to lead LEAD-20251028-0001 - Acme Manufacturing Corp', false, '2025-10-28 09:30:00'),
-('u3e7d123-4567-8901-2345-678901234567', 'l2e7d123-4567-8901-2345-678901234567', 'assignment', 'You have been assigned to lead LEAD-20251029-0001 - Green Valley Restaurant', false, '2025-10-29 14:15:00'),
+('u2e7d123-4567-8901-2345-678901234567', 'l1e7d123-4567-8901-2345-678901234567', 'assignment', 'You have been assigned to lead LEAD-20251028-0001 - Cust One', false, '2025-10-28 09:30:00'),
+('u3e7d123-4567-8901-2345-678901234567', 'l2e7d123-4567-8901-2345-678901234567', 'assignment', 'You have been assigned to lead LEAD-20251029-0001 - Cust Two', false, '2025-10-29 14:15:00'),
 
 -- Status change notifications
 ('u5e7d123-4567-8901-2345-678901234567', 'l10e7d123-4567-8901-2345-678901234567', 'status_change', 'Lead LEAD-20251001-0001 status changed to Ready for Installation', false, '2025-10-29 13:40:00'),
@@ -143,6 +143,34 @@ INSERT INTO attachments (lead_id, status_id, file_name, file_path, file_size, fi
 -- Installation photos/documents
 ('l11e7d123-4567-8901-2345-678901234567', (SELECT id FROM lead_statuses WHERE name = 'Installed'), 'Elite_Fitness_Installation_Photos.zip', 'l11e7d123-4567-8901-2345-678901234567/installed/photos.zip', 2456780, 'application/zip', 'u5e7d123-4567-8901-2345-678901234567', '2025-10-15 16:20:00'),
 ('l15e7d123-4567-8901-2345-678901234567', (SELECT id FROM lead_statuses WHERE name = 'Installed'), 'Innovation_Park_Completion_Report.pdf', 'l15e7d123-4567-8901-2345-678901234567/installed/completion.pdf', 567890, 'application/pdf', 'u5e7d123-4567-8901-2345-678901234567', '2025-09-15 17:30:00');
+
+-- Sample tech bookings for diary/calendar view
+INSERT INTO tech_bookings (id, lead_id, technician_id, booking_date, start_time, end_time, location, notes, status, created_at, updated_at) VALUES
+
+-- Upcoming bookings (this week)
+('tb1e7d123-4567-8901-2345-678901234567', 'l7e7d123-4567-8901-2345-678901234567', 'u5e7d123-4567-8901-2345-678901234567', '2025-11-01', '08:00:00', '12:00:00', '123 Factory Road, Industrial Park', 'Initial site assessment and equipment measurements', 'scheduled', '2025-10-26 14:45:00', '2025-10-26 14:45:00'),
+
+('tb2e7d123-4567-8901-2345-678901234567', 'l10e7d123-4567-8901-2345-678901234567', 'u5e7d123-4567-8901-2345-678901234567', '2025-11-01', '13:00:00', '17:00:00', '456 Medical Plaza, Suite 200', 'HVAC installation - Phase 1', 'scheduled', '2025-10-29 13:40:00', '2025-10-29 13:40:00'),
+
+('tb3e7d123-4567-8901-2345-678901234567', 'l8e7d123-4567-8901-2345-678901234567', 'u5e7d123-4567-8901-2345-678901234567', '2025-11-02', '09:00:00', '15:00:00', '789 Shopping Lane', 'Continue Phase 2 - Storefront installations', 'scheduled', '2025-10-28 08:30:00', '2025-10-28 08:30:00'),
+
+('tb4e7d123-4567-8901-2345-678901234567', 'l7e7d123-4567-8901-2345-678901234567', 'u5e7d123-4567-8901-2345-678901234567', '2025-11-04', '08:00:00', '16:00:00', '123 Factory Road, Industrial Park', 'Main compressor installation', 'scheduled', '2025-10-26 14:45:00', '2025-10-26 14:45:00'),
+
+('tb5e7d123-4567-8901-2345-678901234567', 'l6e7d123-4567-8901-2345-678901234567', 'u5e7d123-4567-8901-2345-678901234567', '2025-11-05', '07:00:00', '11:00:00', '321 Warehouse Dr', 'Industrial dryer setup and testing', 'scheduled', '2025-10-24 11:20:00', '2025-10-24 11:20:00'),
+
+-- Next week bookings
+('tb6e7d123-4567-8901-2345-678901234567', 'l10e7d123-4567-8901-2345-678901234567', 'u5e7d123-4567-8901-2345-678901234567', '2025-11-06', '08:00:00', '12:00:00', '456 Medical Plaza, Suite 200', 'HVAC installation - Phase 2, final testing', 'scheduled', '2025-10-29 13:40:00', '2025-10-29 13:40:00'),
+
+('tb7e7d123-4567-8901-2345-678901234567', 'l8e7d123-4567-8901-2345-678901234567', 'u5e7d123-4567-8901-2345-678901234567', '2025-11-08', '18:00:00', '23:00:00', '789 Shopping Lane', 'Night shift - Final installations and commissioning', 'scheduled', '2025-10-28 08:30:00', '2025-10-28 08:30:00'),
+
+('tb8e7d123-4567-8901-2345-678901234567', 'l7e7d123-4567-8901-2345-678901234567', 'u5e7d123-4567-8901-2345-678901234567', '2025-11-11', '08:00:00', '12:00:00', '123 Factory Road, Industrial Park', 'Final testing and commissioning', 'scheduled', '2025-10-26 14:45:00', '2025-10-26 14:45:00'),
+
+-- Completed bookings (for history)
+('tb9e7d123-4567-8901-2345-678901234567', 'l11e7d123-4567-8901-2345-678901234567', 'u5e7d123-4567-8901-2345-678901234567', '2025-10-10', '09:00:00', '17:00:00', '555 Fitness Ave', 'Gym ventilation system installation', 'completed', '2025-09-25 14:30:00', '2025-10-15 17:00:00'),
+
+('tb10e7d123-4567-8901-2345-678901234567', 'l15e7d123-4567-8901-2345-678901234567', 'u5e7d123-4567-8901-2345-678901234567', '2025-09-10', '08:00:00', '16:00:00', '999 Innovation Way', 'Compressed air infrastructure - Phase 1', 'completed', '2025-08-20 10:00:00', '2025-09-10 16:30:00'),
+
+('tb11e7d123-4567-8901-2345-678901234567', 'l15e7d123-4567-8901-2345-678901234567', 'u5e7d123-4567-8901-2345-678901234567', '2025-09-12', '08:00:00', '16:00:00', '999 Innovation Way', 'Compressed air infrastructure - Phase 2', 'completed', '2025-08-20 10:00:00', '2025-09-12 16:45:00');
 
 -- Success message
 SELECT 'Sample data has been successfully inserted!' as message,

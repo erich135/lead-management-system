@@ -224,20 +224,25 @@ export function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <nav className="bg-white border-b border-slate-200 sticky top-0 z-40">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-white">
+      <nav className="bg-gradient-to-r from-blue-600 to-blue-700 shadow-lg sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-8">
-              <h1 className="text-xl font-bold text-slate-900">Lead Management</h1>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md">
+                  <span className="text-blue-600 font-bold text-sm">ARS</span>
+                </div>
+                <h1 className="text-xl font-bold text-white">ARS Customer Management</h1>
+              </div>
 
               <div className="hidden md:flex gap-1">
                 <button
                   onClick={() => setView('dashboard')}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
                     view === 'dashboard'
-                      ? 'bg-slate-100 text-slate-900'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'bg-white/20 text-white shadow-md'
+                      : 'text-white/80 hover:text-white hover:bg-white/10'
                   }`}
                 >
                   <LayoutDashboard className="w-4 h-4 inline mr-2" />
@@ -245,10 +250,10 @@ export function Dashboard() {
                 </button>
                 <button
                   onClick={() => setView('leads')}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
                     view === 'leads'
-                      ? 'bg-slate-100 text-slate-900'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'bg-white/20 text-white shadow-md'
+                      : 'text-white/80 hover:text-white hover:bg-white/10'
                   }`}
                 >
                   <FileText className="w-4 h-4 inline mr-2" />
@@ -256,10 +261,10 @@ export function Dashboard() {
                 </button>
                 <button
                   onClick={() => setView('reports')}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
                     view === 'reports'
-                      ? 'bg-slate-100 text-slate-900'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'bg-white/20 text-white shadow-md'
+                      : 'text-white/80 hover:text-white hover:bg-white/10'
                   }`}
                 >
                   <BarChart3 className="w-4 h-4 inline mr-2" />
@@ -267,10 +272,10 @@ export function Dashboard() {
                 </button>
                 <button
                   onClick={() => setView('diary')}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
                     view === 'diary'
-                      ? 'bg-slate-100 text-slate-900'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'bg-white/20 text-white shadow-md'
+                      : 'text-white/80 hover:text-white hover:bg-white/10'
                   }`}
                 >
                   <Calendar className="w-4 h-4 inline mr-2" />
@@ -279,10 +284,10 @@ export function Dashboard() {
                 {isAdmin && (
                   <button
                     onClick={() => setView('users')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    className={`px-4 py-2 rounded-lg font-medium transition-all ${
                       view === 'users'
-                        ? 'bg-slate-100 text-slate-900'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                        ? 'bg-white/20 text-white shadow-md'
+                        : 'text-white/80 hover:text-white hover:bg-white/10'
                     }`}
                   >
                     <Users className="w-4 h-4 inline mr-2" />
@@ -296,11 +301,11 @@ export function Dashboard() {
               <div className="relative">
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
-                  className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors relative"
+                  className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-all relative"
                 >
                   <Bell className="w-5 h-5" />
                   {notifications.length > 0 && (
-                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-yellow-400 rounded-full shadow-md"></span>
                   )}
                 </button>
 
@@ -314,7 +319,7 @@ export function Dashboard() {
                       notifications.map((notif) => (
                         <div
                           key={notif.id}
-                          className="px-4 py-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100"
+                          className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-slate-100"
                           onClick={() => markNotificationRead(notif.id)}
                         >
                           <p className="text-sm text-slate-900 font-medium mb-1">
@@ -330,14 +335,14 @@ export function Dashboard() {
                 )}
               </div>
 
-              <div className="flex items-center gap-3 border-l border-slate-200 pl-4">
+              <div className="flex items-center gap-3 border-l border-white/20 pl-4">
                 <div className="text-right">
-                  <p className="text-sm font-medium text-slate-900">{profile?.full_name}</p>
-                  <p className="text-xs text-slate-500 capitalize">{profile?.role}</p>
+                  <p className="text-sm font-medium text-white">{profile?.full_name}</p>
+                  <p className="text-xs text-white/70 capitalize">{profile?.role}</p>
                 </div>
                 <button
                   onClick={signOut}
-                  className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+                  className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-all"
                   title="Sign out"
                 >
                   <LogOut className="w-5 h-5" />
@@ -355,7 +360,7 @@ export function Dashboard() {
               <h2 className="text-2xl font-bold text-slate-900">Dashboard Overview</h2>
               <button
                 onClick={() => setShowLeadForm(true)}
-                className="bg-slate-900 text-white px-4 py-2 rounded-lg font-medium hover:bg-slate-800 transition-colors flex items-center gap-2"
+                className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-2 rounded-lg font-medium hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg flex items-center gap-2"
               >
                 <Plus className="w-5 h-5" />
                 New Lead

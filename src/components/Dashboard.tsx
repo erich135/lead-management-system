@@ -13,7 +13,8 @@ import {
   AlertCircle,
   TrendingUp,
   Banknote,
-  Calendar
+  Calendar,
+  Menu
 } from 'lucide-react';
 import { LeadsList } from './LeadsList';
 import { LeadForm } from './LeadForm';
@@ -21,11 +22,14 @@ import { LeadDetails } from './LeadDetails';
 import { UserManagement } from './UserManagement';
 import { Reports } from './Reports';
 import { Diary } from './Diary';
+import { MobileNavigation } from './MobileNavigation';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 type View = 'dashboard' | 'leads' | 'reports' | 'users' | 'diary';
 
 export function Dashboard() {
-  const { profile, signOut, isAdmin } = useAuth();
+  const { user, signOut, isAdmin } = useAuth();
+  const isMobile = useIsMobile();
   const [view, setView] = useState<View>('dashboard');
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -120,7 +124,7 @@ export function Dashboard() {
       const demoNotifications: Notification[] = [
         {
           id: '1',
-          user_id: profile?.id || '',
+          user_id: user?.id || '',
           lead_id: 'demo-lead-1',
           type: 'overdue',
           message: 'Lead JHB-2025-0023 has been waiting for quote for 3 days',
@@ -130,7 +134,7 @@ export function Dashboard() {
         },
         {
           id: '2',
-          user_id: profile?.id || '',
+          user_id: user?.id || '',
           lead_id: 'demo-lead-2',
           type: 'status_change',
           message: 'Lead JHB-2025-0045 status changed to "Quoted"',
@@ -140,7 +144,7 @@ export function Dashboard() {
         },
         {
           id: '3',
-          user_id: profile?.id || '',
+          user_id: user?.id || '',
           lead_id: 'demo-lead-3',
           type: 'overdue',
           message: 'Lead JHB-2025-0018 is overdue for follow-up',
@@ -154,7 +158,7 @@ export function Dashboard() {
       const { data } = await supabase
         .from('notifications')
         .select('*, lead:leads(*)')
-        .eq('user_id', profile?.id)
+        .eq('user_id', user?.id)
         .eq('is_read', false)
         .order('created_at', { ascending: false })
         .limit(10);
@@ -224,8 +228,9 @@ export function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-white">
-      <nav className="bg-gradient-to-r from-blue-600 to-blue-700 shadow-lg sticky top-0 z-40">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-white pb-20 md:pb-0">
+      {/* Desktop Navigation */}
+      <nav className="bg-gradient-to-r from-slate-700 via-emerald-600 to-teal-500 shadow-lg sticky top-0 z-40 hidden md:block">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-8">
@@ -337,8 +342,8 @@ export function Dashboard() {
 
               <div className="flex items-center gap-3 border-l border-white/20 pl-4">
                 <div className="text-right">
-                  <p className="text-sm font-medium text-white">{profile?.full_name}</p>
-                  <p className="text-xs text-white/70 capitalize">{profile?.role}</p>
+                  <p className="text-sm font-medium text-white">{user?.fullName || 'User'}</p>
+                  <p className="text-xs text-white/70 capitalize">{user?.role?.name || 'user'}</p>
                 </div>
                 <button
                   onClick={signOut}
@@ -353,7 +358,58 @@ export function Dashboard() {
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Mobile Top Bar */}
+      {isMobile && (
+        <div className="bg-gradient-to-r from-slate-700 via-emerald-600 to-teal-500 shadow-lg sticky top-0 z-40 md:hidden">
+          <div className="flex items-center justify-between h-14 px-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-md">
+                <span className="text-emerald-600 font-bold text-xs">ARS</span>
+              </div>
+              <h1 className="text-base font-bold text-white">ARS Management</h1>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="relative p-2 text-white/90"
+              >
+                <Bell className="w-5 h-5" />
+                {notifications.length > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-yellow-400 rounded-full"></span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Notifications Dropdown */}
+      {isMobile && showNotifications && (
+        <div className="fixed top-14 left-0 right-0 bg-white shadow-lg z-30 md:hidden max-h-96 overflow-y-auto">
+          {notifications.length === 0 ? (
+            <p className="px-4 py-8 text-center text-slate-500 text-sm">
+              No new notifications
+            </p>
+          ) : (
+            notifications.map((notif) => (
+              <div
+                key={notif.id}
+                className="px-4 py-3 hover:bg-emerald-50 cursor-pointer border-b border-slate-100"
+                onClick={() => markNotificationRead(notif.id)}
+              >
+                <p className="text-sm text-slate-900 font-medium mb-1">
+                  {notif.message}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {new Date(notif.created_at).toLocaleString()}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      <main className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${isMobile ? 'pt-4' : ''}`}>
         {view === 'dashboard' && stats && (
           <div>
             <div className="flex justify-between items-center mb-8">
@@ -499,6 +555,16 @@ export function Dashboard() {
           users={users}
           onClose={() => setSelectedLead(null)}
           onUpdate={loadStats}
+        />
+      )}
+
+      {/* Mobile Bottom Navigation */}
+      {isMobile && (
+        <MobileNavigation
+          currentView={view}
+          onViewChange={setView}
+          notificationsCount={notifications.length}
+          onNotificationsClick={() => setShowNotifications(!showNotifications)}
         />
       )}
     </div>

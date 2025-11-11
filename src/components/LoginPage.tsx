@@ -1,7 +1,11 @@
 import { useState, FormEvent } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Lock, Mail, Sparkles, Shield, Zap, X } from 'lucide-react';
 
+/**
+ * Login page component with modern, fun styling.
+ * Connects to the ARS backend API for authentication.
+ */
 export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -9,91 +13,242 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
 
+  /**
+   * Handles form submission and authenticates the user.
+   * 
+   * @param e - Form submit event
+   */
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      const { error } = await signIn(email, password);
-      if (error) {
-        setError(error.message || 'Failed to sign in');
+      const result = await signIn(email, password);
+      if (result.error) {
+        // Check for specific error messages
+        const errorMessage = result.error.message.toLowerCase();
+        let displayMessage = 'The email or password you entered is incorrect. Please try again.';
+        
+        if (errorMessage.includes('invalid credentials') || 
+            errorMessage.includes('incorrect') || 
+            errorMessage.includes('wrong password') ||
+            errorMessage.includes('authentication failed') ||
+            errorMessage.includes('unauthorized')) {
+          // Already set to the correct message
+        } else if (errorMessage.includes('password not set')) {
+          displayMessage = 'Please set your password first. Check your email for the invitation link.';
+        } else if (errorMessage.includes('email not verified') || errorMessage.includes('verify your email')) {
+          displayMessage = 'Please verify your email address. Check your email for the verification link.';
+        } else {
+          displayMessage = result.error.message || 'Failed to sign in. Please check your credentials.';
+        }
+        
+        setError(displayMessage);
       }
     } catch (err) {
-      setError('An unexpected error occurred');
+      // Handle any unexpected errors
+      const errorMessage = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+      let displayMessage = 'The email or password you entered is incorrect. Please try again.';
+      
+      if (errorMessage.includes('invalid credentials') || 
+          errorMessage.includes('incorrect') || 
+          errorMessage.includes('unauthorized') ||
+          errorMessage.includes('401')) {
+        // Already set to the correct message
+      } else if (errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('failed to fetch')) {
+        displayMessage = 'Unable to connect to the server. Please check your connection and try again.';
+      } else {
+        displayMessage = err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.';
+      }
+      
+      setError(displayMessage);
     } finally {
       setLoading(false);
     }
   }
 
+  /**
+   * Clears the error message.
+   */
+  function clearError() {
+    setError('');
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-slate-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-xl p-8 border-t-4 border-blue-600">
+    <div className="min-h-screen bg-gradient-to-br from-slate-800 via-slate-700 to-emerald-600 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Animated background elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-emerald-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-teal-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-slate-600 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
+      </div>
+
+      <div className="w-full max-w-md relative z-10">
+        {/* Main login card */}
+        <div className="bg-white/95 backdrop-blur-lg rounded-3xl shadow-2xl p-8 md:p-10 border border-white/20">
+          {/* Logo and header */}
           <div className="text-center mb-8">
-            <div className="flex justify-center mb-4">
-              <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full flex items-center justify-center shadow-lg">
-                <div className="text-white font-bold text-2xl">ARS</div>
+            <div className="flex justify-center mb-6">
+              <div className="relative">
+                <div className="w-24 h-24 bg-gradient-to-br from-slate-700 via-emerald-600 to-teal-500 rounded-2xl flex items-center justify-center shadow-xl transform rotate-3 hover:rotate-6 transition-transform duration-300">
+                  <Shield className="w-12 h-12 text-white" />
+                </div>
+                <div className="absolute -top-2 -right-2 w-8 h-8 bg-emerald-400 rounded-full flex items-center justify-center animate-pulse">
+                  <Sparkles className="w-4 h-4 text-slate-800" />
+                </div>
               </div>
             </div>
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">ARS Customer Management</h1>
-            <p className="text-slate-600">Sign in to your account</p>
+            <h1 className="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-slate-800 via-emerald-600 to-teal-500 bg-clip-text text-transparent mb-2">
+              ARS Management
+            </h1>
+            <p className="text-slate-600 text-lg">Welcome back! Sign in to continue</p>
           </div>
 
+          {/* Error message */}
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-              <p className="text-sm text-red-800">{error}</p>
+            <div className="mb-6 p-4 bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-300 rounded-xl flex items-start gap-3 animate-shake shadow-md relative overflow-hidden group">
+              {/* Decorative background pattern */}
+              <div className="absolute inset-0 opacity-5">
+                <div className="absolute top-0 left-0 w-20 h-20 bg-red-500 rounded-full -translate-x-1/2 -translate-y-1/2"></div>
+                <div className="absolute bottom-0 right-0 w-32 h-32 bg-orange-500 rounded-full translate-x-1/2 translate-y-1/2"></div>
+              </div>
+              
+              <div className="relative z-10 flex items-start gap-3 w-full">
+                <div className="flex-shrink-0 mt-0.5">
+                  <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center shadow-lg">
+                    <AlertCircle className="w-5 h-5 text-white" />
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-bold text-red-900 mb-1">Login Failed</h3>
+                  <p className="text-sm text-red-800 leading-relaxed">{error}</p>
+                </div>
+                <button
+                  onClick={clearError}
+                  className="flex-shrink-0 w-6 h-6 rounded-full hover:bg-red-200 transition-colors flex items-center justify-center group-hover:opacity-100 opacity-70"
+                  aria-label="Dismiss error"
+                >
+                  <X className="w-4 h-4 text-red-700" />
+                </button>
+              </div>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
+          {/* Login form */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Email input */}
+            <div className="space-y-2">
+              <label htmlFor="email" className="block text-sm font-semibold text-slate-700">
                 Email Address
               </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-shadow"
-                placeholder="you@company.com"
-              />
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Mail className="h-5 w-5 text-slate-400" />
+                </div>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                  className="w-full pl-12 pr-4 py-3.5 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 bg-slate-50 focus:bg-white"
+                  placeholder="you@company.com"
+                />
+              </div>
             </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">
+            {/* Password input */}
+            <div className="space-y-2">
+              <label htmlFor="password" className="block text-sm font-semibold text-slate-700">
                 Password
               </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-shadow"
-                placeholder="••••••••"
-              />
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-slate-400" />
+                </div>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  className="w-full pl-12 pr-4 py-3.5 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 bg-slate-50 focus:bg-white"
+                  placeholder="Enter your password"
+                />
+              </div>
             </div>
 
+            {/* Submit button */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 rounded-lg font-medium hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-gradient-to-r from-slate-700 via-emerald-600 to-teal-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2 group hover:from-slate-800 hover:via-emerald-700 hover:to-teal-600"
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Signing in...</span>
+                </>
+              ) : (
+                <>
+                  <Zap className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                  <span>Sign In</span>
+                </>
+              )}
             </button>
           </form>
+
+          {/* Footer note */}
+          <div className="mt-8 pt-6 border-t border-slate-200">
+            <p className="text-center text-sm text-slate-500">
+              <Shield className="w-4 h-4 inline-block mr-1" />
+              Secure authentication powered by ARS
+            </p>
+          </div>
         </div>
 
+        {/* Additional info */}
         <div className="mt-6 text-center">
-          <p className="text-sm text-slate-600">
-            Contact your administrator for account access
+          <p className="text-white/90 text-sm">
+            Need help? Contact your administrator
           </p>
         </div>
       </div>
+
+      {/* Add custom animations */}
+      <style>{`
+        @keyframes blob {
+          0%, 100% {
+            transform: translate(0, 0) scale(1);
+          }
+          33% {
+            transform: translate(30px, -50px) scale(1.1);
+          }
+          66% {
+            transform: translate(-20px, 20px) scale(0.9);
+          }
+        }
+        .animate-blob {
+          animation: blob 7s infinite;
+        }
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+        .animation-delay-4000 {
+          animation-delay: 4s;
+        }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+          20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        .animate-shake {
+          animation: shake 0.5s;
+        }
+      `}</style>
     </div>
   );
 }

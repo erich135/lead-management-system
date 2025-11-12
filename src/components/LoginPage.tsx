@@ -76,12 +76,12 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-800 via-slate-700 to-emerald-600 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-ars-primary via-ars-primary to-blue-700 flex items-center justify-center p-4 relative overflow-hidden">
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-emerald-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-teal-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-slate-600 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-ars-secondary rounded-full mix-blend-multiply filter blur-xl opacity-15 animate-blob"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-ars-primary rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-blue-600 rounded-full mix-blend-multiply filter blur-xl opacity-15 animate-blob animation-delay-4000"></div>
       </div>
 
       <div className="w-full max-w-md relative z-10">
@@ -91,18 +91,18 @@ export function LoginPage() {
           <div className="text-center mb-8">
             <div className="flex justify-center mb-6">
               <div className="relative">
-                <div className="w-24 h-24 bg-gradient-to-br from-slate-700 via-emerald-600 to-teal-500 rounded-2xl flex items-center justify-center shadow-xl transform rotate-3 hover:rotate-6 transition-transform duration-300">
-                  <Shield className="w-12 h-12 text-white" />
+                <div className="w-24 h-24 bg-white rounded-2xl flex items-center justify-center shadow-xl transform rotate-3 hover:rotate-6 transition-transform duration-300 p-3">
+                  <img src="/Logo.png" alt="ARS Logo" className="w-full h-full object-contain" />
                 </div>
-                <div className="absolute -top-2 -right-2 w-8 h-8 bg-emerald-400 rounded-full flex items-center justify-center animate-pulse">
-                  <Sparkles className="w-4 h-4 text-slate-800" />
+                <div className="absolute -top-2 -right-2 w-8 h-8 bg-ars-secondary rounded-full flex items-center justify-center animate-pulse">
+                  <Sparkles className="w-4 h-4 text-ars-heading" />
                 </div>
               </div>
             </div>
-            <h1 className="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-slate-800 via-emerald-600 to-teal-500 bg-clip-text text-transparent mb-2">
+            <h1 className="text-4xl md:text-5xl font-extrabold text-ars-heading mb-2">
               ARS Management
             </h1>
-            <p className="text-slate-600 text-lg">Welcome back! Sign in to continue</p>
+            <p className="text-ars-body text-lg">Welcome back! Sign in to continue</p>
           </div>
 
           {/* Error message */}
@@ -139,12 +139,12 @@ export function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Email input */}
             <div className="space-y-2">
-              <label htmlFor="email" className="block text-sm font-semibold text-slate-700">
+              <label htmlFor="email" className="block text-sm font-semibold text-ars-heading">
                 Email Address
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-slate-400" />
+                  <Mail className="h-5 w-5 text-ars-body" />
                 </div>
                 <input
                   id="email"
@@ -153,7 +153,7 @@ export function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   autoComplete="email"
-                  className="w-full pl-12 pr-4 py-3.5 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 bg-slate-50 focus:bg-white"
+                  className="w-full pl-12 pr-4 py-3.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-ars-primary transition-all duration-200 bg-gray-50 focus:bg-white text-ars-heading"
                   placeholder="you@company.com"
                 />
               </div>
@@ -161,12 +161,12 @@ export function LoginPage() {
 
             {/* Password input */}
             <div className="space-y-2">
-              <label htmlFor="password" className="block text-sm font-semibold text-slate-700">
+              <label htmlFor="password" className="block text-sm font-semibold text-ars-heading">
                 Password
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-slate-400" />
+                  <Lock className="h-5 w-5 text-ars-body" />
                 </div>
                 <input
                   id="password"
@@ -175,7 +175,7 @@ export function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
-                  className="w-full pl-12 pr-4 py-3.5 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 bg-slate-50 focus:bg-white"
+                  className="w-full pl-12 pr-4 py-3.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-ars-primary transition-all duration-200 bg-gray-50 focus:bg-white text-ars-heading"
                   placeholder="Enter your password"
                 />
               </div>
@@ -185,7 +185,7 @@ export function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-slate-700 via-emerald-600 to-teal-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2 group hover:from-slate-800 hover:via-emerald-700 hover:to-teal-600"
+              className="w-full bg-ars-primary text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2 group hover:bg-blue-800"
             >
               {loading ? (
                 <>
@@ -202,8 +202,8 @@ export function LoginPage() {
           </form>
 
           {/* Footer note */}
-          <div className="mt-8 pt-6 border-t border-slate-200">
-            <p className="text-center text-sm text-slate-500">
+          <div className="mt-8 pt-6 border-t border-gray-200">
+            <p className="text-center text-sm text-ars-body">
               <Shield className="w-4 h-4 inline-block mr-1" />
               Secure authentication powered by ARS
             </p>

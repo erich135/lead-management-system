@@ -4,8 +4,8 @@
   "description": "ARS Customer Management and Lead Tracking System",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1e293b",
-  "theme_color": "#059669",
+  "background_color": "#FFFFFF",
+  "theme_color": "#0969a9",
   "orientation": "portrait-primary",
   "icons": [
     {

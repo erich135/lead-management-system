@@ -49,17 +49,17 @@ export function MobileNavigation({
                 }}
                 className={`flex flex-col items-center justify-center flex-1 h-full transition-all ${
                   isActive
-                    ? 'text-emerald-600'
-                    : 'text-slate-500'
+                    ? 'text-ars-primary'
+                    : 'text-ars-body'
                 }`}
               >
                 <div className={`relative ${isActive ? 'scale-110' : 'scale-100'} transition-transform`}>
                   <Icon className="w-6 h-6" />
                   {isActive && (
-                    <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-emerald-600 rounded-full"></div>
+                    <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-ars-primary rounded-full"></div>
                   )}
                 </div>
-                <span className={`text-xs mt-1 ${isActive ? 'font-semibold' : 'font-normal'}`}>
+                <span className={`text-xs mt-1 ${isActive ? 'font-semibold text-ars-heading' : 'font-normal'}`}>
                   {item.label}
                 </span>
               </button>
@@ -70,13 +70,13 @@ export function MobileNavigation({
           <button
             onClick={() => setShowMenu(!showMenu)}
             className={`flex flex-col items-center justify-center flex-1 h-full transition-all ${
-              showMenu ? 'text-emerald-600' : 'text-slate-500'
+              showMenu ? 'text-ars-primary' : 'text-ars-body'
             }`}
           >
             <div className="relative">
               <Menu className="w-6 h-6" />
               {(notificationsCount > 0 || showMenu) && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full"></span>
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-ars-secondary rounded-full"></span>
               )}
             </div>
             <span className="text-xs mt-1">More</span>
@@ -97,16 +97,16 @@ export function MobileNavigation({
           <div className="fixed bottom-16 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-50 md:hidden max-h-[70vh] overflow-y-auto animate-slide-up">
             <div className="p-6">
               {/* Drag handle */}
-              <div className="w-12 h-1 bg-slate-300 rounded-full mx-auto mb-6"></div>
+              <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6"></div>
               
               {/* User Info */}
-              <div className="flex items-center gap-4 mb-6 pb-6 border-b border-slate-200">
-                <div className="w-12 h-12 bg-gradient-to-br from-slate-700 via-emerald-600 to-teal-500 rounded-full flex items-center justify-center text-white font-bold">
+              <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-200">
+                <div className="w-12 h-12 bg-ars-primary rounded-full flex items-center justify-center text-white font-bold">
                   {user?.firstName?.[0] || 'U'}
                 </div>
                 <div className="flex-1">
-                  <p className="font-semibold text-slate-900">{user?.fullName || 'User'}</p>
-                  <p className="text-sm text-slate-500 capitalize">{user?.role?.name || 'user'}</p>
+                  <p className="font-semibold text-ars-heading">{user?.fullName || 'User'}</p>
+                  <p className="text-sm text-ars-body capitalize">{user?.role?.name || 'user'}</p>
                 </div>
               </div>
 
@@ -121,8 +121,8 @@ export function MobileNavigation({
                     }}
                     className={`w-full flex items-center gap-4 p-4 rounded-xl transition-all ${
                       currentView === 'users'
-                        ? 'bg-emerald-50 text-emerald-700'
-                        : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                        ? 'bg-ars-secondary/20 text-ars-heading'
+                        : 'bg-gray-50 text-ars-heading hover:bg-gray-100'
                     }`}
                   >
                     <Users className="w-5 h-5" />
@@ -136,12 +136,12 @@ export function MobileNavigation({
                     onNotificationsClick();
                     setShowMenu(false);
                   }}
-                  className="w-full flex items-center gap-4 p-4 rounded-xl bg-slate-50 text-slate-700 hover:bg-slate-100 transition-all"
+                  className="w-full flex items-center gap-4 p-4 rounded-xl bg-gray-50 text-ars-heading hover:bg-gray-100 transition-all"
                 >
                   <div className="relative">
                     <Bell className="w-5 h-5" />
                     {notificationsCount > 0 && (
-                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 text-white text-xs rounded-full flex items-center justify-center">
+                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-ars-secondary text-ars-heading text-xs rounded-full flex items-center justify-center font-bold">
                         {notificationsCount > 9 ? '9+' : notificationsCount}
                       </span>
                     )}

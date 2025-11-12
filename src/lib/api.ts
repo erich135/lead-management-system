@@ -222,11 +222,287 @@ export async function changePassword(
   });
 }
 
+/**
+ * Job-related API functions.
+ */
+
+export interface Job {
+  _id: string;
+  jobNumber: string;
+  status?: {
+    _id: string;
+    name: string;
+    sortOrder: number;
+  };
+  statusNumber?: number;
+  customer?: {
+    _id: string;
+    name: string;
+  };
+  cashCustomer?: string;
+  description?: {
+    _id: string;
+    name: string;
+  };
+  valueExVat?: number;
+  adm?: string;
+  branch: {
+    _id: string;
+    name: string;
+  };
+  techBooked?: {
+    _id: string;
+    name: string;
+  };
+  startDate?: string | Date;
+  dateQuoted?: string | Date;
+  statusChangedAt?: string;
+  followUp1?: { _id: string; name: string };
+  followUp2?: { _id: string; name: string };
+  followUp3?: { _id: string; name: string };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JobStats {
+  totalJobs: number;
+  activeJobs: number;
+  totalValue: number;
+  overdueReminders: number;
+  approachingReminders: number;
+  jobsByStatus: Record<string, number>;
+  jobsByBranch: Record<string, number>;
+}
+
+export interface OverdueJob {
+  jobId: string;
+  jobNumber: string;
+  isOverdue: boolean;
+  isApproaching: boolean;
+  daysOverdue?: number;
+  daysInStatus: number;
+  currentStatus: string;
+  currentStatusNumber: number;
+  expectedNextStatus: string;
+  maxDaysAllowed: number;
+  reminderType: "status_overdue" | "followup_overdue" | "approaching_due";
+  followUpLevel?: number;
+  severity: "critical" | "warning" | "info";
+  job: Job | null;
+}
+
+/**
+ * Gets dashboard statistics.
+ */
+export async function getJobStats(): Promise<JobStats> {
+  return apiRequest<JobStats>('/api/jobs/stats');
+}
+
+/**
+ * Gets overdue and approaching jobs.
+ */
+export async function getOverdueJobs(params?: {
+  branch?: string;
+  severity?: "critical" | "warning" | "info";
+  includeApproaching?: boolean;
+}): Promise<{ jobs: OverdueJob[]; count: number; overdueCount: number; approachingCount: number }> {
+  const queryParams = new URLSearchParams();
+  if (params?.branch) queryParams.append('branch', params.branch);
+  if (params?.severity) queryParams.append('severity', params.severity);
+  if (params?.includeApproaching !== undefined) {
+    queryParams.append('includeApproaching', params.includeApproaching.toString());
+  }
+  
+  const query = queryParams.toString();
+  return apiRequest(`/api/jobs/overdue${query ? `?${query}` : ''}`);
+}
+
+/**
+ * Gets list of jobs with optional filtering.
+ */
+export async function getJobs(params?: {
+  status?: string;
+  branch?: string;
+  customer?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+  startDate?: string;
+  endDate?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  allTime?: string;
+}): Promise<{ jobs: Job[]; pagination: { page: number; limit: number; total: number; pages: number } }> {
+  const queryParams = new URLSearchParams();
+  if (params?.status) queryParams.append('status', params.status);
+  if (params?.branch) queryParams.append('branch', params.branch);
+  if (params?.customer) queryParams.append('customer', params.customer);
+  if (params?.search) queryParams.append('search', params.search);
+  if (params?.page) queryParams.append('page', params.page.toString());
+  if (params?.limit) queryParams.append('limit', params.limit.toString());
+  if (params?.startDate) queryParams.append('startDate', params.startDate);
+  if (params?.endDate) queryParams.append('endDate', params.endDate);
+  if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
+  if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+  if (params?.allTime) queryParams.append('allTime', params.allTime);
+  
+  const query = queryParams.toString();
+  return apiRequest(`/api/jobs${query ? `?${query}` : ''}`);
+}
+
+/**
+ * Gets a single job by ID.
+ */
+export async function getJob(id: string): Promise<{ job: Job; reminder: OverdueJob | null }> {
+  return apiRequest(`/api/jobs/${id}`);
+}
+
+/**
+ * Creates a new job.
+ */
+export async function createJob(jobData: Partial<Job>): Promise<{ job: Job }> {
+  return apiRequest('/api/jobs', {
+    method: 'POST',
+    body: JSON.stringify(jobData),
+  });
+}
+
+/**
+ * Updates a job.
+ */
+export async function updateJob(id: string, jobData: Partial<Job>): Promise<{ job: Job }> {
+  return apiRequest(`/api/jobs/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(jobData),
+  });
+}
+
+/**
+ * Deletes a job (soft delete).
+ */
+export async function deleteJob(id: string): Promise<void> {
+  await apiRequest(`/api/jobs/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Reference data API functions.
+ */
+
+export interface Status {
+  _id: string;
+  name: string;
+  sortOrder: number;
+  description?: string;
+}
+
+export interface Customer {
+  _id: string;
+  name: string;
+}
+
+export interface Branch {
+  _id: string;
+  name: string;
+  code?: string;
+}
+
+export interface ServiceDescription {
+  _id: string;
+  name: string;
+}
+
+export interface RepCode {
+  _id: string;
+  code: string;
+}
+
+export interface Technician {
+  _id: string;
+  name: string;
+}
+
+export interface FollowUpStatus {
+  _id: string;
+  name: string;
+  order: number;
+}
+
+/**
+ * Gets all statuses.
+ */
+export async function getStatuses(): Promise<{ statuses: Status[] }> {
+  return apiRequest('/api/reference/statuses');
+}
+
+/**
+ * Gets all customers.
+ */
+export async function getCustomers(params?: { search?: string; page?: number; limit?: number }): Promise<{ customers: Customer[]; pagination: any }> {
+  const queryParams = new URLSearchParams();
+  if (params?.search) queryParams.append('search', params.search);
+  if (params?.page) queryParams.append('page', params.page.toString());
+  if (params?.limit) queryParams.append('limit', params.limit.toString());
+  
+  const query = queryParams.toString();
+  return apiRequest(`/api/reference/customers${query ? `?${query}` : ''}`);
+}
+
+/**
+ * Gets all branches.
+ */
+export async function getBranches(): Promise<{ branches: Branch[] }> {
+  return apiRequest('/api/reference/branches');
+}
+
+/**
+ * Gets all service descriptions.
+ */
+export async function getServiceDescriptions(): Promise<{ descriptions: ServiceDescription[] }> {
+  return apiRequest('/api/reference/service-descriptions');
+}
+
+/**
+ * Gets all rep codes.
+ */
+export async function getRepCodes(): Promise<{ repCodes: RepCode[] }> {
+  return apiRequest('/api/reference/rep-codes');
+}
+
+/**
+ * Gets all technicians.
+ */
+export async function getTechnicians(): Promise<{ technicians: Technician[] }> {
+  return apiRequest('/api/reference/technicians');
+}
+
+/**
+ * Gets all follow-up statuses.
+ */
+export async function getFollowUpStatuses(): Promise<{ followUpStatuses: FollowUpStatus[] }> {
+  return apiRequest('/api/reference/follow-up-statuses');
+}
+
 export default {
   login,
   logout,
   getCurrentUser,
   changePassword,
+  getJobStats,
+  getOverdueJobs,
+  getJobs,
+  getJob,
+  createJob,
+  updateJob,
+  deleteJob,
+  getStatuses,
+  getCustomers,
+  getBranches,
+  getServiceDescriptions,
+  getRepCodes,
+  getTechnicians,
+  getFollowUpStatuses,
   apiRequest,
 };
 

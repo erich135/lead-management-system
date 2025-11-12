@@ -1,7 +1,7 @@
 import { useState, FormEvent, useEffect, useRef } from 'react';
-import { createJob, getStatuses, getBranches, getCustomers, getTechnicians, getServiceDescriptions, getRepCodes, type Status, type Branch, type Customer, type Technician, type ServiceDescription, type RepCode } from '../lib/api';
+import { createJob, getStatuses, getBranches, getCustomers, createCustomer, getTechnicians, getServiceDescriptions, getRepCodes, type Status, type Branch, type Customer, type Technician, type ServiceDescription, type RepCode } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
-import { X, AlertCircle, Search } from 'lucide-react';
+import { X, AlertCircle, Search, Plus } from 'lucide-react';
 
 interface LeadFormProps {
   statuses: Status[];
@@ -29,6 +29,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const customerDropdownRef = useRef<HTMLDivElement>(null);
   const isSelectingCustomerRef = useRef(false); // Flag to prevent search when selecting
+  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
 
   // Load technicians, service descriptions, and rep codes on mount
   useEffect(() => {
@@ -103,6 +104,31 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
     setCustomerSearchTerm(customer.name);
     setShowCustomerDropdown(false);
     setSearchedCustomers([]); // Clear search results since we've selected
+  }
+
+  /**
+   * Handles creating a new customer on the fly.
+   */
+  async function handleCreateCustomer() {
+    if (!customerSearchTerm || customerSearchTerm.length < 2) {
+      setError('Please enter a customer name (at least 2 characters)');
+      return;
+    }
+
+    try {
+      setIsCreatingCustomer(true);
+      setError('');
+      const response = await createCustomer(customerSearchTerm);
+      const newCustomer = response.customer;
+      
+      // Select the newly created customer
+      handleCustomerSelect(newCustomer);
+      setIsCreatingCustomer(false);
+    } catch (err: any) {
+      console.error('Error creating customer:', err);
+      setError(err.message || 'Failed to create customer');
+      setIsCreatingCustomer(false);
+    }
   }
 
   const [formData, setFormData] = useState(() => {
@@ -273,7 +299,25 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                   )}
                   {customerSearchTerm.length >= 2 && searchedCustomers.length === 0 && showCustomerDropdown && !selectedCustomer && (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-4">
-                      <p className="text-sm text-ars-body">No customers found matching "{customerSearchTerm}"</p>
+                      <p className="text-sm text-ars-body mb-3">No customers found matching "{customerSearchTerm}"</p>
+                      <button
+                        type="button"
+                        onClick={handleCreateCustomer}
+                        disabled={isCreatingCustomer}
+                        className="w-full px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-lg font-medium hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {isCreatingCustomer ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            Creating...
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="w-4 h-4" />
+                            Create "{customerSearchTerm}"
+                          </>
+                        )}
+                      </button>
                     </div>
                   )}
                 </div>

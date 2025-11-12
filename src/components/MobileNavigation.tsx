@@ -1,8 +1,9 @@
-import { LayoutDashboard, FileText, BarChart3, Calendar, Users, Menu, X, Bell, LogOut } from 'lucide-react';
+import { LayoutDashboard, FileText, BarChart3, Calendar, Users, Menu, X, Bell, LogOut, Clock } from 'lucide-react';
 import { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
-type View = 'dashboard' | 'leads' | 'reports' | 'users' | 'diary';
+type View = 'dashboard' | 'leads' | 'reports' | 'admin' | 'diary' | 'activities';
 
 interface MobileNavigationProps {
   currentView: View;
@@ -22,13 +23,27 @@ export function MobileNavigation({
   onNotificationsClick,
 }: MobileNavigationProps) {
   const { user, signOut } = useAuth();
+  const location = useLocation();
   const [showMenu, setShowMenu] = useState(false);
 
+  // Get current view from path
+  const getViewFromPath = (): View => {
+    const path = location.pathname;
+    if (path === '/jobs' || path === '/leads') return 'leads';
+    if (path === '/reports') return 'reports';
+    if (path === '/diary') return 'diary';
+    if (path === '/admin') return 'admin';
+    if (path === '/activities') return 'activities';
+    return 'dashboard';
+  };
+
+  const activeView = getViewFromPath();
+
   const navItems = [
-    { id: 'dashboard' as View, label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'leads' as View, label: 'Leads', icon: FileText },
-    { id: 'reports' as View, label: 'Reports', icon: BarChart3 },
-    { id: 'diary' as View, label: 'Diary', icon: Calendar },
+    { id: 'dashboard' as View, label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+    { id: 'leads' as View, label: 'Jobs', icon: FileText, path: '/jobs' },
+    { id: 'reports' as View, label: 'Reports', icon: BarChart3, path: '/reports' },
+    { id: 'diary' as View, label: 'Diary', icon: Calendar, path: '/diary' },
   ];
 
   return (
@@ -38,15 +53,13 @@ export function MobileNavigation({
         <div className="flex items-center justify-around h-16 px-2">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = currentView === item.id;
+            const isActive = activeView === item.id;
             
             return (
-              <button
+              <Link
                 key={item.id}
-                onClick={() => {
-                  onViewChange(item.id);
-                  setShowMenu(false);
-                }}
+                to={item.path}
+                onClick={() => setShowMenu(false)}
                 className={`flex flex-col items-center justify-center flex-1 h-full transition-all ${
                   isActive
                     ? 'text-ars-primary'
@@ -62,7 +75,7 @@ export function MobileNavigation({
                 <span className={`text-xs mt-1 ${isActive ? 'font-semibold text-ars-heading' : 'font-normal'}`}>
                   {item.label}
                 </span>
-              </button>
+              </Link>
             );
           })}
           
@@ -112,22 +125,34 @@ export function MobileNavigation({
 
               {/* Menu Items */}
               <div className="space-y-2">
-                {/* Users (if admin) */}
-                {user?.isSuperAdmin || user?.role?.name === 'admin' ? (
-                  <button
-                    onClick={() => {
-                      onViewChange('users');
-                      setShowMenu(false);
-                    }}
+                {/* Activities */}
+                <Link
+                  to="/activities"
+                  onClick={() => setShowMenu(false)}
+                  className={`w-full flex items-center gap-4 p-4 rounded-xl transition-all ${
+                    activeView === 'activities'
+                      ? 'bg-ars-secondary/20 text-ars-heading'
+                      : 'bg-gray-50 text-ars-heading hover:bg-gray-100'
+                  }`}
+                >
+                  <Clock className="w-5 h-5" />
+                  <span className="font-medium">Activities</span>
+                </Link>
+
+                {/* System Admin (if super admin) */}
+                {user?.isSuperAdmin ? (
+                  <Link
+                    to="/admin"
+                    onClick={() => setShowMenu(false)}
                     className={`w-full flex items-center gap-4 p-4 rounded-xl transition-all ${
-                      currentView === 'users'
+                      activeView === 'admin'
                         ? 'bg-ars-secondary/20 text-ars-heading'
                         : 'bg-gray-50 text-ars-heading hover:bg-gray-100'
                     }`}
                   >
                     <Users className="w-5 h-5" />
-                    <span className="font-medium">User Management</span>
-                  </button>
+                    <span className="font-medium">System Admin</span>
+                  </Link>
                 ) : null}
 
                 {/* Notifications */}

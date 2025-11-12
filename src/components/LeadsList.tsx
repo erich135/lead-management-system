@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { getJobs, updateJob, getCustomers, getTechnicians, getOverdueJobs, type Job, type Status, type Branch, type Customer, type Technician, type OverdueJob } from '../lib/api';
 import { Search, Filter, Plus, AlertCircle, Calendar, Edit2, Eye, Clock, CheckCircle2, X, Zap, FileText, User, Building2, DollarSign, Wrench, Sparkles, ArrowRight } from 'lucide-react';
+import { LeadDetails } from './LeadDetails';
 
 interface LeadsListProps {
   onLeadClick: (lead: Job) => void;
@@ -30,11 +31,8 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
   });
   const [loading, setLoading] = useState(true);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-  const [viewMode, setViewMode] = useState<'view' | 'edit'>('view');
-  const [editForm, setEditForm] = useState<Partial<Job>>({});
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
-  const [showModal, setShowModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(24); // 24 items per page (good for grid)
   const [isLoadingJobs, setIsLoadingJobs] = useState(false); // Track if we're actively loading jobs
@@ -426,40 +424,16 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
 
   function handleViewJob(job: Job) {
     setSelectedJob(job);
-    setViewMode('view');
-    setShowModal(true);
   }
 
   function handleEditJob(job: Job) {
     setSelectedJob(job);
-    setViewMode('edit');
-    setEditForm({
-      status: job.status?._id,
-      adm: job.adm,
-      customer: job.customer?._id,
-      cashCustomer: job.cashCustomer,
-      branch: job.branch?._id,
-      valueExVat: job.valueExVat,
-      techBooked: job.techBooked?._id,
-      description: job.description?._id,
-      startDate: job.startDate,
-      dateQuoted: job.dateQuoted,
-    });
-    setShowModal(true);
   }
 
-  async function handleSaveEdit() {
-    if (!selectedJob) return;
-
-    try {
-      await updateJob(selectedJob._id, editForm);
-      await loadOverdueJobsList();
-      setShowModal(false);
-      setSelectedJob(null);
-      setEditForm({});
-    } catch (error) {
-      console.error('Error updating job:', error);
-      alert('Failed to update job. Please try again.');
+  async function handleJobUpdate() {
+    await loadOverdueJobsList();
+    if (priorityFilter.all) {
+      await loadAllJobs();
     }
   }
 
@@ -951,257 +925,16 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
         <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
       </button>
 
-      {/* View/Edit Modal */}
-      {showModal && selectedJob && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            {viewMode === 'view' ? (
-              <>
-                <div className="sticky top-0 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white p-6 rounded-t-2xl">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-2xl font-bold mb-1">{selectedJob.jobNumber}</h3>
-                      <p className="text-white/90 text-sm">Job Details</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          setViewMode('edit');
-                          setEditForm({
-                            status: selectedJob.status?._id,
-                            adm: selectedJob.adm,
-                            customer: selectedJob.customer?._id,
-                            cashCustomer: selectedJob.cashCustomer,
-                            branch: selectedJob.branch?._id,
-                            valueExVat: selectedJob.valueExVat,
-                            techBooked: selectedJob.techBooked?._id,
-                            description: selectedJob.description?._id,
-                            startDate: selectedJob.startDate,
-                            dateQuoted: selectedJob.dateQuoted,
-                          });
-                        }}
-                        className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-all flex items-center gap-2"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => setShowModal(false)}
-                        className="p-2 hover:bg-white/20 rounded-lg transition-all"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-6 space-y-6">
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Status</label>
-                      <div className={`px-4 py-3 rounded-xl ${getStatusColor(selectedJob.status?.name)}`}>
-                        <span className={`font-medium ${getStatusTextColor(selectedJob.status?.name)}`}>
-                          {selectedJob.status?.name || 'No Status'}
-                        </span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Branch</label>
-                      <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                        <span className="text-ars-heading">{selectedJob.branch?.name || '-'}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Customer</label>
-                      <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                        <span className="text-ars-heading">{selectedJob.customer?.name || selectedJob.cashCustomer || '-'}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Admin (ADM)</label>
-                      <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                        <span className="text-ars-heading">{selectedJob.adm || '-'}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Value (ex VAT)</label>
-                      <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                        <span className="text-ars-heading font-medium">{formatCurrency(selectedJob.valueExVat)}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Technician</label>
-                      <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                        <span className="text-ars-heading">{selectedJob.techBooked?.name || '-'}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Start Date</label>
-                      <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                        <span className="text-ars-heading">{formatDate(selectedJob.startDate)}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Date Quoted</label>
-                      <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                        <span className="text-ars-heading">{formatDate(selectedJob.dateQuoted)}</span>
-                      </div>
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Description</label>
-                      <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                        <span className="text-ars-heading">{selectedJob.description?.name || '-'}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="sticky top-0 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white p-6 rounded-t-2xl">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-2xl font-bold mb-1">Edit: {selectedJob.jobNumber}</h3>
-                      <p className="text-white/90 text-sm">Update job details</p>
-                    </div>
-                    <button
-                      onClick={() => setShowModal(false)}
-                      className="p-2 hover:bg-white/20 rounded-lg transition-all"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-                <div className="p-6 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Status</label>
-                      <select
-                        value={editForm.status as string || ''}
-                        onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                      >
-                        <option value="">Select Status</option>
-                        {statuses.map((status) => (
-                          <option key={status._id} value={status._id}>
-                            {status.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Admin (ADM)</label>
-                      <input
-                        type="text"
-                        value={editForm.adm || ''}
-                        onChange={(e) => setEditForm({ ...editForm, adm: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                        placeholder="e.g., AS, ER, HT"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Customer</label>
-                      <select
-                        value={editForm.customer as string || ''}
-                        onChange={(e) => setEditForm({ ...editForm, customer: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                      >
-                        <option value="">Select Customer</option>
-                        {customers.map((customer) => (
-                          <option key={customer._id} value={customer._id}>
-                            {customer.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Cash Customer</label>
-                      <input
-                        type="text"
-                        value={editForm.cashCustomer || ''}
-                        onChange={(e) => setEditForm({ ...editForm, cashCustomer: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Branch</label>
-                      <select
-                        value={editForm.branch as string || ''}
-                        onChange={(e) => setEditForm({ ...editForm, branch: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                      >
-                        <option value="">Select Branch</option>
-                        {branches.map((branch) => (
-                          <option key={branch._id} value={branch._id}>
-                            {branch.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Value (ex VAT)</label>
-                      <input
-                        type="number"
-                        value={editForm.valueExVat || ''}
-                        onChange={(e) => setEditForm({ ...editForm, valueExVat: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Technician</label>
-                      <select
-                        value={editForm.techBooked as string || ''}
-                        onChange={(e) => setEditForm({ ...editForm, techBooked: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                      >
-                        <option value="">Select Technician</option>
-                        {technicians.map((tech) => (
-                          <option key={tech._id} value={tech._id}>
-                            {tech.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Start Date</label>
-                      <input
-                        type="date"
-                        value={editForm.startDate ? (typeof editForm.startDate === 'string' ? editForm.startDate.split('T')[0] : new Date(editForm.startDate).toISOString().split('T')[0]) : ''}
-                        onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Date Quoted</label>
-                      <input
-                        type="date"
-                        value={editForm.dateQuoted ? (typeof editForm.dateQuoted === 'string' ? editForm.dateQuoted.split('T')[0] : new Date(editForm.dateQuoted).toISOString().split('T')[0]) : ''}
-                        onChange={(e) => setEditForm({ ...editForm, dateQuoted: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 pt-4 border-t border-gray-200">
-                    <button
-                      onClick={handleSaveEdit}
-                      className="flex-1 px-6 py-3 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-                    >
-                      Save Changes
-                    </button>
-                    <button
-                      onClick={() => {
-                        setViewMode('view');
-                        setEditForm({});
-                      }}
-                      className="px-6 py-3 border border-gray-300 rounded-xl font-medium text-ars-body hover:bg-gray-50 transition-all"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+      {/* Job Details Modal */}
+      {selectedJob && (
+        <LeadDetails
+          lead={selectedJob}
+          statuses={statuses}
+          branches={branches}
+          adminCodes={adminCodes}
+          onClose={() => setSelectedJob(null)}
+          onUpdate={handleJobUpdate}
+        />
       )}
 
       {/* CSS Animation */}

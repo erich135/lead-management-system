@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   getJobStats,
@@ -6,6 +7,7 @@ import {
   getStatuses,
   getBranches,
   getCustomers,
+  logViewActivity,
   type JobStats,
   type OverdueJob,
   type Status,
@@ -14,7 +16,6 @@ import {
 } from '../lib/api';
 import {
   LogOut,
-  Users,
   Bell,
   LayoutDashboard,
   FileText,
@@ -29,22 +30,55 @@ import {
   ArrowRight,
   Sparkles,
   Zap,
+  Shield,
 } from 'lucide-react';
 import { LeadsList } from './LeadsList';
 import { LeadForm } from './LeadForm';
 import { LeadDetails } from './LeadDetails';
-import { UserManagement } from './UserManagement';
+import { SystemManagement } from './SystemManagement';
 import { Reports } from './Reports';
 import { Diary } from './Diary';
+import { Activities } from './Activities';
 import { MobileNavigation } from './MobileNavigation';
 import { useIsMobile } from '../hooks/useIsMobile';
 
-type View = 'dashboard' | 'leads' | 'reports' | 'users' | 'diary';
+type View = 'dashboard' | 'leads' | 'reports' | 'admin' | 'diary' | 'activities';
 
-export function Dashboard() {
-  const { user, signOut, isAdmin } = useAuth();
+interface DashboardProps {
+  view?: View;
+}
+
+export function Dashboard({ view: initialView }: DashboardProps = {}) {
+  const { user, signOut, isSuperAdmin } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const isMobile = useIsMobile();
-  const [view, setView] = useState<View>('dashboard');
+  
+  // Determine current view from URL path
+  const getViewFromPath = (path: string): View => {
+    if (path === '/jobs' || path === '/leads') return 'leads';
+    if (path === '/reports') return 'reports';
+    if (path === '/diary') return 'diary';
+    if (path === '/admin') return 'admin';
+    if (path === '/activities') return 'activities';
+    return 'dashboard';
+  };
+  
+  // Always derive view from current location to avoid sync issues
+  const view = initialView || getViewFromPath(location.pathname);
+  
+  // Navigation helper
+  const navigateToView = (newView: View) => {
+    const routes: Record<View, string> = {
+      dashboard: '/dashboard',
+      leads: '/jobs',
+      reports: '/reports',
+      diary: '/diary',
+      admin: '/admin',
+      activities: '/activities',
+    };
+    navigate(routes[newView]);
+  };
   const [stats, setStats] = useState<JobStats | null>(null);
   const [overdueJobs, setOverdueJobs] = useState<OverdueJob[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,6 +94,23 @@ export function Dashboard() {
   useEffect(() => {
     loadInitialData();
   }, []);
+
+  // Log page view activities
+  useEffect(() => {
+    if (view === 'dashboard') {
+      logViewActivity('view', 'Page', 'Viewed dashboard page');
+    } else if (view === 'leads') {
+      logViewActivity('view', 'Page', 'Viewed jobs page');
+    } else if (view === 'reports') {
+      logViewActivity('view', 'Page', 'Viewed reports page');
+    } else if (view === 'diary') {
+      logViewActivity('view', 'Page', 'Viewed diary page');
+    } else if (view === 'activities') {
+      logViewActivity('view', 'Page', 'Viewed activities page');
+    } else if (view === 'admin') {
+      logViewActivity('view', 'Page', 'Viewed system admin page');
+    }
+  }, [view]);
 
   async function loadInitialData() {
     setLoading(true);
@@ -201,8 +252,8 @@ export function Dashboard() {
 
               {/* Navigation Pills */}
               <div className="hidden md:flex gap-2 bg-white/10 backdrop-blur-sm rounded-xl p-1.5 border border-white/20">
-                <button
-                  onClick={() => setView('dashboard')}
+                <Link
+                  to="/dashboard"
                   className={`group relative px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
                     view === 'dashboard'
                       ? 'bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] shadow-lg scale-105'
@@ -214,9 +265,9 @@ export function Dashboard() {
                   {view === 'dashboard' && (
                     <div className="absolute inset-0 bg-white/20 rounded-lg animate-pulse"></div>
                   )}
-                </button>
-                <button
-                  onClick={() => setView('leads')}
+                </Link>
+                <Link
+                  to="/jobs"
                   className={`group relative px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
                     view === 'leads'
                       ? 'bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] shadow-lg scale-105'
@@ -228,9 +279,9 @@ export function Dashboard() {
                   {view === 'leads' && (
                     <div className="absolute inset-0 bg-white/20 rounded-lg animate-pulse"></div>
                   )}
-                </button>
-                <button
-                  onClick={() => setView('reports')}
+                </Link>
+                <Link
+                  to="/reports"
                   className={`group relative px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
                     view === 'reports'
                       ? 'bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] shadow-lg scale-105'
@@ -242,9 +293,9 @@ export function Dashboard() {
                   {view === 'reports' && (
                     <div className="absolute inset-0 bg-white/20 rounded-lg animate-pulse"></div>
                   )}
-                </button>
-                <button
-                  onClick={() => setView('diary')}
+                </Link>
+                <Link
+                  to="/diary"
                   className={`group relative px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
                     view === 'diary'
                       ? 'bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] shadow-lg scale-105'
@@ -256,22 +307,36 @@ export function Dashboard() {
                   {view === 'diary' && (
                     <div className="absolute inset-0 bg-white/20 rounded-lg animate-pulse"></div>
                   )}
-                </button>
-                {isAdmin && (
-                  <button
-                    onClick={() => setView('users')}
+                </Link>
+                <Link
+                  to="/activities"
+                  className={`group relative px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
+                    view === 'activities'
+                      ? 'bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] shadow-lg scale-105'
+                      : 'text-white/80 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <Clock className={`w-4 h-4 transition-transform ${view === 'activities' ? 'scale-110' : ''}`} />
+                  <span>Activities</span>
+                  {view === 'activities' && (
+                    <div className="absolute inset-0 bg-white/20 rounded-lg animate-pulse"></div>
+                  )}
+                </Link>
+                {isSuperAdmin && (
+                  <Link
+                    to="/admin"
                     className={`group relative px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
-                      view === 'users'
+                      view === 'admin'
                         ? 'bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] shadow-lg scale-105'
                         : 'text-white/80 hover:text-white hover:bg-white/10'
                     }`}
                   >
-                    <Users className={`w-4 h-4 transition-transform ${view === 'users' ? 'scale-110' : ''}`} />
-                    <span>Users</span>
-                    {view === 'users' && (
+                    <Shield className={`w-4 h-4 transition-transform ${view === 'admin' ? 'scale-110' : ''}`} />
+                    <span>System Admin</span>
+                    {view === 'admin' && (
                       <div className="absolute inset-0 bg-white/20 rounded-lg animate-pulse"></div>
                     )}
-                  </button>
+                  </Link>
                 )}
               </div>
             </div>
@@ -328,7 +393,7 @@ export function Dashboard() {
                             onClick={() => {
                               if (overdue.job) {
                                 setSelectedLead(overdue.job);
-                                setView('leads');
+                                navigateToView('leads');
                                 setShowNotifications(false);
                               }
                             }}
@@ -477,7 +542,7 @@ export function Dashboard() {
                   onClick={() => {
                     if (overdue.job) {
                       setSelectedLead(overdue.job);
-                      setView('leads');
+                      navigateToView('leads');
                       setShowNotifications(false);
                     }
                   }}
@@ -531,15 +596,6 @@ export function Dashboard() {
       )}
 
       <main className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${isMobile ? 'pt-4' : ''}`}>
-        {loading && (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ars-primary mx-auto mb-4"></div>
-              <p className="text-ars-body">Loading dashboard...</p>
-            </div>
-          </div>
-        )}
-
         {error && (
           <div className="mb-6 p-4 bg-red-50 border-2 border-red-300 rounded-xl">
             <p className="text-red-800 font-medium">Error: {error}</p>
@@ -549,6 +605,15 @@ export function Dashboard() {
             >
               Retry
             </button>
+          </div>
+        )}
+
+        {view === 'dashboard' && loading && (
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ars-primary mx-auto mb-4"></div>
+              <p className="text-ars-body">Loading dashboard...</p>
+            </div>
           </div>
         )}
 
@@ -585,7 +650,7 @@ export function Dashboard() {
 
                 {/* Quick Stats Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => setView('leads')}>
+                  <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('leads')}>
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-white/80 text-xs font-medium">Total Jobs</p>
                       <FileText className="w-4 h-4 text-white/60" />
@@ -593,7 +658,7 @@ export function Dashboard() {
                     <p className="text-2xl font-bold">{stats.totalJobs}</p>
                   </div>
 
-                  <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => setView('leads')}>
+                  <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('leads')}>
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-white/80 text-xs font-medium">Active</p>
                       <TrendingUp className="w-4 h-4 text-[#f7c12b]" />
@@ -628,7 +693,7 @@ export function Dashboard() {
                     )}
                   </div>
 
-                  <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => setView('reports')}>
+                  <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('reports')}>
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-white/80 text-xs font-medium">Total Value</p>
                       <Banknote className="w-4 h-4 text-[#f7c12b]" />
@@ -644,7 +709,10 @@ export function Dashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-ars-heading mb-1">Filter by Priority</h3>
-                  <p className="text-xs text-ars-body">Show jobs that need attention based on how overdue they are</p>
+                  <p className="text-xs text-ars-body">
+                    Show jobs that need attention based on how overdue they are. 
+                    Reminders are calculated from the date the status was last changed (or when follow-up was set).
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-2 overflow-x-auto pb-2">
@@ -727,6 +795,7 @@ export function Dashboard() {
                 <>
                   {overdueJobs
                     .filter(job => selectedPriority === 'all' || job.severity === selectedPriority)
+                    .slice(0, 5)
                     .map((overdue, index) => (
                       <div
                         key={overdue.jobId}
@@ -740,7 +809,7 @@ export function Dashboard() {
                         onClick={() => {
                           if (overdue.job) {
                             setSelectedLead(overdue.job);
-                            setView('leads');
+                            navigateToView('leads');
                           }
                         }}
                         style={{
@@ -840,6 +909,22 @@ export function Dashboard() {
                         </div>
                       </div>
                     ))}
+                  {/* Show "more" link if there are more than 5 jobs */}
+                  {overdueJobs.filter(job => selectedPriority === 'all' || job.severity === selectedPriority).length > 5 && (
+                    <div className="mt-6 text-center">
+                      <button
+                        onClick={() => navigateToView('leads')}
+                        className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300 hover:scale-105"
+                      >
+                        <FileText className="w-5 h-5" />
+                        View All {overdueJobs.filter(job => selectedPriority === 'all' || job.severity === selectedPriority).length - 5} More Jobs
+                        <ArrowRight className="w-5 h-5" />
+                      </button>
+                      <p className="mt-2 text-sm text-ars-body">
+                        Showing 5 of {overdueJobs.filter(job => selectedPriority === 'all' || job.severity === selectedPriority).length} jobs that need attention
+                      </p>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -880,11 +965,12 @@ export function Dashboard() {
           <Diary />
         )}
 
-        {view === 'users' && isAdmin && (
-          <UserManagement
-            branches={branches}
-            onUpdate={() => {}}
-          />
+        {view === 'admin' && isSuperAdmin && (
+          <SystemManagement />
+        )}
+
+        {view === 'activities' && (
+          <Activities />
         )}
       </main>
 
@@ -903,6 +989,7 @@ export function Dashboard() {
           lead={selectedLead}
           statuses={statuses}
           branches={branches}
+          adminCodes={Array.from(new Set(overdueJobs.map(j => j.job?.adm).filter(Boolean))).sort() as string[]}
           onClose={() => setSelectedLead(null)}
           onUpdate={() => {
             loadStats();
@@ -915,7 +1002,7 @@ export function Dashboard() {
       {isMobile && (
         <MobileNavigation
           currentView={view}
-          onViewChange={setView}
+          onViewChange={navigateToView}
           notificationsCount={stats ? stats.overdueReminders + stats.approachingReminders : 0}
           onNotificationsClick={() => setShowNotifications(!showNotifications)}
         />

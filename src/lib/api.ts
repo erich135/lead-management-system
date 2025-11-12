@@ -246,20 +246,36 @@ export interface Job {
   };
   valueExVat?: number;
   adm?: string;
-  branch: {
+  repCode?: {
+    _id: string;
+    code: string;
+    description?: string;
+  };
+  registerDate?: string | Date;
+  techBooked?: {
     _id: string;
     name: string;
   };
-  techBooked?: {
+  dateBooked?: string | Date;
+  rsrNumber?: string;
+  feedback?: string;
+  followUp1?: { _id: string; name: string };
+  followUp2?: { _id: string; name: string };
+  followUp3?: { _id: string; name: string };
+  followUp4?: { _id: string; name: string };
+  poDate?: string | Date;
+  poNumber?: string;
+  oilSampleNumber?: string;
+  storePack?: string;
+  invoiceDate?: string | Date;
+  invNumber?: string;
+  branch: {
     _id: string;
     name: string;
   };
   startDate?: string | Date;
   dateQuoted?: string | Date;
   statusChangedAt?: string;
-  followUp1?: { _id: string; name: string };
-  followUp2?: { _id: string; name: string };
-  followUp3?: { _id: string; name: string };
   createdAt: string;
   updatedAt: string;
 }
@@ -416,6 +432,11 @@ export interface ServiceDescription {
 export interface RepCode {
   _id: string;
   code: string;
+  description?: string;
+  isActive: boolean;
+  dbStatus?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Technician {
@@ -450,6 +471,16 @@ export async function getCustomers(params?: { search?: string; page?: number; li
 }
 
 /**
+ * Creates a new customer.
+ */
+export async function createCustomer(name: string): Promise<{ customer: Customer }> {
+  return apiRequest('/api/reference/customers', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+}
+
+/**
  * Gets all branches.
  */
 export async function getBranches(): Promise<{ branches: Branch[] }> {
@@ -471,6 +502,38 @@ export async function getRepCodes(): Promise<{ repCodes: RepCode[] }> {
 }
 
 /**
+ * Creates a new rep code.
+ */
+export async function createRepCode(repCodeData: {
+  code: string;
+  description?: string;
+}): Promise<{ repCode: RepCode }> {
+  return apiRequest('/api/reference/rep-codes', {
+    method: 'POST',
+    body: JSON.stringify(repCodeData),
+  });
+}
+
+/**
+ * Updates a rep code.
+ */
+export async function updateRepCode(id: string, repCodeData: Partial<RepCode>): Promise<{ repCode: RepCode }> {
+  return apiRequest(`/api/reference/rep-codes/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(repCodeData),
+  });
+}
+
+/**
+ * Deletes a rep code.
+ */
+export async function deleteRepCode(id: string): Promise<void> {
+  await apiRequest(`/api/reference/rep-codes/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
  * Gets all technicians.
  */
 export async function getTechnicians(): Promise<{ technicians: Technician[] }> {
@@ -482,6 +545,435 @@ export async function getTechnicians(): Promise<{ technicians: Technician[] }> {
  */
 export async function getFollowUpStatuses(): Promise<{ followUpStatuses: FollowUpStatus[] }> {
   return apiRequest('/api/reference/follow-up-statuses');
+}
+
+/**
+ * User Management API functions.
+ */
+
+export interface User {
+  _id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: {
+    _id: string;
+    name: string;
+    description?: string;
+    isActive: boolean;
+  };
+  permissions: string[];
+  isActive: boolean;
+  isSuperAdmin?: boolean;
+  passwordSet?: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastLogin?: string;
+}
+
+export interface Role {
+  _id: string;
+  name: string;
+  description?: string;
+  permissions: string[];
+  isActive: boolean;
+}
+
+export interface Permission {
+  _id: string;
+  name: string;
+  resource: string;
+  action: string;
+  description: string;
+  category?: string;
+  isActive: boolean;
+}
+
+/**
+ * Gets all users with pagination and search.
+ */
+export async function getUsers(params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+}): Promise<{ users: User[]; pagination: { page: number; limit: number; total: number; pages: number } }> {
+  const queryParams = new URLSearchParams();
+  if (params?.page) queryParams.append('page', params.page.toString());
+  if (params?.limit) queryParams.append('limit', params.limit.toString());
+  if (params?.search) queryParams.append('search', params.search);
+  
+  const query = queryParams.toString();
+  return apiRequest(`/api/users${query ? `?${query}` : ''}`);
+}
+
+/**
+ * Gets a single user by ID.
+ */
+export async function getUser(id: string): Promise<{ user: User }> {
+  return apiRequest(`/api/users/${id}`);
+}
+
+/**
+ * Creates a new user.
+ */
+export async function createUser(userData: {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  permissions?: string[];
+}): Promise<{ user: User }> {
+  return apiRequest('/api/users', {
+    method: 'POST',
+    body: JSON.stringify(userData),
+  });
+}
+
+/**
+ * Invites a user (creates user without password, sends invitation email).
+ */
+export async function inviteUser(userData: {
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  permissions?: string[];
+}): Promise<{ user: User }> {
+  return apiRequest('/api/users/invite', {
+    method: 'POST',
+    body: JSON.stringify(userData),
+  });
+}
+
+/**
+ * Updates a user.
+ */
+export async function updateUser(id: string, userData: Partial<User>): Promise<{ user: User }> {
+  return apiRequest(`/api/users/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(userData),
+  });
+}
+
+/**
+ * Deletes a user (soft delete).
+ */
+export async function deleteUser(id: string): Promise<void> {
+  await apiRequest(`/api/users/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Updates user permissions.
+ */
+export async function updateUserPermissions(id: string, permissions: string[]): Promise<{ user: User }> {
+  return apiRequest(`/api/users/${id}/permissions`, {
+    method: 'PUT',
+    body: JSON.stringify({ permissions }),
+  });
+}
+
+/**
+ * Resends invitation email to a user.
+ */
+export async function resendInvitation(userId: string): Promise<{ message: string }> {
+  return apiRequest(`/api/users/${userId}/resend-invitation`, {
+    method: 'POST',
+  });
+}
+
+/**
+ * Gets all roles.
+ */
+export async function getRoles(): Promise<{ roles: Role[]; count: number }> {
+  return apiRequest('/api/roles');
+}
+
+/**
+ * Gets a single role by ID.
+ */
+export async function getRole(id: string): Promise<{ role: Role }> {
+  return apiRequest(`/api/roles/${id}`);
+}
+
+/**
+ * Creates a new role.
+ */
+export async function createRole(roleData: {
+  name: string;
+  description?: string;
+  permissions?: string[];
+}): Promise<{ role: Role }> {
+  return apiRequest('/api/roles', {
+    method: 'POST',
+    body: JSON.stringify(roleData),
+  });
+}
+
+/**
+ * Updates a role.
+ */
+export async function updateRole(id: string, roleData: Partial<Role>): Promise<{ role: Role }> {
+  return apiRequest(`/api/roles/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(roleData),
+  });
+}
+
+/**
+ * Deletes a role.
+ */
+export async function deleteRole(id: string): Promise<void> {
+  await apiRequest(`/api/roles/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Updates role permissions.
+ */
+export async function updateRolePermissions(id: string, permissions: string[]): Promise<{ role: Role }> {
+  return apiRequest(`/api/roles/${id}/permissions`, {
+    method: 'PUT',
+    body: JSON.stringify({ permissions }),
+  });
+}
+
+/**
+ * Gets all permissions (catalog).
+ */
+export async function getPermissions(params?: {
+  category?: string;
+  resource?: string;
+  isActive?: boolean;
+}): Promise<{ permissions: Permission[]; count: number }> {
+  const queryParams = new URLSearchParams();
+  if (params?.category) queryParams.append('category', params.category);
+  if (params?.resource) queryParams.append('resource', params.resource);
+  if (params?.isActive !== undefined) queryParams.append('isActive', params.isActive.toString());
+  
+  const query = queryParams.toString();
+  return apiRequest(`/api/permissions${query ? `?${query}` : ''}`);
+}
+
+/**
+ * Import Management API functions.
+ */
+
+export interface ImportResult {
+  imported: number;
+  updated: number;
+  errors: string[];
+}
+
+export interface ImportHistory {
+  jobs: {
+    total: number;
+    lastImported: string | null;
+  };
+  customers: {
+    total: number;
+    lastImported: string | null;
+  };
+}
+
+/**
+ * Gets import history/statistics.
+ */
+export async function getImportHistory(): Promise<{ data: ImportHistory }> {
+  return apiRequest('/api/import/history');
+}
+
+/**
+ * Imports jobs from CSV file.
+ */
+export async function importJobs(file: File, clearExisting: boolean): Promise<{ message: string; data: ImportResult }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('clearExisting', clearExisting.toString());
+
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/import/jobs`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Failed to import jobs' } }));
+    throw new Error(error.error?.message || 'Failed to import jobs');
+  }
+
+  return response.json();
+}
+
+/**
+ * Imports customers from CSV file.
+ */
+export async function importCustomers(file: File, clearExisting: boolean): Promise<{ message: string; data: ImportResult }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('clearExisting', clearExisting.toString());
+
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/import/customers`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Failed to import customers' } }));
+    throw new Error(error.error?.message || 'Failed to import customers');
+  }
+
+  return response.json();
+}
+
+/**
+ * Downloads an example CSV file.
+ */
+export async function downloadExampleCSV(type: 'jobs' | 'customers'): Promise<void> {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/import/example/${type}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to download example file');
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${type}-example.csv`;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}
+
+/**
+ * Activity Management API functions.
+ */
+
+export interface Activity {
+  _id: string;
+  userId?: {
+    _id: string;
+    firstName?: string;
+    lastName?: string;
+    email: string;
+  };
+  action: string;
+  resourceType: string;
+  resourceId?: string;
+  description: string;
+  metadata?: Record<string, any>;
+  ipAddress?: string;
+  userAgent?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ActivityPagination {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
+export interface ActivitiesResponse {
+  activities: Activity[];
+  pagination: ActivityPagination;
+}
+
+/**
+ * Gets activities with optional filtering.
+ */
+export async function getActivities(params?: {
+  userId?: string;
+  action?: string;
+  resourceType?: string;
+  resourceId?: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}): Promise<ActivitiesResponse> {
+  const queryParams = new URLSearchParams();
+  if (params?.userId) queryParams.append('userId', params.userId);
+  if (params?.action) queryParams.append('action', params.action);
+  if (params?.resourceType) queryParams.append('resourceType', params.resourceType);
+  if (params?.resourceId) queryParams.append('resourceId', params.resourceId);
+  if (params?.startDate) queryParams.append('startDate', params.startDate);
+  if (params?.endDate) queryParams.append('endDate', params.endDate);
+  if (params?.page) queryParams.append('page', params.page.toString());
+  if (params?.limit) queryParams.append('limit', params.limit.toString());
+  if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
+  if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+  
+  const query = queryParams.toString();
+  return apiRequest<ActivitiesResponse>(`/api/activities${query ? `?${query}` : ''}`);
+}
+
+/**
+ * Gets a single activity by ID.
+ */
+export async function getActivity(id: string): Promise<{ activity: Activity }> {
+  return apiRequest<{ activity: Activity }>(`/api/activities/${id}`);
+}
+
+/**
+ * Logs a view activity from the frontend.
+ * This is a helper function to log page views and other view actions.
+ */
+export async function logViewActivity(
+  action: string,
+  resourceType: string,
+  description: string,
+  resourceId?: string,
+  metadata?: Record<string, any>
+): Promise<void> {
+  try {
+    await apiRequest('/api/activities/log', {
+      method: 'POST',
+      body: JSON.stringify({
+        action,
+        resourceType,
+        resourceId,
+        description,
+        metadata,
+      }),
+    });
+  } catch (error) {
+    // Silently fail - activity logging should not break the app
+    console.error('Failed to log view activity:', error);
+  }
 }
 
 export default {

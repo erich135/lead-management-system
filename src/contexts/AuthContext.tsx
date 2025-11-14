@@ -1,137 +1,152 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
-import { Profile } from '../types';
+import { BackendUser, login, logout, getCurrentUser, getAuthToken } from '../lib/api';
+
+/**
+ * Frontend user type derived from backend user.
+ */
+export interface FrontendUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  role: {
+    id: string;
+    name: string;
+    description?: string;
+    isActive: boolean;
+  };
+  permissions: string[];
+  isActive: boolean;
+  isSuperAdmin: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastLogin?: string;
+}
 
 interface AuthContextType {
-  user: User | null;
-  profile: Profile | null;
+  user: FrontendUser | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, fullName: string, role: string, branchId: string | null) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   isAdmin: boolean;
+  isSuperAdmin: boolean;
+  hasPermission: (permission: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/**
+ * Converts backend user to frontend user format.
+ * 
+ * @param backendUser - User data from backend API
+ * @returns {FrontendUser} Formatted user object
+ */
+function transformUser(backendUser: BackendUser): FrontendUser {
+  return {
+    id: backendUser._id,
+    email: backendUser.email,
+    firstName: backendUser.firstName,
+    lastName: backendUser.lastName,
+    fullName: `${backendUser.firstName} ${backendUser.lastName}`,
+    role: {
+      id: backendUser.role._id,
+      name: backendUser.role.name,
+      description: backendUser.role.description,
+      isActive: backendUser.role.isActive,
+    },
+    permissions: backendUser.permissions || [],
+    isActive: backendUser.isActive,
+    isSuperAdmin: backendUser.isSuperAdmin || backendUser.role.name === 'super_admin',
+    createdAt: backendUser.createdAt,
+    updatedAt: backendUser.updatedAt,
+    lastLogin: backendUser.lastLogin,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [user, setUser] = useState<FrontendUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        loadProfile(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
+  /**
+   * Loads the current user from the API using stored token.
+   */
+  async function loadUser() {
+    const token = getAuthToken();
+    if (!token) {
+      setLoading(false);
+      return;
+    }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      (async () => {
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await loadProfile(session.user.id);
-        } else {
-          setProfile(null);
-          setLoading(false);
-        }
-      })();
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  async function loadProfile(userId: string) {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*, branch:branches(*)')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (error) throw error;
-      setProfile(data);
+      const backendUser = await getCurrentUser();
+      setUser(transformUser(backendUser));
     } catch (error) {
-      console.error('Error loading profile:', error);
+      // Token might be invalid, clear it
+      console.error('Error loading user:', error);
+      setUser(null);
     } finally {
       setLoading(false);
     }
   }
 
+  useEffect(() => {
+    loadUser();
+  }, []);
+
+  /**
+   * Signs in a user with email and password.
+   * 
+   * @param email - User email
+   * @param password - User password
+   * @returns {Promise<{ error: Error | null }>} Error object if login fails
+   */
   async function signIn(email: string, password: string) {
     try {
-      // Demo mode - accept demo credentials
-      if (email === 'admin@demo.com' && password === 'demo123') {
-        const demoUser = { id: 'demo-user-1', email: 'admin@demo.com' } as User;
-        const demoProfile: Profile = {
-          id: 'demo-user-1',
-          full_name: 'Demo Admin',
-          email: 'admin@demo.com',
-          role: 'admin',
-          branch_id: null,
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        setUser(demoUser);
-        setProfile(demoProfile);
-        setLoading(false);
-        return { error: null };
-      }
-      
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      return { error };
-    } catch (error) {
-      return { error: error as Error };
-    }
-  }
-
-  async function signUp(email: string, password: string, fullName: string, role: string, branchId: string | null) {
-    try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      if (authError) return { error: authError };
-
-      if (authData.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: authData.user.id,
-            email,
-            full_name: fullName,
-            role,
-            branch_id: branchId,
-          });
-
-        if (profileError) return { error: profileError };
-      }
-
+      setLoading(true);
+      const response = await login({ email, password });
+      setUser(transformUser(response.user));
       return { error: null };
     } catch (error) {
       return { error: error as Error };
+    } finally {
+      setLoading(false);
     }
   }
 
+  /**
+   * Signs out the current user.
+   */
   async function signOut() {
-    await supabase.auth.signOut();
-    setProfile(null);
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setUser(null);
+    }
   }
 
-  const value = {
+  /**
+   * Checks if the current user has a specific permission.
+   * 
+   * @param permission - Permission name (e.g., 'users.read')
+   * @returns {boolean} True if user has the permission
+   */
+  function hasPermission(permission: string): boolean {
+    if (!user) return false;
+    if (user.isSuperAdmin) return true;
+    return user.permissions.includes(permission);
+  }
+
+  const value: AuthContextType = {
     user,
-    profile,
     loading,
     signIn,
-    signUp,
     signOut,
-    isAdmin: profile?.role === 'admin',
+    isAdmin: user?.role.name === 'admin' || user?.isSuperAdmin || false,
+    isSuperAdmin: user?.isSuperAdmin || false,
+    hasPermission,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,7 +1,6 @@
-import { useState, useEffect, FormEvent } from 'react';
-import { supabase } from '../lib/supabase';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Lead, LeadStatus, Profile, LeadStatusHistory, Attachment } from '../types';
+import { getJob, updateJob, type Job, type Status, type Branch } from '../lib/api';
 import {
   X,
   Calendar,
@@ -9,630 +8,545 @@ import {
   Building2,
   Banknote,
   FileText,
-  Download,
-  Trash2,
+  Edit,
+  Save,
+  Tag,
+  Package,
+  Receipt,
+  MessageSquare,
 } from 'lucide-react';
 
 interface LeadDetailsProps {
-  lead: Lead;
-  statuses: LeadStatus[];
-  users: Profile[];
+  lead: Job;
+  statuses: Status[];
+  branches: Branch[];
+  adminCodes?: string[];
   onClose: () => void;
   onUpdate: () => void;
 }
 
-export function LeadDetails({ lead, statuses, users, onClose, onUpdate }: LeadDetailsProps) {
-  const { profile, isAdmin } = useAuth();
+/**
+ * Displays detailed information about a job and allows editing.
+ * Shows all job fields including the newly added ones.
+ */
+export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes = [], onClose, onUpdate }: LeadDetailsProps) {
+  const { user, isAdmin, isSuperAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [history, setHistory] = useState<LeadStatusHistory[]>([]);
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [showStatusUpdate, setShowStatusUpdate] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [booking, setBooking] = useState({
-    technician_id: '',
-    booking_date: '',
-    start_time: '',
-    end_time: '',
-    location: '',
-  });
-  const [statusUpdate, setStatusUpdate] = useState({
-    status_id: lead.current_status_id || '',
-    notes: '',
-    reference_number: '',
-  });
-
-  const isPOGoAheadSelected = (() => {
-    if (!statusUpdate.status_id) return false;
-    const s = statuses.find((x) => x.id === statusUpdate.status_id);
-    const n = (s?.name || '').toLowerCase();
-    return n.includes('po received') || n.includes('go-ahead');
-  })();
+  const [isEditing, setIsEditing] = useState(false);
+  const [job, setJob] = useState<Job>(initialLead);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadHistory();
-    loadAttachments();
-  }, [lead.id]);
+    loadJobDetails();
+  }, [initialLead._id]);
 
-  async function loadHistory() {
+  async function loadJobDetails() {
     try {
-      const { data } = await supabase
-        .from('lead_status_history')
-        .select('*, status:lead_statuses(*), changed_by_user:profiles(*)')
-        .eq('lead_id', lead.id)
-        .order('created_at', { ascending: false });
-
-      if (data) setHistory(data);
-    } catch (error) {
-      console.error('Error loading history:', error);
+      const response = await getJob(initialLead._id);
+      setJob(response.job);
+    } catch (err: any) {
+      console.error('Error loading job details:', err);
+      setError(err.message || 'Failed to load job details');
     }
   }
 
-  async function loadAttachments() {
-    try {
-      const { data } = await supabase
-        .from('attachments')
-        .select('*, status:lead_statuses(*), uploaded_by_user:profiles(*)')
-        .eq('lead_id', lead.id)
-        .order('created_at', { ascending: false });
-
-      if (data) setAttachments(data);
-    } catch (error) {
-      console.error('Error loading attachments:', error);
-    }
-  }
-
-  async function handleStatusUpdate(e: FormEvent) {
-    e.preventDefault();
+  async function handleSave() {
     setLoading(true);
-
+    setError(null);
     try {
-      const status = statuses.find((s) => s.id === statusUpdate.status_id);
-
-      if (status?.requires_reference_number && !statusUpdate.reference_number) {
-        alert('This status requires a reference number');
-        setLoading(false);
-        return;
-      }
-
-      if (status?.requires_attachment && !selectedFile) {
-        alert('This status requires a file attachment');
-        setLoading(false);
-        return;
-      }
-
-      // Update lead status, and set reference numbers for known status types
-      const updates: any = {
-        current_status_id: statusUpdate.status_id,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (status?.requires_reference_number && statusUpdate.reference_number) {
-        const name = (status?.name || '').toLowerCase();
-        if (name.includes('quote')) {
-          updates.quote_number = statusUpdate.reference_number;
-        } else if (name.includes('invoice')) {
-          updates.invoice_number = statusUpdate.reference_number;
-        } else if (name.includes('purchase') || name.includes('order')) {
-          updates.order_number = statusUpdate.reference_number;
-        }
-      }
-
-      const { error: updateError } = await supabase
-        .from('leads')
-        .update(updates)
-        .eq('id', lead.id);
-
-      if (updateError) throw updateError;
-
-      const alertDate = status?.days_until_alert
-        ? new Date(Date.now() + status.days_until_alert * 24 * 60 * 60 * 1000).toISOString()
-        : null;
-
-      const { error: historyError } = await supabase.from('lead_status_history').insert({
-        lead_id: lead.id,
-        status_id: statusUpdate.status_id,
-        changed_by: profile?.id,
-        notes: statusUpdate.notes,
-        reference_number: statusUpdate.reference_number,
-        alert_date: alertDate,
-      });
-
-      if (historyError) throw historyError;
-
-      if (selectedFile) {
-        await handleFileUpload();
-      }
-
-      // If status is PO Received/Go-Ahead, create a tech booking if provided
-      if ((status?.name || '').toLowerCase().includes('po received') || (status?.name || '').toLowerCase().includes('go-ahead')) {
-        if (booking.technician_id && booking.booking_date && booking.start_time && booking.end_time) {
-          const { error: bookingError } = await supabase.from('tech_bookings').insert({
-            lead_id: lead.id,
-            technician_id: booking.technician_id,
-            booking_date: booking.booking_date,
-            start_time: booking.start_time,
-            end_time: booking.end_time,
-            location: booking.location || null,
-            created_by: profile?.id,
-          });
-          if (bookingError) throw bookingError;
-        }
-      }
-
-  setShowStatusUpdate(false);
-      setStatusUpdate({ status_id: '', notes: '', reference_number: '' });
-      setSelectedFile(null);
-  setBooking({ technician_id: '', booking_date: '', start_time: '', end_time: '', location: '' });
-      loadHistory();
-      loadAttachments();
+      await updateJob(job._id, job);
+      setIsEditing(false);
       onUpdate();
-    } catch (error: any) {
-      alert(error.message || 'Failed to update status');
+    } catch (err: any) {
+      setError(err.message || 'Failed to update job');
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleFileUpload() {
-    if (!selectedFile) return;
-
-    try {
-      const fileExt = selectedFile.name.split('.').pop();
-      const fileName = `${lead.id}/${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('lead-attachments')
-        .upload(fileName, selectedFile);
-
-      if (uploadError) throw uploadError;
-
-      const { error: attachmentError } = await supabase.from('attachments').insert({
-        lead_id: lead.id,
-        status_id: statusUpdate.status_id,
-        file_name: selectedFile.name,
-        file_path: fileName,
-        file_size: selectedFile.size,
-        file_type: selectedFile.type,
-        uploaded_by: profile?.id,
-      });
-
-      if (attachmentError) throw attachmentError;
-    } catch (error: any) {
-      throw new Error('Failed to upload file: ' + error.message);
-    }
+  function formatDate(date: string | Date | undefined): string {
+    if (!date) return '-';
+    const d = typeof date === 'string' ? new Date(date) : date;
+    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
-  async function downloadAttachment(attachment: Attachment) {
-    try {
-      const { data, error } = await supabase.storage
-        .from('lead-attachments')
-        .download(attachment.file_path);
+  // Super admin and admin users can edit
+  const canEdit = isAdmin || isSuperAdmin;
 
-      if (error) throw error;
-
-      const url = URL.createObjectURL(data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = attachment.file_name;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (error: any) {
-      alert('Failed to download file: ' + error.message);
-    }
-  }
-
-  async function deleteAttachment(attachment: Attachment) {
-    if (!confirm('Are you sure you want to delete this attachment?')) return;
-
-    try {
-      const { error: deleteError } = await supabase
-        .from('attachments')
-        .delete()
-        .eq('id', attachment.id);
-
-      if (deleteError) throw deleteError;
-
-      await supabase.storage.from('lead-attachments').remove([attachment.file_path]);
-
-      loadAttachments();
-    } catch (error: any) {
-      alert('Failed to delete attachment: ' + error.message);
-    }
-  }
-
-  const canEdit = isAdmin || lead.assigned_rep === profile?.id || lead.assigned_admin === profile?.id;
+  // Debug logging
+  useEffect(() => {
+    console.log('LeadDetails - isAdmin:', isAdmin, 'isSuperAdmin:', isSuperAdmin, 'canEdit:', canEdit, 'isEditing:', isEditing);
+  }, [isAdmin, isSuperAdmin, canEdit, isEditing]);
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">{lead.lead_number}</h2>
-            <p className="text-sm text-slate-600">{lead.client_name}</p>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white p-6 rounded-t-2xl z-10">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-2xl font-bold mb-1">{job.jobNumber}</h3>
+              <p className="text-white/90 text-sm">Job Details</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isEditing) {
+                    handleSave();
+                  } else {
+                    setIsEditing(true);
+                  }
+                }}
+                disabled={loading}
+                className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                type="button"
+              >
+                {isEditing ? (
+                  <>
+                    <Save className="w-4 h-4" />
+                    {loading ? 'Saving...' : 'Save'}
+                  </>
+                ) : (
+                  <>
+                    <Edit className="w-4 h-4" />
+                    Edit
+                  </>
+                )}
+              </button>
+              {isEditing && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsEditing(false);
+                    loadJobDetails(); // Reload to reset changes
+                  }}
+                  className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-all"
+                  type="button"
+                >
+                  Cancel
+                </button>
+              )}
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                }} 
+                className="p-2 hover:bg-white/20 rounded-lg transition-all"
+                type="button"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
-            <X className="w-5 h-5" />
-          </button>
         </div>
 
+        {error && (
+          <div className="mx-6 mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+        )}
+
         <div className="p-6 space-y-6">
+          {/* Basic Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
-              <h3 className="text-lg font-bold text-slate-900">Lead Information</h3>
+              <h3 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-2">Basic Information</h3>
 
               <div className="space-y-3">
-                {lead.client_name === 'Cash Sales' && (
-                  <div className="flex items-start gap-3">
-                    <User className="w-5 h-5 text-slate-400 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-slate-700">Cash Customer</p>
-                      <p className="text-sm text-slate-900">{lead.cash_customer_name || '-'}</p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-start gap-3">
-                  <User className="w-5 h-5 text-slate-400 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-700">Contact Person</p>
-                    <p className="text-sm text-slate-900">{lead.contact_person || '-'}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <FileText className="w-5 h-5 text-slate-400 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-700">Email</p>
-                    <p className="text-sm text-slate-900">{lead.contact_email || '-'}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <FileText className="w-5 h-5 text-slate-400 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-700">Phone</p>
-                    <p className="text-sm text-slate-900">{lead.contact_phone || '-'}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Building2 className="w-5 h-5 text-slate-400 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-700">Branch</p>
-                    <p className="text-sm text-slate-900">{lead.branch?.name || '-'}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <User className="w-5 h-5 text-slate-400 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-700">Assigned Rep</p>
-                    <p className="text-sm text-slate-900">
-                      {lead.assigned_rep_user?.full_name || 'Unassigned'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <User className="w-5 h-5 text-slate-400 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-700">Assigned Admin</p>
-                    <p className="text-sm text-slate-900">
-                      {lead.assigned_admin_user?.full_name || 'Unassigned'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Banknote className="w-5 h-5 text-slate-400 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-700">Estimated Value</p>
-                    <p className="text-sm text-slate-900">
-                      {lead.estimated_value ? `R${lead.estimated_value.toLocaleString()}` : '-'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Calendar className="w-5 h-5 text-slate-400 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-700">Created</p>
-                    <p className="text-sm text-slate-900">
-                      {new Date(lead.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {lead.description && (
                 <div>
-                  <p className="text-sm font-medium text-slate-700 mb-2">Description</p>
-                  <p className="text-sm text-slate-900 bg-slate-50 p-3 rounded-lg">
-                    {lead.description}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-bold text-slate-900">Current Status</h3>
-                {canEdit && (
-                  <button
-                    onClick={() => setShowStatusUpdate(!showStatusUpdate)}
-                    className="text-sm text-slate-600 hover:text-slate-900 font-medium"
-                  >
-                    {showStatusUpdate ? 'Cancel' : 'Update Status'}
-                  </button>
-                )}
-              </div>
-
-              <div className="bg-slate-50 p-4 rounded-lg">
-                <p className="text-sm font-medium text-slate-700 mb-1">Status</p>
-                <p className="text-lg font-bold text-slate-900">
-                  {lead.current_status?.name || 'Unknown'}
-                </p>
-              </div>
-
-              {showStatusUpdate && (
-                <form onSubmit={handleStatusUpdate} className="bg-slate-50 p-4 rounded-lg space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      New Status
-                    </label>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">Status</label>
+                  {isEditing ? (
                     <select
-                      required
-                      value={statusUpdate.status_id}
-                      onChange={(e) =>
-                        setStatusUpdate({ ...statusUpdate, status_id: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                      value={job.status?._id || ''}
+                      onChange={(e) => {
+                        const status = statuses.find(s => s._id === e.target.value);
+                        setJob({ ...job, status: status ? { _id: status._id, name: status.name, sortOrder: status.sortOrder } : undefined });
+                      }}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                     >
                       <option value="">Select Status</option>
                       {statuses.map((status) => (
-                        <option key={status.id} value={status.id}>
+                        <option key={status._id} value={status._id}>
                           {status.name}
                         </option>
                       ))}
                     </select>
-                  </div>
-
-                  {statusUpdate.status_id &&
-                    statuses.find((s) => s.id === statusUpdate.status_id)
-                      ?.requires_reference_number && (
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          {(() => {
-                            const s = statuses.find((x) => x.id === statusUpdate.status_id);
-                            const n = (s?.name || '').toLowerCase();
-                            if (n.includes('purchase') || n.includes('order')) return 'PO Number *';
-                            if (n.includes('quote')) return 'Quote Number *';
-                            if (n.includes('invoice')) return 'Invoice Number *';
-                            return 'Reference Number *';
-                          })()}
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={statusUpdate.reference_number}
-                          onChange={(e) =>
-                            setStatusUpdate({ ...statusUpdate, reference_number: e.target.value })
-                          }
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
-                          placeholder="Quote/Order/Invoice number"
-                        />
-                      </div>
-                    )}
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Notes</label>
-                    <textarea
-                      rows={3}
-                      value={statusUpdate.notes}
-                      onChange={(e) => setStatusUpdate({ ...statusUpdate, notes: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent resize-none"
-                      placeholder="Add notes about this status change..."
-                    />
-                  </div>
-
-                  {statusUpdate.status_id &&
-                    statuses.find((s) => s.id === statusUpdate.status_id)?.requires_attachment && (
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Attachment *
-                        </label>
-                        <input
-                          type="file"
-                          required
-                          onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
-                        />
-                      </div>
-                    )}
-
-                  {isPOGoAheadSelected && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-3 rounded border border-slate-200">
-                      <div className="md:col-span-2 text-sm font-medium text-slate-700">Book Technician</div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Technician *</label>
-                        <select
-                          required
-                          value={booking.technician_id}
-                          onChange={(e) => setBooking({ ...booking, technician_id: e.target.value })}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
-                        >
-                          <option value="">Select technician</option>
-                          {users
-                            .filter((u) => u.is_active)
-                            .map((u) => (
-                              <option key={u.id} value={u.id}>
-                                {u.full_name}
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Date *</label>
-                        <input
-                          type="date"
-                          required
-                          value={booking.booking_date}
-                          onChange={(e) => setBooking({ ...booking, booking_date: e.target.value })}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Start Time *</label>
-                        <input
-                          type="time"
-                          required
-                          value={booking.start_time}
-                          onChange={(e) => setBooking({ ...booking, start_time: e.target.value })}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">End Time *</label>
-                        <input
-                          type="time"
-                          required
-                          value={booking.end_time}
-                          onChange={(e) => setBooking({ ...booking, end_time: e.target.value })}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Location</label>
-                        <input
-                          type="text"
-                          value={booking.location}
-                          onChange={(e) => setBooking({ ...booking, location: e.target.value })}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
-                          placeholder="Site address or notes"
-                        />
-                      </div>
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                      <span className="text-ars-heading">{job.status?.name || '-'}</span>
                     </div>
                   )}
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-slate-900 text-white py-2 rounded-lg font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
-                  >
-                    {loading ? 'Updating...' : 'Update Status'}
-                  </button>
-                </form>
-              )}
-
-              {lead.quote_number && (
-                <div className="bg-slate-50 p-4 rounded-lg">
-                  <p className="text-sm font-medium text-slate-700 mb-1">Quote Number</p>
-                  <p className="text-sm text-slate-900">{lead.quote_number}</p>
                 </div>
-              )}
 
-              {lead.order_number && (
-                <div className="bg-slate-50 p-4 rounded-lg">
-                  <p className="text-sm font-medium text-slate-700 mb-1">Order Number</p>
-                  <p className="text-sm text-slate-900">{lead.order_number}</p>
-                </div>
-              )}
-
-              {lead.invoice_number && (
-                <div className="bg-slate-50 p-4 rounded-lg">
-                  <p className="text-sm font-medium text-slate-700 mb-1">Invoice Number</p>
-                  <p className="text-sm text-slate-900">{lead.invoice_number}</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Attachments</h3>
-            <div className="space-y-2">
-              {attachments.length === 0 ? (
-                <p className="text-sm text-slate-500 text-center py-6 bg-slate-50 rounded-lg">
-                  No attachments
-                </p>
-              ) : (
-                attachments.map((attachment) => (
-                  <div
-                    key={attachment.id}
-                    className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      <FileText className="w-5 h-5 text-slate-400" />
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">{attachment.file_name}</p>
-                        <p className="text-xs text-slate-500">
-                          {attachment.status?.name} •{' '}
-                          {new Date(attachment.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">Branch</label>
+                  {isEditing ? (
+                    <select
+                      value={job.branch._id}
+                      onChange={(e) => {
+                        const branch = branches.find(b => b._id === e.target.value);
+                        if (branch) {
+                          setJob({ ...job, branch: { _id: branch._id, name: branch.name } });
+                        }
+                      }}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    >
+                      {branches.map((branch) => (
+                        <option key={branch._id} value={branch._id}>
+                          {branch.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                      <span className="text-ars-heading">{job.branch?.name || '-'}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => downloadAttachment(attachment)}
-                        className="p-2 hover:bg-slate-200 rounded transition-colors"
-                        title="Download"
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">Customer</label>
+                  <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                    <span className="text-ars-heading">{job.customer?.name || '-'}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">Cash Customer</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={job.cashCustomer || ''}
+                      onChange={(e) => setJob({ ...job, cashCustomer: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      placeholder="Enter cash customer name"
+                    />
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                      <span className="text-ars-heading">{job.cashCustomer || '-'}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">Admin (ADM)</label>
+                  {isEditing ? (
+                    adminCodes.length > 0 ? (
+                      <select
+                        value={job.adm || ''}
+                        onChange={(e) => setJob({ ...job, adm: e.target.value })}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                       >
-                        <Download className="w-4 h-4 text-slate-600" />
-                      </button>
-                      {(isAdmin || attachment.uploaded_by === profile?.id) && (
-                        <button
-                          onClick={() => deleteAttachment(attachment)}
-                          className="p-2 hover:bg-red-100 rounded transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4 text-red-600" />
-                        </button>
-                      )}
+                        <option value="">Select Admin</option>
+                        {adminCodes.map((code) => (
+                          <option key={code} value={code}>
+                            {code}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        value={job.adm || ''}
+                        onChange={(e) => setJob({ ...job, adm: e.target.value })}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        placeholder="Enter admin code"
+                      />
+                    )
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                      <span className="text-ars-heading">{job.adm || '-'}</span>
                     </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">Value (ex VAT)</label>
+                  {isEditing ? (
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={job.valueExVat || ''}
+                      onChange={(e) => setJob({ ...job, valueExVat: parseFloat(e.target.value) || undefined })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    />
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                      <span className="text-ars-heading font-medium">{job.valueExVat ? `R${job.valueExVat.toLocaleString()}` : '-'}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">Technician</label>
+                  <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                    <span className="text-ars-heading">{job.techBooked?.name || '-'}</span>
                   </div>
-                ))
-              )}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-2">Dates</h3>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">Start Date</label>
+                  {isEditing ? (
+                    <input
+                      type="date"
+                      value={job.startDate ? (typeof job.startDate === 'string' ? job.startDate.split('T')[0] : new Date(job.startDate).toISOString().split('T')[0]) : ''}
+                      onChange={(e) => setJob({ ...job, startDate: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    />
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                      <span className="text-ars-heading">{formatDate(job.startDate)}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">Date Quoted</label>
+                  {isEditing ? (
+                    <input
+                      type="date"
+                      value={job.dateQuoted ? (typeof job.dateQuoted === 'string' ? job.dateQuoted.split('T')[0] : new Date(job.dateQuoted).toISOString().split('T')[0]) : ''}
+                      onChange={(e) => setJob({ ...job, dateQuoted: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    />
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                      <span className="text-ars-heading">{formatDate(job.dateQuoted)}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">Register Date</label>
+                  {isEditing ? (
+                    <input
+                      type="date"
+                      value={job.registerDate ? (typeof job.registerDate === 'string' ? job.registerDate.split('T')[0] : new Date(job.registerDate).toISOString().split('T')[0]) : ''}
+                      onChange={(e) => setJob({ ...job, registerDate: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    />
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                      <span className="text-ars-heading">{formatDate(job.registerDate)}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">Date Booked</label>
+                  {isEditing ? (
+                    <input
+                      type="date"
+                      value={job.dateBooked ? (typeof job.dateBooked === 'string' ? job.dateBooked.split('T')[0] : new Date(job.dateBooked).toISOString().split('T')[0]) : ''}
+                      onChange={(e) => setJob({ ...job, dateBooked: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    />
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                      <span className="text-ars-heading">{formatDate(job.dateBooked)}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">PO Date</label>
+                  {isEditing ? (
+                    <input
+                      type="date"
+                      value={job.poDate ? (typeof job.poDate === 'string' ? job.poDate.split('T')[0] : new Date(job.poDate).toISOString().split('T')[0]) : ''}
+                      onChange={(e) => setJob({ ...job, poDate: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    />
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                      <span className="text-ars-heading">{formatDate(job.poDate)}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">Invoice Date</label>
+                  {isEditing ? (
+                    <input
+                      type="date"
+                      value={job.invoiceDate ? (typeof job.invoiceDate === 'string' ? job.invoiceDate.split('T')[0] : new Date(job.invoiceDate).toISOString().split('T')[0]) : ''}
+                      onChange={(e) => setJob({ ...job, invoiceDate: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    />
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                      <span className="text-ars-heading">{formatDate(job.invoiceDate)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
-          <div>
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Status History</h3>
-            <div className="space-y-3">
-              {history.length === 0 ? (
-                <p className="text-sm text-slate-500 text-center py-6 bg-slate-50 rounded-lg">
-                  No history yet
-                </p>
-              ) : (
-                history.map((entry) => (
-                  <div key={entry.id} className="flex gap-4 pb-3 border-b border-slate-200 last:border-0">
-                    <div className="w-2 h-2 bg-slate-400 rounded-full mt-2"></div>
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-slate-900">
-                            {entry.status?.name}
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            {entry.changed_by_user?.full_name} •{' '}
-                            {new Date(entry.created_at).toLocaleString()}
-                          </p>
-                        </div>
-                        {entry.reference_number && (
-                          <span className="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded">
-                            {entry.reference_number}
-                          </span>
-                        )}
-                      </div>
-                      {entry.notes && (
-                        <p className="text-sm text-slate-700 mt-2 bg-slate-50 p-2 rounded">
-                          {entry.notes}
-                        </p>
-                      )}
-                    </div>
+          {/* Additional Information */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <h3 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-2">Additional Information</h3>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">Rep Code</label>
+                  <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                    <span className="text-ars-heading">{job.repCode?.code || '-'}</span>
                   </div>
-                ))
-              )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">RSR #</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={job.rsrNumber || ''}
+                      onChange={(e) => setJob({ ...job, rsrNumber: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    />
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                      <span className="text-ars-heading">{job.rsrNumber || '-'}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">PO Number</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={job.poNumber || ''}
+                      onChange={(e) => setJob({ ...job, poNumber: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    />
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                      <span className="text-ars-heading">{job.poNumber || '-'}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">Oil Sample #</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={job.oilSampleNumber || ''}
+                      onChange={(e) => setJob({ ...job, oilSampleNumber: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    />
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                      <span className="text-ars-heading">{job.oilSampleNumber || '-'}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">Store Pack</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={job.storePack || ''}
+                      onChange={(e) => setJob({ ...job, storePack: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    />
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                      <span className="text-ars-heading">{job.storePack || '-'}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">Inv #</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={job.invNumber || ''}
+                      onChange={(e) => setJob({ ...job, invNumber: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    />
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                      <span className="text-ars-heading">{job.invNumber || '-'}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-2">Description & Feedback</h3>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">Description</label>
+                  <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                    <span className="text-ars-heading">{job.description?.name || '-'}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">Feedback</label>
+                  {isEditing ? (
+                    <textarea
+                      rows={6}
+                      value={job.feedback || ''}
+                      onChange={(e) => setJob({ ...job, feedback: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent resize-none"
+                      placeholder="Enter feedback..."
+                    />
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl min-h-[100px]">
+                      <span className="text-ars-heading whitespace-pre-wrap">{job.feedback || '-'}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
+
+          {/* Follow-up Statuses */}
+          {(job.followUp1 || job.followUp2 || job.followUp3 || job.followUp4) && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-2">Follow-up Statuses</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {job.followUp1 && (
+                  <div className="bg-slate-50 p-3 rounded-lg">
+                    <p className="text-xs font-medium text-slate-600 mb-1">Follow-up 1</p>
+                    <p className="text-sm text-slate-900">{job.followUp1.name}</p>
+                  </div>
+                )}
+                {job.followUp2 && (
+                  <div className="bg-slate-50 p-3 rounded-lg">
+                    <p className="text-xs font-medium text-slate-600 mb-1">Follow-up 2</p>
+                    <p className="text-sm text-slate-900">{job.followUp2.name}</p>
+                  </div>
+                )}
+                {job.followUp3 && (
+                  <div className="bg-slate-50 p-3 rounded-lg">
+                    <p className="text-xs font-medium text-slate-600 mb-1">Follow-up 3</p>
+                    <p className="text-sm text-slate-900">{job.followUp3.name}</p>
+                  </div>
+                )}
+                {job.followUp4 && (
+                  <div className="bg-slate-50 p-3 rounded-lg">
+                    <p className="text-xs font-medium text-slate-600 mb-1">Follow-up 4</p>
+                    <p className="text-sm text-slate-900">{job.followUp4.name}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

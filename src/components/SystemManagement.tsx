@@ -1,0 +1,1281 @@
+/**
+ * System Management component for super admin.
+ * Provides user management, role/permission assignment, and import functionality.
+ */
+import { useState, useEffect, useMemo } from 'react';
+import { 
+  getUsers, 
+  getUser, 
+  inviteUser, 
+  updateUser, 
+  updateUserPermissions,
+  resendInvitation,
+  getRoles,
+  getPermissions,
+  getImportHistory,
+  importJobs,
+  importCustomers,
+  downloadExampleCSV,
+  getRepCodes,
+  createRepCode,
+  updateRepCode,
+  deleteRepCode,
+  getJobs,
+  User,
+  Role,
+  Permission,
+  ImportHistory,
+  RepCode
+} from '../lib/api';
+import { 
+  Users, 
+  Search, 
+  Edit2, 
+  UserCheck, 
+  UserX, 
+  Plus, 
+  X, 
+  Save, 
+  Upload,
+  Shield,
+  Key,
+  FileText,
+  AlertCircle,
+  Mail,
+  Download,
+  CheckCircle2,
+  XCircle
+} from 'lucide-react';
+
+export function SystemManagement() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [isEditingUser, setIsEditingUser] = useState(false);
+  const [activeTab, setActiveTab] = useState<'users' | 'imports' | 'reference'>('users');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const itemsPerPage = 20;
+  
+  // Import state
+  const [importHistory, setImportHistory] = useState<ImportHistory | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importType, setImportType] = useState<'jobs' | 'customers' | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [clearExisting, setClearExisting] = useState(false);
+  const [importResult, setImportResult] = useState<{ imported: number; updated: number; errors: string[] } | null>(null);
+  
+  // Reference data state
+  const [repCodes, setRepCodes] = useState<RepCode[]>([]);
+  const [adminCodes, setAdminCodes] = useState<string[]>([]);
+  const [editingRepCode, setEditingRepCode] = useState<RepCode | null>(null);
+  const [showRepCodeForm, setShowRepCodeForm] = useState(false);
+  const [newRepCode, setNewRepCode] = useState({ code: '', description: '' });
+  const [newAdminCode, setNewAdminCode] = useState('');
+
+  useEffect(() => {
+    loadData();
+    loadImportHistory();
+    if (activeTab === 'reference') {
+      loadReferenceData();
+    }
+  }, [currentPage, searchTerm, activeTab]);
+
+  /**
+   * Loads import history/statistics.
+   */
+  async function loadImportHistory() {
+    try {
+      const response = await getImportHistory();
+      setImportHistory(response.data);
+    } catch (err: any) {
+      console.error('Error loading import history:', err);
+    }
+  }
+
+  /**
+   * Loads reference data (rep codes, admin codes).
+   */
+  async function loadReferenceData() {
+    try {
+      // Load rep codes
+      const repCodesResponse = await getRepCodes();
+      setRepCodes(repCodesResponse.repCodes || []);
+
+      // Load unique admin codes from jobs
+      const jobsResponse = await getJobs({ allTime: 'true', limit: 10000 });
+      const uniqueAdminCodes = Array.from(
+        new Set(
+          jobsResponse.jobs
+            .map(job => job.adm)
+            .filter((adm): adm is string => !!adm && adm.trim() !== '')
+        )
+      ).sort();
+      setAdminCodes(uniqueAdminCodes);
+    } catch (err: any) {
+      console.error('Error loading reference data:', err);
+      setError(err.message || 'Failed to load reference data');
+    }
+  }
+
+  /**
+   * Loads users, roles, and permissions from the API.
+   */
+  async function loadData() {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Load users with search and pagination
+      const usersResponse = await getUsers({
+        page: currentPage,
+        limit: itemsPerPage,
+        search: searchTerm || undefined,
+      });
+      setUsers(usersResponse.users || []);
+      setTotalPages(usersResponse.pagination?.pages || 1);
+
+      // Load roles and permissions (only once)
+      if (roles.length === 0) {
+        const rolesResponse = await getRoles();
+        setRoles(rolesResponse.roles || []);
+      }
+
+      if (permissions.length === 0) {
+        const permsResponse = await getPermissions({ isActive: true });
+        setPermissions(permsResponse.permissions || []);
+      }
+    } catch (err: any) {
+      console.error('Error loading system data:', err);
+      setError(err.message || 'Failed to load system data');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
+   * Handles viewing/editing a user.
+   */
+  async function handleViewUser(userId: string) {
+    try {
+      const response = await getUser(userId);
+      setSelectedUser(response.user);
+      setIsEditingUser(false);
+    } catch (err: any) {
+      console.error('Error loading user:', err);
+      alert('Failed to load user details');
+    }
+  }
+
+  /**
+   * Handles saving user changes.
+   */
+  async function handleSaveUser() {
+    if (!selectedUser) return;
+
+    try {
+      setLoading(true);
+      await updateUser(selectedUser._id, {
+        firstName: selectedUser.firstName,
+        lastName: selectedUser.lastName,
+        email: selectedUser.email,
+        role: selectedUser.role._id,
+        isActive: selectedUser.isActive,
+      });
+      
+      // Reload users
+      await loadData();
+      setIsEditingUser(false);
+      alert('User updated successfully');
+    } catch (err: any) {
+      console.error('Error saving user:', err);
+      alert('Failed to save user: ' + (err.message || 'Unknown error'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
+   * Handles updating user permissions.
+   */
+  async function handleUpdatePermissions(userId: string, newPermissions: string[]) {
+    try {
+      setLoading(true);
+      await updateUserPermissions(userId, newPermissions);
+      await loadData();
+      if (selectedUser?._id === userId) {
+        const response = await getUser(userId);
+        setSelectedUser(response.user);
+      }
+      alert('Permissions updated successfully');
+    } catch (err: any) {
+      console.error('Error updating permissions:', err);
+      alert('Failed to update permissions: ' + (err.message || 'Unknown error'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
+   * Handles toggling user active status.
+   */
+  async function handleToggleUserStatus(user: User) {
+    try {
+      setLoading(true);
+      await updateUser(user._id, { isActive: !user.isActive });
+      await loadData();
+      if (selectedUser?._id === user._id) {
+        const response = await getUser(user._id);
+        setSelectedUser(response.user);
+      }
+    } catch (err: any) {
+      console.error('Error updating user status:', err);
+      alert('Failed to update user status');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
+   * Handles resending invitation email to a user.
+   */
+  async function handleResendInvitation(userId: string) {
+    if (!confirm('Are you sure you want to resend the invitation email to this user?')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await resendInvitation(userId);
+      alert(response.message || 'Invitation email has been resent successfully');
+      
+      // Reload user data to get updated passwordSet status
+      if (selectedUser?._id === userId) {
+        const userResponse = await getUser(userId);
+        setSelectedUser(userResponse.user);
+      }
+      await loadData();
+    } catch (err: any) {
+      console.error('Error resending invitation:', err);
+      alert('Failed to resend invitation: ' + (err.message || 'Unknown error'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
+   * Groups permissions by resource for better display.
+   */
+  const groupedPermissions = useMemo(() => {
+    if (!permissions || permissions.length === 0) return {} as Record<string, Permission[]>;
+    return permissions.reduce((acc, perm) => {
+      const resource = perm.resource || 'other';
+      if (!acc[resource]) acc[resource] = [];
+      acc[resource].push(perm);
+      return acc;
+    }, {} as Record<string, Permission[]>);
+  }, [permissions]);
+
+  /**
+   * Handles importing CSV file.
+   */
+  async function handleImport() {
+    if (!selectedFile || !importType) return;
+
+    if (clearExisting && !confirm(`Are you sure you want to clear all existing ${importType} before importing? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setImporting(true);
+      setError(null);
+      setImportResult(null);
+
+      let result;
+      if (importType === 'jobs') {
+        result = await importJobs(selectedFile, clearExisting);
+      } else {
+        result = await importCustomers(selectedFile, clearExisting);
+      }
+
+      setImportResult(result.data);
+      await loadImportHistory();
+    } catch (err: any) {
+      console.error('Error importing:', err);
+      setError(err.message || 'Failed to import file');
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  /**
+   * Handles creating a new rep code.
+   */
+  async function handleCreateRepCode() {
+    if (!newRepCode.code.trim()) {
+      setError('Rep code is required');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await createRepCode({
+        code: newRepCode.code.trim(),
+        description: newRepCode.description.trim() || undefined,
+      });
+      setRepCodes([...repCodes, response.repCode]);
+      setNewRepCode({ code: '', description: '' });
+      setShowRepCodeForm(false);
+      alert('Rep code created successfully');
+    } catch (err: any) {
+      console.error('Error creating rep code:', err);
+      setError(err.message || 'Failed to create rep code');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
+   * Handles updating a rep code.
+   */
+  async function handleUpdateRepCode() {
+    if (!editingRepCode) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await updateRepCode(editingRepCode._id, {
+        code: editingRepCode.code,
+        description: editingRepCode.description,
+        isActive: editingRepCode.isActive,
+      });
+      setRepCodes(repCodes.map(rc => rc._id === editingRepCode._id ? response.repCode : rc));
+      setEditingRepCode(null);
+      alert('Rep code updated successfully');
+    } catch (err: any) {
+      console.error('Error updating rep code:', err);
+      setError(err.message || 'Failed to update rep code');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
+   * Handles deleting a rep code.
+   */
+  async function handleDeleteRepCode(id: string) {
+    if (!confirm('Are you sure you want to delete this rep code?')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      await deleteRepCode(id);
+      setRepCodes(repCodes.filter(rc => rc._id !== id));
+      alert('Rep code deleted successfully');
+    } catch (err: any) {
+      console.error('Error deleting rep code:', err);
+      setError(err.message || 'Failed to delete rep code');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
+   * Handles adding a new admin code.
+   * Note: Admin codes are just strings, so we just add it to the list.
+   * It will be saved when a job is created with that code.
+   */
+  function handleAddAdminCode() {
+    if (!newAdminCode.trim()) {
+      setError('Admin code is required');
+      return;
+    }
+
+    const code = newAdminCode.trim().toUpperCase();
+    if (adminCodes.includes(code)) {
+      setError('Admin code already exists');
+      return;
+    }
+
+    setAdminCodes([...adminCodes, code].sort());
+    setNewAdminCode('');
+    setError(null);
+  }
+
+  if (loading && users.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ars-primary mx-auto mb-4"></div>
+          <p className="text-ars-body">Loading system management...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-white p-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-3xl font-bold text-ars-heading flex items-center gap-3">
+            <Shield className="w-8 h-8 text-ars-primary" />
+            System Management
+          </h2>
+        </div>
+
+        {/* Tabs */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-md mb-6">
+          <div className="flex border-b border-gray-200">
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`flex-1 px-6 py-4 font-semibold transition-all ${
+                activeTab === 'users'
+                  ? 'text-ars-primary border-b-2 border-ars-primary bg-blue-50'
+                  : 'text-ars-body hover:text-ars-heading hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <Users className="w-5 h-5" />
+                User Management
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('imports')}
+              className={`flex-1 px-6 py-4 font-semibold transition-all ${
+                activeTab === 'imports'
+                  ? 'text-ars-primary border-b-2 border-ars-primary bg-blue-50'
+                  : 'text-ars-body hover:text-ars-heading hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <Upload className="w-5 h-5" />
+                Imports
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('reference')}
+              className={`flex-1 px-6 py-4 font-semibold transition-all ${
+                activeTab === 'reference'
+                  ? 'text-ars-primary border-b-2 border-ars-primary bg-blue-50'
+                  : 'text-ars-body hover:text-ars-heading hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <Key className="w-5 h-5" />
+                Reference Data
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-red-800 font-semibold">Error</p>
+              <p className="text-red-700 text-sm">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Users Tab */}
+        {activeTab === 'users' && (
+          <div className="flex gap-6">
+            {/* Left Side - User List */}
+            <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-md p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-ars-heading">Users</h3>
+                <button
+                  onClick={() => {
+                    // TODO: Implement invite user modal
+                    alert('Invite user functionality coming soon');
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Invite User
+                </button>
+              </div>
+
+              {/* Search */}
+              <div className="relative mb-6">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search users by name or email..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                />
+              </div>
+
+              {/* User List */}
+              <div className="space-y-3">
+                {users.map((user) => (
+                  <div
+                    key={user._id}
+                    onClick={() => handleViewUser(user._id)}
+                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                      selectedUser?._id === user._id
+                        ? 'border-ars-primary bg-blue-50'
+                        : 'border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2 flex-wrap">
+                          <p className="font-semibold text-ars-heading">
+                            {user.firstName} {user.lastName}
+                          </p>
+                          {user.isSuperAdmin && (
+                            <span className="px-2 py-1 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] text-xs font-bold rounded-lg">
+                              Super Admin
+                            </span>
+                          )}
+                          <span className={`px-2 py-1 text-xs font-medium rounded-lg ${
+                            user.isActive
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-red-100 text-red-700'
+                          }`}>
+                            {user.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                          {user.passwordSet === false && (
+                            <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs font-medium rounded-lg flex items-center gap-1">
+                              <Mail className="w-3 h-3" />
+                              Invitation Pending
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-ars-body mb-1">{user.email}</p>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-lg">
+                            {user.role.name}
+                          </span>
+                          <span className="text-xs text-ars-body">
+                            {user.permissions.length} permission{user.permissions.length !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleUserStatus(user);
+                          }}
+                          className={`p-2 rounded-lg transition-colors ${
+                            user.isActive
+                              ? 'text-green-600 hover:bg-green-50'
+                              : 'text-red-600 hover:bg-red-50'
+                          }`}
+                          title={user.isActive ? 'Deactivate user' : 'Activate user'}
+                        >
+                          {user.isActive ? (
+                            <UserCheck className="w-5 h-5" />
+                          ) : (
+                            <UserX className="w-5 h-5" />
+                          )}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewUser(user._id);
+                          }}
+                          className="p-2 text-ars-primary hover:bg-blue-50 rounded-lg transition-colors"
+                          title="View/Edit user"
+                        >
+                          <Edit2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-ars-body"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm text-ars-body">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage >= totalPages}
+                    className="px-4 py-2 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-ars-body"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Right Side - User Details */}
+            {selectedUser && (
+              <div className="w-96 bg-white rounded-xl border border-gray-200 shadow-md p-6 h-fit sticky top-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-bold text-ars-heading">User Details</h3>
+                  <button
+                    onClick={() => {
+                      setSelectedUser(null);
+                      setIsEditingUser(false);
+                    }}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {isEditingUser ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">First Name</label>
+                      <input
+                        type="text"
+                        value={selectedUser.firstName}
+                        onChange={(e) => setSelectedUser({ ...selectedUser, firstName: e.target.value })}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">Last Name</label>
+                      <input
+                        type="text"
+                        value={selectedUser.lastName}
+                        onChange={(e) => setSelectedUser({ ...selectedUser, lastName: e.target.value })}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">Email</label>
+                      <input
+                        type="email"
+                        value={selectedUser.email}
+                        onChange={(e) => setSelectedUser({ ...selectedUser, email: e.target.value })}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">Role</label>
+                      <select
+                        value={selectedUser.role._id}
+                        onChange={(e) => {
+                          const role = roles.find(r => r._id === e.target.value);
+                          if (role) {
+                            setSelectedUser({ ...selectedUser, role });
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        {roles.map((role) => (
+                          <option key={role._id} value={role._id}>
+                            {role.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2 pt-4">
+                      <button
+                        onClick={handleSaveUser}
+                        className="flex-1 px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                      >
+                        <Save className="w-4 h-4" />
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setIsEditingUser(false)}
+                        className="px-4 py-2.5 border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-1">Name</label>
+                      <p className="text-ars-heading font-medium">
+                        {selectedUser.firstName} {selectedUser.lastName}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-1">Email</label>
+                      <p className="text-ars-heading">{selectedUser.email}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-1">Role</label>
+                      <p className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg inline-block font-medium">
+                        {selectedUser.role.name}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-1">Status</label>
+                      <p className={`px-3 py-1.5 rounded-lg inline-block font-medium ${
+                        selectedUser.isActive
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-red-100 text-red-700'
+                      }`}>
+                        {selectedUser.isActive ? 'Active' : 'Inactive'}
+                      </p>
+                    </div>
+                    {selectedUser.passwordSet === false && (
+                      <div>
+                        <label className="block text-sm font-semibold text-ars-body mb-1">Password Status</label>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded-lg font-medium">
+                            Password Not Set
+                          </span>
+                          <button
+                            onClick={() => handleResendInvitation(selectedUser._id)}
+                            disabled={loading}
+                            className="px-3 py-1.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-lg font-medium hover:shadow-lg transition-all flex items-center gap-2 text-sm disabled:opacity-50"
+                            title="Resend invitation email"
+                          >
+                            <Mail className="w-4 h-4" />
+                            Resend Invitation
+                          </button>
+                        </div>
+                        <p className="text-xs text-ars-body">
+                          This user hasn't set their password yet. Click "Resend Invitation" to send them a new invitation email.
+                        </p>
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">Permissions</label>
+                      <div className="max-h-64 overflow-y-auto space-y-2">
+                        {Object.entries(groupedPermissions).map(([resource, perms]) => (
+                          <div key={resource} className="border border-gray-200 rounded-lg p-3">
+                            <p className="text-xs font-bold text-ars-heading mb-2 uppercase">{resource}</p>
+                            <div className="space-y-1">
+                              {perms.map((perm) => {
+                                const hasPermission = selectedUser.permissions.includes(perm.name);
+                                return (
+                                  <label
+                                    key={perm._id}
+                                    className="flex items-center gap-2 cursor-pointer group"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={hasPermission}
+                                      onChange={(e) => {
+                                        const newPerms = e.target.checked
+                                          ? [...selectedUser.permissions, perm.name]
+                                          : selectedUser.permissions.filter(p => p !== perm.name);
+                                        handleUpdatePermissions(selectedUser._id, newPerms);
+                                      }}
+                                      className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary cursor-pointer"
+                                    />
+                                    <span className="text-sm text-ars-body group-hover:text-ars-heading">
+                                      {perm.description || perm.name}
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setIsEditingUser(true)}
+                      className="w-full px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      Edit User
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Imports Tab */}
+        {activeTab === 'imports' && (
+          <div className="space-y-6">
+            {/* Import History/Stats */}
+            {importHistory && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-ars-heading flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-ars-primary" />
+                      Jobs
+                    </h3>
+                  </div>
+                  <p className="text-3xl font-bold text-ars-primary mb-2">{importHistory.jobs.total.toLocaleString()}</p>
+                  <p className="text-sm text-ars-body">Total jobs in system</p>
+                </div>
+                <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-ars-heading flex items-center gap-2">
+                      <Users className="w-5 h-5 text-ars-primary" />
+                      Customers
+                    </h3>
+                  </div>
+                  <p className="text-3xl font-bold text-ars-primary mb-2">{importHistory.customers.total.toLocaleString()}</p>
+                  <p className="text-sm text-ars-body">Total customers in system</p>
+                </div>
+              </div>
+            )}
+
+            {/* Import Sections */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Import Jobs */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-ars-heading flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-ars-primary" />
+                    Import Jobs
+                  </h3>
+                  <button
+                    onClick={() => downloadExampleCSV('jobs').catch(err => alert('Failed to download: ' + err.message))}
+                    className="px-3 py-1.5 text-sm bg-gray-100 text-ars-heading rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Example CSV
+                  </button>
+                </div>
+                <p className="text-sm text-ars-body mb-4">
+                  Import jobs from a CSV file. Download the example CSV to see the required format.
+                </p>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-ars-body mb-2">Select CSV File</label>
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setSelectedFile(file);
+                          setImportType('jobs');
+                        }
+                      }}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="clear-jobs"
+                      checked={clearExisting && importType === 'jobs'}
+                      onChange={(e) => {
+                        setClearExisting(e.target.checked);
+                        if (e.target.checked && importType !== 'jobs') {
+                          setImportType('jobs');
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary"
+                    />
+                    <label htmlFor="clear-jobs" className="text-sm text-ars-body cursor-pointer">
+                      Clear existing jobs before importing
+                    </label>
+                  </div>
+                  <button
+                    onClick={handleImport}
+                    disabled={!selectedFile || importing || importType !== 'jobs'}
+                    className="w-full px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {importing && importType === 'jobs' ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Importing...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        Import Jobs
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Import Customers */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-ars-heading flex items-center gap-2">
+                    <Users className="w-5 h-5 text-ars-primary" />
+                    Import Customers
+                  </h3>
+                  <button
+                    onClick={() => downloadExampleCSV('customers').catch(err => alert('Failed to download: ' + err.message))}
+                    className="px-3 py-1.5 text-sm bg-gray-100 text-ars-heading rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Example CSV
+                  </button>
+                </div>
+                <p className="text-sm text-ars-body mb-4">
+                  Import customers from a CSV file. Download the example CSV to see the required format.
+                </p>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-ars-body mb-2">Select CSV File</label>
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setSelectedFile(file);
+                          setImportType('customers');
+                        }
+                      }}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="clear-customers"
+                      checked={clearExisting && importType === 'customers'}
+                      onChange={(e) => {
+                        setClearExisting(e.target.checked);
+                        if (e.target.checked && importType !== 'customers') {
+                          setImportType('customers');
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary"
+                    />
+                    <label htmlFor="clear-customers" className="text-sm text-ars-body cursor-pointer">
+                      Clear existing customers before importing
+                    </label>
+                  </div>
+                  <button
+                    onClick={handleImport}
+                    disabled={!selectedFile || importing || importType !== 'customers'}
+                    className="w-full px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {importing && importType === 'customers' ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Importing...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        Import Customers
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Import Result */}
+            {importResult && (
+              <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-ars-heading">Import Result</h3>
+                  <button
+                    onClick={() => {
+                      setImportResult(null);
+                      setSelectedFile(null);
+                      setImportType(null);
+                      setClearExisting(false);
+                    }}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+                    <CheckCircle2 className="w-6 h-6 text-green-600" />
+                    <div>
+                      <p className="text-2xl font-bold text-green-700">{importResult.imported}</p>
+                      <p className="text-sm text-green-600">Imported</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+                    <CheckCircle2 className="w-6 h-6 text-blue-600" />
+                    <div>
+                      <p className="text-2xl font-bold text-blue-700">{importResult.updated}</p>
+                      <p className="text-sm text-blue-600">Updated</p>
+                    </div>
+                  </div>
+                </div>
+                {importResult.errors.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-sm font-semibold text-ars-heading mb-2">
+                      Errors ({importResult.errors.length}):
+                    </p>
+                    <div className="max-h-48 overflow-y-auto space-y-1">
+                      {importResult.errors.map((error, index) => (
+                        <div key={index} className="flex items-start gap-2 p-2 bg-red-50 rounded text-sm text-red-700">
+                          <XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                          <span>{error}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <button
+                  onClick={() => {
+                    loadImportHistory();
+                    setImportResult(null);
+                    setSelectedFile(null);
+                    setImportType(null);
+                    setClearExisting(false);
+                  }}
+                  className="mt-4 w-full px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all"
+                >
+                  Done
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Reference Data Tab */}
+        {activeTab === 'reference' && (
+          <div className="space-y-6">
+            {/* Rep Codes Section */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-ars-heading flex items-center gap-2">
+                  <Key className="w-6 h-6 text-ars-primary" />
+                  Rep Codes
+                </h3>
+                <button
+                  onClick={() => {
+                    setEditingRepCode(null);
+                    setNewRepCode({ code: '', description: '' });
+                    setShowRepCodeForm(true);
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Rep Code
+                </button>
+              </div>
+
+              {/* Add/Edit Rep Code Form */}
+              {(editingRepCode || showRepCodeForm) && (
+                <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-semibold text-ars-heading">
+                      {editingRepCode ? 'Edit Rep Code' : 'New Rep Code'}
+                    </h4>
+                    <button
+                      onClick={() => {
+                        setEditingRepCode(null);
+                        setNewRepCode({ code: '', description: '' });
+                        setShowRepCodeForm(false);
+                      }}
+                      className="p-1 hover:bg-gray-200 rounded transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">Code *</label>
+                      <input
+                        type="text"
+                        value={editingRepCode?.code || newRepCode.code}
+                        onChange={(e) => {
+                          if (editingRepCode) {
+                            setEditingRepCode({ ...editingRepCode, code: e.target.value.toUpperCase() });
+                          } else {
+                            setNewRepCode({ ...newRepCode, code: e.target.value.toUpperCase() });
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        placeholder="e.g., AP001"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">Description</label>
+                      <input
+                        type="text"
+                        value={editingRepCode?.description || newRepCode.description}
+                        onChange={(e) => {
+                          if (editingRepCode) {
+                            setEditingRepCode({ ...editingRepCode, description: e.target.value });
+                          } else {
+                            setNewRepCode({ ...newRepCode, description: e.target.value });
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        placeholder="Optional description"
+                      />
+                    </div>
+                  </div>
+                  {editingRepCode && (
+                    <div className="mt-4 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="rep-code-active"
+                        checked={editingRepCode.isActive}
+                        onChange={(e) => setEditingRepCode({ ...editingRepCode, isActive: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary"
+                      />
+                      <label htmlFor="rep-code-active" className="text-sm text-ars-body cursor-pointer">
+                        Active
+                      </label>
+                    </div>
+                  )}
+                  <div className="flex gap-3 mt-4">
+                    <button
+                      onClick={editingRepCode ? handleUpdateRepCode : handleCreateRepCode}
+                      disabled={loading}
+                      className="px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <Save className="w-4 h-4" />
+                      {editingRepCode ? 'Update' : 'Create'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingRepCode(null);
+                        setNewRepCode({ code: '', description: '' });
+                        setShowRepCodeForm(false);
+                      }}
+                      className="px-4 py-2.5 border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Rep Codes List */}
+              <div className="space-y-2">
+                {repCodes.map((repCode) => (
+                  <div
+                    key={repCode._id}
+                    className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <span className="font-semibold text-ars-heading">{repCode.code}</span>
+                        {repCode.description && (
+                          <span className="text-sm text-ars-body">- {repCode.description}</span>
+                        )}
+                        <span className={`px-2 py-1 text-xs font-medium rounded-lg ${
+                          repCode.isActive
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {repCode.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingRepCode(repCode);
+                          setShowRepCodeForm(false);
+                        }}
+                        className="p-2 text-ars-primary hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Edit rep code"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRepCode(repCode._id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete rep code"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {repCodes.length === 0 && (
+                  <p className="text-center text-ars-body py-8">No rep codes found. Click "Add Rep Code" to create one.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Admin Codes Section */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-ars-heading flex items-center gap-2">
+                  <Shield className="w-6 h-6 text-ars-primary" />
+                  Admin Codes (ADM)
+                </h3>
+              </div>
+              <p className="text-sm text-ars-body mb-4">
+                Admin codes are used in jobs. Add new codes here to make them available when creating jobs.
+              </p>
+
+              {/* Add Admin Code */}
+              <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <label className="block text-sm font-semibold text-ars-body mb-2">Add New Admin Code</label>
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    value={newAdminCode}
+                    onChange={(e) => setNewAdminCode(e.target.value.toUpperCase())}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAddAdminCode();
+                      }
+                    }}
+                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    placeholder="e.g., AS, ER, HT"
+                    maxLength={10}
+                  />
+                  <button
+                    onClick={handleAddAdminCode}
+                    className="px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add
+                  </button>
+                </div>
+              </div>
+
+              {/* Admin Codes List */}
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                {adminCodes.map((code, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200"
+                  >
+                    <span className="font-semibold text-ars-heading">{code}</span>
+                    <button
+                      onClick={() => {
+                        if (confirm(`Remove admin code "${code}" from the list?`)) {
+                          setAdminCodes(adminCodes.filter(c => c !== code));
+                        }
+                      }}
+                      className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                      title="Remove admin code"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+                {adminCodes.length === 0 && (
+                  <p className="col-span-full text-center text-ars-body py-8">
+                    No admin codes found. Add one above or they will appear here when used in jobs.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+

@@ -251,6 +251,7 @@ export interface Job {
     code: string;
     description?: string;
   };
+  machine?: Machine | string;
   registerDate?: string | Date;
   techBooked?: {
     _id: string;
@@ -439,6 +440,39 @@ export interface RepCode {
   updatedAt?: string;
 }
 
+export interface AdminCode {
+  _id: string;
+  code: string;
+  description?: string;
+  user?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  isActive: boolean;
+  dbStatus?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Machine {
+  _id: string;
+  make: string;
+  model: string;
+  serialNumber: string;
+  customer: {
+    _id: string;
+    name: string;
+  } | string;
+  machineHours: number;
+  nextServiceHours: number;
+  isActive: boolean;
+  dbStatus?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Technician {
   _id: string;
   name: string;
@@ -529,6 +563,115 @@ export async function updateRepCode(id: string, repCodeData: Partial<RepCode>): 
  */
 export async function deleteRepCode(id: string): Promise<void> {
   await apiRequest(`/api/reference/rep-codes/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Gets all admin codes.
+ */
+export async function getAdminCodes(): Promise<{ adminCodes: AdminCode[] }> {
+  return apiRequest('/api/reference/admin-codes');
+}
+
+/**
+ * Creates a new admin code.
+ */
+export async function createAdminCode(adminCodeData: {
+  code: string;
+  description?: string;
+  userId?: string;
+}): Promise<{ adminCode: AdminCode }> {
+  return apiRequest('/api/reference/admin-codes', {
+    method: 'POST',
+    body: JSON.stringify(adminCodeData),
+  });
+}
+
+/**
+ * Updates an admin code.
+ */
+export async function updateAdminCode(id: string, adminCodeData: Partial<AdminCode>): Promise<{ adminCode: AdminCode }> {
+  return apiRequest(`/api/reference/admin-codes/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(adminCodeData),
+  });
+}
+
+/**
+ * Deletes an admin code.
+ */
+export async function deleteAdminCode(id: string): Promise<void> {
+  await apiRequest(`/api/reference/admin-codes/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Gets all machines with optional filtering.
+ */
+export async function getMachines(params?: {
+  customerId?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{ machines: Machine[]; pagination: any }> {
+  const queryParams = new URLSearchParams();
+  if (params?.customerId) queryParams.append('customerId', params.customerId);
+  if (params?.search) queryParams.append('search', params.search);
+  if (params?.page) queryParams.append('page', params.page.toString());
+  if (params?.limit) queryParams.append('limit', params.limit.toString());
+  
+  const query = queryParams.toString();
+  return apiRequest(`/api/machines${query ? `?${query}` : ''}`);
+}
+
+/**
+ * Gets a single machine by ID.
+ */
+export async function getMachine(id: string): Promise<{ machine: Machine }> {
+  return apiRequest(`/api/machines/${id}`);
+}
+
+/**
+ * Gets machines by customer ID.
+ */
+export async function getMachinesByCustomer(customerId: string): Promise<{ machines: Machine[] }> {
+  return apiRequest(`/api/machines/customer/${customerId}`);
+}
+
+/**
+ * Creates a new machine.
+ */
+export async function createMachine(machineData: {
+  make: string;
+  model: string;
+  serialNumber: string;
+  customer: string;
+  machineHours: number;
+  nextServiceHours: number;
+}): Promise<{ machine: Machine }> {
+  return apiRequest('/api/machines', {
+    method: 'POST',
+    body: JSON.stringify(machineData),
+  });
+}
+
+/**
+ * Updates a machine.
+ */
+export async function updateMachine(id: string, machineData: Partial<Machine>): Promise<{ machine: Machine }> {
+  return apiRequest(`/api/machines/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(machineData),
+  });
+}
+
+/**
+ * Deletes a machine.
+ */
+export async function deleteMachine(id: string): Promise<void> {
+  await apiRequest(`/api/machines/${id}`, {
     method: 'DELETE',
   });
 }
@@ -993,6 +1136,19 @@ export default {
   getBranches,
   getServiceDescriptions,
   getRepCodes,
+  createRepCode,
+  updateRepCode,
+  deleteRepCode,
+  getAdminCodes,
+  createAdminCode,
+  updateAdminCode,
+  deleteAdminCode,
+  getMachines,
+  getMachine,
+  getMachinesByCustomer,
+  createMachine,
+  updateMachine,
+  deleteMachine,
   getTechnicians,
   getFollowUpStatuses,
   apiRequest,

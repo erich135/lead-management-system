@@ -20,12 +20,16 @@ import {
   createRepCode,
   updateRepCode,
   deleteRepCode,
-  getJobs,
+  getAdminCodes,
+  createAdminCode,
+  updateAdminCode,
+  deleteAdminCode,
   User,
   Role,
   Permission,
   ImportHistory,
-  RepCode
+  RepCode,
+  AdminCode
 } from '../lib/api';
 import { 
   Users, 
@@ -36,8 +40,8 @@ import {
   Plus, 
   X, 
   Save, 
-  Upload,
   Shield,
+  Upload,
   Key,
   FileText,
   AlertCircle,
@@ -71,11 +75,13 @@ export function SystemManagement() {
   
   // Reference data state
   const [repCodes, setRepCodes] = useState<RepCode[]>([]);
-  const [adminCodes, setAdminCodes] = useState<string[]>([]);
+  const [adminCodes, setAdminCodes] = useState<AdminCode[]>([]);
   const [editingRepCode, setEditingRepCode] = useState<RepCode | null>(null);
   const [showRepCodeForm, setShowRepCodeForm] = useState(false);
   const [newRepCode, setNewRepCode] = useState({ code: '', description: '' });
-  const [newAdminCode, setNewAdminCode] = useState('');
+  const [editingAdminCode, setEditingAdminCode] = useState<AdminCode | null>(null);
+  const [showAdminCodeForm, setShowAdminCodeForm] = useState(false);
+  const [newAdminCode, setNewAdminCode] = useState({ code: '', description: '', userId: '' });
 
   useEffect(() => {
     loadData();
@@ -106,16 +112,9 @@ export function SystemManagement() {
       const repCodesResponse = await getRepCodes();
       setRepCodes(repCodesResponse.repCodes || []);
 
-      // Load unique admin codes from jobs
-      const jobsResponse = await getJobs({ allTime: 'true', limit: 10000 });
-      const uniqueAdminCodes = Array.from(
-        new Set(
-          jobsResponse.jobs
-            .map(job => job.adm)
-            .filter((adm): adm is string => !!adm && adm.trim() !== '')
-        )
-      ).sort();
-      setAdminCodes(uniqueAdminCodes);
+      // Load admin codes from API
+      const adminCodesResponse = await getAdminCodes();
+      setAdminCodes(adminCodesResponse.adminCodes || []);
     } catch (err: any) {
       console.error('Error loading reference data:', err);
       setError(err.message || 'Failed to load reference data');
@@ -388,25 +387,65 @@ export function SystemManagement() {
   }
 
   /**
-   * Handles adding a new admin code.
-   * Note: Admin codes are just strings, so we just add it to the list.
-   * It will be saved when a job is created with that code.
+   * Handles creating a new admin code.
    */
-  function handleAddAdminCode() {
-    if (!newAdminCode.trim()) {
+  async function handleCreateAdminCode() {
+    if (!newAdminCode.code.trim()) {
       setError('Admin code is required');
       return;
     }
 
-    const code = newAdminCode.trim().toUpperCase();
-    if (adminCodes.includes(code)) {
-      setError('Admin code already exists');
+    try {
+      setError(null);
+      const response = await createAdminCode({
+        code: newAdminCode.code.trim(),
+        description: newAdminCode.description.trim() || undefined,
+        userId: newAdminCode.userId || undefined,
+      });
+      setAdminCodes([...adminCodes, response.adminCode].sort((a, b) => a.code.localeCompare(b.code)));
+      setNewAdminCode({ code: '', description: '', userId: '' });
+      setShowAdminCodeForm(false);
+    } catch (err: any) {
+      setError(err.message || 'Failed to create admin code');
+    }
+  }
+
+  /**
+   * Handles updating an admin code.
+   */
+  async function handleUpdateAdminCode() {
+    if (!editingAdminCode) return;
+
+    try {
+      setError(null);
+      const response = await updateAdminCode(editingAdminCode._id, {
+        code: editingAdminCode.code,
+        description: editingAdminCode.description,
+        userId: editingAdminCode.user?._id || undefined,
+        isActive: editingAdminCode.isActive,
+      });
+      setAdminCodes(adminCodes.map(ac => ac._id === editingAdminCode._id ? response.adminCode : ac).sort((a, b) => a.code.localeCompare(b.code)));
+      setEditingAdminCode(null);
+      setShowAdminCodeForm(false);
+    } catch (err: any) {
+      setError(err.message || 'Failed to update admin code');
+    }
+  }
+
+  /**
+   * Handles deleting an admin code.
+   */
+  async function handleDeleteAdminCode(id: string) {
+    if (!confirm('Are you sure you want to delete this admin code?')) {
       return;
     }
 
-    setAdminCodes([...adminCodes, code].sort());
-    setNewAdminCode('');
-    setError(null);
+    try {
+      await deleteAdminCode(id);
+      setAdminCodes(adminCodes.filter(ac => ac._id !== id));
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete admin code');
+    }
   }
 
   if (loading && users.length === 0) {
@@ -1212,63 +1251,176 @@ export function SystemManagement() {
                   <Shield className="w-6 h-6 text-ars-primary" />
                   Admin Codes (ADM)
                 </h3>
+                <button
+                  onClick={() => {
+                    setEditingAdminCode(null);
+                    setNewAdminCode({ code: '', description: '', userId: '' });
+                    setShowAdminCodeForm(!showAdminCodeForm);
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Admin Code
+                </button>
               </div>
               <p className="text-sm text-ars-body mb-4">
-                Admin codes are used in jobs. Add new codes here to make them available when creating jobs.
+                Admin codes are used in jobs. Link them to users to track which admin is responsible for each code.
               </p>
 
-              {/* Add Admin Code */}
-              <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                <label className="block text-sm font-semibold text-ars-body mb-2">Add New Admin Code</label>
-                <div className="flex gap-3">
-                  <input
-                    type="text"
-                    value={newAdminCode}
-                    onChange={(e) => setNewAdminCode(e.target.value.toUpperCase())}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        handleAddAdminCode();
-                      }
-                    }}
-                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                    placeholder="e.g., AS, ER, HT"
-                    maxLength={10}
-                  />
-                  <button
-                    onClick={handleAddAdminCode}
-                    className="px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add
-                  </button>
-                </div>
-              </div>
-
-              {/* Admin Codes List */}
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                {adminCodes.map((code, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200"
-                  >
-                    <span className="font-semibold text-ars-heading">{code}</span>
+              {/* Admin Code Form */}
+              {(showAdminCodeForm || editingAdminCode) && (
+                <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <h4 className="text-lg font-semibold text-ars-heading mb-4">
+                    {editingAdminCode ? 'Edit Admin Code' : 'Create New Admin Code'}
+                  </h4>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">
+                        Code <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={editingAdminCode ? editingAdminCode.code : newAdminCode.code}
+                        onChange={(e) => {
+                          if (editingAdminCode) {
+                            setEditingAdminCode({ ...editingAdminCode, code: e.target.value.toUpperCase() });
+                          } else {
+                            setNewAdminCode({ ...newAdminCode, code: e.target.value.toUpperCase() });
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        placeholder="e.g., AS, ER, HT"
+                        maxLength={10}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">Description</label>
+                      <input
+                        type="text"
+                        value={editingAdminCode ? editingAdminCode.description || '' : newAdminCode.description}
+                        onChange={(e) => {
+                          if (editingAdminCode) {
+                            setEditingAdminCode({ ...editingAdminCode, description: e.target.value });
+                          } else {
+                            setNewAdminCode({ ...newAdminCode, description: e.target.value });
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        placeholder="Optional description"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">Linked User</label>
+                      <select
+                        value={editingAdminCode ? editingAdminCode.user?._id || '' : newAdminCode.userId}
+                        onChange={(e) => {
+                          if (editingAdminCode) {
+                            setEditingAdminCode({
+                              ...editingAdminCode,
+                              user: e.target.value ? { _id: e.target.value, firstName: '', lastName: '', email: '' } : undefined,
+                            });
+                          } else {
+                            setNewAdminCode({ ...newAdminCode, userId: e.target.value });
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        <option value="">No user linked</option>
+                        {users.map((user) => (
+                          <option key={user._id} value={user._id}>
+                            {user.firstName} {user.lastName} ({user.email})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  {editingAdminCode && (
+                    <div className="mt-4 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="admin-code-active"
+                        checked={editingAdminCode.isActive}
+                        onChange={(e) => setEditingAdminCode({ ...editingAdminCode, isActive: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary"
+                      />
+                      <label htmlFor="admin-code-active" className="text-sm text-ars-body cursor-pointer">
+                        Active
+                      </label>
+                    </div>
+                  )}
+                  <div className="flex gap-3 mt-4">
+                    <button
+                      onClick={editingAdminCode ? handleUpdateAdminCode : handleCreateAdminCode}
+                      disabled={loading}
+                      className="px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <Save className="w-4 h-4" />
+                      {editingAdminCode ? 'Update' : 'Create'}
+                    </button>
                     <button
                       onClick={() => {
-                        if (confirm(`Remove admin code "${code}" from the list?`)) {
-                          setAdminCodes(adminCodes.filter(c => c !== code));
-                        }
+                        setEditingAdminCode(null);
+                        setNewAdminCode({ code: '', description: '', userId: '' });
+                        setShowAdminCodeForm(false);
                       }}
-                      className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                      title="Remove admin code"
+                      className="px-4 py-2.5 border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition-colors"
                     >
-                      <X className="w-3 h-3" />
+                      Cancel
                     </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Admin Codes List */}
+              <div className="space-y-2">
+                {adminCodes.map((adminCode) => (
+                  <div
+                    key={adminCode._id}
+                    className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <span className="font-semibold text-ars-heading">{adminCode.code}</span>
+                        {adminCode.description && (
+                          <span className="text-sm text-ars-body">- {adminCode.description}</span>
+                        )}
+                        {adminCode.user && (
+                          <span className="text-sm text-ars-body">
+                            (User: {adminCode.user.firstName} {adminCode.user.lastName})
+                          </span>
+                        )}
+                        <span className={`px-2 py-1 text-xs font-medium rounded-lg ${
+                          adminCode.isActive
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {adminCode.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingAdminCode(adminCode);
+                          setShowAdminCodeForm(false);
+                        }}
+                        className="p-2 text-ars-primary hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Edit admin code"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteAdminCode(adminCode._id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete admin code"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {adminCodes.length === 0 && (
-                  <p className="col-span-full text-center text-ars-body py-8">
-                    No admin codes found. Add one above or they will appear here when used in jobs.
-                  </p>
+                  <p className="text-center text-ars-body py-8">No admin codes found. Click "Add Admin Code" to create one.</p>
                 )}
               </div>
             </div>

@@ -1,7 +1,7 @@
 import { useState, FormEvent, useEffect, useRef } from 'react';
-import { createJob, getStatuses, getBranches, getCustomers, createCustomer, getTechnicians, getServiceDescriptions, getRepCodes, type Status, type Branch, type Customer, type Technician, type ServiceDescription, type RepCode } from '../lib/api';
+import { createJob, getStatuses, getBranches, getCustomers, createCustomer, getTechnicians, getServiceDescriptions, getRepCodes, getAdminCodes, getMachinesByCustomer, createMachine, type Status, type Branch, type Customer, type Technician, type ServiceDescription, type RepCode, type AdminCode, type Machine } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
-import { X, AlertCircle, Search, Plus } from 'lucide-react';
+import { X, AlertCircle, Search, Plus, Wrench } from 'lucide-react';
 
 interface LeadFormProps {
   statuses: Status[];
@@ -22,6 +22,17 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [serviceDescriptions, setServiceDescriptions] = useState<ServiceDescription[]>([]);
   const [repCodes, setRepCodes] = useState<RepCode[]>([]);
+  const [adminCodes, setAdminCodes] = useState<AdminCode[]>([]);
+  const [machines, setMachines] = useState<Machine[]>([]);
+  const [showNewMachineForm, setShowNewMachineForm] = useState(false);
+  const [newMachine, setNewMachine] = useState({
+    make: '',
+    model: '',
+    serialNumber: '',
+    machineHours: '',
+    nextServiceHours: '',
+  });
+  const [creatingMachine, setCreatingMachine] = useState(false);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [searchedCustomers, setSearchedCustomers] = useState<Customer[]>([]);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
@@ -31,18 +42,20 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
   const isSelectingCustomerRef = useRef(false); // Flag to prevent search when selecting
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
 
-  // Load technicians, service descriptions, and rep codes on mount
+  // Load technicians, service descriptions, rep codes, and admin codes on mount
   useEffect(() => {
     async function loadReferenceData() {
       try {
-        const [techsData, descsData, repCodesData] = await Promise.all([
+        const [techsData, descsData, repCodesData, adminCodesData] = await Promise.all([
           getTechnicians(),
           getServiceDescriptions(),
           getRepCodes(),
+          getAdminCodes(),
         ]);
         setTechnicians(techsData.technicians || []);
         setServiceDescriptions(descsData.descriptions || []);
         setRepCodes(repCodesData.repCodes || []);
+        setAdminCodes(adminCodesData.adminCodes || []);
       } catch (err) {
         console.error('Error loading reference data:', err);
       }
@@ -96,14 +109,65 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  function handleCustomerSelect(customer: Customer) {
+  async function handleCustomerSelect(customer: Customer) {
     isSelectingCustomerRef.current = true; // Set flag to prevent search
-    setFormData({ ...formData, customer: customer._id });
+    setFormData({ ...formData, customer: customer._id, machine: '' }); // Reset machine when customer changes
     setSelectedCustomer(customer);
     setSelectedCustomerName(customer.name);
     setCustomerSearchTerm(customer.name);
     setShowCustomerDropdown(false);
     setSearchedCustomers([]); // Clear search results since we've selected
+    setShowNewMachineForm(false); // Reset new machine form
+    
+    // Load machines for this customer
+    try {
+      const machinesData = await getMachinesByCustomer(customer._id);
+      setMachines(machinesData.machines || []);
+    } catch (err) {
+      console.error('Error loading machines:', err);
+      setMachines([]);
+    }
+  }
+
+  async function handleCreateMachine() {
+    if (!formData.customer) {
+      setError('Please select a customer first');
+      return;
+    }
+
+    if (!newMachine.make.trim() || !newMachine.model.trim() || !newMachine.serialNumber.trim()) {
+      setError('Make, Model, and Serial Number are required');
+      return;
+    }
+
+    setCreatingMachine(true);
+    setError('');
+    try {
+      const response = await createMachine({
+        make: newMachine.make.trim(),
+        model: newMachine.model.trim(),
+        serialNumber: newMachine.serialNumber.trim(),
+        customer: formData.customer,
+        machineHours: parseFloat(newMachine.machineHours) || 0,
+        nextServiceHours: parseFloat(newMachine.nextServiceHours) || 0,
+      });
+
+      // Add new machine to list and select it
+      setMachines([...machines, response.machine]);
+      setFormData({ ...formData, machine: response.machine._id });
+      setNewMachine({
+        make: '',
+        model: '',
+        serialNumber: '',
+        machineHours: '',
+        nextServiceHours: '',
+      });
+      setShowNewMachineForm(false);
+    } catch (err: any) {
+      setError(err.message || 'Failed to create machine');
+    } finally {
+      setCreatingMachine(false);
+    }
   }
 
   /**
@@ -134,7 +198,6 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
   const [formData, setFormData] = useState(() => {
     const today = new Date().toISOString().split('T')[0];
     return {
-      jobNumber: '',
       customer: '',
       cashCustomer: '',
       branch: branches[0]?._id || '',
@@ -143,9 +206,10 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
       valueExVat: '',
       adm: '',
       repCode: '',
-      registerDate: today,
+      machine: '',
+      registerDate: '',
       techBooked: '',
-      dateBooked: today,
+      dateBooked: '',
       rsrNumber: '',
       feedback: '',
       poDate: '',
@@ -154,8 +218,8 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
       storePack: '',
       invoiceDate: '',
       invNumber: '',
-      startDate: '',
-      dateQuoted: '',
+      startDate: today,
+      dateQuoted: today,
     };
   });
 
@@ -167,15 +231,17 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
     setLoading(true);
 
     try {
+      const today = getTodayDate();
       const payload: any = {
         branch: formData.branch,
         status: formData.status,
         valueExVat: formData.valueExVat ? parseFloat(formData.valueExVat) : undefined,
         adm: formData.adm || undefined,
         repCode: formData.repCode || undefined,
-        registerDate: formData.registerDate || undefined,
+        machine: formData.machine || undefined,
+        registerDate: formData.registerDate || today,
         techBooked: formData.techBooked || undefined,
-        dateBooked: formData.dateBooked || undefined,
+        dateBooked: formData.dateBooked || today,
         rsrNumber: formData.rsrNumber || undefined,
         feedback: formData.feedback || undefined,
         poDate: formData.poDate || undefined,
@@ -212,7 +278,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white px-6 py-4 flex justify-between items-center rounded-t-2xl">
           <h2 className="text-xl font-bold">Create New Job</h2>
           <button
@@ -394,13 +460,24 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
               <label className="block text-sm font-semibold text-ars-body mb-2">
                 Admin (ADM)
               </label>
-              <input
-                type="text"
+              <select
                 value={formData.adm}
                 onChange={(e) => setFormData({ ...formData, adm: e.target.value })}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                placeholder="e.g., AS, ER, HT"
-              />
+              >
+                <option value="">Select Admin</option>
+                {adminCodes && adminCodes.length > 0 ? (
+                  adminCodes
+                    .filter(ac => ac.isActive)
+                    .map((adminCode) => (
+                      <option key={adminCode._id} value={adminCode.code}>
+                        {adminCode.code} {adminCode.description ? `- ${adminCode.description}` : ''}
+                      </option>
+                    ))
+                ) : (
+                  <option value="" disabled>Loading admin codes...</option>
+                )}
+              </select>
             </div>
 
             <div>
@@ -467,9 +544,10 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
               </label>
               <input
                 type="date"
-                value={formData.startDate}
+                value={formData.startDate || getTodayDate()}
                 onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                placeholder="YYYY/MM/DD"
               />
             </div>
 
@@ -479,9 +557,10 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
               </label>
               <input
                 type="date"
-                value={formData.dateQuoted}
+                value={formData.dateQuoted || getTodayDate()}
                 onChange={(e) => setFormData({ ...formData, dateQuoted: e.target.value })}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                placeholder="YYYY/MM/DD"
               />
             </div>
 
@@ -506,6 +585,114 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                 )}
               </select>
             </div>
+
+            {/* Machine Selection - Only show if customer is selected */}
+            {formData.customer && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-ars-body mb-2">
+                  Machine
+                </label>
+                <div className="space-y-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <select
+                      value={formData.machine}
+                      onChange={(e) => setFormData({ ...formData, machine: e.target.value })}
+                      className="flex-1 min-w-0 px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    >
+                      <option value="">Select Machine (Optional)</option>
+                      {machines && machines.length > 0 ? (
+                        machines
+                          .filter(m => m.isActive)
+                          .map((machine) => (
+                            <option key={machine._id} value={machine._id}>
+                              {machine.make} {machine.model} - {machine.serialNumber} ({machine.machineHours} hrs)
+                            </option>
+                          ))
+                      ) : (
+                        <option value="" disabled>No machines found for this customer</option>
+                      )}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewMachineForm(!showNewMachineForm)}
+                      className="px-4 py-2.5 bg-ars-primary text-white rounded-xl hover:bg-ars-primary/90 transition-colors whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-1 sm:w-auto w-full"
+                    >
+                      <Plus className="w-4 h-4" />
+                      {showNewMachineForm ? 'Cancel' : 'New Machine'}
+                    </button>
+                  </div>
+                  
+                  {/* New Machine Form */}
+                  {showNewMachineForm && (
+                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
+                      <h4 className="font-semibold text-ars-heading text-sm">Add New Machine</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-ars-body mb-1">Make *</label>
+                          <input
+                            type="text"
+                            value={newMachine.make}
+                            onChange={(e) => setNewMachine({ ...newMachine, make: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent text-sm"
+                            placeholder="e.g., Caterpillar"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-ars-body mb-1">Model *</label>
+                          <input
+                            type="text"
+                            value={newMachine.model}
+                            onChange={(e) => setNewMachine({ ...newMachine, model: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent text-sm"
+                            placeholder="e.g., CAT 320"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-ars-body mb-1">Serial Number *</label>
+                          <input
+                            type="text"
+                            value={newMachine.serialNumber}
+                            onChange={(e) => setNewMachine({ ...newMachine, serialNumber: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent text-sm"
+                            placeholder="Serial number"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-ars-body mb-1">Machine Hours</label>
+                          <input
+                            type="number"
+                            value={newMachine.machineHours}
+                            onChange={(e) => setNewMachine({ ...newMachine, machineHours: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent text-sm"
+                            placeholder="0"
+                            min="0"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-ars-body mb-1">Next Service Hours</label>
+                          <input
+                            type="number"
+                            value={newMachine.nextServiceHours}
+                            onChange={(e) => setNewMachine({ ...newMachine, nextServiceHours: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent text-sm"
+                            placeholder="0"
+                            min="0"
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCreateMachine}
+                        disabled={creatingMachine}
+                        className="w-full px-4 py-2 bg-ars-primary text-white rounded-lg hover:bg-ars-primary/90 transition-colors disabled:opacity-50 text-sm font-medium"
+                      >
+                        {creatingMachine ? 'Creating...' : 'Create Machine'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-semibold text-ars-body mb-2">
@@ -587,11 +774,10 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                 Store Pack
               </label>
               <input
-                type="text"
+                type="date"
                 value={formData.storePack}
                 onChange={(e) => setFormData({ ...formData, storePack: e.target.value })}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                placeholder="Enter store pack"
               />
             </div>
 

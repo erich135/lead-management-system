@@ -90,6 +90,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedPriority, setSelectedPriority] = useState<'all' | 'critical' | 'warning' | 'info'>('all');
+  const [leadsListRefreshKey, setLeadsListRefreshKey] = useState(0);
 
   useEffect(() => {
     loadInitialData();
@@ -224,6 +225,8 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
     setShowLeadForm(false);
     setSelectedLead(null);
     loadStats();
+    loadOverdueJobs(); // Refresh overdue jobs list
+    setLeadsListRefreshKey(prev => prev + 1); // Trigger LeadsList refresh
   }
 
   return (
@@ -951,6 +954,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
             onCreateNew={() => setShowLeadForm(true)}
             statuses={statuses}
             branches={branches}
+            refreshKey={leadsListRefreshKey}
           />
         )}
 

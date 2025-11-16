@@ -111,7 +111,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
 
   async function handleCustomerSelect(customer: Customer) {
     isSelectingCustomerRef.current = true; // Set flag to prevent search
-    setFormData({ ...formData, customer: customer._id, machine: '' }); // Reset machine when customer changes
+    setFormData({ ...formData, customer: customer._id, machines: [] }); // Reset machines when customer changes
     setSelectedCustomer(customer);
     setSelectedCustomerName(customer.name);
     setCustomerSearchTerm(customer.name);
@@ -152,9 +152,10 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
         nextServiceHours: parseFloat(newMachine.nextServiceHours) || 0,
       });
 
-      // Add new machine to list and select it
+      // Add new machine to list and add it to machines array
       setMachines([...machines, response.machine]);
-      setFormData({ ...formData, machine: response.machine._id });
+      const currentMachines = Array.isArray(formData.machines) ? formData.machines : [];
+      setFormData({ ...formData, machines: [...currentMachines, response.machine._id] });
       setNewMachine({
         make: '',
         model: '',
@@ -195,7 +196,30 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
     }
   }
 
-  const [formData, setFormData] = useState(() => {
+  const [formData, setFormData] = useState<{
+    customer: string;
+    cashCustomer: string;
+    branch: string;
+    status: string;
+    description: string;
+    valueExVat: string;
+    adm: string;
+    repCode: string;
+    machines: string[];
+    registerDate: string;
+    techBooked: string;
+    dateBooked: string;
+    rsrNumber: string;
+    feedback: string;
+    poDate: string;
+    poNumber: string;
+    oilSampleNumber: string;
+    storePack: string;
+    invoiceDate: string;
+    invNumber: string;
+    startDate: string;
+    dateQuoted: string;
+  }>(() => {
     const today = new Date().toISOString().split('T')[0];
     return {
       customer: '',
@@ -206,7 +230,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
       valueExVat: '',
       adm: '',
       repCode: '',
-      machine: '',
+      machines: [] as string[],
       registerDate: '',
       techBooked: '',
       dateBooked: '',
@@ -238,7 +262,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
         valueExVat: formData.valueExVat ? parseFloat(formData.valueExVat) : undefined,
         adm: formData.adm || undefined,
         repCode: formData.repCode || undefined,
-        machine: formData.machine || undefined,
+        machines: Array.isArray(formData.machines) && formData.machines.length > 0 ? formData.machines : undefined,
         registerDate: formData.registerDate || today,
         techBooked: formData.techBooked || undefined,
         dateBooked: formData.dateBooked || today,
@@ -586,23 +610,68 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
               </select>
             </div>
 
-            {/* Machine Selection - Only show if customer is selected */}
+            {/* Machines Selection - Only show if customer is selected */}
             {formData.customer && (
               <div className="md:col-span-2">
                 <label className="block text-sm font-semibold text-ars-body mb-2">
-                  Machine
+                  Machines
                 </label>
-                <div className="space-y-2">
-                  <div className="flex flex-col sm:flex-row gap-2">
+                <div className="space-y-3">
+                  {/* Display selected machines */}
+                  {Array.isArray(formData.machines) && formData.machines.length > 0 && (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {formData.machines.map((machineId, index) => {
+                        const machine = machines.find(m => m._id === machineId);
+                        if (!machine) return null;
+                        return (
+                          <div key={machine._id || index} className="p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-ars-heading text-sm">
+                                {machine.make} {machine.model}
+                              </div>
+                              <div className="text-xs text-ars-body mt-1">
+                                Serial: {machine.serialNumber} • Hours: {machine.machineHours.toLocaleString()} • Next: {machine.nextServiceHours.toLocaleString()}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updatedMachines = formData.machines?.filter(id => id !== machineId) || [];
+                                setFormData({ ...formData, machines: updatedMachines });
+                              }}
+                              className="ml-2 px-2 py-1 text-red-600 hover:bg-red-50 rounded transition-colors text-sm flex-shrink-0"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  
+                  {/* Add machine dropdown and button - Always visible */}
+                  <div className="flex flex-col sm:flex-row gap-2 relative z-10">
                     <select
-                      value={formData.machine}
-                      onChange={(e) => setFormData({ ...formData, machine: e.target.value })}
-                      className="flex-1 min-w-0 px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          const currentMachines = Array.isArray(formData.machines) ? formData.machines : [];
+                          if (!currentMachines.includes(e.target.value)) {
+                            setFormData({ ...formData, machines: [...currentMachines, e.target.value] });
+                          }
+                          e.target.value = '';
+                        }
+                      }}
+                      className="flex-1 min-w-0 px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
                     >
-                      <option value="">Select Machine (Optional)</option>
+                      <option value="">Select Machine to Add</option>
                       {machines && machines.length > 0 ? (
                         machines
-                          .filter(m => m.isActive)
+                          .filter(m => {
+                            if (!m.isActive) return false;
+                            const currentMachines = Array.isArray(formData.machines) ? formData.machines : [];
+                            return !currentMachines.includes(m._id);
+                          })
                           .map((machine) => (
                             <option key={machine._id} value={machine._id}>
                               {machine.make} {machine.model} - {machine.serialNumber} ({machine.machineHours} hrs)

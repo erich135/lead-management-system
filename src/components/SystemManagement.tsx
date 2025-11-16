@@ -24,12 +24,14 @@ import {
   createAdminCode,
   updateAdminCode,
   deleteAdminCode,
+  getTechnicians,
   User,
   Role,
   Permission,
   ImportHistory,
   RepCode,
-  AdminCode
+  AdminCode,
+  Technician
 } from '../lib/api';
 import { 
   Users, 
@@ -76,20 +78,37 @@ export function SystemManagement() {
   // Reference data state
   const [repCodes, setRepCodes] = useState<RepCode[]>([]);
   const [adminCodes, setAdminCodes] = useState<AdminCode[]>([]);
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [editingRepCode, setEditingRepCode] = useState<RepCode | null>(null);
   const [showRepCodeForm, setShowRepCodeForm] = useState(false);
   const [newRepCode, setNewRepCode] = useState({ code: '', description: '' });
   const [editingAdminCode, setEditingAdminCode] = useState<AdminCode | null>(null);
   const [showAdminCodeForm, setShowAdminCodeForm] = useState(false);
   const [newAdminCode, setNewAdminCode] = useState({ code: '', description: '', userId: '' });
+  
+  // Invite user state
+  const [showInviteForm, setShowInviteForm] = useState(false);
+  const [inviteFormData, setInviteFormData] = useState({
+    email: '',
+    firstName: '',
+    lastName: '',
+    role: '',
+    adminCodeId: '',
+    adminCode: { code: '', description: '' },
+    repCodeId: '',
+    repCode: { code: '', description: '' },
+    technicianId: '',
+    technician: { name: '', email: '', phone: '' },
+  });
+  const [inviting, setInviting] = useState(false);
 
   useEffect(() => {
     loadData();
     loadImportHistory();
-    if (activeTab === 'reference') {
+    if (activeTab === 'reference' || showInviteForm) {
       loadReferenceData();
     }
-  }, [currentPage, searchTerm, activeTab]);
+  }, [currentPage, searchTerm, activeTab, showInviteForm]);
 
   /**
    * Loads import history/statistics.
@@ -104,7 +123,7 @@ export function SystemManagement() {
   }
 
   /**
-   * Loads reference data (rep codes, admin codes).
+   * Loads reference data (rep codes, admin codes, technicians).
    */
   async function loadReferenceData() {
     try {
@@ -115,6 +134,10 @@ export function SystemManagement() {
       // Load admin codes from API
       const adminCodesResponse = await getAdminCodes();
       setAdminCodes(adminCodesResponse.adminCodes || []);
+      
+      // Load technicians
+      const techniciansResponse = await getTechnicians();
+      setTechnicians(techniciansResponse.technicians || []);
     } catch (err: any) {
       console.error('Error loading reference data:', err);
       setError(err.message || 'Failed to load reference data');
@@ -278,6 +301,93 @@ export function SystemManagement() {
       return acc;
     }, {} as Record<string, Permission[]>);
   }, [permissions]);
+
+  /**
+   * Handles inviting a new user with role-specific connections.
+   */
+  async function handleInviteUser() {
+    if (!inviteFormData.email || !inviteFormData.firstName || !inviteFormData.lastName || !inviteFormData.role) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      setInviting(true);
+      setError(null);
+
+      const selectedRole = roles.find(r => r._id === inviteFormData.role);
+      const roleName = selectedRole?.name?.toLowerCase() || '';
+
+      // Build invite payload based on role
+      const invitePayload: any = {
+        email: inviteFormData.email,
+        firstName: inviteFormData.firstName,
+        lastName: inviteFormData.lastName,
+        role: inviteFormData.role,
+      };
+
+      // Add role-specific data
+      if (roleName === 'admin') {
+        if (inviteFormData.adminCodeId) {
+          invitePayload.adminCodeId = inviteFormData.adminCodeId;
+        } else if (inviteFormData.adminCode.code) {
+          invitePayload.adminCode = inviteFormData.adminCode;
+        } else {
+          alert('Admin users must have an AdminCode. Please select an existing one or create a new one.');
+          setInviting(false);
+          return;
+        }
+      } else if (roleName === 'rep') {
+        if (inviteFormData.repCodeId) {
+          invitePayload.repCodeId = inviteFormData.repCodeId;
+        } else if (inviteFormData.repCode.code) {
+          invitePayload.repCode = inviteFormData.repCode;
+        } else {
+          alert('Rep users must have a RepCode. Please select an existing one or create a new one.');
+          setInviting(false);
+          return;
+        }
+      } else if (roleName === 'technician') {
+        if (inviteFormData.technicianId) {
+          invitePayload.technicianId = inviteFormData.technicianId;
+        } else if (inviteFormData.technician.name) {
+          invitePayload.technician = inviteFormData.technician;
+        } else {
+          alert('Technician users must have a Technician record. Please select an existing one or create a new one.');
+          setInviting(false);
+          return;
+        }
+      }
+      // Manager role doesn't need additional data
+
+      const response = await inviteUser(invitePayload);
+      alert(response.message || 'User invited successfully');
+      
+      // Reset form and close modal
+      setShowInviteForm(false);
+      setInviteFormData({
+        email: '',
+        firstName: '',
+        lastName: '',
+        role: '',
+        adminCodeId: '',
+        adminCode: { code: '', description: '' },
+        repCodeId: '',
+        repCode: { code: '', description: '' },
+        technicianId: '',
+        technician: { name: '', email: '', phone: '' },
+      });
+      
+      // Reload users
+      await loadData();
+    } catch (err: any) {
+      console.error('Error inviting user:', err);
+      alert('Failed to invite user: ' + (err.message || 'Unknown error'));
+      setError(err.message || 'Failed to invite user');
+    } finally {
+      setInviting(false);
+    }
+  }
 
   /**
    * Handles importing CSV file.
@@ -533,8 +643,19 @@ export function SystemManagement() {
                 <h3 className="text-xl font-bold text-ars-heading">Users</h3>
                 <button
                   onClick={() => {
-                    // TODO: Implement invite user modal
-                    alert('Invite user functionality coming soon');
+                    setShowInviteForm(true);
+                    setInviteFormData({
+                      email: '',
+                      firstName: '',
+                      lastName: '',
+                      role: '',
+                      adminCodeId: '',
+                      adminCode: { code: '', description: '' },
+                      repCodeId: '',
+                      repCode: { code: '', description: '' },
+                      technicianId: '',
+                      technician: { name: '', email: '', phone: '' },
+                    });
                   }}
                   className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2"
                 >
@@ -1427,6 +1548,288 @@ export function SystemManagement() {
           </div>
         )}
       </div>
+
+      {/* Invite User Modal */}
+      {showInviteForm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white p-6 rounded-t-2xl z-10">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold">Invite New User</h2>
+                <button
+                  onClick={() => setShowInviteForm(false)}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {error && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-red-800">{error}</p>
+                </div>
+              )}
+
+              {/* Basic User Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">Email *</label>
+                  <input
+                    type="email"
+                    value={inviteFormData.email}
+                    onChange={(e) => setInviteFormData({ ...inviteFormData, email: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    placeholder="user@example.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">Role *</label>
+                  <select
+                    value={inviteFormData.role}
+                    onChange={(e) => setInviteFormData({ ...inviteFormData, role: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                  >
+                    <option value="">Select Role</option>
+                    {roles.map((role) => (
+                      <option key={role._id} value={role._id}>
+                        {role.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">First Name *</label>
+                  <input
+                    type="text"
+                    value={inviteFormData.firstName}
+                    onChange={(e) => setInviteFormData({ ...inviteFormData, firstName: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    placeholder="John"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">Last Name *</label>
+                  <input
+                    type="text"
+                    value={inviteFormData.lastName}
+                    onChange={(e) => setInviteFormData({ ...inviteFormData, lastName: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    placeholder="Doe"
+                  />
+                </div>
+              </div>
+
+              {/* Role-Specific Fields */}
+              {(() => {
+                const selectedRole = roles.find(r => r._id === inviteFormData.role);
+                const roleName = selectedRole?.name?.toLowerCase() || '';
+
+                if (roleName === 'admin') {
+                  return (
+                    <div className="space-y-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                      <h3 className="font-semibold text-ars-heading">Admin Code *</h3>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-ars-body mb-2">Select Existing AdminCode</label>
+                          <select
+                            value={inviteFormData.adminCodeId}
+                            onChange={(e) => setInviteFormData({ 
+                              ...inviteFormData, 
+                              adminCodeId: e.target.value,
+                              adminCode: { code: '', description: '' }
+                            })}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          >
+                            <option value="">Select AdminCode (or create new below)</option>
+                            {adminCodes.filter(ac => ac.isActive).map((ac) => (
+                              <option key={ac._id} value={ac._id}>
+                                {ac.code} {ac.description ? `- ${ac.description}` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="text-center text-sm text-gray-500">OR</div>
+                        <div>
+                          <label className="block text-sm font-medium text-ars-body mb-2">Create New AdminCode</label>
+                          <div className="grid grid-cols-2 gap-3">
+                            <input
+                              type="text"
+                              value={inviteFormData.adminCode.code}
+                              onChange={(e) => setInviteFormData({ 
+                                ...inviteFormData, 
+                                adminCode: { ...inviteFormData.adminCode, code: e.target.value },
+                                adminCodeId: ''
+                              })}
+                              className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                              placeholder="Code (e.g., AS)"
+                            />
+                            <input
+                              type="text"
+                              value={inviteFormData.adminCode.description}
+                              onChange={(e) => setInviteFormData({ 
+                                ...inviteFormData, 
+                                adminCode: { ...inviteFormData.adminCode, description: e.target.value }
+                              })}
+                              className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                              placeholder="Description (optional)"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                } else if (roleName === 'rep') {
+                  return (
+                    <div className="space-y-4 p-4 bg-green-50 rounded-xl border border-green-200">
+                      <h3 className="font-semibold text-ars-heading">Rep Code *</h3>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-ars-body mb-2">Select Existing RepCode</label>
+                          <select
+                            value={inviteFormData.repCodeId}
+                            onChange={(e) => setInviteFormData({ 
+                              ...inviteFormData, 
+                              repCodeId: e.target.value,
+                              repCode: { code: '', description: '' }
+                            })}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          >
+                            <option value="">Select RepCode (or create new below)</option>
+                            {repCodes.filter(rc => rc.isActive).map((rc) => (
+                              <option key={rc._id} value={rc._id}>
+                                {rc.code} {rc.description ? `- ${rc.description}` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="text-center text-sm text-gray-500">OR</div>
+                        <div>
+                          <label className="block text-sm font-medium text-ars-body mb-2">Create New RepCode</label>
+                          <div className="grid grid-cols-2 gap-3">
+                            <input
+                              type="text"
+                              value={inviteFormData.repCode.code}
+                              onChange={(e) => setInviteFormData({ 
+                                ...inviteFormData, 
+                                repCode: { ...inviteFormData.repCode, code: e.target.value },
+                                repCodeId: ''
+                              })}
+                              className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                              placeholder="Code (e.g., AP001)"
+                            />
+                            <input
+                              type="text"
+                              value={inviteFormData.repCode.description}
+                              onChange={(e) => setInviteFormData({ 
+                                ...inviteFormData, 
+                                repCode: { ...inviteFormData.repCode, description: e.target.value }
+                              })}
+                              className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                              placeholder="Description (optional)"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                } else if (roleName === 'technician') {
+                  return (
+                    <div className="space-y-4 p-4 bg-purple-50 rounded-xl border border-purple-200">
+                      <h3 className="font-semibold text-ars-heading">Technician *</h3>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-ars-body mb-2">Select Existing Technician</label>
+                          <select
+                            value={inviteFormData.technicianId}
+                            onChange={(e) => setInviteFormData({ 
+                              ...inviteFormData, 
+                              technicianId: e.target.value,
+                              technician: { name: '', email: '', phone: '' }
+                            })}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          >
+                            <option value="">Select Technician (or create new below)</option>
+                            {technicians.filter(t => t.isActive).map((t) => (
+                              <option key={t._id} value={t._id}>
+                                {t.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="text-center text-sm text-gray-500">OR</div>
+                        <div>
+                          <label className="block text-sm font-medium text-ars-body mb-2">Create New Technician</label>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <input
+                              type="text"
+                              value={inviteFormData.technician.name}
+                              onChange={(e) => setInviteFormData({ 
+                                ...inviteFormData, 
+                                technician: { ...inviteFormData.technician, name: e.target.value },
+                                technicianId: ''
+                              })}
+                              className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                              placeholder="Name *"
+                            />
+                            <input
+                              type="email"
+                              value={inviteFormData.technician.email}
+                              onChange={(e) => setInviteFormData({ 
+                                ...inviteFormData, 
+                                technician: { ...inviteFormData.technician, email: e.target.value }
+                              })}
+                              className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                              placeholder="Email (optional)"
+                            />
+                            <input
+                              type="tel"
+                              value={inviteFormData.technician.phone}
+                              onChange={(e) => setInviteFormData({ 
+                                ...inviteFormData, 
+                                technician: { ...inviteFormData.technician, phone: e.target.value }
+                              })}
+                              className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                              placeholder="Phone (optional)"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                } else if (roleName === 'manager') {
+                  return (
+                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                      <p className="text-sm text-ars-body">Manager role selected. No additional configuration required.</p>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => setShowInviteForm(false)}
+                  className="px-6 py-3 border border-gray-300 rounded-xl font-medium text-ars-body hover:bg-gray-50 transition-colors"
+                  disabled={inviting}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleInviteUser}
+                  disabled={inviting}
+                  className="px-6 py-3 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {inviting ? 'Inviting...' : 'Send Invitation'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

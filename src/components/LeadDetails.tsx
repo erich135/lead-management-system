@@ -102,9 +102,12 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
         nextServiceHours: parseFloat(newMachine.nextServiceHours) || 0,
       });
 
-      // Add new machine to list and select it
-      setMachines([...machines, response.machine]);
-      setJob({ ...job, machine: response.machine._id });
+      // Add new machine to list and add it to job's machines array
+      const updatedMachines = [...machines, response.machine];
+      setMachines(updatedMachines);
+      const currentMachines = Array.isArray(job.machines) ? job.machines : [];
+      const machineIds = currentMachines.map(m => typeof m === 'object' && m !== null ? m._id : m).filter(Boolean);
+      setJob({ ...job, machines: [...machineIds, response.machine._id] });
       setNewMachine({
         make: '',
         model: '',
@@ -472,130 +475,6 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                   </div>
                 </div>
 
-                {/* Machine Field - Only show if customer exists */}
-                {job.customer && typeof job.customer === 'object' && job.customer._id && (
-                  <div>
-                    <label className="block text-sm font-semibold text-ars-body mb-2">Machine</label>
-                    {isEditing ? (
-                      <div className="space-y-2">
-                        <div className="flex gap-2">
-                          <select
-                            value={typeof job.machine === 'object' && job.machine !== null ? job.machine._id : (job.machine || '')}
-                            onChange={(e) => setJob({ ...job, machine: e.target.value || undefined })}
-                            className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                          >
-                            <option value="">No Machine (Optional)</option>
-                            {machines
-                              .filter(m => m.isActive)
-                              .map((machine) => (
-                                <option key={machine._id} value={machine._id}>
-                                  {machine.make} {machine.model} - {machine.serialNumber} ({machine.machineHours} hrs)
-                                </option>
-                              ))}
-                          </select>
-                          <button
-                            type="button"
-                            onClick={() => setShowNewMachineForm(!showNewMachineForm)}
-                            className="px-4 py-3 bg-ars-primary text-white rounded-xl hover:bg-ars-primary/90 transition-colors whitespace-nowrap"
-                          >
-                            {showNewMachineForm ? 'Cancel' : '+ New'}
-                          </button>
-                        </div>
-                        
-                        {/* New Machine Form */}
-                        {showNewMachineForm && (
-                          <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
-                            <h4 className="font-semibold text-ars-heading">Add New Machine</h4>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-xs font-semibold text-ars-body mb-1">Make *</label>
-                                <input
-                                  type="text"
-                                  value={newMachine.make}
-                                  onChange={(e) => setNewMachine({ ...newMachine, make: e.target.value })}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                                  placeholder="e.g., Caterpillar"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-semibold text-ars-body mb-1">Model *</label>
-                                <input
-                                  type="text"
-                                  value={newMachine.model}
-                                  onChange={(e) => setNewMachine({ ...newMachine, model: e.target.value })}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                                  placeholder="e.g., CAT 320"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-semibold text-ars-body mb-1">Serial Number *</label>
-                                <input
-                                  type="text"
-                                  value={newMachine.serialNumber}
-                                  onChange={(e) => setNewMachine({ ...newMachine, serialNumber: e.target.value })}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                                  placeholder="Serial number"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-semibold text-ars-body mb-1">Machine Hours</label>
-                                <input
-                                  type="number"
-                                  value={newMachine.machineHours}
-                                  onChange={(e) => setNewMachine({ ...newMachine, machineHours: e.target.value })}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                                  placeholder="0"
-                                  min="0"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-semibold text-ars-body mb-1">Next Service Hours</label>
-                                <input
-                                  type="number"
-                                  value={newMachine.nextServiceHours}
-                                  onChange={(e) => setNewMachine({ ...newMachine, nextServiceHours: e.target.value })}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                                  placeholder="0"
-                                  min="0"
-                                />
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={handleCreateMachine}
-                              disabled={creatingMachine}
-                              className="w-full px-4 py-2 bg-ars-primary text-white rounded-lg hover:bg-ars-primary/90 transition-colors disabled:opacity-50"
-                            >
-                              {creatingMachine ? 'Creating...' : 'Create Machine'}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                        {job.machine && typeof job.machine === 'object' && job.machine !== null ? (
-                          <div className="space-y-1">
-                            <div className="text-ars-heading font-semibold">
-                              {job.machine.make} {job.machine.model}
-                            </div>
-                            <div className="text-sm text-ars-body">
-                              Serial: {job.machine.serialNumber}
-                            </div>
-                            <div className="flex items-center gap-4 text-sm text-ars-body">
-                              <span>Hours: <span className="font-medium">{job.machine.machineHours.toLocaleString()}</span></span>
-                              <span>Next Service: <span className="font-medium">{job.machine.nextServiceHours.toLocaleString()}</span></span>
-                            </div>
-                          </div>
-                        ) : job.machine ? (
-                          <span className="text-ars-heading">Machine (ID)</span>
-                        ) : (
-                          <span className="text-ars-heading">-</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 <div>
                   <label className="block text-sm font-semibold text-ars-body mb-2">RSR #</label>
                   {isEditing ? (
@@ -708,6 +587,193 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
               </div>
             </div>
           </div>
+
+          {/* Machines Section - Full Width Block */}
+          {job.customer && typeof job.customer === 'object' && job.customer._id && (
+            <div className="mt-6 space-y-4">
+              <h3 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-2">Machines</h3>
+              {isEditing ? (
+                <div className="space-y-3">
+                  {/* Display selected machines */}
+                  {Array.isArray(job.machines) && job.machines.length > 0 && (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {job.machines.map((machineRef, index) => {
+                        const machine = typeof machineRef === 'object' && machineRef !== null
+                          ? machineRef
+                          : machines.find(m => m._id === machineRef);
+                        if (!machine) return null;
+                        return (
+                          <div key={machine._id || index} className="p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-ars-heading">
+                                {machine.make} {machine.model}
+                              </div>
+                              <div className="text-xs text-ars-body mt-1">
+                                Serial: {machine.serialNumber} • Hours: {machine.machineHours.toLocaleString()} • Next: {machine.nextServiceHours.toLocaleString()}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updatedMachines = job.machines?.filter((m) => {
+                                  const mId = typeof m === 'object' && m !== null ? m._id : m;
+                                  const refId = typeof machineRef === 'object' && machineRef !== null ? machineRef._id : machineRef;
+                                  return mId !== refId;
+                                }) || [];
+                                setJob({ ...job, machines: updatedMachines });
+                              }}
+                              className="ml-2 px-2 py-1 text-red-600 hover:bg-red-50 rounded transition-colors flex-shrink-0"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  
+                  {/* Add machine dropdown and button - Always visible */}
+                  <div className="flex gap-2">
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          const currentMachines = Array.isArray(job.machines) ? job.machines : [];
+                          const machineIds = currentMachines.map(m => typeof m === 'object' && m !== null ? m._id : m).filter(Boolean);
+                          if (!machineIds.includes(e.target.value)) {
+                            setJob({ ...job, machines: [...machineIds, e.target.value] });
+                          }
+                          e.target.value = '';
+                        }
+                      }}
+                      className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                    >
+                      <option value="">Select Machine to Add</option>
+                      {machines
+                        .filter(m => {
+                          if (!m.isActive) return false;
+                          const currentMachines = Array.isArray(job.machines) ? job.machines : [];
+                          const machineIds = currentMachines.map(m => typeof m === 'object' && m !== null ? m._id : m).filter(Boolean);
+                          return !machineIds.includes(m._id);
+                        })
+                        .map((machine) => (
+                          <option key={machine._id} value={machine._id}>
+                            {machine.make} {machine.model} - {machine.serialNumber} ({machine.machineHours} hrs)
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewMachineForm(!showNewMachineForm)}
+                      className="px-4 py-3 bg-ars-primary text-white rounded-xl hover:bg-ars-primary/90 transition-colors whitespace-nowrap flex-shrink-0"
+                    >
+                      {showNewMachineForm ? 'Cancel' : '+ New'}
+                    </button>
+                  </div>
+                  
+                  {/* New Machine Form */}
+                  {showNewMachineForm && (
+                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
+                      <h4 className="font-semibold text-ars-heading">Add New Machine</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-ars-body mb-1">Make *</label>
+                          <input
+                            type="text"
+                            value={newMachine.make}
+                            onChange={(e) => setNewMachine({ ...newMachine, make: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                            placeholder="e.g., Caterpillar"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-ars-body mb-1">Model *</label>
+                          <input
+                            type="text"
+                            value={newMachine.model}
+                            onChange={(e) => setNewMachine({ ...newMachine, model: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                            placeholder="e.g., CAT 320"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-ars-body mb-1">Serial Number *</label>
+                          <input
+                            type="text"
+                            value={newMachine.serialNumber}
+                            onChange={(e) => setNewMachine({ ...newMachine, serialNumber: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                            placeholder="Serial number"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-ars-body mb-1">Machine Hours</label>
+                          <input
+                            type="number"
+                            value={newMachine.machineHours}
+                            onChange={(e) => setNewMachine({ ...newMachine, machineHours: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                            placeholder="0"
+                            min="0"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-ars-body mb-1">Next Service Hours</label>
+                          <input
+                            type="number"
+                            value={newMachine.nextServiceHours}
+                            onChange={(e) => setNewMachine({ ...newMachine, nextServiceHours: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                            placeholder="0"
+                            min="0"
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCreateMachine}
+                        disabled={creatingMachine}
+                        className="w-full px-4 py-2 bg-ars-primary text-white rounded-lg hover:bg-ars-primary/90 transition-colors disabled:opacity-50"
+                      >
+                        {creatingMachine ? 'Creating...' : 'Create Machine'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {Array.isArray(job.machines) && job.machines.length > 0 ? (
+                    job.machines.map((machineRef, index) => {
+                      const machine = typeof machineRef === 'object' && machineRef !== null
+                        ? machineRef
+                        : machines.find(m => m._id === machineRef);
+                      if (!machine) return null;
+                      return (
+                        <div key={machine._id || index} className="px-4 py-3 bg-gray-50 rounded-xl border border-gray-200">
+                          <div className="space-y-1">
+                            <div className="text-ars-heading font-semibold">
+                              {machine.make} {machine.model}
+                            </div>
+                            <div className="text-sm text-ars-body">
+                              Serial: {machine.serialNumber}
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-ars-body">
+                              <span>Hours: <span className="font-medium">{machine.machineHours.toLocaleString()}</span></span>
+                              <span>Next Service: <span className="font-medium">{machine.nextServiceHours.toLocaleString()}</span></span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                      <span className="text-ars-heading">-</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Follow-up Statuses */}
           {(job.followUp1 || job.followUp2 || job.followUp3 || job.followUp4) && (

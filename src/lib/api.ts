@@ -251,7 +251,7 @@ export interface Job {
     code: string;
     description?: string;
   };
-  machine?: Machine | string;
+  machines?: (Machine | string)[];
   registerDate?: string | Date;
   techBooked?: {
     _id: string;

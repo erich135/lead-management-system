@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { getJobs, updateJob, getCustomers, getTechnicians, getOverdueJobs, getRepCodes, getAdminCodes, type Job, type Status, type Branch, type Customer, type Technician, type OverdueJob, type RepCode, type AdminCode } from '../lib/api';
-import { Search, Filter, Plus, AlertCircle, Calendar, Edit2, Eye, Clock, CheckCircle2, X, Zap, FileText, User, Building2, DollarSign, Wrench, Sparkles, ArrowRight, Tag } from 'lucide-react';
+import { Search, Filter, Plus, AlertCircle, Calendar, Edit2, Eye, Clock, CheckCircle2, X, Zap, FileText, User, Building2, DollarSign, Wrench, Sparkles, ArrowRight, Tag, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
 import { LeadDetails } from './LeadDetails';
 
 interface LeadsListProps {
@@ -42,6 +42,13 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
   const [isLoadingJobs, setIsLoadingJobs] = useState(false); // Track if we're actively loading jobs
   const isLoadingAllJobsRef = useRef(false); // Ref to track if we're loading all jobs (prevents race conditions)
   const isAllJobsModeRef = useRef(false); // Ref to track if we're in "all jobs" mode (prevents overdue requests from overwriting)
+  
+  // Machines visibility state - load from localStorage
+  const [showMachinesGlobal, setShowMachinesGlobal] = useState<boolean>(() => {
+    const saved = localStorage.getItem('leadsList_showMachines');
+    return saved !== null ? saved === 'true' : true; // Default to showing machines
+  });
+  const [expandedMachines, setExpandedMachines] = useState<Set<string>>(new Set());
 
   /**
    * Extracts the numeric part from a job number for sorting.
@@ -652,6 +659,27 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
     return null;
   }
 
+  /**
+   * Gets the technician name from a job's techBooked field (which can be a string ID or an object)
+   */
+  function getTechnicianNameFromJob(job: Job): string | null {
+    if (!job.techBooked) return null;
+    
+    // If techBooked is already an object with name, use it
+    if (typeof job.techBooked === 'object' && 'name' in job.techBooked) {
+      return job.techBooked.name;
+    }
+    
+    // If techBooked is a string ID, look it up from technicians array
+    if (typeof job.techBooked === 'string') {
+      const techBookedId = job.techBooked;
+      const technician = technicians.find(t => t._id === techBookedId);
+      return technician ? technician.name : null;
+    }
+    
+    return null;
+  }
+
   function formatDate(dateString?: string | Date) {
     if (!dateString) return '-';
     const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
@@ -677,7 +705,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       ) : (
         <div className="flex gap-6">
           {/* Left Sidebar - Filters */}
-          <div className="w-80 flex-shrink-0 bg-white rounded-2xl border border-gray-200 shadow-lg p-6 h-fit sticky top-6">
+          <div className="w-80 flex-shrink-0 bg-white rounded-2xl border border-gray-200 shadow-lg p-6 max-h-[calc(100vh-3rem)] overflow-y-auto sticky top-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-bold text-ars-heading flex items-center gap-2">
                 <Filter className="w-5 h-5 text-ars-primary" />
@@ -839,6 +867,33 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                   <option value="" disabled>Loading...</option>
                 )}
               </select>
+            </div>
+
+            {/* Machines Visibility Toggle */}
+            <div className="mb-6 pt-4 border-t border-gray-200">
+              <label className="block text-sm font-semibold text-ars-heading mb-3">Display Options</label>
+              <button
+                onClick={() => {
+                  const newValue = !showMachinesGlobal;
+                  setShowMachinesGlobal(newValue);
+                  localStorage.setItem('leadsList_showMachines', String(newValue));
+                  // If hiding globally, clear all expanded states
+                  if (!newValue) {
+                    setExpandedMachines(new Set());
+                  }
+                }}
+                className="w-full flex items-center justify-between px-4 py-2.5 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors bg-white"
+              >
+                <div className="flex items-center gap-2">
+                  <Wrench className="w-4 h-4 text-ars-primary" />
+                  <span className="text-sm text-ars-body">Show Machines</span>
+                </div>
+                {showMachinesGlobal ? (
+                  <ChevronDown className="w-4 h-4 text-ars-primary" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                )}
+              </button>
             </div>
 
             {/* Results Count */}
@@ -1014,29 +1069,88 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                               </div>
                             ) : null;
                           })()}
-                          {job.machine && typeof job.machine === 'object' && job.machine !== null && (
-                            <div className="space-y-1 pt-1 border-t border-gray-200">
-                              <div className="flex items-center gap-1 text-xs text-ars-body">
+                        </div>
+
+                        {/* Technician - On its own line */}
+                        {(() => {
+                          const technicianName = getTechnicianNameFromJob(job);
+                          return technicianName ? (
+                            <div className="mb-3 pt-2 border-t border-gray-200">
+                              <div className="flex items-center gap-2 text-xs text-ars-body">
+                                <User className="w-3 h-3" />
+                                <span className="font-medium">Technician: {technicianName}</span>
+                              </div>
+                            </div>
+                          ) : null;
+                        })()}
+
+                        {/* Machines */}
+                        {Array.isArray(job.machines) && job.machines.length > 0 && (
+                          <div className="mb-3 pt-2 border-t border-gray-200">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const isExpanded = expandedMachines.has(job._id);
+                                const newExpanded = new Set(expandedMachines);
+                                if (isExpanded) {
+                                  newExpanded.delete(job._id);
+                                } else {
+                                  newExpanded.add(job._id);
+                                }
+                                setExpandedMachines(newExpanded);
+                              }}
+                              className="w-full flex items-center justify-between mb-2 hover:bg-gray-50 -mx-2 px-2 py-1 rounded transition-colors"
+                            >
+                              <div className="flex items-center gap-2 text-xs text-ars-body">
                                 <Wrench className="w-3 h-3 flex-shrink-0" />
                                 <span className="font-medium">
-                                  {job.machine.make} {job.machine.model}
+                                  {job.machines.length} Machine{job.machines.length !== 1 ? 's' : ''}
                                 </span>
                               </div>
-                              <div className="text-xs text-ars-body pl-4">
-                                <div className="flex items-center gap-2">
-                                  <span>Hours: <span className="font-semibold text-ars-primary">{job.machine.machineHours.toLocaleString()}</span></span>
-                                  <span className="text-gray-400">•</span>
-                                  <span>Next: <span className="font-semibold text-orange-600">{job.machine.nextServiceHours.toLocaleString()}</span></span>
-                                </div>
+                              {showMachinesGlobal || expandedMachines.has(job._id) ? (
+                                <ChevronUp className="w-3 h-3 text-ars-body" />
+                              ) : (
+                                <ChevronDown className="w-3 h-3 text-ars-body" />
+                              )}
+                            </button>
+                            {(showMachinesGlobal || expandedMachines.has(job._id)) && (
+                              <div className="space-y-2">
+                                {job.machines.map((machineRef, index) => {
+                                  const machine = typeof machineRef === 'object' && machineRef !== null
+                                    ? machineRef
+                                    : null;
+                                  if (!machine) return null;
+                                  return (
+                                    <div key={machine._id || index} className="space-y-1">
+                                      <div className="flex items-center gap-1 text-xs text-ars-body">
+                                        <Wrench className="w-3 h-3 flex-shrink-0" />
+                                        <span className="font-medium">
+                                          {machine.make} {machine.model}
+                                        </span>
+                                      </div>
+                                      <div className="text-xs text-ars-body pl-4">
+                                        <div className="flex items-center gap-2">
+                                          <span>Hours: <span className="font-semibold text-ars-primary">{machine.machineHours.toLocaleString()}</span></span>
+                                          <span className="text-gray-400">•</span>
+                                          <span>Next: <span className="font-semibold text-orange-600">{machine.nextServiceHours.toLocaleString()}</span></span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
-                            </div>
-                          )}
-                          {job.valueExVat && (
-                            <div className="flex items-center gap-1 text-xs text-ars-body font-medium pt-1 border-t border-gray-200">
+                            )}
+                          </div>
+                        )}
+
+                        {/* Value */}
+                        {job.valueExVat && (
+                          <div className="mb-3 pt-2 border-t border-gray-200">
+                            <div className="flex items-center gap-1 text-xs text-ars-body font-medium">
                               <span>{formatCurrency(job.valueExVat)}</span>
                             </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
 
                         {/* Actions */}
                         <div className="flex items-center gap-2 pt-3 border-t border-gray-200">

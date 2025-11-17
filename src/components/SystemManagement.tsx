@@ -25,13 +25,15 @@ import {
   updateAdminCode,
   deleteAdminCode,
   getTechnicians,
+  getBranches,
   User,
   Role,
   Permission,
   ImportHistory,
   RepCode,
   AdminCode,
-  Technician
+  Technician,
+  Branch
 } from '../lib/api';
 import { 
   Users, 
@@ -73,7 +75,11 @@ export function SystemManagement() {
   const [importType, setImportType] = useState<'jobs' | 'customers' | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [clearExisting, setClearExisting] = useState(false);
+  const [selectedBranch, setSelectedBranch] = useState<string>(''); // Branch ID or code
   const [importResult, setImportResult] = useState<{ imported: number; updated: number; errors: string[] } | null>(null);
+  
+  // Branches state
+  const [branches, setBranches] = useState<Branch[]>([]);
   
   // Reference data state
   const [repCodes, setRepCodes] = useState<RepCode[]>([]);
@@ -105,6 +111,7 @@ export function SystemManagement() {
   useEffect(() => {
     loadData();
     loadImportHistory();
+    loadBranches();
     if (activeTab === 'reference' || showInviteForm) {
       loadReferenceData();
     }
@@ -119,6 +126,18 @@ export function SystemManagement() {
       setImportHistory(response.data);
     } catch (err: any) {
       console.error('Error loading import history:', err);
+    }
+  }
+
+  /**
+   * Loads branches.
+   */
+  async function loadBranches() {
+    try {
+      const response = await getBranches();
+      setBranches(response.branches || []);
+    } catch (err: any) {
+      console.error('Error loading branches:', err);
     }
   }
 
@@ -406,7 +425,10 @@ export function SystemManagement() {
 
       let result;
       if (importType === 'jobs') {
-        result = await importJobs(selectedFile, clearExisting);
+        // Use branchId if a branch is selected
+        const branchId = selectedBranch && branches.find(b => b._id === selectedBranch) ? selectedBranch : undefined;
+        const branchCode = selectedBranch && !branchId && branches.find(b => b.code === selectedBranch) ? selectedBranch : undefined;
+        result = await importJobs(selectedFile, clearExisting, branchId, branchCode);
       } else {
         result = await importCustomers(selectedFile, clearExisting);
       }
@@ -1029,6 +1051,24 @@ export function SystemManagement() {
                       }}
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-ars-body mb-2">Branch</label>
+                    <select
+                      value={selectedBranch}
+                      onChange={(e) => setSelectedBranch(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    >
+                      <option value="">Default (JHB)</option>
+                      {branches.map((branch) => (
+                        <option key={branch._id} value={branch._id}>
+                          {branch.name} ({branch.code})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-ars-body mt-1">
+                      Select a branch to assign all imported jobs to. If not selected, defaults to JHB.
+                    </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <input

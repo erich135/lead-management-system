@@ -39,10 +39,13 @@ export function MobileNavigation({
 
   const activeView = getViewFromPath();
 
+  // Only show Reports to Managers and Super Admins
+  const isManagerOrSuperAdmin = user?.isSuperAdmin || user?.role?.name?.toLowerCase() === 'manager';
+
   const navItems = [
     { id: 'dashboard' as View, label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
     { id: 'leads' as View, label: 'Jobs', icon: FileText, path: '/jobs' },
-    { id: 'reports' as View, label: 'Reports', icon: BarChart3, path: '/reports' },
+    ...(isManagerOrSuperAdmin ? [{ id: 'reports' as View, label: 'Reports', icon: BarChart3, path: '/reports' }] : []),
     { id: 'diary' as View, label: 'Diary', icon: Calendar, path: '/diary' },
   ];
 

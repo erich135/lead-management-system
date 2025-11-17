@@ -295,9 +295,15 @@ export function Reports({ statuses, branches }: ReportsProps) {
       const jobsResponse = await getJobs(jobFilters);
       setUserJobs(jobsResponse.jobs || []);
 
-      // Load activities
-      const activitiesResponse = await getActivities(activityFilters);
-      setUserActivities(activitiesResponse.activities || []);
+      // Load activities (optional - may fail if user doesn't have permission)
+      try {
+        const activitiesResponse = await getActivities(activityFilters);
+        setUserActivities(activitiesResponse.activities || []);
+      } catch (activitiesError: any) {
+        // If activities.read permission is missing, just set empty array
+        console.warn('Could not load activities (permission may be missing):', activitiesError.message);
+        setUserActivities([]);
+      }
 
       // Load overdue jobs
       const overdueResponse = await getOverdueJobs({ includeApproaching: true });
@@ -358,21 +364,27 @@ export function Reports({ statuses, branches }: ReportsProps) {
       const machinesResponse = await getMachines({ customerId: selectedCustomerId });
       setCustomerMachines(machinesResponse.machines || []);
 
-      // Load activities related to customer jobs
+      // Load activities related to customer jobs (optional - may fail if user doesn't have permission)
       const jobIds = (jobsResponse.jobs || []).map(j => j._id);
       if (jobIds.length > 0) {
-        // Load activities for these jobs
-        const activitiesResponse = await getActivities({
-          resourceType: 'Job',
-          startDate,
-          endDate,
-          limit: 1000,
-        });
-        // Filter to only activities for this customer's jobs
-        const filteredActivities = (activitiesResponse.activities || []).filter(
-          act => jobIds.includes(act.resourceId as string)
-        );
-        setCustomerActivities(filteredActivities);
+        try {
+          // Load activities for these jobs
+          const activitiesResponse = await getActivities({
+            resourceType: 'Job',
+            startDate,
+            endDate,
+            limit: 1000,
+          });
+          // Filter to only activities for this customer's jobs
+          const filteredActivities = (activitiesResponse.activities || []).filter(
+            act => jobIds.includes(act.resourceId as string)
+          );
+          setCustomerActivities(filteredActivities);
+        } catch (activitiesError: any) {
+          // If activities.read permission is missing, just set empty array
+          console.warn('Could not load activities (permission may be missing):', activitiesError.message);
+          setCustomerActivities([]);
+        }
       } else {
         setCustomerActivities([]);
       }

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { getJobs, updateJob, getCustomers, getTechnicians, getOverdueJobs, getRepCodes, getAdminCodes, type Job, type Status, type Branch, type Customer, type Technician, type OverdueJob, type RepCode, type AdminCode } from '../lib/api';
 import { Search, Filter, Plus, AlertCircle, Calendar, Edit2, Eye, Clock, CheckCircle2, X, Zap, FileText, User, Building2, DollarSign, Wrench, Sparkles, ArrowRight, Tag, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
 import { LeadDetails } from './LeadDetails';
+import { useAuth } from '../contexts/AuthContext';
 
 interface LeadsListProps {
   onLeadClick: (lead: Job) => void;
@@ -12,6 +13,7 @@ interface LeadsListProps {
 }
 
 export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refreshKey }: LeadsListProps) {
+  const { user } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
   const [overdueJobs, setOverdueJobs] = useState<OverdueJob[]>([]);
@@ -116,6 +118,35 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
     loadRepCodes();
     loadAdminCodes();
   }, []);
+
+  // Auto-set admin filter for admin users
+  useEffect(() => {
+    if (user?.role?.name === 'admin' && !user?.isSuperAdmin && user?.adminCode?.code) {
+      if (admFilter === 'all') {
+        setAdmFilter(user.adminCode.code);
+      }
+    }
+  }, [user, adminCodes]);
+
+  // Auto-set rep code filter for rep users
+  useEffect(() => {
+    if (user?.role?.name === 'rep' && !user?.isSuperAdmin && user?.repCode?.code) {
+      // Find the rep code ID from the repCodes list
+      const userRepCode = repCodes.find(rc => rc.code === user.repCode?.code);
+      if (userRepCode && repCodeFilter === 'all') {
+        setRepCodeFilter(userRepCode._id);
+      }
+    }
+  }, [user, repCodes]);
+
+  // Auto-set technician filter for technician users
+  useEffect(() => {
+    if (user?.role?.name === 'technician' && !user?.isSuperAdmin && user?.technician?.id) {
+      if (technicianFilter === 'all') {
+        setTechnicianFilter(user.technician.id);
+      }
+    }
+  }, [user, technicians]);
 
   useEffect(() => {
     // Only apply filters if not loading and not actively loading jobs
@@ -874,7 +905,8 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
               <select
                 value={admFilter}
                 onChange={(e) => setAdmFilter(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                disabled={user?.role?.name === 'admin' && !user?.isSuperAdmin}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
               >
                 <option value="all">All Admins</option>
                 {adminCodeOptions.length > 0 ? (
@@ -895,7 +927,8 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
               <select
                 value={repCodeFilter}
                 onChange={(e) => setRepCodeFilter(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                disabled={user?.role?.name === 'rep' && !user?.isSuperAdmin}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
               >
                 <option value="all">All Rep Codes</option>
                 {repCodes && repCodes.length > 0 ? (
@@ -918,7 +951,8 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
               <select
                 value={technicianFilter}
                 onChange={(e) => setTechnicianFilter(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                disabled={user?.role?.name === 'technician' && !user?.isSuperAdmin}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
               >
                 <option value="all">All Technicians</option>
                 {technicians && technicians.length > 0 ? (
@@ -1106,6 +1140,12 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                             <div className="flex items-center gap-2">
                               <Calendar className="w-3 h-3" />
                               <span>Quoted: {formatDate(job.dateQuoted)}</span>
+                            </div>
+                          )}
+                          {job.statusChangedAt && (
+                            <div className="flex items-center gap-2">
+                              <Clock className="w-3 h-3" />
+                              <span>Status Changed: {formatDate(job.statusChangedAt)}</span>
                             </div>
                           )}
                         </div>

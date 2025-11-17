@@ -775,33 +775,33 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
             </div>
           )}
 
-          {/* Follow-up Statuses */}
-          {(job.followUp1 || job.followUp2 || job.followUp3 || job.followUp4) && (
+          {/* Follow-up Dates */}
+          {(job.followUp1Date || job.followUp2Date || job.followUp3Date || job.followUp4Date) && (
             <div className="space-y-4">
-              <h3 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-2">Follow-up Statuses</h3>
+              <h3 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-2">Follow-up Dates</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {job.followUp1 && (
+                {job.followUp1Date && (
                   <div className="bg-slate-50 p-3 rounded-lg">
                     <p className="text-xs font-medium text-slate-600 mb-1">Follow-up 1</p>
-                    <p className="text-sm text-slate-900">{job.followUp1.name}</p>
+                    <p className="text-sm text-slate-900">{formatDate(job.followUp1Date)}</p>
                   </div>
                 )}
-                {job.followUp2 && (
+                {job.followUp2Date && (
                   <div className="bg-slate-50 p-3 rounded-lg">
                     <p className="text-xs font-medium text-slate-600 mb-1">Follow-up 2</p>
-                    <p className="text-sm text-slate-900">{job.followUp2.name}</p>
+                    <p className="text-sm text-slate-900">{formatDate(job.followUp2Date)}</p>
                   </div>
                 )}
-                {job.followUp3 && (
+                {job.followUp3Date && (
                   <div className="bg-slate-50 p-3 rounded-lg">
                     <p className="text-xs font-medium text-slate-600 mb-1">Follow-up 3</p>
-                    <p className="text-sm text-slate-900">{job.followUp3.name}</p>
+                    <p className="text-sm text-slate-900">{formatDate(job.followUp3Date)}</p>
                   </div>
                 )}
-                {job.followUp4 && (
+                {job.followUp4Date && (
                   <div className="bg-slate-50 p-3 rounded-lg">
                     <p className="text-xs font-medium text-slate-600 mb-1">Follow-up 4</p>
-                    <p className="text-sm text-slate-900">{job.followUp4.name}</p>
+                    <p className="text-sm text-slate-900">{formatDate(job.followUp4Date)}</p>
                   </div>
                 )}
               </div>

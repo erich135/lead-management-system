@@ -49,6 +49,20 @@ export interface BackendUser {
   emailVerified: boolean;
   emailVerifiedAt?: string;
   isSuperAdmin?: boolean;
+  adminCode?: {
+    _id: string;
+    code: string;
+    description?: string;
+  } | string;
+  repCode?: {
+    _id: string;
+    code: string;
+    description?: string;
+  } | string;
+  technician?: {
+    _id: string;
+    name: string;
+  } | string;
 }
 
 /**
@@ -223,6 +237,36 @@ export async function changePassword(
 }
 
 /**
+ * Verifies an invitation token.
+ * Used to check if a token is valid before showing the password setup form.
+ * 
+ * @param token - Invitation token from email link
+ * @returns {Promise<{ user: { email: string; firstName?: string; lastName?: string } }>}
+ * @throws {Error} If token verification fails
+ */
+export async function verifyInvitationToken(token: string): Promise<{ user: { email: string; firstName?: string; lastName?: string } }> {
+  return apiRequest(`/api/auth/verify-invitation-token?token=${encodeURIComponent(token)}`);
+}
+
+/**
+ * Sets a password for a user using an invitation token.
+ * 
+ * @param token - Invitation token from email link
+ * @param password - New password to set
+ * @returns {Promise<{ success: boolean; message: string }>}
+ * @throws {Error} If password setting fails
+ */
+export async function setPassword(token: string, password: string): Promise<{ success: boolean; message: string }> {
+  return apiRequest('/api/auth/set-password', {
+    method: 'POST',
+    body: JSON.stringify({
+      token,
+      password,
+    }),
+  });
+}
+
+/**
  * Job-related API functions.
  */
 
@@ -260,10 +304,13 @@ export interface Job {
   dateBooked?: string | Date;
   rsrNumber?: string;
   feedback?: string;
-  followUp1?: { _id: string; name: string };
-  followUp2?: { _id: string; name: string };
-  followUp3?: { _id: string; name: string };
-  followUp4?: { _id: string; name: string };
+  followUp1Date?: string | Date;
+  followUp2Date?: string | Date;
+  followUp3Date?: string | Date;
+  followUp4Date?: string | Date;
+  reminderFollowUp1Date?: string | Date;
+  reminderFollowUp2Date?: string | Date;
+  reminderFollowUp3Date?: string | Date;
   poDate?: string | Date;
   poNumber?: string;
   oilSampleNumber?: string;
@@ -932,12 +979,18 @@ export async function getImportHistory(): Promise<{ data: ImportHistory }> {
 /**
  * Imports jobs from CSV file.
  */
-export async function importJobs(file: File, clearExisting: boolean): Promise<{ message: string; data: ImportResult }> {
+export async function importJobs(file: File, clearExisting: boolean, branchId?: string, branchCode?: string): Promise<{ message: string; data: ImportResult }> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('clearExisting', clearExisting.toString());
+  if (branchId) {
+    formData.append('branchId', branchId);
+  }
+  if (branchCode) {
+    formData.append('branchCode', branchCode);
+  }
 
-  const token = localStorage.getItem('token');
+  const token = getAuthToken();
   if (!token) {
     throw new Error('No authentication token found');
   }
@@ -966,7 +1019,7 @@ export async function importCustomers(file: File, clearExisting: boolean): Promi
   formData.append('file', file);
   formData.append('clearExisting', clearExisting.toString());
 
-  const token = localStorage.getItem('token');
+  const token = getAuthToken();
   if (!token) {
     throw new Error('No authentication token found');
   }
@@ -991,7 +1044,7 @@ export async function importCustomers(file: File, clearExisting: boolean): Promi
  * Downloads an example CSV file.
  */
 export async function downloadExampleCSV(type: 'jobs' | 'customers'): Promise<void> {
-  const token = localStorage.getItem('token');
+  const token = getAuthToken();
   if (!token) {
     throw new Error('No authentication token found');
   }

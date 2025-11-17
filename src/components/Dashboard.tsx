@@ -434,20 +434,22 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                     <div className="absolute inset-0 bg-white/20 rounded-lg animate-pulse"></div>
                   )}
                 </Link>
-                <Link
-                  to="/reports"
-                  className={`group relative px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
-                    view === 'reports'
-                      ? 'bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] shadow-lg scale-105'
-                      : 'text-white/80 hover:text-white hover:bg-white/10'
-                  }`}
-                >
-                  <BarChart3 className={`w-4 h-4 transition-transform ${view === 'reports' ? 'scale-110' : ''}`} />
-                  <span>Reports</span>
-                  {view === 'reports' && (
-                    <div className="absolute inset-0 bg-white/20 rounded-lg animate-pulse"></div>
-                  )}
-                </Link>
+                {(isSuperAdmin || user?.role?.name?.toLowerCase() === 'manager') && (
+                  <Link
+                    to="/reports"
+                    className={`group relative px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
+                      view === 'reports'
+                        ? 'bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] shadow-lg scale-105'
+                        : 'text-white/80 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <BarChart3 className={`w-4 h-4 transition-transform ${view === 'reports' ? 'scale-110' : ''}`} />
+                    <span>Reports</span>
+                    {view === 'reports' && (
+                      <div className="absolute inset-0 bg-white/20 rounded-lg animate-pulse"></div>
+                    )}
+                  </Link>
+                )}
                 <Link
                   to="/diary"
                   className={`group relative px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
@@ -847,13 +849,15 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                     )}
                   </div>
 
-                  <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('reports')}>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-white/80 text-xs font-medium">Total Value</p>
-                      <Banknote className="w-4 h-4 text-[#f7c12b]" />
+                  {(isSuperAdmin || user?.role?.name?.toLowerCase() === 'manager') && (
+                    <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('reports')}>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-white/80 text-xs font-medium">Total Value</p>
+                        <Banknote className="w-4 h-4 text-[#f7c12b]" />
+                      </div>
+                      <p className="text-2xl font-bold">R{stats.totalValue.toLocaleString()}</p>
                     </div>
-                    <p className="text-2xl font-bold">R{stats.totalValue.toLocaleString()}</p>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1177,11 +1181,26 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           />
         )}
 
-        {view === 'reports' && (
+        {view === 'reports' && (isSuperAdmin || user?.role?.name?.toLowerCase() === 'manager') && (
           <Reports
             statuses={statuses}
             branches={branches}
           />
+        )}
+        {view === 'reports' && !isSuperAdmin && user?.role?.name?.toLowerCase() !== 'manager' && (
+          <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+              <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+              <h1 className="text-2xl font-bold text-slate-900 mb-2">Access Denied</h1>
+              <p className="text-slate-600 mb-6">You don't have permission to access the Reports page. This page is only available to Managers and Super Admins.</p>
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="px-6 py-3 bg-[#0969a9] text-white rounded-xl font-medium hover:bg-[#0a7bc4] transition-colors"
+              >
+                Go to Dashboard
+              </button>
+            </div>
+          </div>
         )}
 
         {view === 'diary' && (

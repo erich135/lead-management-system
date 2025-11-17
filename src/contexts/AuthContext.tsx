@@ -22,6 +22,20 @@ export interface FrontendUser {
   createdAt: string;
   updatedAt: string;
   lastLogin?: string;
+  adminCode?: {
+    id: string;
+    code: string;
+    description?: string;
+  };
+  repCode?: {
+    id: string;
+    code: string;
+    description?: string;
+  };
+  technician?: {
+    id: string;
+    name: string;
+  };
 }
 
 interface AuthContextType {
@@ -43,6 +57,29 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
  * @returns {FrontendUser} Formatted user object
  */
 function transformUser(backendUser: BackendUser): FrontendUser {
+  const adminCode = typeof backendUser.adminCode === 'object' && backendUser.adminCode !== null
+    ? {
+        id: backendUser.adminCode._id,
+        code: backendUser.adminCode.code,
+        description: backendUser.adminCode.description,
+      }
+    : undefined;
+
+  const repCode = typeof backendUser.repCode === 'object' && backendUser.repCode !== null
+    ? {
+        id: backendUser.repCode._id,
+        code: backendUser.repCode.code,
+        description: backendUser.repCode.description,
+      }
+    : undefined;
+
+  const technician = typeof backendUser.technician === 'object' && backendUser.technician !== null
+    ? {
+        id: backendUser.technician._id,
+        name: backendUser.technician.name,
+      }
+    : undefined;
+
   return {
     id: backendUser._id,
     email: backendUser.email,
@@ -61,6 +98,9 @@ function transformUser(backendUser: BackendUser): FrontendUser {
     createdAt: backendUser.createdAt,
     updatedAt: backendUser.updatedAt,
     lastLogin: backendUser.lastLogin,
+    adminCode,
+    repCode,
+    technician,
   };
 }
 

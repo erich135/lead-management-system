@@ -276,7 +276,7 @@ export interface Job {
   status?: {
     _id: string;
     name: string;
-    sortOrder: number;
+    sortOrder?: number;
   };
   statusNumber?: number;
   customer?: {

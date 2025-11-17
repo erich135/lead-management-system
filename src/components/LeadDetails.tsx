@@ -1,20 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getJob, updateJob, getMachinesByCustomer, createMachine, getTechnicians, type Job, type Status, type Branch, type Machine, type Technician } from '../lib/api';
-import {
-  X,
-  Calendar,
-  User,
-  Building2,
-  Banknote,
-  FileText,
-  Edit,
-  Save,
-  Tag,
-  Package,
-  Receipt,
-  MessageSquare,
-} from 'lucide-react';
+import { X, Edit, Save } from 'lucide-react';
 
 interface LeadDetailsProps {
   lead: Job;
@@ -29,24 +16,37 @@ interface LeadDetailsProps {
  * Displays detailed information about a job and allows editing.
  * Shows all job fields including the newly added ones.
  */
-function normalizeJobTech(jobData: Job): Job {
-  if (jobData?.techBooked && typeof jobData.techBooked === 'string') {
-    return {
-      ...jobData,
+function normalizeJob(jobData: Job): Job {
+  let normalized: Job = { ...jobData };
+
+  if (normalized?.techBooked && typeof normalized.techBooked === 'string') {
+    normalized = {
+      ...normalized,
       techBooked: {
-        _id: jobData.techBooked,
+        _id: normalized.techBooked,
         name: '',
       },
     };
   }
-  return jobData;
+
+  if (normalized?.status && typeof normalized.status === 'string') {
+    normalized = {
+      ...normalized,
+      status: {
+        _id: normalized.status,
+        name: '',
+      },
+    };
+  }
+
+  return normalized;
 }
 
 export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes = [], onClose, onUpdate }: LeadDetailsProps) {
-  const { user, isAdmin, isSuperAdmin } = useAuth();
+  const { isAdmin, isSuperAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [job, setJob] = useState<Job>(normalizeJobTech(initialLead));
+  const [job, setJob] = useState<Job>(normalizeJob(initialLead));
   const [error, setError] = useState<string | null>(null);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
@@ -77,7 +77,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   async function loadJobDetails() {
     try {
       const response = await getJob(initialLead._id);
-      setJob(normalizeJobTech(response.job));
+      setJob(normalizeJob(response.job));
     } catch (err: any) {
       console.error('Error loading job details:', err);
       setError(err.message || 'Failed to load job details');
@@ -155,6 +155,9 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
       if (payload.techBooked && typeof payload.techBooked === 'object') {
         payload.techBooked = payload.techBooked._id;
       }
+      if (payload.status && typeof payload.status === 'object') {
+        payload.status = payload.status._id;
+      }
       await updateJob(job._id, payload);
       setIsEditing(false);
       onUpdate();
@@ -189,43 +192,47 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
               <p className="text-white/90 text-sm">Job Details</p>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isEditing) {
-                    handleSave();
-                  } else {
-                    setIsEditing(true);
-                  }
-                }}
-                disabled={loading}
-                className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                type="button"
-              >
-                {isEditing ? (
-                  <>
-                    <Save className="w-4 h-4" />
-                    {loading ? 'Saving...' : 'Save'}
-                  </>
-                ) : (
-                  <>
-                    <Edit className="w-4 h-4" />
-                    Edit
-                  </>
-                )}
-              </button>
-              {isEditing && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsEditing(false);
-                    loadJobDetails(); // Reload to reset changes
-                  }}
-                  className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-all"
-                  type="button"
-                >
-                  Cancel
-                </button>
+              {canEdit && (
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isEditing) {
+                        handleSave();
+                      } else {
+                        setIsEditing(true);
+                      }
+                    }}
+                    disabled={loading}
+                    className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    type="button"
+                  >
+                    {isEditing ? (
+                      <>
+                        <Save className="w-4 h-4" />
+                        {loading ? 'Saving...' : 'Save'}
+                      </>
+                    ) : (
+                      <>
+                        <Edit className="w-4 h-4" />
+                        Edit
+                      </>
+                    )}
+                  </button>
+                  {isEditing && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsEditing(false);
+                        loadJobDetails(); // Reload to reset changes
+                      }}
+                      className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-all"
+                      type="button"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </>
               )}
               <button 
                 onClick={(e) => {

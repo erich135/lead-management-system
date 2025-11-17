@@ -1,16 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
-import { getJobs, updateJob, getCustomers, getTechnicians, getOverdueJobs, type Job, type Status, type Branch, type Customer, type Technician, type OverdueJob } from '../lib/api';
-import { Search, Filter, Plus, AlertCircle, Calendar, Edit2, Eye, Clock, CheckCircle2, X, Zap, FileText, User, Building2, DollarSign, Wrench, Sparkles, ArrowRight } from 'lucide-react';
+import { getJobs, updateJob, getCustomers, getTechnicians, getOverdueJobs, getRepCodes, getAdminCodes, type Job, type Status, type Branch, type Customer, type Technician, type OverdueJob, type RepCode, type AdminCode } from '../lib/api';
+import { Search, Filter, Plus, AlertCircle, Calendar, Edit2, Eye, Clock, CheckCircle2, X, Zap, FileText, User, Building2, DollarSign, Wrench, Sparkles, ArrowRight, Tag, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
 import { LeadDetails } from './LeadDetails';
+import { useAuth } from '../contexts/AuthContext';
 
 interface LeadsListProps {
   onLeadClick: (lead: Job) => void;
   onCreateNew: () => void;
   statuses: Status[];
   branches: Branch[];
+  refreshKey?: number; // When this changes, refresh the job list
 }
 
-export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: LeadsListProps) {
+export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refreshKey }: LeadsListProps) {
+  const { user } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
   const [overdueJobs, setOverdueJobs] = useState<OverdueJob[]>([]);
@@ -18,32 +21,73 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [branchFilter, setBranchFilter] = useState<string>('all');
   const [admFilter, setAdmFilter] = useState<string>('all');
+  const [repCodeFilter, setRepCodeFilter] = useState<string>('all');
+  const [technicianFilter, setTechnicianFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<{
     overdue: boolean;
     approaching: boolean;
     open: boolean;
     all: boolean;
   }>({
-    overdue: true,
-    approaching: true,
-    open: true,
-    all: false,
+    overdue: false,
+    approaching: false,
+    open: false,
+    all: true, // Default to "All Jobs" on page load
   });
   const [loading, setLoading] = useState(true);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [repCodes, setRepCodes] = useState<RepCode[]>([]);
+  const [adminCodes, setAdminCodes] = useState<AdminCode[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(24); // 24 items per page (good for grid)
   const [isLoadingJobs, setIsLoadingJobs] = useState(false); // Track if we're actively loading jobs
   const isLoadingAllJobsRef = useRef(false); // Ref to track if we're loading all jobs (prevents race conditions)
   const isAllJobsModeRef = useRef(false); // Ref to track if we're in "all jobs" mode (prevents overdue requests from overwriting)
+  
+  // Machines visibility state - load from localStorage
+  const [showMachinesGlobal, setShowMachinesGlobal] = useState<boolean>(() => {
+    const saved = localStorage.getItem('leadsList_showMachines');
+    return saved !== null ? saved === 'true' : true; // Default to showing machines
+  });
+  const [expandedMachines, setExpandedMachines] = useState<Set<string>>(new Set());
 
-  // Get unique admin codes from jobs
-  const adminCodes = Array.from(new Set(jobs.map(j => j.adm).filter(Boolean))).sort();
+  /**
+   * Extracts the numeric part from a job number for sorting.
+   * Example: "J1568" -> 1568, "CE1990" -> 1990
+   * This allows sorting by numeric value regardless of branch prefix.
+   */
+  const getJobNumberValue = (jobNumber: string | undefined): number => {
+    if (!jobNumber) return 0;
+    // Extract numeric part from job number (e.g., "J1568" -> 1568, "CE1990" -> 1990)
+    const numericPart = jobNumber.replace(/^[A-Z]+/i, '');
+    const num = parseInt(numericPart, 10);
+    return isNaN(num) ? 0 : num;
+  };
 
+  /**
+   * Sorts jobs by job number (numeric part) in descending order (highest first).
+   * This ensures J1568 appears before CE1989, and CE1990 appears before CE1989.
+   */
+  const sortJobsByJobNumber = (jobs: Job[]): Job[] => {
+    return [...jobs].sort((a, b) => {
+      const numA = getJobNumberValue(a.jobNumber);
+      const numB = getJobNumberValue(b.jobNumber);
+      // Sort descending (highest first)
+      return numB - numA;
+    });
+  };
+
+  // Get admin code codes for filter dropdown
+  const adminCodeOptions = adminCodes
+    .filter(ac => ac.isActive)
+    .map(ac => ac.code)
+    .sort();
+
+  // Initialize refs based on initial state
   useEffect(() => {
-    loadOverdueJobsList();
+    isAllJobsModeRef.current = priorityFilter.all;
   }, []);
 
   useEffect(() => {
@@ -57,10 +101,52 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
     }
   }, [priorityFilter.all]); // Only trigger when all changes, not the whole object
 
+  // Refresh jobs when refreshKey changes (triggered from parent after job creation)
+  useEffect(() => {
+    if (refreshKey !== undefined && refreshKey > 0) {
+      if (priorityFilter.all) {
+        loadAllJobs();
+      } else {
+        loadOverdueJobsList();
+      }
+    }
+  }, [refreshKey]);
+
   useEffect(() => {
     loadCustomers();
     loadTechnicians();
+    loadRepCodes();
+    loadAdminCodes();
   }, []);
+
+  // Auto-set admin filter for admin users
+  useEffect(() => {
+    if (user?.role?.name === 'admin' && !user?.isSuperAdmin && user?.adminCode?.code) {
+      if (admFilter === 'all') {
+        setAdmFilter(user.adminCode.code);
+      }
+    }
+  }, [user, adminCodes]);
+
+  // Auto-set rep code filter for rep users
+  useEffect(() => {
+    if (user?.role?.name === 'rep' && !user?.isSuperAdmin && user?.repCode?.code) {
+      // Find the rep code ID from the repCodes list
+      const userRepCode = repCodes.find(rc => rc.code === user.repCode?.code);
+      if (userRepCode && repCodeFilter === 'all') {
+        setRepCodeFilter(userRepCode._id);
+      }
+    }
+  }, [user, repCodes]);
+
+  // Auto-set technician filter for technician users
+  useEffect(() => {
+    if (user?.role?.name === 'technician' && !user?.isSuperAdmin && user?.technician?.id) {
+      if (technicianFilter === 'all') {
+        setTechnicianFilter(user.technician.id);
+      }
+    }
+  }, [user, technicians]);
 
   useEffect(() => {
     // Only apply filters if not loading and not actively loading jobs
@@ -69,7 +155,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
     if (!loading && !isLoadingJobs && !priorityFilter.all) {
       applyFilters();
     }
-  }, [jobs, searchTerm, statusFilter, branchFilter, admFilter, priorityFilter, overdueJobs, loading, isLoadingJobs]);
+  }, [jobs, searchTerm, statusFilter, branchFilter, admFilter, repCodeFilter, technicianFilter, priorityFilter, overdueJobs, loading, isLoadingJobs]);
 
   // Handle filter changes when in "All Jobs" mode (re-filter existing jobs without re-fetching)
   // This only runs when filters change, NOT when jobs are initially loaded (loadAllJobs handles that)
@@ -85,13 +171,17 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
       // Apply search filter
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
-        filtered = filtered.filter(job => 
-          job.jobNumber?.toLowerCase().includes(searchLower) ||
-          job.customer?.name?.toLowerCase().includes(searchLower) ||
-          job.cashCustomer?.toLowerCase().includes(searchLower) ||
-          job.adm?.toLowerCase().includes(searchLower) ||
-          job.branch?.name?.toLowerCase().includes(searchLower)
-        );
+        filtered = filtered.filter(job => {
+          const repCode = getRepCodeFromJob(job);
+          return (
+            job.jobNumber?.toLowerCase().includes(searchLower) ||
+            job.customer?.name?.toLowerCase().includes(searchLower) ||
+            job.cashCustomer?.toLowerCase().includes(searchLower) ||
+            job.adm?.toLowerCase().includes(searchLower) ||
+            job.branch?.name?.toLowerCase().includes(searchLower) ||
+            repCode?.code?.toLowerCase().includes(searchLower)
+          );
+        });
       }
       
       // Apply status filter
@@ -109,17 +199,50 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
         filtered = filtered.filter(job => job.adm === admFilter);
       }
       
-      // Sort by date descending
-      filtered.sort((a, b) => {
-        const dateA = a.startDate ? new Date(a.startDate).getTime() : 0;
-        const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
-        return dateB - dateA;
-      });
+      // Apply rep code filter
+      if (repCodeFilter !== 'all') {
+        filtered = filtered.filter(job => {
+          // Handle both string ID and object formats
+          if (typeof job.repCode === 'string') {
+            return job.repCode === repCodeFilter;
+          }
+          if (typeof job.repCode === 'object' && job.repCode?._id) {
+            return job.repCode._id === repCodeFilter;
+          }
+          return false;
+        });
+      }
+      
+      // Apply technician filter
+      if (technicianFilter !== 'all') {
+        filtered = filtered.filter(job => {
+          // Handle both string ID and object formats
+          if (typeof job.techBooked === 'string') {
+            return job.techBooked === technicianFilter;
+          }
+          if (typeof job.techBooked === 'object' && job.techBooked?._id) {
+            return job.techBooked._id === technicianFilter;
+          }
+          return false;
+        });
+      }
+      
+      // Sort by job number (numeric part) descending when in "All Jobs" mode
+      // Otherwise, sort by date descending for overdue/approaching/open filters
+      if (priorityFilter.all) {
+        filtered = sortJobsByJobNumber(filtered);
+      } else {
+        filtered.sort((a, b) => {
+          const dateA = a.startDate ? new Date(a.startDate).getTime() : 0;
+          const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
+          return dateB - dateA;
+        });
+      }
       
       setFilteredJobs(filtered);
       setCurrentPage(1);
     }
-  }, [searchTerm, statusFilter, branchFilter, admFilter, priorityFilter.all]);
+  }, [searchTerm, statusFilter, branchFilter, admFilter, repCodeFilter, technicianFilter, priorityFilter.all]);
 
   async function loadAllJobs() {
     try {
@@ -156,12 +279,9 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
         if (currentPage > 10) break;
       }
       
-      // Sort by startDate descending (newest first) as fallback
-      allJobs.sort((a, b) => {
-        const dateA = a.startDate ? new Date(a.startDate).getTime() : 0;
-        const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
-        return dateB - dateA; // Descending order
-      });
+      // Sort by job number (numeric part) descending (highest to lowest)
+      // This ensures J1568 appears before CE1989, and CE1990 appears before CE1989
+      allJobs = sortJobsByJobNumber(allJobs);
       
       // Apply filters with the new jobs data immediately
       // We need to apply all filters (search, status, branch, admin) to the new jobs
@@ -170,13 +290,17 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
       // Apply search filter
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
-        filtered = filtered.filter(job => 
-          job.jobNumber?.toLowerCase().includes(searchLower) ||
-          job.customer?.name?.toLowerCase().includes(searchLower) ||
-          job.cashCustomer?.toLowerCase().includes(searchLower) ||
-          job.adm?.toLowerCase().includes(searchLower) ||
-          job.branch?.name?.toLowerCase().includes(searchLower)
-        );
+        filtered = filtered.filter(job => {
+          const repCode = getRepCodeFromJob(job);
+          return (
+            job.jobNumber?.toLowerCase().includes(searchLower) ||
+            job.customer?.name?.toLowerCase().includes(searchLower) ||
+            job.cashCustomer?.toLowerCase().includes(searchLower) ||
+            job.adm?.toLowerCase().includes(searchLower) ||
+            job.branch?.name?.toLowerCase().includes(searchLower) ||
+            repCode?.code?.toLowerCase().includes(searchLower)
+          );
+        });
       }
       
       // Apply status filter
@@ -194,12 +318,36 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
         filtered = filtered.filter(job => job.adm === admFilter);
       }
       
-      // Sort by date descending
-      filtered.sort((a, b) => {
-        const dateA = a.startDate ? new Date(a.startDate).getTime() : 0;
-        const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
-        return dateB - dateA;
-      });
+      // Apply rep code filter
+      if (repCodeFilter !== 'all') {
+        filtered = filtered.filter(job => {
+          // Handle both string ID and object formats
+          if (typeof job.repCode === 'string') {
+            return job.repCode === repCodeFilter;
+          }
+          if (typeof job.repCode === 'object' && job.repCode?._id) {
+            return job.repCode._id === repCodeFilter;
+          }
+          return false;
+        });
+      }
+      
+      // Apply technician filter
+      if (technicianFilter !== 'all') {
+        filtered = filtered.filter(job => {
+          // Handle both string ID and object formats
+          if (typeof job.techBooked === 'string') {
+            return job.techBooked === technicianFilter;
+          }
+          if (typeof job.techBooked === 'object' && job.techBooked?._id) {
+            return job.techBooked._id === technicianFilter;
+          }
+          return false;
+        });
+      }
+      
+      // Sort by job number (numeric part) descending (highest to lowest)
+      filtered = sortJobsByJobNumber(filtered);
       
       // Set both jobs and filteredJobs in the same batch
       // Use React's batching to ensure both updates happen together
@@ -277,13 +425,17 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
       // Apply search filter
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
-        filtered = filtered.filter(job => 
-          job.jobNumber?.toLowerCase().includes(searchLower) ||
-          job.customer?.name?.toLowerCase().includes(searchLower) ||
-          job.cashCustomer?.toLowerCase().includes(searchLower) ||
-          job.adm?.toLowerCase().includes(searchLower) ||
-          job.branch?.name?.toLowerCase().includes(searchLower)
-        );
+        filtered = filtered.filter(job => {
+          const repCode = getRepCodeFromJob(job);
+          return (
+            job.jobNumber?.toLowerCase().includes(searchLower) ||
+            job.customer?.name?.toLowerCase().includes(searchLower) ||
+            job.cashCustomer?.toLowerCase().includes(searchLower) ||
+            job.adm?.toLowerCase().includes(searchLower) ||
+            job.branch?.name?.toLowerCase().includes(searchLower) ||
+            repCode?.code?.toLowerCase().includes(searchLower)
+          );
+        });
       }
       
       // Apply status filter
@@ -301,7 +453,35 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
         filtered = filtered.filter(job => job.adm === admFilter);
       }
       
-      // Sort by date descending
+      // Apply rep code filter
+      if (repCodeFilter !== 'all') {
+        filtered = filtered.filter(job => {
+          // Handle both string ID and object formats
+          if (typeof job.repCode === 'string') {
+            return job.repCode === repCodeFilter;
+          }
+          if (typeof job.repCode === 'object' && job.repCode?._id) {
+            return job.repCode._id === repCodeFilter;
+          }
+          return false;
+        });
+      }
+      
+      // Apply technician filter
+      if (technicianFilter !== 'all') {
+        filtered = filtered.filter(job => {
+          // Handle both string ID and object formats
+          if (typeof job.techBooked === 'string') {
+            return job.techBooked === technicianFilter;
+          }
+          if (typeof job.techBooked === 'object' && job.techBooked?._id) {
+            return job.techBooked._id === technicianFilter;
+          }
+          return false;
+        });
+      }
+      
+      // Sort by date descending (newest first) for overdue/approaching/open filters
       filtered.sort((a, b) => {
         const dateA = a.startDate ? new Date(a.startDate).getTime() : 0;
         const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
@@ -349,6 +529,24 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
     }
   }
 
+  async function loadRepCodes() {
+    try {
+      const data = await getRepCodes();
+      setRepCodes(data.repCodes || []);
+    } catch (error) {
+      console.error('Error loading rep codes:', error);
+    }
+  }
+
+  async function loadAdminCodes() {
+    try {
+      const data = await getAdminCodes();
+      setAdminCodes(data.adminCodes || []);
+    } catch (error) {
+      console.error('Error loading admin codes:', error);
+    }
+  }
+
   function applyFilters() {
     // Don't apply filters if we're still loading - this prevents the glitch
     if (loading) {
@@ -387,13 +585,17 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
     // Apply search filter
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(job => 
-        job.jobNumber?.toLowerCase().includes(searchLower) ||
-        job.customer?.name?.toLowerCase().includes(searchLower) ||
-        job.cashCustomer?.toLowerCase().includes(searchLower) ||
-        job.adm?.toLowerCase().includes(searchLower) ||
-        job.branch?.name?.toLowerCase().includes(searchLower)
-      );
+      filtered = filtered.filter(job => {
+        const repCode = getRepCodeFromJob(job);
+        return (
+          job.jobNumber?.toLowerCase().includes(searchLower) ||
+          job.customer?.name?.toLowerCase().includes(searchLower) ||
+          job.cashCustomer?.toLowerCase().includes(searchLower) ||
+          job.adm?.toLowerCase().includes(searchLower) ||
+          job.branch?.name?.toLowerCase().includes(searchLower) ||
+          repCode?.code?.toLowerCase().includes(searchLower)
+        );
+      });
     }
 
     // Apply status filter
@@ -411,12 +613,31 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
       filtered = filtered.filter(job => job.adm === admFilter);
     }
 
-    // Ensure jobs are sorted by date descending (newest first)
-    filtered.sort((a, b) => {
-      const dateA = a.startDate ? new Date(a.startDate).getTime() : 0;
-      const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
-      return dateB - dateA; // Descending order
-    });
+    // Apply rep code filter
+    if (repCodeFilter !== 'all') {
+      filtered = filtered.filter(job => {
+        // Handle both string ID and object formats
+        if (typeof job.repCode === 'string') {
+          return job.repCode === repCodeFilter;
+        }
+        if (typeof job.repCode === 'object' && job.repCode?._id) {
+          return job.repCode._id === repCodeFilter;
+        }
+        return false;
+      });
+    }
+
+    // Sort by job number (numeric part) descending when in "All Jobs" mode
+    // Otherwise, sort by date descending for overdue/approaching/open filters
+    if (priorityFilter.all) {
+      filtered = sortJobsByJobNumber(filtered);
+    } else {
+      filtered.sort((a, b) => {
+        const dateA = a.startDate ? new Date(a.startDate).getTime() : 0;
+        const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
+        return dateB - dateA; // Descending order
+      });
+    }
 
     setFilteredJobs(filtered);
     setCurrentPage(1); // Reset to first page when filters change
@@ -491,6 +712,48 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
     return overdueJobs.find(oj => oj.jobId === jobId) || null;
   }
 
+  /**
+   * Gets the rep code object from a job's repCode field (which can be a string ID or an object)
+   */
+  function getRepCodeFromJob(job: Job): RepCode | null {
+    if (!job.repCode) return null;
+    
+    // If repCode is already an object with _id, use it
+    if (typeof job.repCode === 'object' && '_id' in job.repCode) {
+      const repCodeObj = job.repCode as { _id: string; code: string; description?: string };
+      return repCodes.find(rc => rc._id === repCodeObj._id) || null;
+    }
+    
+    // If repCode is a string ID, look it up
+    if (typeof job.repCode === 'string') {
+      const repCodeId = job.repCode;
+      return repCodes.find(rc => rc._id === repCodeId) || null;
+    }
+    
+    return null;
+  }
+
+  /**
+   * Gets the technician name from a job's techBooked field (which can be a string ID or an object)
+   */
+  function getTechnicianNameFromJob(job: Job): string | null {
+    if (!job.techBooked) return null;
+    
+    // If techBooked is already an object with name, use it
+    if (typeof job.techBooked === 'object' && 'name' in job.techBooked) {
+      return job.techBooked.name;
+    }
+    
+    // If techBooked is a string ID, look it up from technicians array
+    if (typeof job.techBooked === 'string') {
+      const techBookedId = job.techBooked;
+      const technician = technicians.find(t => t._id === techBookedId);
+      return technician ? technician.name : null;
+    }
+    
+    return null;
+  }
+
   function formatDate(dateString?: string | Date) {
     if (!dateString) return '-';
     const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
@@ -499,7 +762,11 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
 
   function formatCurrency(value?: number) {
     if (!value) return '-';
-    return `R${value.toLocaleString()}`;
+    // Format number with commas and 2 decimal places, then add R prefix
+    const formatted = value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const result = `R${formatted}`;
+    console.log('formatCurrency - Input:', value, 'Formatted:', formatted, 'Result:', result);
+    return result;
   }
 
   return (
@@ -512,7 +779,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
       ) : (
         <div className="flex gap-6">
           {/* Left Sidebar - Filters */}
-          <div className="w-80 flex-shrink-0 bg-white rounded-2xl border border-gray-200 shadow-lg p-6 h-fit sticky top-6">
+          <div className="w-80 flex-shrink-0 bg-white rounded-2xl border border-gray-200 shadow-lg p-6 max-h-[calc(100vh-3rem)] overflow-y-auto sticky top-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-bold text-ars-heading flex items-center gap-2">
                 <Filter className="w-5 h-5 text-ars-primary" />
@@ -638,15 +905,93 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
               <select
                 value={admFilter}
                 onChange={(e) => setAdmFilter(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                disabled={user?.role?.name === 'admin' && !user?.isSuperAdmin}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
               >
                 <option value="all">All Admins</option>
-                {adminCodes.map((code) => (
-                  <option key={code} value={code}>
-                    {code}
-                  </option>
-                ))}
+                {adminCodeOptions.length > 0 ? (
+                  adminCodeOptions.map((code) => (
+                    <option key={code} value={code}>
+                      {code}
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled>Loading admin codes...</option>
+                )}
               </select>
+            </div>
+
+            {/* Rep Code Filter */}
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-ars-heading mb-2">Rep Code</label>
+              <select
+                value={repCodeFilter}
+                onChange={(e) => setRepCodeFilter(e.target.value)}
+                disabled={user?.role?.name === 'rep' && !user?.isSuperAdmin}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
+              >
+                <option value="all">All Rep Codes</option>
+                {repCodes && repCodes.length > 0 ? (
+                  repCodes
+                    .filter(rc => rc.isActive)
+                    .map((repCode) => (
+                      <option key={repCode._id} value={repCode._id}>
+                        {repCode.code} {repCode.description ? `- ${repCode.description}` : ''}
+                      </option>
+                    ))
+                ) : (
+                  <option value="" disabled>Loading...</option>
+                )}
+              </select>
+            </div>
+
+            {/* Technician Filter */}
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-ars-heading mb-2">Technician</label>
+              <select
+                value={technicianFilter}
+                onChange={(e) => setTechnicianFilter(e.target.value)}
+                disabled={user?.role?.name === 'technician' && !user?.isSuperAdmin}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
+              >
+                <option value="all">All Technicians</option>
+                {technicians && technicians.length > 0 ? (
+                  technicians.map((technician) => (
+                    <option key={technician._id} value={technician._id}>
+                      {technician.name}
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled>Loading...</option>
+                )}
+              </select>
+            </div>
+
+            {/* Machines Visibility Toggle */}
+            <div className="mb-6 pt-4 border-t border-gray-200">
+              <label className="block text-sm font-semibold text-ars-heading mb-3">Display Options</label>
+              <button
+                onClick={() => {
+                  const newValue = !showMachinesGlobal;
+                  setShowMachinesGlobal(newValue);
+                  localStorage.setItem('leadsList_showMachines', String(newValue));
+                  // If hiding globally, clear all expanded states
+                  if (!newValue) {
+                    setExpandedMachines(new Set());
+                  }
+                }}
+                className="w-full flex items-center justify-between px-4 py-2.5 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors bg-white"
+              >
+                <div className="flex items-center gap-2">
+                  <Wrench className="w-4 h-4 text-ars-primary" />
+                  <span className="text-sm text-ars-body">Show Machines</span>
+                </div>
+                {showMachinesGlobal ? (
+                  <ChevronDown className="w-4 h-4 text-ars-primary" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                )}
+              </button>
             </div>
 
             {/* Results Count */}
@@ -797,6 +1142,12 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
                               <span>Quoted: {formatDate(job.dateQuoted)}</span>
                             </div>
                           )}
+                          {job.statusChangedAt && (
+                            <div className="flex items-center gap-2">
+                              <Clock className="w-3 h-3" />
+                              <span>Status Changed: {formatDate(job.statusChangedAt)}</span>
+                            </div>
+                          )}
                         </div>
 
                         {/* Metadata Row */}
@@ -813,13 +1164,97 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
                               <span>{job.adm}</span>
                             </div>
                           )}
-                          {job.valueExVat && (
+                          {(() => {
+                            const repCode = getRepCodeFromJob(job);
+                            return repCode ? (
+                              <div className="flex items-center gap-1 text-xs text-ars-body">
+                                <Tag className="w-3 h-3" />
+                                <span className="font-medium">{repCode.code}</span>
+                              </div>
+                            ) : null;
+                          })()}
+                        </div>
+
+                        {/* Technician - On its own line */}
+                        {(() => {
+                          const technicianName = getTechnicianNameFromJob(job);
+                          return technicianName ? (
+                            <div className="mb-3 pt-2 border-t border-gray-200">
+                              <div className="flex items-center gap-2 text-xs text-ars-body">
+                                <User className="w-3 h-3" />
+                                <span className="font-medium">Technician: {technicianName}</span>
+                              </div>
+                            </div>
+                          ) : null;
+                        })()}
+
+                        {/* Machines */}
+                        {Array.isArray(job.machines) && job.machines.length > 0 && (
+                          <div className="mb-3 pt-2 border-t border-gray-200">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const isExpanded = expandedMachines.has(job._id);
+                                const newExpanded = new Set(expandedMachines);
+                                if (isExpanded) {
+                                  newExpanded.delete(job._id);
+                                } else {
+                                  newExpanded.add(job._id);
+                                }
+                                setExpandedMachines(newExpanded);
+                              }}
+                              className="w-full flex items-center justify-between mb-2 hover:bg-gray-50 -mx-2 px-2 py-1 rounded transition-colors"
+                            >
+                              <div className="flex items-center gap-2 text-xs text-ars-body">
+                                <Wrench className="w-3 h-3 flex-shrink-0" />
+                                <span className="font-medium">
+                                  {job.machines.length} Machine{job.machines.length !== 1 ? 's' : ''}
+                                </span>
+                              </div>
+                              {showMachinesGlobal || expandedMachines.has(job._id) ? (
+                                <ChevronUp className="w-3 h-3 text-ars-body" />
+                              ) : (
+                                <ChevronDown className="w-3 h-3 text-ars-body" />
+                              )}
+                            </button>
+                            {(showMachinesGlobal || expandedMachines.has(job._id)) && (
+                              <div className="space-y-2">
+                                {job.machines.map((machineRef, index) => {
+                                  const machine = typeof machineRef === 'object' && machineRef !== null
+                                    ? machineRef
+                                    : null;
+                                  if (!machine) return null;
+                                  return (
+                                    <div key={machine._id || index} className="space-y-1">
+                                      <div className="flex items-center gap-1 text-xs text-ars-body">
+                                        <Wrench className="w-3 h-3 flex-shrink-0" />
+                                        <span className="font-medium">
+                                          {machine.make} {machine.model}
+                                        </span>
+                                      </div>
+                                      <div className="text-xs text-ars-body pl-4">
+                                        <div className="flex items-center gap-2">
+                                          <span>Hours: <span className="font-semibold text-ars-primary">{machine.machineHours.toLocaleString()}</span></span>
+                                          <span className="text-gray-400">•</span>
+                                          <span>Next: <span className="font-semibold text-orange-600">{machine.nextServiceHours.toLocaleString()}</span></span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Value */}
+                        {job.valueExVat && (
+                          <div className="mb-3 pt-2 border-t border-gray-200">
                             <div className="flex items-center gap-1 text-xs text-ars-body font-medium">
-                              <DollarSign className="w-3 h-3" />
                               <span>{formatCurrency(job.valueExVat)}</span>
                             </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
 
                         {/* Actions */}
                         <div className="flex items-center gap-2 pt-3 border-t border-gray-200">
@@ -931,7 +1366,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches }: Lead
           lead={selectedJob}
           statuses={statuses}
           branches={branches}
-          adminCodes={adminCodes}
+          adminCodes={adminCodeOptions}
           onClose={() => setSelectedJob(null)}
           onUpdate={handleJobUpdate}
         />

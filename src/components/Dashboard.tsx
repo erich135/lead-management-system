@@ -7,12 +7,19 @@ import {
   getStatuses,
   getBranches,
   getCustomers,
+  getRepCodes,
+  getTechnicians,
+  getAdminCodes,
   logViewActivity,
   type JobStats,
   type OverdueJob,
   type Status,
   type Branch,
   type Customer,
+  type RepCode,
+  type Technician,
+  type AdminCode,
+  type Job,
 } from '../lib/api';
 import {
   LogOut,
@@ -31,6 +38,12 @@ import {
   Sparkles,
   Zap,
   Shield,
+  User,
+  Building2,
+  Tag,
+  Wrench,
+  Edit2,
+  Eye,
 } from 'lucide-react';
 import { LeadsList } from './LeadsList';
 import { LeadForm } from './LeadForm';
@@ -89,7 +102,11 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [repCodes, setRepCodes] = useState<RepCode[]>([]);
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [adminCodes, setAdminCodes] = useState<AdminCode[]>([]);
   const [selectedPriority, setSelectedPriority] = useState<'all' | 'critical' | 'warning' | 'info'>('all');
+  const [leadsListRefreshKey, setLeadsListRefreshKey] = useState(0);
 
   useEffect(() => {
     loadInitialData();
@@ -122,6 +139,9 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
         loadStatuses(),
         loadBranches(),
         loadCustomers(),
+        loadRepCodes(),
+        loadTechnicians(),
+        loadAdminCodes(),
       ]);
     } catch (err: any) {
       console.error('Error loading initial data:', err);
@@ -190,6 +210,138 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
     }
   }
 
+  async function loadRepCodes() {
+    try {
+      const data = await getRepCodes();
+      setRepCodes(data.repCodes || []);
+    } catch (error) {
+      console.error('Error loading rep codes:', error);
+    }
+  }
+
+  async function loadTechnicians() {
+    try {
+      const data = await getTechnicians();
+      setTechnicians(data.technicians || []);
+    } catch (error) {
+      console.error('Error loading technicians:', error);
+    }
+  }
+
+  async function loadAdminCodes() {
+    try {
+      const data = await getAdminCodes();
+      setAdminCodes(data.adminCodes || []);
+    } catch (error) {
+      console.error('Error loading admin codes:', error);
+    }
+  }
+
+  /**
+   * Gets the rep code object from a job's repCode field (which can be a string ID or an object)
+   */
+  function getRepCodeFromJob(job: Job): RepCode | null {
+    if (!job.repCode) return null;
+    
+    // If repCode is already an object with _id, use it
+    if (typeof job.repCode === 'object' && '_id' in job.repCode) {
+      const repCodeObj = job.repCode as { _id: string; code: string; description?: string };
+      return repCodes.find(rc => rc._id === repCodeObj._id) || null;
+    }
+    
+    // If repCode is a string ID, look it up
+    if (typeof job.repCode === 'string') {
+      const repCodeId = job.repCode;
+      return repCodes.find(rc => rc._id === repCodeId) || null;
+    }
+    
+    return null;
+  }
+
+  /**
+   * Gets the technician name from a job's techBooked field (which can be a string ID or an object)
+   */
+  function getTechnicianNameFromJob(job: Job): string | null {
+    if (!job.techBooked) return null;
+    
+    // If techBooked is already an object with name, use it
+    if (typeof job.techBooked === 'object' && 'name' in job.techBooked) {
+      return job.techBooked.name;
+    }
+    
+    // If techBooked is a string ID, look it up from technicians array
+    if (typeof job.techBooked === 'string') {
+      const techBookedId = job.techBooked;
+      const technician = technicians.find(t => t._id === techBookedId);
+      return technician ? technician.name : null;
+    }
+    
+    return null;
+  }
+
+  function formatDate(dateString?: string | Date) {
+    if (!dateString) return '-';
+    const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function formatCurrency(value?: number) {
+    if (!value) return '-';
+    // Format number with commas and 2 decimal places, then add R prefix
+    const formatted = value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return `R${formatted}`;
+  }
+
+  function getStatusColor(statusName?: string): string {
+    if (!statusName) return 'bg-gray-50 border-gray-200';
+    
+    const colors: Record<string, string> = {
+      'In Progress': 'bg-blue-50 border-blue-200',
+      'Quoted': 'bg-amber-50 border-amber-200',
+      'Sent to Client': 'bg-purple-50 border-purple-200',
+      'Await PO': 'bg-orange-50 border-orange-200',
+      'Register': 'bg-cyan-50 border-cyan-200',
+      'Parts Ready': 'bg-teal-50 border-teal-200',
+      'Job Done': 'bg-green-50 border-green-200',
+      'RSR Needed': 'bg-yellow-50 border-yellow-200',
+      'Sent to Inv': 'bg-indigo-50 border-indigo-200',
+      'Query': 'bg-pink-50 border-pink-200',
+      'Ready to Inv': 'bg-emerald-50 border-emerald-200',
+      'Invoiced': 'bg-emerald-50 border-emerald-200',
+      'Warranty': 'bg-gray-50 border-gray-200',
+      'Assesment': 'bg-slate-50 border-slate-200',
+      'Asses Done': 'bg-slate-50 border-slate-200',
+      'Ask Leana to Cancel': 'bg-red-50 border-red-200',
+      'Cancel before 7/7/25': 'bg-red-50 border-red-200',
+    };
+    return colors[statusName] || 'bg-gray-50 border-gray-200';
+  }
+
+  function getStatusTextColor(statusName?: string): string {
+    if (!statusName) return 'text-gray-700';
+    
+    const colors: Record<string, string> = {
+      'In Progress': 'text-blue-700',
+      'Quoted': 'text-amber-700',
+      'Sent to Client': 'text-purple-700',
+      'Await PO': 'text-orange-700',
+      'Register': 'text-cyan-700',
+      'Parts Ready': 'text-teal-700',
+      'Job Done': 'text-green-700',
+      'RSR Needed': 'text-yellow-700',
+      'Sent to Inv': 'text-indigo-700',
+      'Query': 'text-pink-700',
+      'Ready to Inv': 'text-emerald-700',
+      'Invoiced': 'text-emerald-700',
+      'Warranty': 'text-gray-700',
+      'Assesment': 'text-slate-700',
+      'Asses Done': 'text-slate-700',
+      'Ask Leana to Cancel': 'text-red-700',
+      'Cancel before 7/7/25': 'text-red-700',
+    };
+    return colors[statusName] || 'text-gray-700';
+  }
+
   function getSeverityColor(severity: 'critical' | 'warning' | 'info'): string {
     switch (severity) {
       case 'critical':
@@ -224,6 +376,8 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
     setShowLeadForm(false);
     setSelectedLead(null);
     loadStats();
+    loadOverdueJobs(); // Refresh overdue jobs list
+    setLeadsListRefreshKey(prev => prev + 1); // Trigger LeadsList refresh
   }
 
   return (
@@ -280,20 +434,22 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                     <div className="absolute inset-0 bg-white/20 rounded-lg animate-pulse"></div>
                   )}
                 </Link>
-                <Link
-                  to="/reports"
-                  className={`group relative px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
-                    view === 'reports'
-                      ? 'bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] shadow-lg scale-105'
-                      : 'text-white/80 hover:text-white hover:bg-white/10'
-                  }`}
-                >
-                  <BarChart3 className={`w-4 h-4 transition-transform ${view === 'reports' ? 'scale-110' : ''}`} />
-                  <span>Reports</span>
-                  {view === 'reports' && (
-                    <div className="absolute inset-0 bg-white/20 rounded-lg animate-pulse"></div>
-                  )}
-                </Link>
+                {(isSuperAdmin || user?.role?.name?.toLowerCase() === 'manager') && (
+                  <Link
+                    to="/reports"
+                    className={`group relative px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
+                      view === 'reports'
+                        ? 'bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] shadow-lg scale-105'
+                        : 'text-white/80 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <BarChart3 className={`w-4 h-4 transition-transform ${view === 'reports' ? 'scale-110' : ''}`} />
+                    <span>Reports</span>
+                    {view === 'reports' && (
+                      <div className="absolute inset-0 bg-white/20 rounded-lg animate-pulse"></div>
+                    )}
+                  </Link>
+                )}
                 <Link
                   to="/diary"
                   className={`group relative px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
@@ -693,13 +849,15 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                     )}
                   </div>
 
-                  <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('reports')}>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-white/80 text-xs font-medium">Total Value</p>
-                      <Banknote className="w-4 h-4 text-[#f7c12b]" />
+                  {(isSuperAdmin || user?.role?.name?.toLowerCase() === 'manager') && (
+                    <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('reports')}>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-white/80 text-xs font-medium">Total Value</p>
+                        <Banknote className="w-4 h-4 text-[#f7c12b]" />
+                      </div>
+                      <p className="text-2xl font-bold">R{stats.totalValue.toLocaleString()}</p>
                     </div>
-                    <p className="text-2xl font-bold">R{stats.totalValue.toLocaleString()}</p>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -793,19 +951,14 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                 </div>
               ) : (
                 <>
-                  {overdueJobs
-                    .filter(job => selectedPriority === 'all' || job.severity === selectedPriority)
-                    .slice(0, 5)
-                    .map((overdue, index) => (
-                      <div
-                        key={overdue.jobId}
-                        className={`group relative overflow-hidden rounded-xl border-2 transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer ${
-                          overdue.severity === 'critical'
-                            ? 'bg-gradient-to-r from-red-50 via-red-50 to-orange-50 border-red-300 hover:border-red-400'
-                            : overdue.severity === 'warning'
-                            ? 'bg-gradient-to-r from-orange-50 via-amber-50 to-yellow-50 border-orange-300 hover:border-orange-400'
-                            : 'bg-gradient-to-r from-blue-50 via-cyan-50 to-sky-50 border-blue-300 hover:border-blue-400'
-                        }`}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {overdueJobs
+                      .filter(job => selectedPriority === 'all' || job.severity === selectedPriority)
+                      .slice(0, 5)
+                      .map((overdue, index) => (
+                        <div
+                          key={overdue.jobId}
+                          className={`group relative overflow-hidden rounded-xl border-2 transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer ${getStatusColor(overdue.job?.status?.name)}`}
                         onClick={() => {
                           if (overdue.job) {
                             setSelectedLead(overdue.job);
@@ -816,99 +969,172 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                           animation: `fadeInUp 0.3s ease-out ${index * 0.05}s both`
                         }}
                       >
-                        {/* Animated gradient overlay on hover */}
-                        <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${
-                          overdue.severity === 'critical'
-                            ? 'bg-gradient-to-r from-red-400/10 to-orange-400/10'
-                            : overdue.severity === 'warning'
-                            ? 'bg-gradient-to-r from-orange-400/10 to-yellow-400/10'
-                            : 'bg-gradient-to-r from-blue-400/10 to-cyan-400/10'
-                        }`}></div>
 
-                        <div className="relative p-6">
-                          <div className="flex items-start gap-4">
-                            {/* Priority Indicator */}
-                            <div className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center shadow-lg ${
-                              overdue.severity === 'critical'
-                                ? 'bg-gradient-to-br from-red-500 to-red-600'
-                                : overdue.severity === 'warning'
-                                ? 'bg-gradient-to-br from-orange-500 to-orange-600'
-                                : 'bg-gradient-to-br from-blue-500 to-blue-600'
-                            }`}>
-                              {getSeverityIcon(overdue.severity)}
+                        <div className="relative p-5">
+                          {/* Priority Badge */}
+                          {overdue.isOverdue && (
+                            <div className="absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-bold shadow-md bg-red-500 text-white animate-pulse">
+                              {overdue.daysOverdue}d overdue
                             </div>
+                          )}
+                          {overdue.isApproaching && !overdue.isOverdue && (
+                            <div className="absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-bold shadow-md bg-orange-500 text-white">
+                              Approaching
+                            </div>
+                          )}
 
-                            {/* Ticket Content */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between mb-3">
-                                <div>
-                                  <div className="flex items-center gap-3 mb-2">
-                                    <h3 className="text-lg font-bold text-ars-heading group-hover:text-ars-primary transition-colors">
-                                      {overdue.jobNumber}
-                                    </h3>
-                                    {overdue.isOverdue && (
-                                      <span className="px-3 py-1 bg-red-500 text-white text-xs font-bold rounded-full shadow-md animate-pulse">
-                                        {overdue.daysOverdue} days overdue
-                                      </span>
-                                    )}
-                                    {overdue.isApproaching && !overdue.isOverdue && (
-                                      <span className="px-3 py-1 bg-orange-500 text-white text-xs font-bold rounded-full">
-                                        Approaching
-                                      </span>
-                                    )}
-                                  </div>
-                                  <p className="text-ars-body font-medium mb-1">
-                                    {overdue.job?.customer?.name || overdue.job?.cashCustomer || 'No customer'}
-                                  </p>
-                                </div>
-                                <ArrowRight className="w-5 h-5 text-ars-body group-hover:text-ars-primary group-hover:translate-x-1 transition-all flex-shrink-0" />
+                          {/* Job Number & Status */}
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <h3 className="text-lg font-bold text-ars-heading group-hover:text-ars-primary transition-colors mb-1">
+                                {overdue.jobNumber}
+                              </h3>
+                              <span className={`inline-block px-3 py-1 rounded-lg text-xs font-semibold ${getStatusTextColor(overdue.job?.status?.name)} bg-white/60 border border-current/20`}>
+                                {overdue.job?.status?.name || overdue.currentStatus || 'No Status'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Customer */}
+                          <div className="mb-3">
+                            <div className="flex items-center gap-2 text-sm text-ars-body mb-1">
+                              <User className="w-4 h-4" />
+                              <span className="font-medium text-ars-heading">
+                                {overdue.job?.customer?.name || overdue.job?.cashCustomer || 'No customer'}
+                              </span>
+                            </div>
+                            {overdue.job?.cashCustomer && overdue.job?.customer && (
+                              <p className="text-xs text-ars-body ml-6">Cash: {overdue.job.cashCustomer}</p>
+                            )}
+                          </div>
+
+                          {/* Dates */}
+                          <div className="space-y-2 mb-3 text-xs text-ars-body">
+                            {overdue.job?.startDate && (
+                              <div className="flex items-center gap-2">
+                                <Calendar className="w-3 h-3" />
+                                <span>Start: {formatDate(overdue.job.startDate)}</span>
                               </div>
-
-                              {/* Status Flow */}
-                              <div className="flex items-center gap-2 mb-3 flex-wrap">
-                                <span className={`px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm ${
-                                  overdue.severity === 'critical'
-                                    ? 'bg-red-100 text-red-800 border border-red-200'
-                                    : overdue.severity === 'warning'
-                                    ? 'bg-orange-100 text-orange-800 border border-orange-200'
-                                    : 'bg-blue-100 text-blue-800 border border-blue-200'
-                                }`}>
-                                  {overdue.currentStatus}
-                                </span>
-                                <ArrowRight className="w-4 h-4 text-ars-body" />
-                                <span className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white shadow-sm">
-                                  {overdue.expectedNextStatus}
-                                </span>
+                            )}
+                            {overdue.job?.dateQuoted && (
+                              <div className="flex items-center gap-2">
+                                <Calendar className="w-3 h-3" />
+                                <span>Quoted: {formatDate(overdue.job.dateQuoted)}</span>
                               </div>
+                            )}
+                          </div>
 
-                              {/* Metadata */}
-                              <div className="flex items-center gap-4 text-xs text-ars-body">
-                                <div className="flex items-center gap-1">
-                                  <Clock className="w-3 h-3" />
-                                  <span>
-                                    {overdue.isOverdue 
-                                      ? `${overdue.daysOverdue} days overdue` 
-                                      : `${overdue.daysInStatus}/${overdue.maxDaysAllowed} days`}
-                                  </span>
+                          {/* Metadata Row */}
+                          <div className="flex items-center gap-3 flex-wrap mb-3 pt-3 border-t border-gray-200">
+                            {overdue.job?.branch && (
+                              <div className="flex items-center gap-1 text-xs text-ars-body">
+                                <Building2 className="w-3 h-3" />
+                                <span>{overdue.job.branch.name}</span>
+                              </div>
+                            )}
+                            {overdue.job?.adm && (
+                              <div className="flex items-center gap-1 text-xs text-ars-body">
+                                <User className="w-3 h-3" />
+                                <span>{overdue.job.adm}</span>
+                              </div>
+                            )}
+                            {overdue.job && (() => {
+                              const repCode = getRepCodeFromJob(overdue.job);
+                              return repCode ? (
+                                <div className="flex items-center gap-1 text-xs text-ars-body">
+                                  <Tag className="w-3 h-3" />
+                                  <span className="font-medium">{repCode.code}</span>
                                 </div>
-                                {overdue.followUpLevel && (
-                                  <div className="flex items-center gap-1">
-                                    <FileText className="w-3 h-3" />
-                                    <span>Follow-up {overdue.followUpLevel}</span>
-                                  </div>
-                                )}
-                                {overdue.job?.branch && (
-                                  <div className="flex items-center gap-1">
-                                    <LayoutDashboard className="w-3 h-3" />
-                                    <span>{overdue.job.branch.name}</span>
-                                  </div>
-                                )}
+                              ) : null;
+                            })()}
+                          </div>
+
+                          {/* Technician - On its own line */}
+                          {overdue.job && (() => {
+                            const technicianName = getTechnicianNameFromJob(overdue.job);
+                            return technicianName ? (
+                              <div className="mb-3 pt-2 border-t border-gray-200">
+                                <div className="flex items-center gap-2 text-xs text-ars-body">
+                                  <User className="w-3 h-3" />
+                                  <span className="font-medium">Technician: {technicianName}</span>
+                                </div>
+                              </div>
+                            ) : null;
+                          })()}
+
+                          {/* Machines */}
+                          {Array.isArray(overdue.job?.machines) && overdue.job.machines.length > 0 && (
+                            <div className="mb-3 pt-2 border-t border-gray-200">
+                              <div className="space-y-2">
+                                {overdue.job.machines.map((machineRef: any, index: number) => {
+                                  const machine = typeof machineRef === 'object' && machineRef !== null
+                                    ? machineRef
+                                    : null;
+                                  if (!machine) return null;
+                                  return (
+                                    <div key={machine._id || index} className="space-y-1">
+                                      <div className="flex items-center gap-1 text-xs text-ars-body">
+                                        <Wrench className="w-3 h-3 flex-shrink-0" />
+                                        <span className="font-medium">
+                                          {machine.make} {machine.model}
+                                        </span>
+                                      </div>
+                                      <div className="text-xs text-ars-body pl-4">
+                                        <div className="flex items-center gap-2">
+                                          <span>Hours: <span className="font-semibold text-ars-primary">{machine.machineHours.toLocaleString()}</span></span>
+                                          <span className="text-gray-400">•</span>
+                                          <span>Next: <span className="font-semibold text-orange-600">{machine.nextServiceHours.toLocaleString()}</span></span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
+                          )}
+
+                          {/* Value */}
+                          {overdue.job?.valueExVat && (
+                            <div className="mb-3 pt-2 border-t border-gray-200">
+                              <div className="flex items-center gap-1 text-xs text-ars-body font-medium">
+                                <span>{formatCurrency(overdue.job.valueExVat)}</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-2 pt-3 border-t border-gray-200">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (overdue.job) {
+                                  handleLeadClick(overdue.job);
+                                  navigateToView('leads');
+                                }
+                              }}
+                              className="flex-1 px-3 py-2 bg-white/80 hover:bg-white rounded-lg text-xs font-medium text-ars-heading hover:text-ars-primary transition-all flex items-center justify-center gap-1"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                              Edit
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (overdue.job) {
+                                  setSelectedLead(overdue.job);
+                                  navigateToView('leads');
+                                }
+                              }}
+                              className="flex-1 px-3 py-2 bg-white/80 hover:bg-white rounded-lg text-xs font-medium text-ars-heading hover:text-ars-primary transition-all flex items-center justify-center gap-1"
+                            >
+                              <Eye className="w-3 h-3" />
+                              View
+                            </button>
                           </div>
                         </div>
                       </div>
-                    ))}
+                      ))}
+                  </div>
                   {/* Show "more" link if there are more than 5 jobs */}
                   {overdueJobs.filter(job => selectedPriority === 'all' || job.severity === selectedPriority).length > 5 && (
                     <div className="mt-6 text-center">
@@ -951,14 +1177,30 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
             onCreateNew={() => setShowLeadForm(true)}
             statuses={statuses}
             branches={branches}
+            refreshKey={leadsListRefreshKey}
           />
         )}
 
-        {view === 'reports' && (
+        {view === 'reports' && (isSuperAdmin || user?.role?.name?.toLowerCase() === 'manager') && (
           <Reports
             statuses={statuses}
             branches={branches}
           />
+        )}
+        {view === 'reports' && !isSuperAdmin && user?.role?.name?.toLowerCase() !== 'manager' && (
+          <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+              <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+              <h1 className="text-2xl font-bold text-slate-900 mb-2">Access Denied</h1>
+              <p className="text-slate-600 mb-6">You don't have permission to access the Reports page. This page is only available to Managers and Super Admins.</p>
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="px-6 py-3 bg-[#0969a9] text-white rounded-xl font-medium hover:bg-[#0a7bc4] transition-colors"
+              >
+                Go to Dashboard
+              </button>
+            </div>
+          </div>
         )}
 
         {view === 'diary' && (

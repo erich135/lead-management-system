@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getJob, updateJob, type Job, type Status, type Branch } from '../lib/api';
+import { getJob, updateJob, getMachinesByCustomer, createMachine, type Job, type Status, type Branch, type Machine } from '../lib/api';
 import {
   X,
   Calendar,
@@ -35,10 +35,29 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   const [isEditing, setIsEditing] = useState(false);
   const [job, setJob] = useState<Job>(initialLead);
   const [error, setError] = useState<string | null>(null);
+  const [machines, setMachines] = useState<Machine[]>([]);
+  const [showNewMachineForm, setShowNewMachineForm] = useState(false);
+  const [newMachine, setNewMachine] = useState({
+    make: '',
+    model: '',
+    serialNumber: '',
+    machineHours: '',
+    nextServiceHours: '',
+  });
+  const [creatingMachine, setCreatingMachine] = useState(false);
 
   useEffect(() => {
     loadJobDetails();
   }, [initialLead._id]);
+
+  // Load machines when job has a customer
+  useEffect(() => {
+    if (job.customer && typeof job.customer === 'object' && job.customer._id) {
+      loadMachines(job.customer._id);
+    } else {
+      setMachines([]);
+    }
+  }, [job.customer]);
 
   async function loadJobDetails() {
     try {
@@ -47,6 +66,60 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     } catch (err: any) {
       console.error('Error loading job details:', err);
       setError(err.message || 'Failed to load job details');
+    }
+  }
+
+  async function loadMachines(customerId: string) {
+    try {
+      const response = await getMachinesByCustomer(customerId);
+      setMachines(response.machines || []);
+    } catch (err: any) {
+      console.error('Error loading machines:', err);
+      setMachines([]);
+    }
+  }
+
+  async function handleCreateMachine() {
+    if (!job.customer || typeof job.customer !== 'object' || !job.customer._id) {
+      setError('Customer is required to create a machine');
+      return;
+    }
+
+    if (!newMachine.make.trim() || !newMachine.model.trim() || !newMachine.serialNumber.trim()) {
+      setError('Make, Model, and Serial Number are required');
+      return;
+    }
+
+    setCreatingMachine(true);
+    setError(null);
+    try {
+      const response = await createMachine({
+        make: newMachine.make.trim(),
+        model: newMachine.model.trim(),
+        serialNumber: newMachine.serialNumber.trim(),
+        customer: job.customer._id,
+        machineHours: parseFloat(newMachine.machineHours) || 0,
+        nextServiceHours: parseFloat(newMachine.nextServiceHours) || 0,
+      });
+
+      // Add new machine to list and add it to job's machines array
+      const updatedMachines = [...machines, response.machine];
+      setMachines(updatedMachines);
+      const currentMachines = Array.isArray(job.machines) ? job.machines : [];
+      const machineIds = currentMachines.map(m => typeof m === 'object' && m !== null ? m._id : m).filter(Boolean);
+      setJob({ ...job, machines: [...machineIds, response.machine._id] });
+      setNewMachine({
+        make: '',
+        model: '',
+        serialNumber: '',
+        machineHours: '',
+        nextServiceHours: '',
+      });
+      setShowNewMachineForm(false);
+    } catch (err: any) {
+      setError(err.message || 'Failed to create machine');
+    } finally {
+      setCreatingMachine(false);
     }
   }
 
@@ -515,33 +588,220 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
             </div>
           </div>
 
-          {/* Follow-up Statuses */}
-          {(job.followUp1 || job.followUp2 || job.followUp3 || job.followUp4) && (
+          {/* Machines Section - Full Width Block */}
+          {job.customer && typeof job.customer === 'object' && job.customer._id && (
+            <div className="mt-6 space-y-4">
+              <h3 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-2">Machines</h3>
+              {isEditing ? (
+                <div className="space-y-3">
+                  {/* Display selected machines */}
+                  {Array.isArray(job.machines) && job.machines.length > 0 && (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {job.machines.map((machineRef, index) => {
+                        const machine = typeof machineRef === 'object' && machineRef !== null
+                          ? machineRef
+                          : machines.find(m => m._id === machineRef);
+                        if (!machine) return null;
+                        return (
+                          <div key={machine._id || index} className="p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-ars-heading">
+                                {machine.make} {machine.model}
+                              </div>
+                              <div className="text-xs text-ars-body mt-1">
+                                Serial: {machine.serialNumber} • Hours: {machine.machineHours.toLocaleString()} • Next: {machine.nextServiceHours.toLocaleString()}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updatedMachines = job.machines?.filter((m) => {
+                                  const mId = typeof m === 'object' && m !== null ? m._id : m;
+                                  const refId = typeof machineRef === 'object' && machineRef !== null ? machineRef._id : machineRef;
+                                  return mId !== refId;
+                                }) || [];
+                                setJob({ ...job, machines: updatedMachines });
+                              }}
+                              className="ml-2 px-2 py-1 text-red-600 hover:bg-red-50 rounded transition-colors flex-shrink-0"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  
+                  {/* Add machine dropdown and button - Always visible */}
+                  <div className="flex gap-2">
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          const currentMachines = Array.isArray(job.machines) ? job.machines : [];
+                          const machineIds = currentMachines.map(m => typeof m === 'object' && m !== null ? m._id : m).filter(Boolean);
+                          if (!machineIds.includes(e.target.value)) {
+                            setJob({ ...job, machines: [...machineIds, e.target.value] });
+                          }
+                          e.target.value = '';
+                        }
+                      }}
+                      className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                    >
+                      <option value="">Select Machine to Add</option>
+                      {machines
+                        .filter(m => {
+                          if (!m.isActive) return false;
+                          const currentMachines = Array.isArray(job.machines) ? job.machines : [];
+                          const machineIds = currentMachines.map(m => typeof m === 'object' && m !== null ? m._id : m).filter(Boolean);
+                          return !machineIds.includes(m._id);
+                        })
+                        .map((machine) => (
+                          <option key={machine._id} value={machine._id}>
+                            {machine.make} {machine.model} - {machine.serialNumber} ({machine.machineHours} hrs)
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewMachineForm(!showNewMachineForm)}
+                      className="px-4 py-3 bg-ars-primary text-white rounded-xl hover:bg-ars-primary/90 transition-colors whitespace-nowrap flex-shrink-0"
+                    >
+                      {showNewMachineForm ? 'Cancel' : '+ New'}
+                    </button>
+                  </div>
+                  
+                  {/* New Machine Form */}
+                  {showNewMachineForm && (
+                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
+                      <h4 className="font-semibold text-ars-heading">Add New Machine</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-ars-body mb-1">Make *</label>
+                          <input
+                            type="text"
+                            value={newMachine.make}
+                            onChange={(e) => setNewMachine({ ...newMachine, make: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                            placeholder="e.g., Caterpillar"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-ars-body mb-1">Model *</label>
+                          <input
+                            type="text"
+                            value={newMachine.model}
+                            onChange={(e) => setNewMachine({ ...newMachine, model: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                            placeholder="e.g., CAT 320"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-ars-body mb-1">Serial Number *</label>
+                          <input
+                            type="text"
+                            value={newMachine.serialNumber}
+                            onChange={(e) => setNewMachine({ ...newMachine, serialNumber: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                            placeholder="Serial number"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-ars-body mb-1">Machine Hours</label>
+                          <input
+                            type="number"
+                            value={newMachine.machineHours}
+                            onChange={(e) => setNewMachine({ ...newMachine, machineHours: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                            placeholder="0"
+                            min="0"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-ars-body mb-1">Next Service Hours</label>
+                          <input
+                            type="number"
+                            value={newMachine.nextServiceHours}
+                            onChange={(e) => setNewMachine({ ...newMachine, nextServiceHours: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                            placeholder="0"
+                            min="0"
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCreateMachine}
+                        disabled={creatingMachine}
+                        className="w-full px-4 py-2 bg-ars-primary text-white rounded-lg hover:bg-ars-primary/90 transition-colors disabled:opacity-50"
+                      >
+                        {creatingMachine ? 'Creating...' : 'Create Machine'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {Array.isArray(job.machines) && job.machines.length > 0 ? (
+                    job.machines.map((machineRef, index) => {
+                      const machine = typeof machineRef === 'object' && machineRef !== null
+                        ? machineRef
+                        : machines.find(m => m._id === machineRef);
+                      if (!machine) return null;
+                      return (
+                        <div key={machine._id || index} className="px-4 py-3 bg-gray-50 rounded-xl border border-gray-200">
+                          <div className="space-y-1">
+                            <div className="text-ars-heading font-semibold">
+                              {machine.make} {machine.model}
+                            </div>
+                            <div className="text-sm text-ars-body">
+                              Serial: {machine.serialNumber}
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-ars-body">
+                              <span>Hours: <span className="font-medium">{machine.machineHours.toLocaleString()}</span></span>
+                              <span>Next Service: <span className="font-medium">{machine.nextServiceHours.toLocaleString()}</span></span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                      <span className="text-ars-heading">-</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Follow-up Dates */}
+          {(job.followUp1Date || job.followUp2Date || job.followUp3Date || job.followUp4Date) && (
             <div className="space-y-4">
-              <h3 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-2">Follow-up Statuses</h3>
+              <h3 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-2">Follow-up Dates</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {job.followUp1 && (
+                {job.followUp1Date && (
                   <div className="bg-slate-50 p-3 rounded-lg">
                     <p className="text-xs font-medium text-slate-600 mb-1">Follow-up 1</p>
-                    <p className="text-sm text-slate-900">{job.followUp1.name}</p>
+                    <p className="text-sm text-slate-900">{formatDate(job.followUp1Date)}</p>
                   </div>
                 )}
-                {job.followUp2 && (
+                {job.followUp2Date && (
                   <div className="bg-slate-50 p-3 rounded-lg">
                     <p className="text-xs font-medium text-slate-600 mb-1">Follow-up 2</p>
-                    <p className="text-sm text-slate-900">{job.followUp2.name}</p>
+                    <p className="text-sm text-slate-900">{formatDate(job.followUp2Date)}</p>
                   </div>
                 )}
-                {job.followUp3 && (
+                {job.followUp3Date && (
                   <div className="bg-slate-50 p-3 rounded-lg">
                     <p className="text-xs font-medium text-slate-600 mb-1">Follow-up 3</p>
-                    <p className="text-sm text-slate-900">{job.followUp3.name}</p>
+                    <p className="text-sm text-slate-900">{formatDate(job.followUp3Date)}</p>
                   </div>
                 )}
-                {job.followUp4 && (
+                {job.followUp4Date && (
                   <div className="bg-slate-50 p-3 rounded-lg">
                     <p className="text-xs font-medium text-slate-600 mb-1">Follow-up 4</p>
-                    <p className="text-sm text-slate-900">{job.followUp4.name}</p>
+                    <p className="text-sm text-slate-900">{formatDate(job.followUp4Date)}</p>
                   </div>
                 )}
               </div>

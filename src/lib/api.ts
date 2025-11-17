@@ -49,6 +49,20 @@ export interface BackendUser {
   emailVerified: boolean;
   emailVerifiedAt?: string;
   isSuperAdmin?: boolean;
+  adminCode?: {
+    _id: string;
+    code: string;
+    description?: string;
+  } | string;
+  repCode?: {
+    _id: string;
+    code: string;
+    description?: string;
+  } | string;
+  technician?: {
+    _id: string;
+    name: string;
+  } | string;
 }
 
 /**
@@ -223,6 +237,36 @@ export async function changePassword(
 }
 
 /**
+ * Verifies an invitation token.
+ * Used to check if a token is valid before showing the password setup form.
+ * 
+ * @param token - Invitation token from email link
+ * @returns {Promise<{ user: { email: string; firstName?: string; lastName?: string } }>}
+ * @throws {Error} If token verification fails
+ */
+export async function verifyInvitationToken(token: string): Promise<{ user: { email: string; firstName?: string; lastName?: string } }> {
+  return apiRequest(`/api/auth/verify-invitation-token?token=${encodeURIComponent(token)}`);
+}
+
+/**
+ * Sets a password for a user using an invitation token.
+ * 
+ * @param token - Invitation token from email link
+ * @param password - New password to set
+ * @returns {Promise<{ success: boolean; message: string }>}
+ * @throws {Error} If password setting fails
+ */
+export async function setPassword(token: string, password: string): Promise<{ success: boolean; message: string }> {
+  return apiRequest('/api/auth/set-password', {
+    method: 'POST',
+    body: JSON.stringify({
+      token,
+      password,
+    }),
+  });
+}
+
+/**
  * Job-related API functions.
  */
 
@@ -251,6 +295,7 @@ export interface Job {
     code: string;
     description?: string;
   };
+  machines?: (Machine | string)[];
   registerDate?: string | Date;
   techBooked?: {
     _id: string;
@@ -259,10 +304,13 @@ export interface Job {
   dateBooked?: string | Date;
   rsrNumber?: string;
   feedback?: string;
-  followUp1?: { _id: string; name: string };
-  followUp2?: { _id: string; name: string };
-  followUp3?: { _id: string; name: string };
-  followUp4?: { _id: string; name: string };
+  followUp1Date?: string | Date;
+  followUp2Date?: string | Date;
+  followUp3Date?: string | Date;
+  followUp4Date?: string | Date;
+  reminderFollowUp1Date?: string | Date;
+  reminderFollowUp2Date?: string | Date;
+  reminderFollowUp3Date?: string | Date;
   poDate?: string | Date;
   poNumber?: string;
   oilSampleNumber?: string;
@@ -439,6 +487,39 @@ export interface RepCode {
   updatedAt?: string;
 }
 
+export interface AdminCode {
+  _id: string;
+  code: string;
+  description?: string;
+  user?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  isActive: boolean;
+  dbStatus?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Machine {
+  _id: string;
+  make: string;
+  model: string;
+  serialNumber: string;
+  customer: {
+    _id: string;
+    name: string;
+  } | string;
+  machineHours: number;
+  nextServiceHours: number;
+  isActive: boolean;
+  dbStatus?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Technician {
   _id: string;
   name: string;
@@ -529,6 +610,115 @@ export async function updateRepCode(id: string, repCodeData: Partial<RepCode>): 
  */
 export async function deleteRepCode(id: string): Promise<void> {
   await apiRequest(`/api/reference/rep-codes/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Gets all admin codes.
+ */
+export async function getAdminCodes(): Promise<{ adminCodes: AdminCode[] }> {
+  return apiRequest('/api/reference/admin-codes');
+}
+
+/**
+ * Creates a new admin code.
+ */
+export async function createAdminCode(adminCodeData: {
+  code: string;
+  description?: string;
+  userId?: string;
+}): Promise<{ adminCode: AdminCode }> {
+  return apiRequest('/api/reference/admin-codes', {
+    method: 'POST',
+    body: JSON.stringify(adminCodeData),
+  });
+}
+
+/**
+ * Updates an admin code.
+ */
+export async function updateAdminCode(id: string, adminCodeData: Partial<AdminCode>): Promise<{ adminCode: AdminCode }> {
+  return apiRequest(`/api/reference/admin-codes/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(adminCodeData),
+  });
+}
+
+/**
+ * Deletes an admin code.
+ */
+export async function deleteAdminCode(id: string): Promise<void> {
+  await apiRequest(`/api/reference/admin-codes/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Gets all machines with optional filtering.
+ */
+export async function getMachines(params?: {
+  customerId?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{ machines: Machine[]; pagination: any }> {
+  const queryParams = new URLSearchParams();
+  if (params?.customerId) queryParams.append('customerId', params.customerId);
+  if (params?.search) queryParams.append('search', params.search);
+  if (params?.page) queryParams.append('page', params.page.toString());
+  if (params?.limit) queryParams.append('limit', params.limit.toString());
+  
+  const query = queryParams.toString();
+  return apiRequest(`/api/machines${query ? `?${query}` : ''}`);
+}
+
+/**
+ * Gets a single machine by ID.
+ */
+export async function getMachine(id: string): Promise<{ machine: Machine }> {
+  return apiRequest(`/api/machines/${id}`);
+}
+
+/**
+ * Gets machines by customer ID.
+ */
+export async function getMachinesByCustomer(customerId: string): Promise<{ machines: Machine[] }> {
+  return apiRequest(`/api/machines/customer/${customerId}`);
+}
+
+/**
+ * Creates a new machine.
+ */
+export async function createMachine(machineData: {
+  make: string;
+  model: string;
+  serialNumber: string;
+  customer: string;
+  machineHours: number;
+  nextServiceHours: number;
+}): Promise<{ machine: Machine }> {
+  return apiRequest('/api/machines', {
+    method: 'POST',
+    body: JSON.stringify(machineData),
+  });
+}
+
+/**
+ * Updates a machine.
+ */
+export async function updateMachine(id: string, machineData: Partial<Machine>): Promise<{ machine: Machine }> {
+  return apiRequest(`/api/machines/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(machineData),
+  });
+}
+
+/**
+ * Deletes a machine.
+ */
+export async function deleteMachine(id: string): Promise<void> {
+  await apiRequest(`/api/machines/${id}`, {
     method: 'DELETE',
   });
 }
@@ -789,12 +979,18 @@ export async function getImportHistory(): Promise<{ data: ImportHistory }> {
 /**
  * Imports jobs from CSV file.
  */
-export async function importJobs(file: File, clearExisting: boolean): Promise<{ message: string; data: ImportResult }> {
+export async function importJobs(file: File, clearExisting: boolean, branchId?: string, branchCode?: string): Promise<{ message: string; data: ImportResult }> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('clearExisting', clearExisting.toString());
+  if (branchId) {
+    formData.append('branchId', branchId);
+  }
+  if (branchCode) {
+    formData.append('branchCode', branchCode);
+  }
 
-  const token = localStorage.getItem('token');
+  const token = getAuthToken();
   if (!token) {
     throw new Error('No authentication token found');
   }
@@ -823,7 +1019,7 @@ export async function importCustomers(file: File, clearExisting: boolean): Promi
   formData.append('file', file);
   formData.append('clearExisting', clearExisting.toString());
 
-  const token = localStorage.getItem('token');
+  const token = getAuthToken();
   if (!token) {
     throw new Error('No authentication token found');
   }
@@ -848,7 +1044,7 @@ export async function importCustomers(file: File, clearExisting: boolean): Promi
  * Downloads an example CSV file.
  */
 export async function downloadExampleCSV(type: 'jobs' | 'customers'): Promise<void> {
-  const token = localStorage.getItem('token');
+  const token = getAuthToken();
   if (!token) {
     throw new Error('No authentication token found');
   }
@@ -993,6 +1189,19 @@ export default {
   getBranches,
   getServiceDescriptions,
   getRepCodes,
+  createRepCode,
+  updateRepCode,
+  deleteRepCode,
+  getAdminCodes,
+  createAdminCode,
+  updateAdminCode,
+  deleteAdminCode,
+  getMachines,
+  getMachine,
+  getMachinesByCustomer,
+  createMachine,
+  updateMachine,
+  deleteMachine,
   getTechnicians,
   getFollowUpStatuses,
   apiRequest,

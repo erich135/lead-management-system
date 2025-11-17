@@ -20,6 +20,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
   const [branchFilter, setBranchFilter] = useState<string>('all');
   const [admFilter, setAdmFilter] = useState<string>('all');
   const [repCodeFilter, setRepCodeFilter] = useState<string>('all');
+  const [technicianFilter, setTechnicianFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<{
     overdue: boolean;
     approaching: boolean;
@@ -123,7 +124,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
     if (!loading && !isLoadingJobs && !priorityFilter.all) {
       applyFilters();
     }
-  }, [jobs, searchTerm, statusFilter, branchFilter, admFilter, repCodeFilter, priorityFilter, overdueJobs, loading, isLoadingJobs]);
+  }, [jobs, searchTerm, statusFilter, branchFilter, admFilter, repCodeFilter, technicianFilter, priorityFilter, overdueJobs, loading, isLoadingJobs]);
 
   // Handle filter changes when in "All Jobs" mode (re-filter existing jobs without re-fetching)
   // This only runs when filters change, NOT when jobs are initially loaded (loadAllJobs handles that)
@@ -181,6 +182,20 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
         });
       }
       
+      // Apply technician filter
+      if (technicianFilter !== 'all') {
+        filtered = filtered.filter(job => {
+          // Handle both string ID and object formats
+          if (typeof job.techBooked === 'string') {
+            return job.techBooked === technicianFilter;
+          }
+          if (typeof job.techBooked === 'object' && job.techBooked?._id) {
+            return job.techBooked._id === technicianFilter;
+          }
+          return false;
+        });
+      }
+      
       // Sort by job number (numeric part) descending when in "All Jobs" mode
       // Otherwise, sort by date descending for overdue/approaching/open filters
       if (priorityFilter.all) {
@@ -196,7 +211,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       setFilteredJobs(filtered);
       setCurrentPage(1);
     }
-  }, [searchTerm, statusFilter, branchFilter, admFilter, repCodeFilter, priorityFilter.all]);
+  }, [searchTerm, statusFilter, branchFilter, admFilter, repCodeFilter, technicianFilter, priorityFilter.all]);
 
   async function loadAllJobs() {
     try {
@@ -281,6 +296,20 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
           }
           if (typeof job.repCode === 'object' && job.repCode?._id) {
             return job.repCode._id === repCodeFilter;
+          }
+          return false;
+        });
+      }
+      
+      // Apply technician filter
+      if (technicianFilter !== 'all') {
+        filtered = filtered.filter(job => {
+          // Handle both string ID and object formats
+          if (typeof job.techBooked === 'string') {
+            return job.techBooked === technicianFilter;
+          }
+          if (typeof job.techBooked === 'object' && job.techBooked?._id) {
+            return job.techBooked._id === technicianFilter;
           }
           return false;
         });
@@ -402,6 +431,20 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
           }
           if (typeof job.repCode === 'object' && job.repCode?._id) {
             return job.repCode._id === repCodeFilter;
+          }
+          return false;
+        });
+      }
+      
+      // Apply technician filter
+      if (technicianFilter !== 'all') {
+        filtered = filtered.filter(job => {
+          // Handle both string ID and object formats
+          if (typeof job.techBooked === 'string') {
+            return job.techBooked === technicianFilter;
+          }
+          if (typeof job.techBooked === 'object' && job.techBooked?._id) {
+            return job.techBooked._id === technicianFilter;
           }
           return false;
         });
@@ -863,6 +906,27 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                         {repCode.code} {repCode.description ? `- ${repCode.description}` : ''}
                       </option>
                     ))
+                ) : (
+                  <option value="" disabled>Loading...</option>
+                )}
+              </select>
+            </div>
+
+            {/* Technician Filter */}
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-ars-heading mb-2">Technician</label>
+              <select
+                value={technicianFilter}
+                onChange={(e) => setTechnicianFilter(e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+              >
+                <option value="all">All Technicians</option>
+                {technicians && technicians.length > 0 ? (
+                  technicians.map((technician) => (
+                    <option key={technician._id} value={technician._id}>
+                      {technician.name}
+                    </option>
+                  ))
                 ) : (
                   <option value="" disabled>Loading...</option>
                 )}

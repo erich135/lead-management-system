@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getJob, updateJob, getMachinesByCustomer, createMachine, getTechnicians, type Job, type Status, type Branch, type Machine, type Technician } from '../lib/api';
+import { getJob, updateJob, getMachinesByCustomer, createMachine, getTechnicians, getRepCodes, type Job, type Status, type Branch, type Machine, type Technician, type RepCode } from '../lib/api';
 import { X, Edit, Save } from 'lucide-react';
 
 interface LeadDetailsProps {
@@ -39,6 +39,16 @@ function normalizeJob(jobData: Job): Job {
     };
   }
 
+  if (normalized?.repCode && typeof normalized.repCode === 'string') {
+    normalized = {
+      ...normalized,
+      repCode: {
+        _id: normalized.repCode,
+        code: '',
+      },
+    };
+  }
+
   return normalized;
 }
 
@@ -59,10 +69,12 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     nextServiceHours: '',
   });
   const [creatingMachine, setCreatingMachine] = useState(false);
+  const [repCodes, setRepCodes] = useState<RepCode[]>([]);
 
   useEffect(() => {
     loadJobDetails();
     loadTechnicians();
+    loadRepCodes();
   }, [initialLead._id]);
 
   // Load machines when job has a customer
@@ -100,6 +112,15 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
       setTechnicians(response.technicians || []);
     } catch (err) {
       console.error('Error loading technicians:', err);
+    }
+  }
+
+  async function loadRepCodes() {
+    try {
+      const response = await getRepCodes();
+      setRepCodes(response.repCodes || []);
+    } catch (err) {
+      console.error('Error loading rep codes:', err);
     }
   }
 
@@ -157,6 +178,9 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
       }
       if (payload.status && typeof payload.status === 'object') {
         payload.status = payload.status._id;
+      }
+      if (payload.repCode && typeof payload.repCode === 'object') {
+        payload.repCode = payload.repCode._id;
       }
       await updateJob(job._id, payload);
       setIsEditing(false);
@@ -544,9 +568,52 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-semibold text-ars-body mb-2">Rep Code</label>
-                  <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                    <span className="text-ars-heading">{job.repCode?.code || '-'}</span>
-                  </div>
+                  {isEditing ? (
+                    <select
+                      value={
+                        typeof job.repCode === 'string'
+                          ? job.repCode
+                          : job.repCode?._id || ''
+                      }
+                      onChange={(e) => {
+                        const selectedId = e.target.value || '';
+                        if (!selectedId) {
+                          setJob({ ...job, repCode: undefined });
+                          return;
+                        }
+                        const rep = repCodes.find((code) => code._id === selectedId);
+                        setJob({
+                          ...job,
+                          repCode: rep
+                            ? { _id: rep._id, code: rep.code }
+                            : {
+                                _id: selectedId,
+                                code: '',
+                              },
+                        });
+                      }}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    >
+                      <option value="">Select Rep Code</option>
+                      {repCodes.length > 0 ? (
+                        repCodes
+                          .filter((code) => code.isActive && code.dbStatus !== 'deleted')
+                          .map((code) => (
+                            <option key={code._id} value={code._id}>
+                              {code.code} {code.description ? `- ${code.description}` : ''}
+                            </option>
+                          ))
+                      ) : (
+                        <option value="" disabled>
+                          Loading rep codes...
+                        </option>
+                      )}
+                    </select>
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                      <span className="text-ars-heading">{job.repCode?.code || '-'}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div>

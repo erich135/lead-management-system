@@ -523,6 +523,7 @@ export interface Machine {
 export interface Technician {
   _id: string;
   name: string;
+  isActive?: boolean;
 }
 
 export interface FollowUpStatus {

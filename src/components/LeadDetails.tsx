@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getJob, updateJob, getMachinesByCustomer, createMachine, type Job, type Status, type Branch, type Machine } from '../lib/api';
+import { getJob, updateJob, getMachinesByCustomer, createMachine, getTechnicians, type Job, type Status, type Branch, type Machine, type Technician } from '../lib/api';
 import {
   X,
   Calendar,
@@ -29,13 +29,27 @@ interface LeadDetailsProps {
  * Displays detailed information about a job and allows editing.
  * Shows all job fields including the newly added ones.
  */
+function normalizeJobTech(jobData: Job): Job {
+  if (jobData?.techBooked && typeof jobData.techBooked === 'string') {
+    return {
+      ...jobData,
+      techBooked: {
+        _id: jobData.techBooked,
+        name: '',
+      },
+    };
+  }
+  return jobData;
+}
+
 export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes = [], onClose, onUpdate }: LeadDetailsProps) {
   const { user, isAdmin, isSuperAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [job, setJob] = useState<Job>(initialLead);
+  const [job, setJob] = useState<Job>(normalizeJobTech(initialLead));
   const [error, setError] = useState<string | null>(null);
   const [machines, setMachines] = useState<Machine[]>([]);
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [showNewMachineForm, setShowNewMachineForm] = useState(false);
   const [newMachine, setNewMachine] = useState({
     make: '',
@@ -48,6 +62,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
 
   useEffect(() => {
     loadJobDetails();
+    loadTechnicians();
   }, [initialLead._id]);
 
   // Load machines when job has a customer
@@ -62,7 +77,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   async function loadJobDetails() {
     try {
       const response = await getJob(initialLead._id);
-      setJob(response.job);
+      setJob(normalizeJobTech(response.job));
     } catch (err: any) {
       console.error('Error loading job details:', err);
       setError(err.message || 'Failed to load job details');
@@ -76,6 +91,15 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     } catch (err: any) {
       console.error('Error loading machines:', err);
       setMachines([]);
+    }
+  }
+
+  async function loadTechnicians() {
+    try {
+      const response = await getTechnicians();
+      setTechnicians(response.technicians || []);
+    } catch (err) {
+      console.error('Error loading technicians:', err);
     }
   }
 
@@ -127,7 +151,11 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     setLoading(true);
     setError(null);
     try {
-      await updateJob(job._id, job);
+      const payload: any = { ...job };
+      if (payload.techBooked && typeof payload.techBooked === 'object') {
+        payload.techBooked = payload.techBooked._id;
+      }
+      await updateJob(job._id, payload);
       setIsEditing(false);
       onUpdate();
     } catch (err: any) {
@@ -352,9 +380,48 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
 
                 <div>
                   <label className="block text-sm font-semibold text-ars-body mb-2">Technician</label>
-                  <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                    <span className="text-ars-heading">{job.techBooked?.name || '-'}</span>
-                  </div>
+                  {isEditing ? (
+                    <select
+                      value={job.techBooked?._id || ''}
+                      onChange={(e) => {
+                        const selectedId = e.target.value || '';
+                        if (!selectedId) {
+                          setJob({ ...job, techBooked: undefined });
+                          return;
+                        }
+                        const technicianObj = technicians.find((tech) => tech._id === selectedId);
+                        setJob({
+                          ...job,
+                          techBooked: {
+                            _id: selectedId,
+                            name:
+                              technicianObj?.name ||
+                              (typeof job.techBooked === 'object' ? job.techBooked?.name : ''),
+                          },
+                        });
+                      }}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    >
+                      <option value="">Unassigned</option>
+                      {technicians && technicians.length > 0 ? (
+                        technicians
+                          .filter((tech) => tech.isActive !== false)
+                          .map((tech) => (
+                            <option key={tech._id} value={tech._id}>
+                              {tech.name}
+                            </option>
+                          ))
+                      ) : (
+                        <option value="" disabled>
+                          {technicians.length === 0 ? 'Loading technicians...' : 'No technicians available'}
+                        </option>
+                      )}
+                    </select>
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                      <span className="text-ars-heading">{job.techBooked?.name || '-'}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

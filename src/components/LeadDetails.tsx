@@ -332,7 +332,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
         ).filter(Boolean);
       }
       // Explicitly handle date fields - ensure undefined/null dates are sent as null to clear them
-      const dateFields = ['dateBooked', 'poDate', 'invoiceDate', 'dateQuoted'];
+      const dateFields = ['startDate', 'registerDate', 'dateBooked', 'dateQuoted', 'poDate', 'invoiceDate'];
       dateFields.forEach(field => {
         if (payload[field] === undefined || payload[field] === null || payload[field] === '') {
           payload[field] = null;

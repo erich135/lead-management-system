@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getJob, updateJob, getMachinesByCustomer, createMachine, getTechnicians, getRepCodes, type Job, type Status, type Branch, type Machine, type Technician, type RepCode } from '../lib/api';
-import { X, Edit, Save } from 'lucide-react';
+import { getJob, updateJob, getMachinesByCustomer, createMachine, getTechnicians, getRepCodes, getCustomers, getActivities, getServiceDescriptions, type Job, type Status, type Branch, type Machine, type Technician, type RepCode, type Customer, type Activity, type ServiceDescription } from '../lib/api';
+import { X, Edit, Save, Clock, User } from 'lucide-react';
 
 interface LeadDetailsProps {
   lead: Job;
@@ -70,21 +70,38 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   });
   const [creatingMachine, setCreatingMachine] = useState(false);
   const [repCodes, setRepCodes] = useState<RepCode[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [serviceDescriptions, setServiceDescriptions] = useState<ServiceDescription[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [loadingActivities, setLoadingActivities] = useState(false);
+  const [showActivityHistory, setShowActivityHistory] = useState(false);
 
   useEffect(() => {
     loadJobDetails();
     loadTechnicians();
     loadRepCodes();
+    loadCustomers();
+    loadServiceDescriptions();
+    loadActivityHistory();
   }, [initialLead._id]);
 
-  // Load machines when job has a customer
+  // Reload activities when job is updated
+  useEffect(() => {
+    if (!isEditing) {
+      loadActivityHistory();
+    }
+  }, [isEditing]);
+
+  // Load machines when job has a customer or cash customer
   useEffect(() => {
     if (job.customer && typeof job.customer === 'object' && job.customer._id) {
       loadMachines(job.customer._id);
+    } else if (job.cashCustomer && job.cashCustomer.trim()) {
+      loadMachinesForCashCustomer(job.cashCustomer.trim());
     } else {
       setMachines([]);
     }
-  }, [job.customer]);
+  }, [job.customer, job.cashCustomer]);
 
   async function loadJobDetails() {
     try {
@@ -96,12 +113,28 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     }
   }
 
+  /**
+   * Loads machines for a regular customer.
+   */
   async function loadMachines(customerId: string) {
     try {
       const response = await getMachinesByCustomer(customerId);
       setMachines(response.machines || []);
     } catch (err: any) {
       console.error('Error loading machines:', err);
+      setMachines([]);
+    }
+  }
+
+  /**
+   * Loads machines for a cash customer.
+   */
+  async function loadMachinesForCashCustomer(cashCustomerName: string) {
+    try {
+      const response = await getMachinesByCustomer(undefined, cashCustomerName);
+      setMachines(response.machines || []);
+    } catch (err: any) {
+      console.error('Error loading machines for cash customer:', err);
       setMachines([]);
     }
   }
@@ -124,9 +157,100 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     }
   }
 
+  /**
+   * Loads all customers for the dropdown.
+   */
+  async function loadCustomers() {
+    try {
+      const response = await getCustomers({ limit: 1000 });
+      setCustomers(response.customers || []);
+    } catch (err) {
+      console.error('Error loading customers:', err);
+      setCustomers([]);
+    }
+  }
+
+  /**
+   * Loads service descriptions for the dropdown.
+   */
+  async function loadServiceDescriptions() {
+    try {
+      const response = await getServiceDescriptions();
+      setServiceDescriptions(response.descriptions || []);
+    } catch (err) {
+      console.error('Error loading service descriptions:', err);
+      setServiceDescriptions([]);
+    }
+  }
+
+  /**
+   * Loads activity history for this job.
+   */
+  async function loadActivityHistory() {
+    setLoadingActivities(true);
+    try {
+      const jobId = job._id || initialLead._id;
+      if (!jobId) return;
+      
+      const response = await getActivities({
+        resourceType: 'Job',
+        resourceId: jobId,
+        limit: 50,
+        sortOrder: 'desc'
+      });
+      setActivities(response.activities || []);
+    } catch (err) {
+      console.error('Error loading activity history:', err);
+      setActivities([]);
+    } finally {
+      setLoadingActivities(false);
+    }
+  }
+
+  /**
+   * Handles selecting a customer from the dropdown. Clears machines and loads new ones for the selected customer.
+   */
+  async function handleCustomerSelect(customerId: string) {
+    if (!customerId) {
+      // If no customer selected, clear customer and machines
+      setJob({ 
+        ...job, 
+        customer: undefined,
+        machines: []
+      });
+      setMachines([]);
+      return;
+    }
+
+    const selectedCustomer = customers.find(c => c._id === customerId);
+    if (!selectedCustomer) return;
+
+    setJob({ 
+      ...job, 
+      customer: { _id: selectedCustomer._id, name: selectedCustomer.name },
+      cashCustomer: undefined, // Clear cash customer when selecting regular customer
+      machines: [] // Reset machines when customer changes
+    });
+    
+    // Load machines for this customer
+    try {
+      const machinesData = await getMachinesByCustomer(selectedCustomer._id);
+      setMachines(machinesData.machines || []);
+    } catch (err) {
+      console.error('Error loading machines:', err);
+      setMachines([]);
+    }
+  }
+
+  /**
+   * Handles creating a new machine for either a regular customer or cash customer.
+   */
   async function handleCreateMachine() {
-    if (!job.customer || typeof job.customer !== 'object' || !job.customer._id) {
-      setError('Customer is required to create a machine');
+    const hasCustomer = job.customer && typeof job.customer === 'object' && job.customer._id;
+    const hasCashCustomer = job.cashCustomer && job.cashCustomer.trim();
+
+    if (!hasCustomer && !hasCashCustomer) {
+      setError('Customer or cash customer is required to create a machine');
       return;
     }
 
@@ -138,14 +262,21 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     setCreatingMachine(true);
     setError(null);
     try {
-      const response = await createMachine({
+      const machineData: any = {
         make: newMachine.make.trim(),
         model: newMachine.model.trim(),
         serialNumber: newMachine.serialNumber.trim(),
-        customer: job.customer._id,
         machineHours: parseFloat(newMachine.machineHours) || 0,
         nextServiceHours: parseFloat(newMachine.nextServiceHours) || 0,
-      });
+      };
+
+      if (hasCustomer && job.customer && typeof job.customer === 'object') {
+        machineData.customer = job.customer._id;
+      } else if (hasCashCustomer && job.cashCustomer) {
+        machineData.cashCustomer = job.cashCustomer.trim();
+      }
+
+      const response = await createMachine(machineData);
 
       // Add new machine to list and add it to job's machines array
       const updatedMachines = [...machines, response.machine];
@@ -168,6 +299,10 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     }
   }
 
+  /**
+   * Handles saving the job with all updates including machines.
+   * Ensures empty dates are properly sent as null/undefined to clear them.
+   */
   async function handleSave() {
     setLoading(true);
     setError(null);
@@ -181,6 +316,41 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
       }
       if (payload.repCode && typeof payload.repCode === 'object') {
         payload.repCode = payload.repCode._id;
+      }
+      // Serialize description to ID if it's an object
+      if (payload.description && typeof payload.description === 'object') {
+        payload.description = payload.description._id;
+      }
+      // If description is cleared, set to null
+      if (!payload.description) {
+        payload.description = null;
+      }
+      // Serialize machines array to IDs only
+      if (Array.isArray(payload.machines)) {
+        payload.machines = payload.machines.map((m: any) => 
+          typeof m === 'object' && m !== null ? m._id : m
+        ).filter(Boolean);
+      }
+      // Explicitly handle date fields - ensure undefined/null dates are sent as null to clear them
+      const dateFields = ['dateBooked', 'poDate', 'invoiceDate', 'dateQuoted'];
+      dateFields.forEach(field => {
+        if (payload[field] === undefined || payload[field] === null || payload[field] === '') {
+          payload[field] = null;
+        }
+      });
+      // Handle customer - serialize to ID if it's an object
+      if (payload.customer && typeof payload.customer === 'object') {
+        payload.customer = payload.customer._id;
+      }
+      // If customer is cleared, set to null
+      if (!payload.customer) {
+        payload.customer = null;
+      }
+      // If cash customer is set, clear regular customer
+      if (payload.cashCustomer && payload.cashCustomer.trim()) {
+        payload.customer = null;
+      } else if (payload.customer) {
+        payload.cashCustomer = null;
       }
       await updateJob(job._id, payload);
       setIsEditing(false);
@@ -338,9 +508,28 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
 
                 <div>
                   <label className="block text-sm font-semibold text-ars-body mb-2">Customer</label>
-                  <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                    <span className="text-ars-heading">{job.customer?.name || '-'}</span>
-                  </div>
+                  {isEditing && isSuperAdmin ? (
+                    <select
+                      value={job.customer && typeof job.customer === 'object' ? job.customer._id : ''}
+                      onChange={(e) => handleCustomerSelect(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    >
+                      <option value="">Select Customer</option>
+                      {customers && customers.length > 0 ? (
+                        customers.map((customer) => (
+                          <option key={customer._id} value={customer._id}>
+                            {customer.name}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="" disabled>Loading customers...</option>
+                      )}
+                    </select>
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                      <span className="text-ars-heading">{job.customer?.name || '-'}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -349,7 +538,15 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                     <input
                       type="text"
                       value={job.cashCustomer || ''}
-                      onChange={(e) => setJob({ ...job, cashCustomer: e.target.value })}
+                      onChange={(e) => {
+                        const newValue = e.target.value;
+                        setJob({ 
+                          ...job, 
+                          cashCustomer: newValue,
+                          customer: newValue.trim() ? undefined : job.customer, // Clear regular customer if cash customer is set
+                          machines: newValue.trim() ? [] : job.machines // Clear machines if switching to cash customer
+                        });
+                      }}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                       placeholder="Enter cash customer name"
                     />
@@ -704,9 +901,39 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-semibold text-ars-body mb-2">Description</label>
-                  <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                    <span className="text-ars-heading">{job.description?.name || '-'}</span>
-                  </div>
+                  {isEditing && (isAdmin || isSuperAdmin) ? (
+                    <select
+                      value={job.description && typeof job.description === 'object' ? job.description._id : (typeof job.description === 'string' ? job.description : '')}
+                      onChange={(e) => {
+                        const selectedId = e.target.value || '';
+                        if (!selectedId) {
+                          setJob({ ...job, description: undefined });
+                          return;
+                        }
+                        const selectedDescription = serviceDescriptions.find((desc) => desc._id === selectedId);
+                        setJob({
+                          ...job,
+                          description: selectedDescription ? { _id: selectedDescription._id, name: selectedDescription.name } : undefined,
+                        });
+                      }}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    >
+                      <option value="">Select Description</option>
+                      {serviceDescriptions && serviceDescriptions.length > 0 ? (
+                        serviceDescriptions.map((desc) => (
+                          <option key={desc._id} value={desc._id}>
+                            {desc.name}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="" disabled>Loading descriptions...</option>
+                      )}
+                    </select>
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                      <span className="text-ars-heading">{job.description?.name || '-'}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -730,7 +957,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
           </div>
 
           {/* Machines Section - Full Width Block */}
-          {job.customer && typeof job.customer === 'object' && job.customer._id && (
+          {((job.customer && typeof job.customer === 'object' && job.customer._id) || (job.cashCustomer && job.cashCustomer.trim())) && (
             <div className="mt-6 space-y-4">
               <h3 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-2">Machines</h3>
               {isEditing ? (
@@ -948,6 +1175,76 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
               </div>
             </div>
           )}
+
+          {/* Activity History */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-2 flex-1">Activity History</h3>
+              <button
+                onClick={() => setShowActivityHistory(!showActivityHistory)}
+                className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                {showActivityHistory ? 'Hide' : 'Show'} History
+              </button>
+            </div>
+            
+            {showActivityHistory && (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {loadingActivities ? (
+                  <div className="text-center py-8 text-ars-body">Loading activity history...</div>
+                ) : activities.length === 0 ? (
+                  <div className="text-center py-8 text-ars-body">No activity history found for this job.</div>
+                ) : (
+                  activities.map((activity) => {
+                    const userName = activity.userId
+                      ? `${activity.userId.firstName || ''} ${activity.userId.lastName || ''}`.trim() || activity.userId.email
+                      : 'System';
+                    const activityDate = new Date(activity.createdAt);
+                    const formattedDate = activityDate.toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    });
+
+                    return (
+                      <div
+                        key={activity._id}
+                        className="p-4 bg-gray-50 rounded-xl border border-gray-200 hover:bg-gray-100 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <User className="w-4 h-4 text-ars-primary" />
+                              <span className="font-semibold text-ars-heading">{userName}</span>
+                              <span className="text-xs text-ars-body">•</span>
+                              <span className="text-xs text-ars-body">{formattedDate}</span>
+                            </div>
+                            <p className="text-sm text-ars-body mb-2">{activity.description}</p>
+                            {activity.metadata?.changes && Array.isArray(activity.metadata.changes) && activity.metadata.changes.length > 0 && (
+                              <div className="mt-2 space-y-1">
+                                <p className="text-xs font-semibold text-ars-heading">Changes:</p>
+                                <ul className="list-disc list-inside text-xs text-ars-body space-y-0.5">
+                                  {activity.metadata.changes.map((change: string, idx: number) => (
+                                    <li key={idx}>{change}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-ars-body">
+                            <Clock className="w-3 h-3" />
+                            <span>{activity.action}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

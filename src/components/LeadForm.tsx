@@ -1,5 +1,5 @@
 import { useState, FormEvent, useEffect, useRef } from 'react';
-import { createJob, getStatuses, getBranches, getCustomers, createCustomer, getTechnicians, getServiceDescriptions, getRepCodes, getAdminCodes, getMachinesByCustomer, createMachine, type Status, type Branch, type Customer, type Technician, type ServiceDescription, type RepCode, type AdminCode, type Machine } from '../lib/api';
+import { createJob, getJobs, getStatuses, getBranches, getCustomers, createCustomer, getTechnicians, getServiceDescriptions, getRepCodes, getAdminCodes, getMachinesByCustomer, createMachine, getCashCustomers, createCashCustomer, type Status, type Branch, type Customer, type Technician, type ServiceDescription, type RepCode, type AdminCode, type Machine, type Job, type CashCustomer } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { X, AlertCircle, Search, Plus, Wrench } from 'lucide-react';
 
@@ -9,14 +9,15 @@ interface LeadFormProps {
   customers?: Customer[]; // Optional, will load dynamically
   onClose: () => void;
   onSaved: () => void;
+  onJobCreated?: (job: Job) => void; // Optional callback with the created job
 }
 
 /**
  * Form component for creating a new job.
  * Uses the new API structure with proper types and error handling.
  */
-export function LeadForm({ statuses, branches, customers: initialCustomers, onClose, onSaved }: LeadFormProps) {
-  const { user } = useAuth();
+export function LeadForm({ statuses, branches, customers: initialCustomers, onClose, onSaved, onJobCreated }: LeadFormProps) {
+  const { user, isSuperAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [technicians, setTechnicians] = useState<Technician[]>([]);
@@ -37,10 +38,66 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
   const [searchedCustomers, setSearchedCustomers] = useState<Customer[]>([]);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [selectedCustomerName, setSelectedCustomerName] = useState('');
+  const machinesSectionRef = useRef<HTMLDivElement>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const customerDropdownRef = useRef<HTMLDivElement>(null);
   const isSelectingCustomerRef = useRef(false); // Flag to prevent search when selecting
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
+
+  const [formData, setFormData] = useState<{
+    jobNumber: string;
+    customer: string;
+    cashCustomer: string;
+    branch: string;
+    status: string;
+    description: string;
+    valueExVat: string;
+    adm: string;
+    repCode: string;
+    machines: string[];
+    registerDate: string;
+    techBooked: string;
+    dateBooked: string;
+    rsrNumber: string;
+    feedback: string;
+    poDate: string;
+    poNumber: string;
+    oilSampleNumber: string;
+    storePack: string;
+    invoiceDate: string;
+    invNumber: string;
+    startDate: string;
+    dateQuoted: string;
+  }>(() => {
+    const today = new Date().toISOString().split('T')[0];
+    return {
+      jobNumber: '',
+      customer: '',
+      cashCustomer: '',
+      branch: branches[0]?._id || '',
+      status: statuses[0]?._id || '',
+      description: '',
+      valueExVat: '',
+      adm: '',
+      repCode: '',
+      machines: [] as string[],
+      registerDate: '',
+      techBooked: '',
+      dateBooked: '',
+      rsrNumber: '',
+      feedback: '',
+      poDate: '',
+      poNumber: '',
+      oilSampleNumber: '',
+      storePack: '',
+      invoiceDate: '',
+      invNumber: '',
+      startDate: today,
+      dateQuoted: '',
+    };
+  });
+
+  const [customerSelection, setCustomerSelection] = useState<'customer' | 'cash'>('customer');
 
   // Load technicians, service descriptions, rep codes, and admin codes on mount
   useEffect(() => {
@@ -127,11 +184,37 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
       console.error('Error loading machines:', err);
       setMachines([]);
     }
+    
+    // Scroll to machines section after a short delay to ensure it's rendered
+    setTimeout(() => {
+      if (machinesSectionRef.current) {
+        machinesSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 100);
   }
 
+  // Load machines when cash customer changes
+  useEffect(() => {
+    async function loadCashCustomerMachines() {
+      if (customerSelection === 'cash' && formData.cashCustomer && formData.cashCustomer.trim()) {
+        try {
+          const machinesData = await getMachinesByCustomer(undefined, formData.cashCustomer.trim());
+          setMachines(machinesData.machines || []);
+        } catch (err) {
+          console.error('Error loading machines for cash customer:', err);
+          setMachines([]);
+        }
+      } else if (customerSelection === 'cash') {
+        setMachines([]);
+      }
+    }
+    
+    loadCashCustomerMachines();
+  }, [formData.cashCustomer, customerSelection]);
+
   async function handleCreateMachine() {
-    if (!formData.customer) {
-      setError('Please select a customer first');
+    if (!formData.customer && !formData.cashCustomer) {
+      setError('Please select a customer or enter a cash customer name first');
       return;
     }
 
@@ -143,14 +226,21 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
     setCreatingMachine(true);
     setError('');
     try {
-      const response = await createMachine({
+      const machineData: any = {
         make: newMachine.make.trim(),
         model: newMachine.model.trim(),
         serialNumber: newMachine.serialNumber.trim(),
-        customer: formData.customer,
         machineHours: parseFloat(newMachine.machineHours) || 0,
         nextServiceHours: parseFloat(newMachine.nextServiceHours) || 0,
-      });
+      };
+      
+      if (formData.customer) {
+        machineData.customer = formData.customer;
+      } else if (formData.cashCustomer) {
+        machineData.cashCustomer = formData.cashCustomer.trim();
+      }
+      
+      const response = await createMachine(machineData);
 
       // Add new machine to list and add it to machines array
       setMachines([...machines, response.machine]);
@@ -196,58 +286,28 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
     }
   }
 
-  const [formData, setFormData] = useState<{
-    customer: string;
-    cashCustomer: string;
-    branch: string;
-    status: string;
-    description: string;
-    valueExVat: string;
-    adm: string;
-    repCode: string;
-    machines: string[];
-    registerDate: string;
-    techBooked: string;
-    dateBooked: string;
-    rsrNumber: string;
-    feedback: string;
-    poDate: string;
-    poNumber: string;
-    oilSampleNumber: string;
-    storePack: string;
-    invoiceDate: string;
-    invNumber: string;
-    startDate: string;
-    dateQuoted: string;
-  }>(() => {
-    const today = new Date().toISOString().split('T')[0];
-    return {
-      customer: '',
-      cashCustomer: '',
-      branch: branches[0]?._id || '',
-      status: statuses[0]?._id || '',
-      description: '',
-      valueExVat: '',
-      adm: '',
-      repCode: '',
-      machines: [] as string[],
-      registerDate: '',
-      techBooked: '',
-      dateBooked: '',
-      rsrNumber: '',
-      feedback: '',
-      poDate: '',
-      poNumber: '',
-      oilSampleNumber: '',
-      storePack: '',
-      invoiceDate: '',
-      invNumber: '',
-      startDate: today,
-      dateQuoted: today,
-    };
-  });
+  /**
+   * Validates if a job number already exists.
+   */
+  async function checkJobNumberExists(jobNumber: string): Promise<boolean> {
+    if (!jobNumber || !jobNumber.trim()) {
+      return false;
+    }
 
-  const [customerSelection, setCustomerSelection] = useState<'customer' | 'cash'>('customer');
+    try {
+      const response = await getJobs({ search: jobNumber.trim().toUpperCase(), limit: 1 });
+      // Check if any job has an exact match (case-insensitive)
+      const exists = response.jobs.some(job => 
+        job.jobNumber.toUpperCase() === jobNumber.trim().toUpperCase()
+      );
+      return exists;
+    } catch (err) {
+      console.error('Error checking job number:', err);
+      // If there's an error, assume it doesn't exist to allow submission
+      // The backend will catch duplicates anyway
+      return false;
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -255,6 +315,16 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
     setLoading(true);
 
     try {
+      // Validate job number if provided (super admin only)
+      if (isSuperAdmin && formData.jobNumber && formData.jobNumber.trim()) {
+        const jobNumberExists = await checkJobNumberExists(formData.jobNumber.trim());
+        if (jobNumberExists) {
+          setError(`Job number "${formData.jobNumber.trim().toUpperCase()}" already exists. Please use a different job number.`);
+          setLoading(false);
+          return;
+        }
+      }
+
       const today = getTodayDate();
       const payload: any = {
         branch: formData.branch,
@@ -265,7 +335,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
         machines: Array.isArray(formData.machines) && formData.machines.length > 0 ? formData.machines : undefined,
         registerDate: formData.registerDate || today,
         techBooked: formData.techBooked || undefined,
-        dateBooked: formData.dateBooked || today,
+        dateBooked: formData.dateBooked || undefined,
         rsrNumber: formData.rsrNumber || undefined,
         feedback: formData.feedback || undefined,
         poDate: formData.poDate || undefined,
@@ -279,6 +349,11 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
         dateQuoted: formData.dateQuoted || undefined,
       };
 
+      // Add job number if provided (super admin only)
+      if (isSuperAdmin && formData.jobNumber && formData.jobNumber.trim()) {
+        payload.jobNumber = formData.jobNumber.trim().toUpperCase();
+      }
+
       // Handle customer selection
       if (customerSelection === 'customer') {
         if (formData.customer) {
@@ -290,11 +365,23 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
         }
       }
 
-      await createJob(payload);
+      const response = await createJob(payload);
       onSaved();
-      onClose();
+      
+      // If onJobCreated callback is provided, call it with the created job
+      if (onJobCreated && response.job) {
+        onJobCreated(response.job);
+      } else {
+        // Otherwise, just close the form
+        onClose();
+      }
     } catch (err: any) {
-      setError(err.message || 'Failed to create job');
+      // Check if it's a duplicate job number error from backend
+      if (err.message && err.message.includes('duplicate') && err.message.includes('jobNumber')) {
+        setError(`Job number "${formData.jobNumber?.trim().toUpperCase() || ''}" already exists. Please use a different job number.`);
+      } else {
+        setError(err.message || 'Failed to create job');
+      }
     } finally {
       setLoading(false);
     }
@@ -322,6 +409,24 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {isSuperAdmin && (
+              <div>
+                <label className="block text-sm font-semibold text-ars-body mb-2">
+                  Job Number (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={formData.jobNumber}
+                  onChange={(e) => setFormData({ ...formData, jobNumber: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent uppercase"
+                  placeholder="Leave empty for auto-generation"
+                />
+                <p className="mt-1 text-xs text-ars-body">
+                  If left empty, a job number will be automatically generated
+                </p>
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-semibold text-ars-body mb-2">Customer Type</label>
               <select
@@ -390,24 +495,30 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                   {customerSearchTerm.length >= 2 && searchedCustomers.length === 0 && showCustomerDropdown && !selectedCustomer && (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-4">
                       <p className="text-sm text-ars-body mb-3">No customers found matching "{customerSearchTerm}"</p>
-                      <button
-                        type="button"
-                        onClick={handleCreateCustomer}
-                        disabled={isCreatingCustomer}
-                        className="w-full px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-lg font-medium hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                      >
-                        {isCreatingCustomer ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                            Creating...
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="w-4 h-4" />
-                            Create "{customerSearchTerm}"
-                          </>
-                        )}
-                      </button>
+                      {isSuperAdmin ? (
+                        <button
+                          type="button"
+                          onClick={handleCreateCustomer}
+                          disabled={isCreatingCustomer}
+                          className="w-full px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-lg font-medium hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          {isCreatingCustomer ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              Creating...
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-4 h-4" />
+                              Create "{customerSearchTerm}"
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <p className="text-xs text-ars-body text-center py-2">
+                          Customer not found. Only super admins can create new customers.
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -581,10 +692,10 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
               </label>
               <input
                 type="date"
-                value={formData.dateQuoted || getTodayDate()}
+                value={formData.dateQuoted || ''}
                 onChange={(e) => setFormData({ ...formData, dateQuoted: e.target.value })}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                placeholder="YYYY/MM/DD"
+                placeholder="yyyy/mm/dd"
               />
             </div>
 
@@ -610,10 +721,11 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
               </select>
             </div>
 
-            {/* Machines Selection - Only show if customer is selected */}
-            {formData.customer && (
-              <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-ars-body mb-2">
+            {/* Machines Selection - Show if customer or cash customer is selected */}
+            {(formData.customer || (customerSelection === 'cash' && formData.cashCustomer)) && (
+              <div ref={machinesSectionRef} className="md:col-span-2">
+                <label className="block text-sm font-semibold text-ars-body mb-2 flex items-center gap-2">
+                  <Wrench className="w-4 h-4 text-ars-primary" />
                   Machines
                 </label>
                 <div className="space-y-3">

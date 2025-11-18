@@ -26,6 +26,10 @@ import {
   deleteAdminCode,
   getTechnicians,
   getBranches,
+  getStatuses,
+  createStatus,
+  updateStatus,
+  deleteStatus,
   User,
   Role,
   Permission,
@@ -33,7 +37,8 @@ import {
   RepCode,
   AdminCode,
   Technician,
-  Branch
+  Branch,
+  Status
 } from '../lib/api';
 import { 
   Users, 
@@ -52,7 +57,10 @@ import {
   Mail,
   Download,
   CheckCircle2,
-  XCircle
+  XCircle,
+  ChevronDown,
+  ChevronUp,
+  Tag
 } from 'lucide-react';
 
 export function SystemManagement() {
@@ -85,12 +93,19 @@ export function SystemManagement() {
   const [repCodes, setRepCodes] = useState<RepCode[]>([]);
   const [adminCodes, setAdminCodes] = useState<AdminCode[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [statuses, setStatuses] = useState<Status[]>([]);
   const [editingRepCode, setEditingRepCode] = useState<RepCode | null>(null);
   const [showRepCodeForm, setShowRepCodeForm] = useState(false);
   const [newRepCode, setNewRepCode] = useState({ code: '', description: '' });
   const [editingAdminCode, setEditingAdminCode] = useState<AdminCode | null>(null);
   const [showAdminCodeForm, setShowAdminCodeForm] = useState(false);
   const [newAdminCode, setNewAdminCode] = useState({ code: '', description: '', userId: '' });
+  const [editingStatus, setEditingStatus] = useState<Status | null>(null);
+  const [showStatusForm, setShowStatusForm] = useState(false);
+  const [newStatus, setNewStatus] = useState({ name: '', description: '' });
+  const [isStatusesExpanded, setIsStatusesExpanded] = useState(false);
+  const [isRepCodesExpanded, setIsRepCodesExpanded] = useState(false);
+  const [isAdminCodesExpanded, setIsAdminCodesExpanded] = useState(false);
   
   // Invite user state
   const [showInviteForm, setShowInviteForm] = useState(false);
@@ -142,7 +157,7 @@ export function SystemManagement() {
   }
 
   /**
-   * Loads reference data (rep codes, admin codes, technicians).
+   * Loads reference data (rep codes, admin codes, technicians, statuses).
    */
   async function loadReferenceData() {
     try {
@@ -157,6 +172,10 @@ export function SystemManagement() {
       // Load technicians
       const techniciansResponse = await getTechnicians();
       setTechnicians(techniciansResponse.technicians || []);
+
+      // Load statuses
+      const statusesResponse = await getStatuses();
+      setStatuses(statusesResponse.statuses || []);
     } catch (err: any) {
       console.error('Error loading reference data:', err);
       setError(err.message || 'Failed to load reference data');
@@ -578,6 +597,85 @@ export function SystemManagement() {
     } catch (err: any) {
       setError(err.message || 'Failed to delete admin code');
     }
+  }
+
+  /**
+   * Handles creating a new status.
+   */
+  async function handleCreateStatus() {
+    if (!newStatus.name.trim()) {
+      setError('Status name is required');
+      return;
+    }
+
+    try {
+      setError(null);
+      const response = await createStatus({
+        name: newStatus.name.trim(),
+        description: newStatus.description.trim() || undefined,
+      });
+      setStatuses([...statuses, response.status].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)));
+      setNewStatus({ name: '', description: '' });
+      setShowStatusForm(false);
+      alert('Status created successfully');
+      // Refresh the page to update statuses on other pages
+      window.location.reload();
+    } catch (err: any) {
+      setError(err.message || 'Failed to create status');
+    }
+  }
+
+  /**
+   * Handles updating a status.
+   */
+  async function handleUpdateStatus() {
+    if (!editingStatus) return;
+
+    try {
+      setError(null);
+      const response = await updateStatus(editingStatus._id, {
+        name: editingStatus.name,
+        description: editingStatus.description,
+        sortOrder: editingStatus.sortOrder,
+        isActive: editingStatus.isActive,
+      });
+      setStatuses(statuses.map(s => s._id === editingStatus._id ? response.status : s).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)));
+      setEditingStatus(null);
+      setShowStatusForm(false);
+      alert('Status updated successfully');
+      // Refresh the page to update statuses on other pages
+      window.location.reload();
+    } catch (err: any) {
+      setError(err.message || 'Failed to update status');
+    }
+  }
+
+  /**
+   * Handles deleting a status.
+   */
+  async function handleDeleteStatus(id: string) {
+    if (!confirm('Are you sure you want to delete this status?')) {
+      return;
+    }
+
+    try {
+      await deleteStatus(id);
+      setStatuses(statuses.filter(s => s._id !== id));
+      alert('Status deleted successfully');
+      // Refresh the page to update statuses on other pages
+      window.location.reload();
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete status');
+    }
+  }
+
+  /**
+   * Calculates the next sort order for a new status.
+   */
+  function getNextSortOrder(): number {
+    if (statuses.length === 0) return 1;
+    const maxOrder = Math.max(...statuses.map(s => s.sortOrder || 0));
+    return maxOrder + 1;
   }
 
   if (loading && users.length === 0) {
@@ -1247,13 +1345,212 @@ export function SystemManagement() {
         {/* Reference Data Tab */}
         {activeTab === 'reference' && (
           <div className="space-y-6">
+            {/* Job Statuses Section */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+              <div className="flex items-center justify-between mb-6">
+                <button
+                  onClick={() => setIsStatusesExpanded(!isStatusesExpanded)}
+                  className="flex items-center gap-2 text-xl font-bold text-ars-heading hover:text-ars-primary transition-colors"
+                >
+                  {isStatusesExpanded ? <ChevronUp className="w-6 h-6 text-ars-primary" /> : <ChevronDown className="w-6 h-6 text-ars-primary" />}
+                  <Tag className="w-6 h-6 text-ars-primary" />
+                  Job Statuses
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingStatus(null);
+                    setNewStatus({ name: '', description: '' });
+                    setShowStatusForm(true);
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Status
+                </button>
+              </div>
+
+              {isStatusesExpanded && (
+                <>
+
+              {/* Add/Edit Status Form */}
+              {(editingStatus || showStatusForm) && (
+                <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-semibold text-ars-heading">
+                      {editingStatus ? 'Edit Status' : 'New Status'}
+                    </h4>
+                    <button
+                      onClick={() => {
+                        setEditingStatus(null);
+                        setNewStatus({ name: '', description: '' });
+                        setShowStatusForm(false);
+                      }}
+                      className="p-1 hover:bg-gray-200 rounded transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">Status Name *</label>
+                      <input
+                        type="text"
+                        value={editingStatus?.name || newStatus.name}
+                        onChange={(e) => {
+                          if (editingStatus) {
+                            setEditingStatus({ ...editingStatus, name: e.target.value });
+                          } else {
+                            setNewStatus({ ...newStatus, name: e.target.value });
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        placeholder="e.g., In Progress"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">Description</label>
+                      <input
+                        type="text"
+                        value={editingStatus?.description || newStatus.description}
+                        onChange={(e) => {
+                          if (editingStatus) {
+                            setEditingStatus({ ...editingStatus, description: e.target.value });
+                          } else {
+                            setNewStatus({ ...newStatus, description: e.target.value });
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        placeholder="Optional description"
+                      />
+                    </div>
+                  </div>
+                  {!editingStatus && (
+                    <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <p className="text-sm text-ars-body">
+                        <span className="font-semibold">Order Number:</span> {getNextSortOrder()}
+                      </p>
+                      <p className="text-xs text-ars-body mt-1">This status will be assigned order number {getNextSortOrder()} when created.</p>
+                    </div>
+                  )}
+                  {editingStatus && (
+                    <div className="mt-4 space-y-3">
+                      <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <p className="text-sm text-ars-body">
+                          <span className="font-semibold">Current Order Number:</span> {editingStatus.sortOrder || 0}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-ars-body mb-2">Order Number</label>
+                        <input
+                          type="number"
+                          value={editingStatus.sortOrder || 0}
+                          onChange={(e) => setEditingStatus({ ...editingStatus, sortOrder: parseInt(e.target.value) || 0 })}
+                          className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          min="0"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="status-active"
+                          checked={editingStatus.isActive}
+                          onChange={(e) => setEditingStatus({ ...editingStatus, isActive: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary"
+                        />
+                        <label htmlFor="status-active" className="text-sm text-ars-body cursor-pointer">
+                          Active
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex gap-3 mt-4">
+                    <button
+                      onClick={editingStatus ? handleUpdateStatus : handleCreateStatus}
+                      disabled={loading}
+                      className="px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <Save className="w-4 h-4" />
+                      {editingStatus ? 'Update' : 'Create'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingStatus(null);
+                        setNewStatus({ name: '', description: '' });
+                        setShowStatusForm(false);
+                      }}
+                      className="px-4 py-2.5 border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Statuses List */}
+              <div className="space-y-2">
+                {statuses.map((status) => (
+                  <div
+                    key={status._id}
+                    className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <span className="font-semibold text-ars-heading">{status.name}</span>
+                        {status.description && (
+                          <span className="text-sm text-ars-body">- {status.description}</span>
+                        )}
+                        <span className="px-2 py-1 text-xs font-medium rounded-lg bg-blue-100 text-blue-700">
+                          Order: {status.sortOrder || 0}
+                        </span>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-lg ${
+                          status.isActive
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {status.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingStatus(status);
+                          setShowStatusForm(false);
+                        }}
+                        className="p-2 text-ars-primary hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Edit status"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteStatus(status._id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete status"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {statuses.length === 0 && (
+                  <p className="text-center text-ars-body py-8">No statuses found. Click "Add Status" to create one.</p>
+                )}
+              </div>
+                </>
+              )}
+            </div>
+
             {/* Rep Codes Section */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-ars-heading flex items-center gap-2">
+                <button
+                  onClick={() => setIsRepCodesExpanded(!isRepCodesExpanded)}
+                  className="flex items-center gap-2 text-xl font-bold text-ars-heading hover:text-ars-primary transition-colors"
+                >
+                  {isRepCodesExpanded ? <ChevronUp className="w-6 h-6 text-ars-primary" /> : <ChevronDown className="w-6 h-6 text-ars-primary" />}
                   <Key className="w-6 h-6 text-ars-primary" />
                   Rep Codes
-                </h3>
+                </button>
                 <button
                   onClick={() => {
                     setEditingRepCode(null);
@@ -1267,6 +1564,8 @@ export function SystemManagement() {
                 </button>
               </div>
 
+              {isRepCodesExpanded && (
+                <>
               {/* Add/Edit Rep Code Form */}
               {(editingRepCode || showRepCodeForm) && (
                 <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
@@ -1403,15 +1702,21 @@ export function SystemManagement() {
                   <p className="text-center text-ars-body py-8">No rep codes found. Click "Add Rep Code" to create one.</p>
                 )}
               </div>
+                </>
+              )}
             </div>
 
             {/* Admin Codes Section */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-ars-heading flex items-center gap-2">
+                <button
+                  onClick={() => setIsAdminCodesExpanded(!isAdminCodesExpanded)}
+                  className="flex items-center gap-2 text-xl font-bold text-ars-heading hover:text-ars-primary transition-colors"
+                >
+                  {isAdminCodesExpanded ? <ChevronUp className="w-6 h-6 text-ars-primary" /> : <ChevronDown className="w-6 h-6 text-ars-primary" />}
                   <Shield className="w-6 h-6 text-ars-primary" />
                   Admin Codes (ADM)
-                </h3>
+                </button>
                 <button
                   onClick={() => {
                     setEditingAdminCode(null);
@@ -1424,6 +1729,8 @@ export function SystemManagement() {
                   Add Admin Code
                 </button>
               </div>
+              {isAdminCodesExpanded && (
+                <>
               <p className="text-sm text-ars-body mb-4">
                 Admin codes are used in jobs. Link them to users to track which admin is responsible for each code.
               </p>
@@ -1584,6 +1891,8 @@ export function SystemManagement() {
                   <p className="text-center text-ars-body py-8">No admin codes found. Click "Add Admin Code" to create one.</p>
                 )}
               </div>
+                </>
+              )}
             </div>
           </div>
         )}

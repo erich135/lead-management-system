@@ -466,6 +466,14 @@ export interface Customer {
   name: string;
 }
 
+export interface CashCustomer {
+  _id: string;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Branch {
   _id: string;
   name: string;
@@ -508,10 +516,11 @@ export interface Machine {
   make: string;
   model: string;
   serialNumber: string;
-  customer: {
+  customer?: {
     _id: string;
     name: string;
   } | string;
+  cashCustomer?: string;
   machineHours: number;
   nextServiceHours: number;
   isActive: boolean;
@@ -537,6 +546,38 @@ export interface FollowUpStatus {
  */
 export async function getStatuses(): Promise<{ statuses: Status[] }> {
   return apiRequest('/api/reference/statuses');
+}
+
+/**
+ * Creates a new status.
+ */
+export async function createStatus(statusData: {
+  name: string;
+  description?: string;
+}): Promise<{ status: Status }> {
+  return apiRequest('/api/reference/statuses', {
+    method: 'POST',
+    body: JSON.stringify(statusData),
+  });
+}
+
+/**
+ * Updates a status.
+ */
+export async function updateStatus(id: string, statusData: Partial<Status>): Promise<{ status: Status }> {
+  return apiRequest(`/api/reference/statuses/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(statusData),
+  });
+}
+
+/**
+ * Deletes a status.
+ */
+export async function deleteStatus(id: string): Promise<void> {
+  await apiRequest(`/api/reference/statuses/${id}`, {
+    method: 'DELETE',
+  });
 }
 
 /**
@@ -682,10 +723,16 @@ export async function getMachine(id: string): Promise<{ machine: Machine }> {
 }
 
 /**
- * Gets machines by customer ID.
+ * Gets machines by customer ID or cash customer name.
  */
-export async function getMachinesByCustomer(customerId: string): Promise<{ machines: Machine[] }> {
-  return apiRequest(`/api/machines/customer/${customerId}`);
+export async function getMachinesByCustomer(customerId?: string, cashCustomer?: string): Promise<{ machines: Machine[] }> {
+  if (cashCustomer) {
+    return apiRequest(`/api/machines/cash-customer/${encodeURIComponent(cashCustomer)}`);
+  }
+  if (customerId) {
+    return apiRequest(`/api/machines/customer/${customerId}`);
+  }
+  throw new Error('Either customerId or cashCustomer must be provided');
 }
 
 /**
@@ -695,7 +742,8 @@ export async function createMachine(machineData: {
   make: string;
   model: string;
   serialNumber: string;
-  customer: string;
+  customer?: string;
+  cashCustomer?: string;
   machineHours: number;
   nextServiceHours: number;
 }): Promise<{ machine: Machine }> {
@@ -720,6 +768,65 @@ export async function updateMachine(id: string, machineData: Partial<Machine>): 
  */
 export async function deleteMachine(id: string): Promise<void> {
   await apiRequest(`/api/machines/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Cash Customer API functions.
+ */
+
+/**
+ * Gets all cash customers.
+ */
+export async function getCashCustomers(params?: {
+  search?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{ cashCustomers: CashCustomer[]; pagination: any }> {
+  const queryParams = new URLSearchParams();
+  if (params?.search) queryParams.append('search', params.search);
+  if (params?.page) queryParams.append('page', params.page.toString());
+  if (params?.limit) queryParams.append('limit', params.limit.toString());
+  
+  const query = queryParams.toString();
+  return apiRequest(`/api/cash-customers${query ? `?${query}` : ''}`);
+}
+
+/**
+ * Gets a single cash customer by ID.
+ */
+export async function getCashCustomer(id: string): Promise<{ cashCustomer: CashCustomer }> {
+  return apiRequest(`/api/cash-customers/${id}`);
+}
+
+/**
+ * Creates a new cash customer.
+ */
+export async function createCashCustomer(cashCustomerData: {
+  name: string;
+}): Promise<{ cashCustomer: CashCustomer }> {
+  return apiRequest('/api/cash-customers', {
+    method: 'POST',
+    body: JSON.stringify(cashCustomerData),
+  });
+}
+
+/**
+ * Updates a cash customer.
+ */
+export async function updateCashCustomer(id: string, cashCustomerData: Partial<CashCustomer>): Promise<{ cashCustomer: CashCustomer }> {
+  return apiRequest(`/api/cash-customers/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(cashCustomerData),
+  });
+}
+
+/**
+ * Deletes a cash customer (soft delete).
+ */
+export async function deleteCashCustomer(id: string): Promise<void> {
+  await apiRequest(`/api/cash-customers/${id}`, {
     method: 'DELETE',
   });
 }
@@ -996,7 +1103,7 @@ export async function importJobs(file: File, clearExisting: boolean, branchId?: 
     throw new Error('No authentication token found');
   }
 
-  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/import/jobs`, {
+  const response = await fetch(`${API_BASE_URL}/api/import/jobs`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -1025,7 +1132,7 @@ export async function importCustomers(file: File, clearExisting: boolean): Promi
     throw new Error('No authentication token found');
   }
 
-  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/import/customers`, {
+  const response = await fetch(`${API_BASE_URL}/api/import/customers`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -1050,7 +1157,7 @@ export async function downloadExampleCSV(type: 'jobs' | 'customers'): Promise<vo
     throw new Error('No authentication token found');
   }
 
-  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/import/example/${type}`, {
+  const response = await fetch(`${API_BASE_URL}/api/import/example/${type}`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -1186,6 +1293,9 @@ export default {
   updateJob,
   deleteJob,
   getStatuses,
+  createStatus,
+  updateStatus,
+  deleteStatus,
   getCustomers,
   getBranches,
   getServiceDescriptions,
@@ -1203,6 +1313,11 @@ export default {
   createMachine,
   updateMachine,
   deleteMachine,
+  getCashCustomers,
+  getCashCustomer,
+  createCashCustomer,
+  updateCashCustomer,
+  deleteCashCustomer,
   getTechnicians,
   getFollowUpStatuses,
   apiRequest,

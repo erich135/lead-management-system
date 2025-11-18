@@ -374,10 +374,20 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
 
   function handleLeadSaved() {
     setShowLeadForm(false);
-    setSelectedLead(null);
     loadStats();
     loadOverdueJobs(); // Refresh overdue jobs list
     setLeadsListRefreshKey(prev => prev + 1); // Trigger LeadsList refresh
+  }
+
+  function handleJobCreated(job: Job) {
+    // Close the form
+    setShowLeadForm(false);
+    // Open the job details with the newly created job
+    setSelectedLead(job);
+    // Refresh stats and lists
+    loadStats();
+    loadOverdueJobs();
+    setLeadsListRefreshKey(prev => prev + 1);
   }
 
   return (
@@ -1223,6 +1233,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           customers={customers}
           onClose={() => setShowLeadForm(false)}
           onSaved={handleLeadSaved}
+          onJobCreated={handleJobCreated}
         />
       )}
 

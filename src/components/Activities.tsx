@@ -10,6 +10,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Clock, User as UserIcon, Filter, Search, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export function Activities() {
+  
   const { user } = useAuth();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);

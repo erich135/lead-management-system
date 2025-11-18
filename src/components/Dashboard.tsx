@@ -934,7 +934,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
               </div>
             </div>
 
-            {/* Job List / Cards */}
+            {/* Job List - Table View */}
             <div className="space-y-4">
               {overdueJobs.length === 0 ? (
                 <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl p-12 text-center">
@@ -961,203 +961,169 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {overdueJobs
-                      .filter(job => selectedPriority === 'all' || job.severity === selectedPriority)
-                      .slice(0, 5)
-                      .map((overdue, index) => (
-                        <div
-                          key={overdue.jobId}
-                          className={`group relative overflow-hidden rounded-xl border-2 transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer ${getStatusColor(overdue.job?.status?.name)}`}
-                        onClick={() => {
-                          if (overdue.job) {
-                            setSelectedLead(overdue.job);
-                            navigateToView('leads');
-                          }
-                        }}
-                        style={{
-                          animation: `fadeInUp 0.3s ease-out ${index * 0.05}s both`
-                        }}
-                      >
-
-                        <div className="relative p-5">
-                          {/* Priority Badge */}
-                          {overdue.isOverdue && (
-                            <div className="absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-bold shadow-md bg-red-500 text-white animate-pulse">
-                              {overdue.daysOverdue}d overdue
-                            </div>
-                          )}
-                          {overdue.isApproaching && !overdue.isOverdue && (
-                            <div className="absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-bold shadow-md bg-orange-500 text-white">
-                              Approaching
-                            </div>
-                          )}
-
-                          {/* Job Number & Status */}
-                          <div className="flex items-start justify-between mb-3">
-                            <div>
-                              <h3 className="text-lg font-bold text-ars-heading group-hover:text-ars-primary transition-colors mb-1">
-                                {overdue.jobNumber}
-                              </h3>
-                              <span className={`inline-block px-3 py-1 rounded-lg text-xs font-semibold ${getStatusTextColor(overdue.job?.status?.name)} bg-white/60 border border-current/20`}>
-                                {overdue.job?.status?.name || overdue.currentStatus || 'No Status'}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Customer */}
-                          <div className="mb-3">
-                            <div className="flex items-center gap-2 text-sm text-ars-body mb-1">
-                              <User className="w-4 h-4" />
-                              <span className="font-medium text-ars-heading">
-                                {overdue.job?.customer?.name || overdue.job?.cashCustomer || 'No customer'}
-                              </span>
-                            </div>
-                            {overdue.job?.cashCustomer && overdue.job?.customer && (
-                              <p className="text-xs text-ars-body ml-6">Cash: {overdue.job.cashCustomer}</p>
-                            )}
-                          </div>
-
-                          {/* Dates */}
-                          <div className="space-y-2 mb-3 text-xs text-ars-body">
-                            {overdue.job?.startDate && (
-                              <div className="flex items-center gap-2">
-                                <Calendar className="w-3 h-3" />
-                                <span>Start: {formatDate(overdue.job.startDate)}</span>
-                              </div>
-                            )}
-                            {overdue.job?.dateQuoted && (
-                              <div className="flex items-center gap-2">
-                                <Calendar className="w-3 h-3" />
-                                <span>Quoted: {formatDate(overdue.job.dateQuoted)}</span>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Metadata Row */}
-                          <div className="flex items-center gap-3 flex-wrap mb-3 pt-3 border-t border-gray-200">
-                            {overdue.job?.branch && (
-                              <div className="flex items-center gap-1 text-xs text-ars-body">
-                                <Building2 className="w-3 h-3" />
-                                <span>{overdue.job.branch.name}</span>
-                              </div>
-                            )}
-                            {overdue.job?.adm && (
-                              <div className="flex items-center gap-1 text-xs text-ars-body">
-                                <User className="w-3 h-3" />
-                                <span>{overdue.job.adm}</span>
-                              </div>
-                            )}
-                            {overdue.job && (() => {
-                              const repCode = getRepCodeFromJob(overdue.job);
-                              return repCode ? (
-                                <div className="flex items-center gap-1 text-xs text-ars-body">
-                                  <Tag className="w-3 h-3" />
-                                  <span className="font-medium">{repCode.code}</span>
-                                </div>
-                              ) : null;
-                            })()}
-                          </div>
-
-                          {/* Technician - On its own line */}
-                          {overdue.job && (() => {
-                            const technicianName = getTechnicianNameFromJob(overdue.job);
-                            return technicianName ? (
-                              <div className="mb-3 pt-2 border-t border-gray-200">
-                                <div className="flex items-center gap-2 text-xs text-ars-body">
-                                  <User className="w-3 h-3" />
-                                  <span className="font-medium">Technician: {technicianName}</span>
-                                </div>
-                              </div>
-                            ) : null;
-                          })()}
-
-                          {/* Machines */}
-                          {Array.isArray(overdue.job?.machines) && overdue.job.machines.length > 0 && (
-                            <div className="mb-3 pt-2 border-t border-gray-200">
-                              <div className="space-y-2">
-                                {overdue.job.machines.map((machineRef: any, index: number) => {
-                                  const machine = typeof machineRef === 'object' && machineRef !== null
-                                    ? machineRef
-                                    : null;
-                                  if (!machine) return null;
-                                  return (
-                                    <div key={machine._id || index} className="space-y-1">
-                                      <div className="flex items-center gap-1 text-xs text-ars-body">
-                                        <Wrench className="w-3 h-3 flex-shrink-0" />
-                                        <span className="font-medium">
-                                          {machine.make} {machine.model}
-                                        </span>
-                                      </div>
-                                      <div className="text-xs text-ars-body pl-4">
-                                        <div className="flex items-center gap-2">
-                                          <span>Hours: <span className="font-semibold text-ars-primary">{machine.machineHours.toLocaleString()}</span></span>
-                                          <span className="text-gray-400">•</span>
-                                          <span>Next: <span className="font-semibold text-orange-600">{machine.nextServiceHours.toLocaleString()}</span></span>
-                                        </div>
-                                      </div>
+                  {/* Table View */}
+                  <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-200">
+                            <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Job Number</th>
+                            <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Status</th>
+                            <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Customer</th>
+                            <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Start Date</th>
+                            <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Quoted</th>
+                            <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">City</th>
+                            <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Admin</th>
+                            <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Rep</th>
+                            <th className="text-right px-4 py-3 text-sm font-medium text-gray-600">Amount</th>
+                            <th className="text-center px-4 py-3 text-sm font-medium text-gray-600">Days Overdue</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {overdueJobs
+                            .filter(job => selectedPriority === 'all' || job.severity === selectedPriority)
+                            .map((overdue, index) => {
+                              const rowColorClass = getStatusColor(overdue.job?.status?.name);
+                              const textColorClass = getStatusTextColor(overdue.job?.status?.name);
+                              const repCode = overdue.job ? getRepCodeFromJob(overdue.job) : null;
+                              
+                              return (
+                                <tr 
+                                  key={overdue.jobId}
+                                  className={`${rowColorClass} border-b border-gray-100 hover:shadow-md transition-all duration-200 cursor-pointer group`}
+                                  onClick={() => {
+                                    if (overdue.job) {
+                                      setSelectedLead(overdue.job);
+                                      navigateToView('leads');
+                                    }
+                                  }}
+                                  style={{
+                                    animation: `fadeInUp 0.3s ease-out ${index * 0.05}s both`
+                                  }}
+                                >
+                                  {/* Job Number */}
+                                  <td className="px-4 py-3">
+                                    <div className="font-semibold text-gray-900 group-hover:text-ars-primary transition-colors">
+                                      {overdue.jobNumber}
                                     </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
+                                  </td>
 
-                          {/* Value */}
-                          {overdue.job?.valueExVat && (
-                            <div className="mb-3 pt-2 border-t border-gray-200">
-                              <div className="flex items-center gap-1 text-xs text-ars-body font-medium">
-                                <span>{formatCurrency(overdue.job.valueExVat)}</span>
-                              </div>
-                            </div>
-                          )}
+                                  {/* Status */}
+                                  <td className="px-4 py-3">
+                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${textColorClass} bg-white/60 border border-current/20`}>
+                                      {overdue.job?.status?.name || overdue.currentStatus || 'No Status'}
+                                    </span>
+                                  </td>
 
-                          {/* Actions */}
-                          <div className="flex items-center gap-2 pt-3 border-t border-gray-200">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (overdue.job) {
-                                  handleLeadClick(overdue.job);
-                                  navigateToView('leads');
-                                }
-                              }}
-                              className="flex-1 px-3 py-2 bg-white/80 hover:bg-white rounded-lg text-xs font-medium text-ars-heading hover:text-ars-primary transition-all flex items-center justify-center gap-1"
-                            >
-                              <Edit2 className="w-3 h-3" />
-                              Edit
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (overdue.job) {
-                                  setSelectedLead(overdue.job);
-                                  navigateToView('leads');
-                                }
-                              }}
-                              className="flex-1 px-3 py-2 bg-white/80 hover:bg-white rounded-lg text-xs font-medium text-ars-heading hover:text-ars-primary transition-all flex items-center justify-center gap-1"
-                            >
-                              <Eye className="w-3 h-3" />
-                              View
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                      ))}
+                                  {/* Customer */}
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <User className="w-4 h-4 text-gray-400" />
+                                      <span className="font-medium text-gray-900">
+                                        {(() => {
+                                          if (overdue.job?.cashCustomer && overdue.job?.customer?.name) {
+                                            return `${overdue.job.cashCustomer} - ${overdue.job.customer.name}`;
+                                          }
+                                          return overdue.job?.customer?.name || overdue.job?.cashCustomer || 'No customer';
+                                        })()}
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  {/* Start Date */}
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <Calendar className="w-4 h-4 text-gray-400" />
+                                      <span className="text-sm text-gray-600">
+                                        {formatDate(overdue.job?.startDate)}
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  {/* Quoted Date */}
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <Calendar className="w-4 h-4 text-gray-400" />
+                                      <span className="text-sm text-gray-600">
+                                        {formatDate(overdue.job?.dateQuoted)}
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  {/* City/Branch */}
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <Building2 className="w-4 h-4 text-gray-400" />
+                                      <span className="text-sm text-gray-600">
+                                        {overdue.job?.branch?.name || '-'}
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  {/* Admin */}
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <Shield className="w-4 h-4 text-gray-400" />
+                                      <span className="text-sm text-gray-600">
+                                        {overdue.job?.adm || '-'}
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  {/* Rep */}
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <Tag className="w-4 h-4 text-gray-400" />
+                                      <span className="text-sm text-gray-600">
+                                        {repCode?.code || '-'}
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  {/* Amount */}
+                                  <td className="px-4 py-3 text-right">
+                                    <span className="font-semibold text-gray-900">
+                                      {formatCurrency(overdue.job?.valueExVat)}
+                                    </span>
+                                  </td>
+
+                                  {/* Days Overdue */}
+                                  <td className="px-4 py-3 text-center">
+                                    {overdue.isOverdue ? (
+                                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800">
+                                        {overdue.daysOverdue}d overdue
+                                      </span>
+                                    ) : overdue.isApproaching ? (
+                                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800">
+                                        Approaching
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                        0d overdue
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                  {/* Show "more" link if there are more than 5 jobs */}
-                  {overdueJobs.filter(job => selectedPriority === 'all' || job.severity === selectedPriority).length > 5 && (
+                  
+                  {/* Show "more" link if there are more jobs to display */}
+                  {overdueJobs.filter(job => selectedPriority === 'all' || job.severity === selectedPriority).length > 10 && (
                     <div className="mt-6 text-center">
                       <button
                         onClick={() => navigateToView('leads')}
                         className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300 hover:scale-105"
                       >
                         <FileText className="w-5 h-5" />
-                        View All {overdueJobs.filter(job => selectedPriority === 'all' || job.severity === selectedPriority).length - 5} More Jobs
+                        View All {overdueJobs.filter(job => selectedPriority === 'all' || job.severity === selectedPriority).length} Jobs
                         <ArrowRight className="w-5 h-5" />
                       </button>
                       <p className="mt-2 text-sm text-ars-body">
-                        Showing 5 of {overdueJobs.filter(job => selectedPriority === 'all' || job.severity === selectedPriority).length} jobs that need attention
+                        Table shows all {overdueJobs.filter(job => selectedPriority === 'all' || job.severity === selectedPriority).length} jobs that need attention
                       </p>
                     </div>
                   )}

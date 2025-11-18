@@ -107,6 +107,19 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
   const [adminCodes, setAdminCodes] = useState<AdminCode[]>([]);
   const [selectedPriority, setSelectedPriority] = useState<'all' | 'critical' | 'warning' | 'info'>('all');
   const [leadsListRefreshKey, setLeadsListRefreshKey] = useState(0);
+  
+  // Filter and sorting states
+  const [filters, setFilters] = useState({
+    jobNumber: '',
+    status: '',
+    customer: '',
+    admin: '',
+    rep: ''
+  });
+  const [sortConfig, setSortConfig] = useState<{
+    field: 'jobNumber' | 'status' | 'customer' | 'startDate' | 'dateQuoted' | 'city' | 'admin' | 'rep' | 'amount' | 'daysOverdue' | null;
+    direction: 'asc' | 'desc';
+  }>({ field: null, direction: 'asc' });
 
   useEffect(() => {
     loadInitialData();
@@ -388,6 +401,107 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
     loadStats();
     loadOverdueJobs();
     setLeadsListRefreshKey(prev => prev + 1);
+  }
+
+  // Filter and sorting functions
+  function handleSort(field: 'jobNumber' | 'status' | 'customer' | 'startDate' | 'dateQuoted' | 'city' | 'admin' | 'rep' | 'amount' | 'daysOverdue') {
+    const direction = sortConfig.field === field && sortConfig.direction === 'asc' ? 'desc' : 'asc';
+    setSortConfig({ field, direction });
+  }
+
+  function getFilteredAndSortedJobs() {
+    let filteredJobs = overdueJobs.filter(job => selectedPriority === 'all' || job.severity === selectedPriority);
+
+    // Apply filters
+    if (filters.jobNumber) {
+      filteredJobs = filteredJobs.filter(job => 
+        job.jobNumber.toLowerCase().includes(filters.jobNumber.toLowerCase())
+      );
+    }
+    if (filters.status) {
+      filteredJobs = filteredJobs.filter(job => 
+        (job.job?.status?.name || job.currentStatus || '').toLowerCase().includes(filters.status.toLowerCase())
+      );
+    }
+    if (filters.customer) {
+      filteredJobs = filteredJobs.filter(job => {
+        const customerName = job.job?.customer?.name || job.job?.cashCustomer || '';
+        return customerName.toLowerCase().includes(filters.customer.toLowerCase());
+      });
+    }
+    if (filters.admin) {
+      filteredJobs = filteredJobs.filter(job => 
+        (job.job?.adm || '').toLowerCase().includes(filters.admin.toLowerCase())
+      );
+    }
+    if (filters.rep) {
+      filteredJobs = filteredJobs.filter(job => {
+        const repCode = job.job ? getRepCodeFromJob(job.job) : null;
+        const repCodeStr = repCode?.code || '';
+        return repCodeStr.toLowerCase().includes(filters.rep.toLowerCase());
+      });
+    }
+
+    // Apply sorting
+    if (sortConfig.field) {
+      filteredJobs.sort((a, b) => {
+        let aValue: any = '';
+        let bValue: any = '';
+
+        switch (sortConfig.field) {
+          case 'jobNumber':
+            aValue = a.jobNumber;
+            bValue = b.jobNumber;
+            break;
+          case 'status':
+            aValue = a.job?.status?.name || a.currentStatus || '';
+            bValue = b.job?.status?.name || b.currentStatus || '';
+            break;
+          case 'customer':
+            aValue = a.job?.customer?.name || a.job?.cashCustomer || '';
+            bValue = b.job?.customer?.name || b.job?.cashCustomer || '';
+            break;
+          case 'startDate':
+            aValue = a.job?.startDate ? new Date(a.job.startDate).getTime() : 0;
+            bValue = b.job?.startDate ? new Date(b.job.startDate).getTime() : 0;
+            break;
+          case 'dateQuoted':
+            aValue = a.job?.dateQuoted ? new Date(a.job.dateQuoted).getTime() : 0;
+            bValue = b.job?.dateQuoted ? new Date(b.job.dateQuoted).getTime() : 0;
+            break;
+          case 'city':
+            aValue = a.job?.branch?.name || '';
+            bValue = b.job?.branch?.name || '';
+            break;
+          case 'admin':
+            aValue = a.job?.adm || '';
+            bValue = b.job?.adm || '';
+            break;
+          case 'rep':
+            const aRepCode = a.job ? getRepCodeFromJob(a.job) : null;
+            const bRepCode = b.job ? getRepCodeFromJob(b.job) : null;
+            aValue = aRepCode?.code || '';
+            bValue = bRepCode?.code || '';
+            break;
+          case 'amount':
+            aValue = a.job?.valueExVat || 0;
+            bValue = b.job?.valueExVat || 0;
+            break;
+          case 'daysOverdue':
+            aValue = a.daysOverdue || 0;
+            bValue = b.daysOverdue || 0;
+            break;
+        }
+
+        if (sortConfig.direction === 'asc') {
+          return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+        } else {
+          return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+        }
+      });
+    }
+
+    return filteredJobs;
   }
 
   return (
@@ -961,28 +1075,214 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                 </div>
               ) : (
                 <>
+                  {/* Filters */}
+                  <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4 mb-4">
+                    <h3 className="text-sm font-semibold text-ars-heading mb-3">Filters</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Job Number</label>
+                        <input
+                          type="text"
+                          placeholder="Filter by job number..."
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          value={filters.jobNumber}
+                          onChange={(e) => setFilters({...filters, jobNumber: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
+                        <input
+                          type="text"
+                          placeholder="Filter by status..."
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          value={filters.status}
+                          onChange={(e) => setFilters({...filters, status: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Customer</label>
+                        <input
+                          type="text"
+                          placeholder="Filter by customer..."
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          value={filters.customer}
+                          onChange={(e) => setFilters({...filters, customer: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Admin</label>
+                        <input
+                          type="text"
+                          placeholder="Filter by admin..."
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          value={filters.admin}
+                          onChange={(e) => setFilters({...filters, admin: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Rep</label>
+                        <input
+                          type="text"
+                          placeholder="Filter by rep..."
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          value={filters.rep}
+                          onChange={(e) => setFilters({...filters, rep: e.target.value})}
+                        />
+                      </div>
+                    </div>
+                    {Object.values(filters).some(filter => filter) && (
+                      <div className="mt-3 flex items-center gap-2">
+                        <span className="text-xs text-gray-600">Active filters:</span>
+                        <button
+                          onClick={() => setFilters({ jobNumber: '', status: '', customer: '', admin: '', rep: '' })}
+                          className="text-xs text-ars-primary hover:text-ars-primary/80 underline"
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Table View */}
                   <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead>
                           <tr className="bg-gray-50 border-b border-gray-200">
-                            <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Job Number</th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Status</th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Customer</th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Start Date</th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Quoted</th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">City</th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Admin</th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Rep</th>
-                            <th className="text-right px-4 py-3 text-sm font-medium text-gray-600">Amount</th>
-                            <th className="text-center px-4 py-3 text-sm font-medium text-gray-600">Days Overdue</th>
+                            <th 
+                              className="text-left px-4 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => handleSort('jobNumber')}
+                            >
+                              <div className="flex items-center gap-1">
+                                Job Number
+                                {sortConfig.field === 'jobNumber' && (
+                                  <span className="text-ars-primary">
+                                    {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
+                              </div>
+                            </th>
+                            <th 
+                              className="text-left px-4 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => handleSort('status')}
+                            >
+                              <div className="flex items-center gap-1">
+                                Status
+                                {sortConfig.field === 'status' && (
+                                  <span className="text-ars-primary">
+                                    {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
+                              </div>
+                            </th>
+                            <th 
+                              className="text-left px-4 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => handleSort('customer')}
+                            >
+                              <div className="flex items-center gap-1">
+                                Customer
+                                {sortConfig.field === 'customer' && (
+                                  <span className="text-ars-primary">
+                                    {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
+                              </div>
+                            </th>
+                            <th 
+                              className="text-left px-4 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => handleSort('startDate')}
+                            >
+                              <div className="flex items-center gap-1">
+                                Start Date
+                                {sortConfig.field === 'startDate' && (
+                                  <span className="text-ars-primary">
+                                    {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
+                              </div>
+                            </th>
+                            <th 
+                              className="text-left px-4 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => handleSort('dateQuoted')}
+                            >
+                              <div className="flex items-center gap-1">
+                                Quoted
+                                {sortConfig.field === 'dateQuoted' && (
+                                  <span className="text-ars-primary">
+                                    {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
+                              </div>
+                            </th>
+                            <th 
+                              className="text-left px-4 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => handleSort('city')}
+                            >
+                              <div className="flex items-center gap-1">
+                                City
+                                {sortConfig.field === 'city' && (
+                                  <span className="text-ars-primary">
+                                    {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
+                              </div>
+                            </th>
+                            <th 
+                              className="text-left px-4 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => handleSort('admin')}
+                            >
+                              <div className="flex items-center gap-1">
+                                Admin
+                                {sortConfig.field === 'admin' && (
+                                  <span className="text-ars-primary">
+                                    {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
+                              </div>
+                            </th>
+                            <th 
+                              className="text-left px-4 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => handleSort('rep')}
+                            >
+                              <div className="flex items-center gap-1">
+                                Rep
+                                {sortConfig.field === 'rep' && (
+                                  <span className="text-ars-primary">
+                                    {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
+                              </div>
+                            </th>
+                            <th 
+                              className="text-right px-4 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => handleSort('amount')}
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                Amount
+                                {sortConfig.field === 'amount' && (
+                                  <span className="text-ars-primary">
+                                    {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
+                              </div>
+                            </th>
+                            <th 
+                              className="text-center px-4 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => handleSort('daysOverdue')}
+                            >
+                              <div className="flex items-center justify-center gap-1">
+                                Days Overdue
+                                {sortConfig.field === 'daysOverdue' && (
+                                  <span className="text-ars-primary">
+                                    {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
+                              </div>
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
-                          {overdueJobs
-                            .filter(job => selectedPriority === 'all' || job.severity === selectedPriority)
-                            .map((overdue, index) => {
+                          {getFilteredAndSortedJobs().map((overdue, index) => {
                               const rowColorClass = getStatusColor(overdue.job?.status?.name);
                               const textColorClass = getStatusTextColor(overdue.job?.status?.name);
                               const repCode = overdue.job ? getRepCodeFromJob(overdue.job) : null;
@@ -1111,22 +1411,30 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                     </div>
                   </div>
                   
-                  {/* Show "more" link if there are more jobs to display */}
-                  {overdueJobs.filter(job => selectedPriority === 'all' || job.severity === selectedPriority).length > 10 && (
-                    <div className="mt-6 text-center">
-                      <button
-                        onClick={() => navigateToView('leads')}
-                        className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300 hover:scale-105"
-                      >
-                        <FileText className="w-5 h-5" />
-                        View All {overdueJobs.filter(job => selectedPriority === 'all' || job.severity === selectedPriority).length} Jobs
-                        <ArrowRight className="w-5 h-5" />
-                      </button>
-                      <p className="mt-2 text-sm text-ars-body">
-                        Table shows all {overdueJobs.filter(job => selectedPriority === 'all' || job.severity === selectedPriority).length} jobs that need attention
+                  {/* Show results count */}
+                  {getFilteredAndSortedJobs().length > 0 && (
+                    <div className="mt-4 text-center">
+                      <p className="text-sm text-ars-body">
+                        Showing {getFilteredAndSortedJobs().length} job{getFilteredAndSortedJobs().length !== 1 ? 's' : ''}
+                        {Object.values(filters).some(filter => filter) && ' (filtered)'}
                       </p>
                     </div>
                   )}
+                  
+                  {/* Show "view all jobs" link */}
+                  <div className="mt-6 text-center">
+                    <button
+                      onClick={() => navigateToView('leads')}
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300 hover:scale-105"
+                    >
+                      <FileText className="w-5 h-5" />
+                      View All Jobs
+                      <ArrowRight className="w-5 h-5" />
+                    </button>
+                    <p className="mt-2 text-sm text-ars-body">
+                      Go to Jobs page for complete job management
+                    </p>
+                  </div>
                 </>
               )}
             </div>

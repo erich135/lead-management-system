@@ -111,15 +111,17 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
   // Filter and sorting states
   const [filters, setFilters] = useState({
     jobNumber: '',
-    status: '',
+    status: [] as string[],
     customer: '',
-    admin: '',
-    rep: ''
+    admin: [] as string[],
+    rep: [] as string[]
   });
   const [sortConfig, setSortConfig] = useState<{
     field: 'jobNumber' | 'status' | 'customer' | 'startDate' | 'dateQuoted' | 'city' | 'admin' | 'rep' | 'amount' | 'daysOverdue' | null;
     direction: 'asc' | 'desc';
   }>({ field: null, direction: 'asc' });
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
 
   useEffect(() => {
     loadInitialData();
@@ -418,10 +420,11 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
         job.jobNumber.toLowerCase().includes(filters.jobNumber.toLowerCase())
       );
     }
-    if (filters.status) {
-      filteredJobs = filteredJobs.filter(job => 
-        (job.job?.status?.name || job.currentStatus || '').toLowerCase().includes(filters.status.toLowerCase())
-      );
+    if (filters.status.length > 0) {
+      filteredJobs = filteredJobs.filter(job => {
+        const jobStatus = (job.job?.status?.name || job.currentStatus || '').toLowerCase();
+        return filters.status.some(status => jobStatus.includes(status.toLowerCase()));
+      });
     }
     if (filters.customer) {
       filteredJobs = filteredJobs.filter(job => {
@@ -429,16 +432,17 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
         return customerName.toLowerCase().includes(filters.customer.toLowerCase());
       });
     }
-    if (filters.admin) {
-      filteredJobs = filteredJobs.filter(job => 
-        (job.job?.adm || '').toLowerCase().includes(filters.admin.toLowerCase())
-      );
+    if (filters.admin.length > 0) {
+      filteredJobs = filteredJobs.filter(job => {
+        const jobAdmin = (job.job?.adm || '').toLowerCase();
+        return filters.admin.some(admin => jobAdmin.includes(admin.toLowerCase()));
+      });
     }
-    if (filters.rep) {
+    if (filters.rep.length > 0) {
       filteredJobs = filteredJobs.filter(job => {
         const repCode = job.job ? getRepCodeFromJob(job.job) : null;
-        const repCodeStr = repCode?.code || '';
-        return repCodeStr.toLowerCase().includes(filters.rep.toLowerCase());
+        const repCodeStr = (repCode?.code || '').toLowerCase();
+        return filters.rep.some(rep => repCodeStr.includes(rep.toLowerCase()));
       });
     }
 
@@ -502,6 +506,66 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
     }
 
     return filteredJobs;
+  }
+
+  // Calculate pagination
+  const filteredJobs = getFilteredAndSortedJobs();
+  const totalPages = Math.ceil(filteredJobs.length / itemsPerPage);
+  const paginatedJobs = filteredJobs.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, selectedPriority]);
+
+  // Helper functions for multi-select filters
+  function toggleFilterItem(filterType: 'status' | 'admin' | 'rep', value: string) {
+    setFilters(prev => {
+      const currentArray = prev[filterType] as string[];
+      const newArray = currentArray.includes(value)
+        ? currentArray.filter(item => item !== value)
+        : [...currentArray, value];
+      return { ...prev, [filterType]: newArray };
+    });
+  }
+
+  function clearAllFilters() {
+    setFilters({
+      jobNumber: '',
+      status: [],
+      customer: '',
+      admin: [],
+      rep: []
+    });
+  }
+
+  function getUniqueStatuses(): string[] {
+    const statusSet = new Set<string>();
+    overdueJobs.forEach(job => {
+      const status = job.job?.status?.name || job.currentStatus;
+      if (status) statusSet.add(status);
+    });
+    return Array.from(statusSet).sort();
+  }
+
+  function getUniqueAdmins(): string[] {
+    const adminSet = new Set<string>();
+    overdueJobs.forEach(job => {
+      if (job.job?.adm) adminSet.add(job.job.adm);
+    });
+    return Array.from(adminSet).sort();
+  }
+
+  function getUniqueReps(): string[] {
+    const repSet = new Set<string>();
+    overdueJobs.forEach(job => {
+      const repCode = job.job ? getRepCodeFromJob(job.job) : null;
+      if (repCode?.code) repSet.add(repCode.code);
+    });
+    return Array.from(repSet).sort();
   }
 
   return (
@@ -1089,16 +1153,40 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                           onChange={(e) => setFilters({...filters, jobNumber: e.target.value})}
                         />
                       </div>
+                      
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
-                        <input
-                          type="text"
-                          placeholder="Filter by status..."
+                        <select
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                          value={filters.status}
-                          onChange={(e) => setFilters({...filters, status: e.target.value})}
-                        />
+                          value=""
+                          onChange={(e) => {
+                            if (e.target.value && !filters.status.includes(e.target.value)) {
+                              setFilters({...filters, status: [...filters.status, e.target.value]});
+                            }
+                          }}
+                        >
+                          <option value="">Select status...</option>
+                          {getUniqueStatuses().filter(status => !filters.status.includes(status)).map(status => (
+                            <option key={status} value={status}>{status}</option>
+                          ))}
+                        </select>
+                        {filters.status.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {filters.status.map(status => (
+                              <span key={status} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-md text-xs">
+                                {status}
+                                <button
+                                  onClick={() => setFilters({...filters, status: filters.status.filter(s => s !== status)})}
+                                  className="text-blue-600 hover:text-blue-800 ml-1"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
+                      
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Customer</label>
                         <input
@@ -1109,32 +1197,103 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                           onChange={(e) => setFilters({...filters, customer: e.target.value})}
                         />
                       </div>
+                      
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Admin</label>
-                        <input
-                          type="text"
-                          placeholder="Filter by admin..."
+                        <select
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                          value={filters.admin}
-                          onChange={(e) => setFilters({...filters, admin: e.target.value})}
-                        />
+                          value=""
+                          onChange={(e) => {
+                            if (e.target.value && !filters.admin.includes(e.target.value)) {
+                              setFilters({...filters, admin: [...filters.admin, e.target.value]});
+                            }
+                          }}
+                        >
+                          <option value="">Select admin...</option>
+                          {getUniqueAdmins().filter(admin => !filters.admin.includes(admin)).map(admin => (
+                            <option key={admin} value={admin}>{admin}</option>
+                          ))}
+                        </select>
+                        {filters.admin.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {filters.admin.map(admin => (
+                              <span key={admin} className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded-md text-xs">
+                                {admin}
+                                <button
+                                  onClick={() => setFilters({...filters, admin: filters.admin.filter(a => a !== admin)})}
+                                  className="text-green-600 hover:text-green-800 ml-1"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
+                      
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Rep</label>
-                        <input
-                          type="text"
-                          placeholder="Filter by rep..."
+                        <select
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                          value={filters.rep}
-                          onChange={(e) => setFilters({...filters, rep: e.target.value})}
-                        />
+                          value=""
+                          onChange={(e) => {
+                            if (e.target.value && !filters.rep.includes(e.target.value)) {
+                              setFilters({...filters, rep: [...filters.rep, e.target.value]});
+                            }
+                          }}
+                        >
+                          <option value="">Select rep...</option>
+                          {getUniqueReps().filter(rep => !filters.rep.includes(rep)).map(rep => (
+                            <option key={rep} value={rep}>{rep}</option>
+                          ))}
+                        </select>
+                        {filters.rep.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {filters.rep.map(rep => (
+                              <span key={rep} className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 rounded-md text-xs">
+                                {rep}
+                                <button
+                                  onClick={() => setFilters({...filters, rep: filters.rep.filter(r => r !== rep)})}
+                                  className="text-purple-600 hover:text-purple-800 ml-1"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
-                    {Object.values(filters).some(filter => filter) && (
+                    {(Object.values(filters).some(filter => Array.isArray(filter) ? filter.length > 0 : filter)) && (
                       <div className="mt-3 flex items-center gap-2">
                         <span className="text-xs text-gray-600">Active filters:</span>
+                        {filters.status.length > 0 && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                            Status ({filters.status.length})
+                          </span>
+                        )}
+                        {filters.admin.length > 0 && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
+                            Admin ({filters.admin.length})
+                          </span>
+                        )}
+                        {filters.rep.length > 0 && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">
+                            Rep ({filters.rep.length})
+                          </span>
+                        )}
+                        {filters.jobNumber && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs">
+                            Job Number
+                          </span>
+                        )}
+                        {filters.customer && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-pink-100 text-pink-800 rounded text-xs">
+                            Customer
+                          </span>
+                        )}
                         <button
-                          onClick={() => setFilters({ jobNumber: '', status: '', customer: '', admin: '', rep: '' })}
+                          onClick={clearAllFilters}
                           className="text-xs text-ars-primary hover:text-ars-primary/80 underline"
                         >
                           Clear all
@@ -1282,7 +1441,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                           </tr>
                         </thead>
                         <tbody>
-                          {getFilteredAndSortedJobs().map((overdue, index) => {
+                          {paginatedJobs.map((overdue, index) => {
                               const rowColorClass = getStatusColor(overdue.job?.status?.name);
                               const textColorClass = getStatusTextColor(overdue.job?.status?.name);
                               const repCode = overdue.job ? getRepCodeFromJob(overdue.job) : null;
@@ -1411,12 +1570,86 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                     </div>
                   </div>
                   
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="mt-4 bg-white border-t border-gray-200 px-4 py-3 flex items-center justify-between rounded-b-xl">
+                      <div className="flex-1 flex justify-between sm:hidden">
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                          disabled={currentPage === 1}
+                          className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Previous
+                        </button>
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                          disabled={currentPage === totalPages}
+                          className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Next
+                        </button>
+                      </div>
+                      <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm text-gray-700">
+                            Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
+                            <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredJobs.length)}</span> of{' '}
+                            <span className="font-medium">{filteredJobs.length}</span> results
+                          </p>
+                        </div>
+                        <div>
+                          <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                            <button
+                              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                              disabled={currentPage === 1}
+                              className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Previous
+                            </button>
+                            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                              let pageNum;
+                              if (totalPages <= 5) {
+                                pageNum = i + 1;
+                              } else if (currentPage <= 3) {
+                                pageNum = i + 1;
+                              } else if (currentPage >= totalPages - 2) {
+                                pageNum = totalPages - 4 + i;
+                              } else {
+                                pageNum = currentPage - 2 + i;
+                              }
+                              return (
+                                <button
+                                  key={pageNum}
+                                  onClick={() => setCurrentPage(pageNum)}
+                                  className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                                    currentPage === pageNum
+                                      ? 'z-10 bg-ars-primary border-ars-primary text-white'
+                                      : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  {pageNum}
+                                </button>
+                              );
+                            })}
+                            <button
+                              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                              disabled={currentPage === totalPages}
+                              className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Next
+                            </button>
+                          </nav>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                   {/* Show results count */}
-                  {getFilteredAndSortedJobs().length > 0 && (
+                  {filteredJobs.length > 0 && (
                     <div className="mt-4 text-center">
                       <p className="text-sm text-ars-body">
-                        Showing {getFilteredAndSortedJobs().length} job{getFilteredAndSortedJobs().length !== 1 ? 's' : ''}
-                        {Object.values(filters).some(filter => filter) && ' (filtered)'}
+                        Showing {filteredJobs.length} job{filteredJobs.length !== 1 ? 's' : ''}
+                        {Object.values(filters).some(filter => Array.isArray(filter) ? filter.length > 0 : filter) && ' (filtered)'}
                       </p>
                     </div>
                   )}

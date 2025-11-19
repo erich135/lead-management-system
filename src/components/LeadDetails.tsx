@@ -364,6 +364,25 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     }
   }
 
+  /**
+   * Handles deleting the job.
+   */
+  async function handleDelete() {
+    setDeleting(true);
+    setError(null);
+    try {
+      await deleteJob(job._id);
+      setShowDeleteConfirm(false);
+      onUpdate(); // Refresh the job list
+      onClose(); // Close the details modal
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete job');
+      setShowDeleteConfirm(false);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   function formatDate(date: string | Date | undefined): string {
     if (!date) return '-';
     const d = typeof date === 'string' ? new Date(date) : date;

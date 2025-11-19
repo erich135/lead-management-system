@@ -506,10 +506,14 @@ export function Diary() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {paginatedJobs.map((job) => (
+                  {paginatedJobs.map((job) => {
+                    const formattedDate = job.dateBooked 
+                      ? new Date(job.dateBooked).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                      : '-';
+                    return (
                     <tr key={job._id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-ars-heading">
-                        {formatDate(job.dateBooked)}
+                        {formattedDate}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-ars-body font-semibold">
                         {job.jobNumber || '-'}
@@ -532,7 +536,8 @@ export function Diary() {
                         {job.description?.name || '-'}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -612,6 +617,13 @@ interface CalendarViewProps {
 }
 
 function CalendarView({ jobs }: CalendarViewProps) {
+  console.log('CalendarView received jobs:', jobs.length);
+  console.log('Jobs with dateBooked:', jobs.filter(j => j.dateBooked).map(j => ({
+    id: j._id,
+    dateBooked: j.dateBooked,
+    techBooked: j.techBooked
+  })));
+  
   const [currentDate, setCurrentDate] = useState(new Date());
   
   // Get the first and last day of the current month
@@ -677,14 +689,14 @@ function CalendarView({ jobs }: CalendarViewProps) {
         <div className="space-y-1 overflow-y-auto max-h-[90px]">
           {bookings.map((job, idx) => {
             const techName = typeof job.techBooked === 'object' && job.techBooked !== null
-              ? (job.techBooked as any).name
-              : '';
+              ? (job.techBooked as any).name || 'Unknown Tech'
+              : 'Unknown Tech';
             const time = job.dateBooked ? formatTimeShort(new Date(job.dateBooked)) : '';
             
             return (
               <div
                 key={idx}
-                className="text-xs px-2 py-1 rounded bg-purple-100 text-purple-800 truncate cursor-default hover:bg-purple-200 transition-colors"
+                className="text-xs px-2 py-1 rounded bg-purple-100 text-purple-800 cursor-default hover:bg-purple-200 transition-colors"
                 title={`${time} ${techName} - ${job.jobNumber}`}
               >
                 <div className="font-semibold">{time} {techName}</div>

@@ -61,6 +61,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   const [machines, setMachines] = useState<Machine[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [showNewMachineForm, setShowNewMachineForm] = useState(false);
+  const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
   const [newMachine, setNewMachine] = useState({
     make: '',
     model: '',
@@ -264,28 +265,61 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     setCreatingMachine(true);
     setError(null);
     try {
-      const machineData: any = {
-        make: newMachine.make.trim(),
-        model: newMachine.model.trim(),
-        serialNumber: newMachine.serialNumber.trim(),
-        machineHours: parseFloat(newMachine.machineHours) || 0,
-        nextServiceHours: parseFloat(newMachine.nextServiceHours) || 0,
-      };
+      if (editingMachine) {
+        // Update existing machine
+        const updatedData = {
+          make: newMachine.make.trim(),
+          model: newMachine.model.trim(),
+          serialNumber: newMachine.serialNumber.trim(),
+          machineHours: parseFloat(newMachine.machineHours) || 0,
+          nextServiceHours: parseFloat(newMachine.nextServiceHours) || 0,
+        };
+        
+        const response = await updateMachine(editingMachine._id, updatedData);
+        
+        // Update machine in list
+        const updatedMachines = machines.map(m => 
+          m._id === editingMachine._id ? response.machine : m
+        );
+        setMachines(updatedMachines);
+        
+        // Update machine in job's machines array if it's there
+        const currentMachines = Array.isArray(job.machines) ? job.machines : [];
+        const updatedJobMachines = currentMachines.map(m => {
+          if (typeof m === 'object' && m !== null && m._id === editingMachine._id) {
+            return response.machine;
+          }
+          return m;
+        });
+        setJob({ ...job, machines: updatedJobMachines });
+        
+        setEditingMachine(null);
+      } else {
+        // Create new machine
+        const machineData: any = {
+          make: newMachine.make.trim(),
+          model: newMachine.model.trim(),
+          serialNumber: newMachine.serialNumber.trim(),
+          machineHours: parseFloat(newMachine.machineHours) || 0,
+          nextServiceHours: parseFloat(newMachine.nextServiceHours) || 0,
+        };
 
-      if (hasCustomer && job.customer && typeof job.customer === 'object') {
-        machineData.customer = job.customer._id;
-      } else if (hasCashCustomer && job.cashCustomer) {
-        machineData.cashCustomer = job.cashCustomer.trim();
+        if (hasCustomer && job.customer && typeof job.customer === 'object') {
+          machineData.customer = job.customer._id;
+        } else if (hasCashCustomer && job.cashCustomer) {
+          machineData.cashCustomer = job.cashCustomer.trim();
+        }
+
+        const response = await createMachine(machineData);
+
+        // Add new machine to list and add it to job's machines array
+        const updatedMachines = [...machines, response.machine];
+        setMachines(updatedMachines);
+        const currentMachines = Array.isArray(job.machines) ? job.machines : [];
+        const machineIds = currentMachines.map(m => typeof m === 'object' && m !== null ? m._id : m).filter(Boolean);
+        setJob({ ...job, machines: [...machineIds, response.machine._id] });
       }
-
-      const response = await createMachine(machineData);
-
-      // Add new machine to list and add it to job's machines array
-      const updatedMachines = [...machines, response.machine];
-      setMachines(updatedMachines);
-      const currentMachines = Array.isArray(job.machines) ? job.machines : [];
-      const machineIds = currentMachines.map(m => typeof m === 'object' && m !== null ? m._id : m).filter(Boolean);
-      setJob({ ...job, machines: [...machineIds, response.machine._id] });
+      
       setNewMachine({
         make: '',
         model: '',
@@ -1015,20 +1049,39 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                                 Serial: {machine.serialNumber} • Hours: {machine.machineHours.toLocaleString()} • Next: {machine.nextServiceHours.toLocaleString()}
                               </div>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const updatedMachines = job.machines?.filter((m) => {
-                                  const mId = typeof m === 'object' && m !== null ? m._id : m;
-                                  const refId = typeof machineRef === 'object' && machineRef !== null ? machineRef._id : machineRef;
-                                  return mId !== refId;
-                                }) || [];
-                                setJob({ ...job, machines: updatedMachines });
-                              }}
-                              className="ml-2 px-2 py-1 text-red-600 hover:bg-red-50 rounded transition-colors flex-shrink-0"
-                            >
-                              Remove
-                            </button>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingMachine(machine);
+                                  setNewMachine({
+                                    make: machine.make || '',
+                                    model: machine.model || '',
+                                    serialNumber: machine.serialNumber || '',
+                                    machineHours: machine.machineHours || 0,
+                                    nextServiceHours: machine.nextServiceHours || 0,
+                                  });
+                                  setShowNewMachineForm(true);
+                                }}
+                                className="px-2 py-1 text-ars-primary hover:bg-blue-50 rounded transition-colors"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updatedMachines = job.machines?.filter((m) => {
+                                    const mId = typeof m === 'object' && m !== null ? m._id : m;
+                                    const refId = typeof machineRef === 'object' && machineRef !== null ? machineRef._id : machineRef;
+                                    return mId !== refId;
+                                  }) || [];
+                                  setJob({ ...job, machines: updatedMachines });
+                                }}
+                                className="px-2 py-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                              >
+                                Remove
+                              </button>
+                            </div>
                           </div>
                         );
                       })}
@@ -1067,7 +1120,17 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                     </select>
                     <button
                       type="button"
-                      onClick={() => setShowNewMachineForm(!showNewMachineForm)}
+                      onClick={() => {
+                        setEditingMachine(null);
+                        setNewMachine({
+                          make: '',
+                          model: '',
+                          serialNumber: '',
+                          machineHours: '',
+                          nextServiceHours: '',
+                        });
+                        setShowNewMachineForm(!showNewMachineForm);
+                      }}
                       className="px-4 py-3 bg-ars-primary text-white rounded-xl hover:bg-ars-primary/90 transition-colors whitespace-nowrap flex-shrink-0"
                     >
                       {showNewMachineForm ? 'Cancel' : '+ New'}
@@ -1077,7 +1140,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                   {/* New Machine Form */}
                   {showNewMachineForm && (
                     <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
-                      <h4 className="font-semibold text-ars-heading">Add New Machine</h4>
+                      <h4 className="font-semibold text-ars-heading">{editingMachine ? 'Edit Machine' : 'Add New Machine'}</h4>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-semibold text-ars-body mb-1">Make *</label>
@@ -1138,7 +1201,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                         disabled={creatingMachine}
                         className="w-full px-4 py-2 bg-ars-primary text-white rounded-lg hover:bg-ars-primary/90 transition-colors disabled:opacity-50"
                       >
-                        {creatingMachine ? 'Creating...' : 'Create Machine'}
+                        {creatingMachine ? (editingMachine ? 'Updating...' : 'Creating...') : (editingMachine ? 'Update Machine' : 'Create Machine')}
                       </button>
                     </div>
                   )}

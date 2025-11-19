@@ -482,7 +482,10 @@ export function Diary() {
             </div>
           </div>
 
-          {filtered.length === 0 ? (
+          {/* Show calendar view when no technician is selected (for super admin) */}
+          {techFilter === 'all' && currentUser?.isSuperAdmin && allJobs.length > 0 ? (
+            <CalendarView jobs={allJobs} />
+          ) : filtered.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-xl">
               <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <p className="text-lg font-semibold text-ars-heading mb-2">No bookings found</p>
@@ -599,3 +602,154 @@ export function Diary() {
     </div>
   );
 }
+
+/**
+ * Calendar View Component
+ * Displays technician bookings in a monthly calendar format
+ */
+interface CalendarViewProps {
+  jobs: Job[];
+}
+
+function CalendarView({ jobs }: CalendarViewProps) {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  
+  // Get the first and last day of the current month
+  const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+  const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+  
+  // Get the day of week for the first day (0 = Sunday)
+  const firstDayWeekday = firstDayOfMonth.getDay();
+  
+  // Calculate days to show from previous month
+  const daysInMonth = lastDayOfMonth.getDate();
+  const totalCells = Math.ceil((daysInMonth + firstDayWeekday) / 7) * 7;
+  
+  // Navigate to previous month
+  const previousMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+  };
+  
+  // Navigate to next month
+  const nextMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+  };
+  
+  // Go to today
+  const goToToday = () => {
+    setCurrentDate(new Date());
+  };
+  
+  // Get bookings for a specific date
+  const getBookingsForDate = (date: Date): Job[] => {
+    const dateStr = date.toISOString().split('T')[0];
+    return jobs.filter(job => {
+      if (!job.dateBooked) return false;
+      const jobDateStr = typeof job.dateBooked === 'string' 
+        ? job.dateBooked.split('T')[0] 
+        : new Date(job.dateBooked).toISOString().split('T')[0];
+      return jobDateStr === dateStr;
+    });
+  };
+  
+  // Generate calendar cells
+  const calendarCells = [];
+  for (let i = 0; i < totalCells; i++) {
+    const dayNumber = i - firstDayWeekday + 1;
+    const cellDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), dayNumber);
+    const isCurrentMonth = dayNumber > 0 && dayNumber <= daysInMonth;
+    const isToday = isCurrentMonth && 
+      cellDate.toDateString() === new Date().toDateString();
+    const bookings = isCurrentMonth ? getBookingsForDate(cellDate) : [];
+    
+    calendarCells.push(
+      <div
+        key={i}
+        className={`min-h-[120px] border border-gray-200 p-2 ${
+          isCurrentMonth ? 'bg-white' : 'bg-gray-50'
+        } ${isToday ? 'ring-2 ring-blue-500' : ''}`}
+      >
+        <div className={`text-sm font-semibold mb-1 ${
+          isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
+        } ${isToday ? 'text-blue-600' : ''}`}>
+          {isCurrentMonth ? dayNumber : ''}
+        </div>
+        <div className="space-y-1 overflow-y-auto max-h-[90px]">
+          {bookings.map((job, idx) => {
+            const techName = typeof job.techBooked === 'object' && job.techBooked !== null
+              ? (job.techBooked as any).name
+              : '';
+            const time = job.dateBooked ? formatTimeShort(new Date(job.dateBooked)) : '';
+            
+            return (
+              <div
+                key={idx}
+                className="text-xs px-2 py-1 rounded bg-purple-100 text-purple-800 truncate cursor-default hover:bg-purple-200 transition-colors"
+                title={`${time} ${techName} - ${job.jobNumber}`}
+              >
+                <div className="font-semibold">{time} {techName}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+  
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+  const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h4 className="text-2xl font-bold text-gray-900">
+          {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+        </h4>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={previousMonth}
+            className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <button
+            onClick={goToToday}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+          >
+            Today
+          </button>
+          <button
+            onClick={nextMonth}
+            className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-7 gap-0 border-t border-l border-gray-200">
+        {/* Week day headers */}
+        {weekDays.map(day => (
+          <div
+            key={day}
+            className="bg-gray-100 border-r border-b border-gray-200 px-2 py-3 text-center font-semibold text-sm text-gray-700"
+          >
+            {day}
+          </div>
+        ))}
+        {/* Calendar cells */}
+        {calendarCells}
+      </div>
+      
+      <div className="mt-4 text-sm text-gray-600">
+        Showing all technician bookings for {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+      </div>
+    </div>
+  );
+}
+
+function formatTimeShort(date: Date): string {
+  return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+

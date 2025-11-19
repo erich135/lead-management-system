@@ -4,9 +4,10 @@
  * Role-based: Super Admin must select technician, Admin/Rep see linked technicians, Technician sees own jobs.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { getJobs, getTechnicians, Job, Technician } from '../lib/api';
+import { getJobs, getTechnicians, getStatuses, getBranches, Job, Technician, Status, Branch } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Download, Calendar, Filter, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LeadDetails } from './LeadDetails';
 
 export function Diary() {
   const { user: currentUser } = useAuth();
@@ -14,6 +15,8 @@ export function Diary() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [allTechnicians, setAllTechnicians] = useState<Technician[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [statuses, setStatuses] = useState<Status[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [techFilter, setTechFilter] = useState<string>('all');
@@ -72,6 +75,14 @@ export function Diary() {
       const techsResponse = await getTechnicians();
       const allTechs = techsResponse.technicians || [];
       setAllTechnicians(allTechs);
+
+      // Load statuses and branches for LeadDetails modal
+      const [statusesResponse, branchesResponse] = await Promise.all([
+        getStatuses(),
+        getBranches()
+      ]);
+      setStatuses(statusesResponse.statuses || []);
+      setBranches(branchesResponse.branches || []);
 
       // Filter technicians and jobs based on user role
       const roleName = currentUser?.role?.name?.toLowerCase();
@@ -484,7 +495,12 @@ export function Diary() {
 
           {/* Show calendar view when no technician is selected (for super admin) */}
           {techFilter === 'all' && currentUser?.isSuperAdmin && allJobs.length > 0 ? (
-            <CalendarView jobs={allJobs} />
+            <CalendarView 
+              jobs={allJobs} 
+              statuses={statuses}
+              branches={branches}
+              onUpdate={loadData}
+            />
           ) : filtered.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-xl">
               <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -614,9 +630,12 @@ export function Diary() {
  */
 interface CalendarViewProps {
   jobs: Job[];
+  statuses: Status[];
+  branches: Branch[];
+  onUpdate: () => void;
 }
 
-function CalendarView({ jobs }: CalendarViewProps) {
+function CalendarView({ jobs, statuses, branches, onUpdate }: CalendarViewProps) {
   console.log('CalendarView received jobs:', jobs.length);
   console.log('Jobs with dateBooked:', jobs.filter(j => j.dateBooked).map(j => ({
     id: j._id,
@@ -625,6 +644,7 @@ function CalendarView({ jobs }: CalendarViewProps) {
   })));
   
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   
   // Get the first and last day of the current month
   const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -696,7 +716,8 @@ function CalendarView({ jobs }: CalendarViewProps) {
             return (
               <div
                 key={idx}
-                className="text-xs px-2 py-1 rounded bg-purple-100 text-purple-800 cursor-default hover:bg-purple-200 transition-colors"
+                onClick={() => setSelectedJob(job)}
+                className="text-xs px-2 py-1 rounded bg-purple-100 text-purple-800 cursor-pointer hover:bg-purple-200 transition-colors"
                 title={`${time} ${techName} - ${job.jobNumber}`}
               >
                 <div className="font-semibold">{time} {techName}</div>
@@ -757,6 +778,20 @@ function CalendarView({ jobs }: CalendarViewProps) {
       <div className="mt-4 text-sm text-gray-600">
         Showing all technician bookings for {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
       </div>
+      
+      {/* Job Details Popup Modal */}
+      {selectedJob && (
+        <LeadDetails
+          lead={selectedJob}
+          statuses={statuses}
+          branches={branches}
+          onClose={() => setSelectedJob(null)}
+          onUpdate={() => {
+            onUpdate();
+            setSelectedJob(null);
+          }}
+        />
+      )}
     </div>
   );
 }

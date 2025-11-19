@@ -25,6 +25,13 @@ import {
   updateAdminCode,
   deleteAdminCode,
   getTechnicians,
+  createTechnician,
+  updateTechnician,
+  deleteTechnician,
+  getServiceDescriptions,
+  createServiceDescription,
+  updateServiceDescription,
+  deleteServiceDescription,
   getBranches,
   getStatuses,
   createStatus,
@@ -37,6 +44,7 @@ import {
   RepCode,
   AdminCode,
   Technician,
+  ServiceDescription,
   Branch,
   Status
 } from '../lib/api';
@@ -93,6 +101,7 @@ export function SystemManagement() {
   const [repCodes, setRepCodes] = useState<RepCode[]>([]);
   const [adminCodes, setAdminCodes] = useState<AdminCode[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [descriptions, setDescriptions] = useState<ServiceDescription[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [editingRepCode, setEditingRepCode] = useState<RepCode | null>(null);
   const [showRepCodeForm, setShowRepCodeForm] = useState(false);
@@ -100,12 +109,20 @@ export function SystemManagement() {
   const [editingAdminCode, setEditingAdminCode] = useState<AdminCode | null>(null);
   const [showAdminCodeForm, setShowAdminCodeForm] = useState(false);
   const [newAdminCode, setNewAdminCode] = useState({ code: '', description: '', userId: '' });
+  const [editingTechnician, setEditingTechnician] = useState<Technician | null>(null);
+  const [showTechnicianForm, setShowTechnicianForm] = useState(false);
+  const [newTechnician, setNewTechnician] = useState({ name: '', email: '', phone: '', userId: '' });
+  const [editingDescription, setEditingDescription] = useState<ServiceDescription | null>(null);
+  const [showDescriptionForm, setShowDescriptionForm] = useState(false);
+  const [newDescription, setNewDescription] = useState({ name: '', description: '' });
   const [editingStatus, setEditingStatus] = useState<Status | null>(null);
   const [showStatusForm, setShowStatusForm] = useState(false);
   const [newStatus, setNewStatus] = useState({ name: '', description: '' });
   const [isStatusesExpanded, setIsStatusesExpanded] = useState(false);
   const [isRepCodesExpanded, setIsRepCodesExpanded] = useState(false);
   const [isAdminCodesExpanded, setIsAdminCodesExpanded] = useState(false);
+  const [isTechniciansExpanded, setIsTechniciansExpanded] = useState(false);
+  const [isDescriptionsExpanded, setIsDescriptionsExpanded] = useState(false);
   
   // Invite user state
   const [showInviteForm, setShowInviteForm] = useState(false);
@@ -157,7 +174,7 @@ export function SystemManagement() {
   }
 
   /**
-   * Loads reference data (rep codes, admin codes, technicians, statuses).
+   * Loads reference data (rep codes, admin codes, technicians, descriptions, statuses).
    */
   async function loadReferenceData() {
     try {
@@ -172,6 +189,10 @@ export function SystemManagement() {
       // Load technicians
       const techniciansResponse = await getTechnicians();
       setTechnicians(techniciansResponse.technicians || []);
+
+      // Load service descriptions
+      const descriptionsResponse = await getServiceDescriptions();
+      setDescriptions(descriptionsResponse.descriptions || []);
 
       // Load statuses
       const statusesResponse = await getStatuses();
@@ -676,6 +697,130 @@ export function SystemManagement() {
     if (statuses.length === 0) return 1;
     const maxOrder = Math.max(...statuses.map(s => s.sortOrder || 0));
     return maxOrder + 1;
+  }
+
+  /**
+   * Handles creating a new technician.
+   */
+  async function handleCreateTechnician() {
+    if (!newTechnician.name.trim()) {
+      setError('Technician name is required');
+      return;
+    }
+
+    try {
+      setError(null);
+      const response = await createTechnician({
+        name: newTechnician.name.trim(),
+        email: newTechnician.email.trim() || undefined,
+        phone: newTechnician.phone.trim() || undefined,
+        user: newTechnician.userId || undefined,
+      });
+      setTechnicians([...technicians, response.technician].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewTechnician({ name: '', email: '', phone: '', userId: '' });
+      setShowTechnicianForm(false);
+    } catch (err: any) {
+      setError(err.message || 'Failed to create technician');
+    }
+  }
+
+  /**
+   * Handles updating a technician.
+   */
+  async function handleUpdateTechnician() {
+    if (!editingTechnician) return;
+
+    try {
+      setError(null);
+      const response = await updateTechnician(editingTechnician._id, {
+        name: editingTechnician.name,
+        email: editingTechnician.email,
+        phone: editingTechnician.phone,
+        user: editingTechnician.user?._id || undefined,
+        isActive: editingTechnician.isActive,
+      });
+      setTechnicians(technicians.map(t => t._id === editingTechnician._id ? response.technician : t).sort((a, b) => a.name.localeCompare(b.name)));
+      setEditingTechnician(null);
+      setShowTechnicianForm(false);
+    } catch (err: any) {
+      setError(err.message || 'Failed to update technician');
+    }
+  }
+
+  /**
+   * Handles deleting a technician.
+   */
+  async function handleDeleteTechnician(id: string) {
+    if (!confirm('Are you sure you want to delete this technician?')) {
+      return;
+    }
+
+    try {
+      await deleteTechnician(id);
+      setTechnicians(technicians.filter(t => t._id !== id));
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete technician');
+    }
+  }
+
+  /**
+   * Handles creating a new service description.
+   */
+  async function handleCreateDescription() {
+    if (!newDescription.name.trim()) {
+      setError('Description name is required');
+      return;
+    }
+
+    try {
+      setError(null);
+      const response = await createServiceDescription({
+        name: newDescription.name.trim(),
+        description: newDescription.description.trim() || undefined,
+      });
+      setDescriptions([...descriptions, response.description].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewDescription({ name: '', description: '' });
+      setShowDescriptionForm(false);
+    } catch (err: any) {
+      setError(err.message || 'Failed to create service description');
+    }
+  }
+
+  /**
+   * Handles updating a service description.
+   */
+  async function handleUpdateDescription() {
+    if (!editingDescription) return;
+
+    try {
+      setError(null);
+      const response = await updateServiceDescription(editingDescription._id, {
+        name: editingDescription.name,
+        description: editingDescription.description,
+        isActive: editingDescription.isActive,
+      });
+      setDescriptions(descriptions.map(d => d._id === editingDescription._id ? response.description : d).sort((a, b) => a.name.localeCompare(b.name)));
+      setEditingDescription(null);
+      setShowDescriptionForm(false);
+    } catch (err: any) {
+      setError(err.message || 'Failed to update service description');
+    }
+  }
+
+  /**
+   * Handles deleting a service description.
+   */
+  async function handleDeleteDescription(id: string) {
+    if (!confirm('Are you sure you want to delete this service description?')) {
+      return;
+    }
+
+    try {
+      await deleteServiceDescription(id);
+      setDescriptions(descriptions.filter(d => d._id !== id));
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete service description');
+    }
   }
 
   if (loading && users.length === 0) {
@@ -1889,6 +2034,372 @@ export function SystemManagement() {
                 ))}
                 {adminCodes.length === 0 && (
                   <p className="text-center text-ars-body py-8">No admin codes found. Click "Add Admin Code" to create one.</p>
+                )}
+              </div>
+                </>
+              )}
+            </div>
+
+            {/* Technicians Section */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+              <div className="flex items-center justify-between mb-6">
+                <button
+                  onClick={() => setIsTechniciansExpanded(!isTechniciansExpanded)}
+                  className="flex items-center gap-2 text-xl font-bold text-ars-heading hover:text-ars-primary transition-colors"
+                >
+                  {isTechniciansExpanded ? <ChevronUp className="w-6 h-6 text-ars-primary" /> : <ChevronDown className="w-6 h-6 text-ars-primary" />}
+                  <Users className="w-6 h-6 text-ars-primary" />
+                  Technicians
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingTechnician(null);
+                    setNewTechnician({ name: '', email: '', phone: '', userId: '' });
+                    setShowTechnicianForm(!showTechnicianForm);
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Technician
+                </button>
+              </div>
+              {isTechniciansExpanded && (
+                <>
+              <p className="text-sm text-ars-body mb-4">
+                Manage technicians who can be assigned to jobs.
+              </p>
+
+              {/* Technician Form */}
+              {(showTechnicianForm || editingTechnician) && (
+                <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <h4 className="text-lg font-semibold text-ars-heading mb-4">
+                    {editingTechnician ? 'Edit Technician' : 'Create New Technician'}
+                  </h4>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">
+                        Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={editingTechnician ? editingTechnician.name : newTechnician.name}
+                        onChange={(e) => {
+                          if (editingTechnician) {
+                            setEditingTechnician({ ...editingTechnician, name: e.target.value });
+                          } else {
+                            setNewTechnician({ ...newTechnician, name: e.target.value });
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        placeholder="e.g., John Smith"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">Email</label>
+                      <input
+                        type="email"
+                        value={editingTechnician ? editingTechnician.email || '' : newTechnician.email}
+                        onChange={(e) => {
+                          if (editingTechnician) {
+                            setEditingTechnician({ ...editingTechnician, email: e.target.value });
+                          } else {
+                            setNewTechnician({ ...newTechnician, email: e.target.value });
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        placeholder="technician@example.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">Phone</label>
+                      <input
+                        type="tel"
+                        value={editingTechnician ? editingTechnician.phone || '' : newTechnician.phone}
+                        onChange={(e) => {
+                          if (editingTechnician) {
+                            setEditingTechnician({ ...editingTechnician, phone: e.target.value });
+                          } else {
+                            setNewTechnician({ ...newTechnician, phone: e.target.value });
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        placeholder="+1 234 567 8900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">Linked User</label>
+                      <select
+                        value={editingTechnician ? editingTechnician.user?._id || '' : newTechnician.userId}
+                        onChange={(e) => {
+                          if (editingTechnician) {
+                            setEditingTechnician({
+                              ...editingTechnician,
+                              user: e.target.value ? { _id: e.target.value, firstName: '', lastName: '', email: '' } : undefined,
+                            });
+                          } else {
+                            setNewTechnician({ ...newTechnician, userId: e.target.value });
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        <option value="">No user linked</option>
+                        {users.map((user) => (
+                          <option key={user._id} value={user._id}>
+                            {user.firstName} {user.lastName} ({user.email})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  {editingTechnician && (
+                    <div className="mt-4 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="technician-active"
+                        checked={editingTechnician.isActive}
+                        onChange={(e) => setEditingTechnician({ ...editingTechnician, isActive: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary"
+                      />
+                      <label htmlFor="technician-active" className="text-sm text-ars-body cursor-pointer">
+                        Active
+                      </label>
+                    </div>
+                  )}
+                  <div className="flex gap-3 mt-4">
+                    <button
+                      onClick={editingTechnician ? handleUpdateTechnician : handleCreateTechnician}
+                      disabled={loading}
+                      className="px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <Save className="w-4 h-4" />
+                      {editingTechnician ? 'Update' : 'Create'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingTechnician(null);
+                        setNewTechnician({ name: '', email: '', phone: '', userId: '' });
+                        setShowTechnicianForm(false);
+                      }}
+                      className="px-4 py-2.5 border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Technicians List */}
+              <div className="space-y-2">
+                {technicians.map((technician) => (
+                  <div
+                    key={technician._id}
+                    className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <span className="font-semibold text-ars-heading">{technician.name}</span>
+                        {technician.email && (
+                          <span className="text-sm text-ars-body">({technician.email})</span>
+                        )}
+                        {technician.phone && (
+                          <span className="text-sm text-ars-body">| {technician.phone}</span>
+                        )}
+                        {technician.user && (
+                          <span className="text-sm text-ars-body">
+                            - User: {technician.user.firstName} {technician.user.lastName}
+                          </span>
+                        )}
+                        <span className={`px-2 py-1 text-xs font-medium rounded-lg ${
+                          technician.isActive
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {technician.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingTechnician(technician);
+                          setShowTechnicianForm(false);
+                        }}
+                        className="p-2 text-ars-primary hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Edit technician"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteTechnician(technician._id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete technician"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {technicians.length === 0 && (
+                  <p className="text-center text-ars-body py-8">No technicians found. Click "Add Technician" to create one.</p>
+                )}
+              </div>
+                </>
+              )}
+            </div>
+
+            {/* Service Descriptions Section */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+              <div className="flex items-center justify-between mb-6">
+                <button
+                  onClick={() => setIsDescriptionsExpanded(!isDescriptionsExpanded)}
+                  className="flex items-center gap-2 text-xl font-bold text-ars-heading hover:text-ars-primary transition-colors"
+                >
+                  {isDescriptionsExpanded ? <ChevronUp className="w-6 h-6 text-ars-primary" /> : <ChevronDown className="w-6 h-6 text-ars-primary" />}
+                  <FileText className="w-6 h-6 text-ars-primary" />
+                  Service Descriptions
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingDescription(null);
+                    setNewDescription({ name: '', description: '' });
+                    setShowDescriptionForm(!showDescriptionForm);
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Description
+                </button>
+              </div>
+              {isDescriptionsExpanded && (
+                <>
+              <p className="text-sm text-ars-body mb-4">
+                Manage service descriptions for job categorization.
+              </p>
+
+              {/* Description Form */}
+              {(showDescriptionForm || editingDescription) && (
+                <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <h4 className="text-lg font-semibold text-ars-heading mb-4">
+                    {editingDescription ? 'Edit Service Description' : 'Create New Service Description'}
+                  </h4>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">
+                        Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={editingDescription ? editingDescription.name : newDescription.name}
+                        onChange={(e) => {
+                          if (editingDescription) {
+                            setEditingDescription({ ...editingDescription, name: e.target.value });
+                          } else {
+                            setNewDescription({ ...newDescription, name: e.target.value });
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        placeholder="e.g., Air Audit, Parts Supply"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">Description</label>
+                      <textarea
+                        value={editingDescription ? editingDescription.description || '' : newDescription.description}
+                        onChange={(e) => {
+                          if (editingDescription) {
+                            setEditingDescription({ ...editingDescription, description: e.target.value });
+                          } else {
+                            setNewDescription({ ...newDescription, description: e.target.value });
+                          }
+                        }}
+                        rows={3}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        placeholder="Optional detailed description"
+                      />
+                    </div>
+                  </div>
+                  {editingDescription && (
+                    <div className="mt-4 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="description-active"
+                        checked={editingDescription.isActive}
+                        onChange={(e) => setEditingDescription({ ...editingDescription, isActive: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary"
+                      />
+                      <label htmlFor="description-active" className="text-sm text-ars-body cursor-pointer">
+                        Active
+                      </label>
+                    </div>
+                  )}
+                  <div className="flex gap-3 mt-4">
+                    <button
+                      onClick={editingDescription ? handleUpdateDescription : handleCreateDescription}
+                      disabled={loading}
+                      className="px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <Save className="w-4 h-4" />
+                      {editingDescription ? 'Update' : 'Create'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingDescription(null);
+                        setNewDescription({ name: '', description: '' });
+                        setShowDescriptionForm(false);
+                      }}
+                      className="px-4 py-2.5 border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Descriptions List */}
+              <div className="space-y-2">
+                {descriptions.map((description) => (
+                  <div
+                    key={description._id}
+                    className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <span className="font-semibold text-ars-heading">{description.name}</span>
+                        {description.description && (
+                          <span className="text-sm text-ars-body">- {description.description}</span>
+                        )}
+                        <span className={`px-2 py-1 text-xs font-medium rounded-lg ${
+                          description.isActive
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {description.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingDescription(description);
+                          setShowDescriptionForm(false);
+                        }}
+                        className="p-2 text-ars-primary hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Edit description"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteDescription(description._id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete description"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {descriptions.length === 0 && (
+                  <p className="text-center text-ars-body py-8">No service descriptions found. Click "Add Description" to create one.</p>
                 )}
               </div>
                 </>

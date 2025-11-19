@@ -618,6 +618,38 @@ export async function getServiceDescriptions(): Promise<{ descriptions: ServiceD
 }
 
 /**
+ * Creates a new service description.
+ */
+export async function createServiceDescription(descriptionData: {
+  name: string;
+  description?: string;
+}): Promise<{ description: ServiceDescription }> {
+  return apiRequest('/api/reference/service-descriptions', {
+    method: 'POST',
+    body: JSON.stringify(descriptionData),
+  });
+}
+
+/**
+ * Updates a service description.
+ */
+export async function updateServiceDescription(id: string, descriptionData: Partial<ServiceDescription>): Promise<{ description: ServiceDescription }> {
+  return apiRequest(`/api/reference/service-descriptions/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(descriptionData),
+  });
+}
+
+/**
+ * Deletes a service description.
+ */
+export async function deleteServiceDescription(id: string): Promise<{ message: string }> {
+  return apiRequest(`/api/reference/service-descriptions/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
  * Gets all rep codes.
  */
 export async function getRepCodes(): Promise<{ repCodes: RepCode[] }> {
@@ -836,6 +868,40 @@ export async function deleteCashCustomer(id: string): Promise<void> {
  */
 export async function getTechnicians(): Promise<{ technicians: Technician[] }> {
   return apiRequest('/api/reference/technicians');
+}
+
+/**
+ * Creates a new technician.
+ */
+export async function createTechnician(technicianData: {
+  name: string;
+  email?: string;
+  phone?: string;
+  user?: string;
+}): Promise<{ technician: Technician }> {
+  return apiRequest('/api/reference/technicians', {
+    method: 'POST',
+    body: JSON.stringify(technicianData),
+  });
+}
+
+/**
+ * Updates a technician.
+ */
+export async function updateTechnician(id: string, technicianData: Partial<Technician>): Promise<{ technician: Technician }> {
+  return apiRequest(`/api/reference/technicians/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(technicianData),
+  });
+}
+
+/**
+ * Deletes a technician.
+ */
+export async function deleteTechnician(id: string): Promise<{ message: string }> {
+  return apiRequest(`/api/reference/technicians/${id}`, {
+    method: 'DELETE',
+  });
 }
 
 /**
@@ -1299,6 +1365,9 @@ export default {
   getCustomers,
   getBranches,
   getServiceDescriptions,
+  createServiceDescription,
+  updateServiceDescription,
+  deleteServiceDescription,
   getRepCodes,
   createRepCode,
   updateRepCode,
@@ -1319,6 +1388,9 @@ export default {
   updateCashCustomer,
   deleteCashCustomer,
   getTechnicians,
+  createTechnician,
+  updateTechnician,
+  deleteTechnician,
   getFollowUpStatuses,
   apiRequest,
 };

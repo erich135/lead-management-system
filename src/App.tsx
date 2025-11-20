@@ -112,12 +112,6 @@ function AppContent() {
     </>
   );
 }
-      } />
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
-  );
-}
 
 function App() {
   return (
@@ -130,3 +124,4 @@ function App() {
 }
 
 export default App;
+

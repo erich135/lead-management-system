@@ -478,6 +478,7 @@ export interface Branch {
   _id: string;
   name: string;
   code?: string;
+  isDefault?: boolean;
 }
 
 export interface ServiceDescription {

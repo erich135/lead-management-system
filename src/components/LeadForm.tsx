@@ -44,6 +44,15 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
   const isSelectingCustomerRef = useRef(false); // Flag to prevent search when selecting
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
 
+  /**
+   * Gets the default branch ID.
+   * Returns the branch with isDefault: true, or falls back to the first branch if none is marked as default.
+   */
+  const getDefaultBranchId = (): string => {
+    const defaultBranch = branches.find(b => b.isDefault === true);
+    return defaultBranch?._id || branches[0]?._id || '';
+  };
+
   const [formData, setFormData] = useState<{
     jobNumber: string;
     customer: string;
@@ -74,7 +83,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
       jobNumber: '',
       customer: '',
       cashCustomer: '',
-      branch: branches[0]?._id || '',
+      branch: getDefaultBranchId(),
       status: statuses[0]?._id || '',
       description: '',
       valueExVat: '',
@@ -98,6 +107,24 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
   });
 
   const [customerSelection, setCustomerSelection] = useState<'customer' | 'cash'>('customer');
+
+  /**
+   * Updates the branch field when branches prop changes or if no branch is currently selected.
+   * This ensures the default branch is set correctly even if branches load asynchronously.
+   */
+  useEffect(() => {
+    if (branches.length > 0) {
+      const defaultBranch = branches.find(b => b.isDefault === true) || branches[0];
+      const currentBranchExists = branches.find(b => b._id === formData.branch);
+      
+      // Only update if no branch is selected or the current branch doesn't exist in the list
+      if (!formData.branch || !currentBranchExists) {
+        if (defaultBranch?._id) {
+          setFormData(prev => ({ ...prev, branch: defaultBranch._id }));
+        }
+      }
+    }
+  }, [branches]);
 
   // Load technicians, service descriptions, rep codes, and admin codes on mount
   useEffect(() => {
@@ -333,7 +360,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
         adm: formData.adm || undefined,
         repCode: formData.repCode || undefined,
         machines: Array.isArray(formData.machines) && formData.machines.length > 0 ? formData.machines : undefined,
-        registerDate: formData.registerDate || today,
+        registerDate: formData.registerDate || undefined,
         techBooked: formData.techBooked || undefined,
         dateBooked: formData.dateBooked || undefined,
         rsrNumber: formData.rsrNumber || undefined,

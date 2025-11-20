@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getJobs, getTechnicians, getStatuses, getBranches, Job, Technician, Status, Branch } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
-import { Download, Calendar, Filter, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Download, Calendar, Filter, Search, ChevronLeft, ChevronRight, Table } from 'lucide-react';
 import { LeadDetails } from './LeadDetails';
 
 export function Diary() {
@@ -26,6 +26,7 @@ export function Diary() {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage] = useState<number>(50);
+  const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar'); // Default to calendar view
 
   useEffect(() => {
     loadData();
@@ -379,6 +380,24 @@ export function Diary() {
               Technician Diary
             </h3>
             <div className="flex gap-2">
+              {/* View Toggle Button */}
+              <button
+                onClick={() => setViewMode(viewMode === 'calendar' ? 'table' : 'calendar')}
+                className="px-4 py-2 border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition-all flex items-center gap-2 text-sm"
+                title={`Switch to ${viewMode === 'calendar' ? 'table' : 'calendar'} view`}
+              >
+                {viewMode === 'calendar' ? (
+                  <>
+                    <Table className="w-4 h-4" />
+                    Table View
+                  </>
+                ) : (
+                  <>
+                    <Calendar className="w-4 h-4" />
+                    Calendar View
+                  </>
+                )}
+              </button>
               <button
                 onClick={toCSV}
                 className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 text-sm"
@@ -493,14 +512,62 @@ export function Diary() {
             </div>
           </div>
 
-          {/* Show calendar view when no technician is selected (for super admin) */}
-          {techFilter === 'all' && currentUser?.isSuperAdmin && allJobs.length > 0 ? (
-            <CalendarView 
-              jobs={allJobs} 
-              statuses={statuses}
-              branches={branches}
-              onUpdate={loadData}
-            />
+          {/* Show calendar or table view based on viewMode */}
+          {viewMode === 'calendar' ? (
+            (() => {
+              // For Super Admin with no technician selected, use allJobs and apply date/search filters
+              // For others, use filtered jobs
+              const calendarJobs = currentUser?.isSuperAdmin && techFilter === 'all' 
+                ? (() => {
+                    let result = allJobs.filter((job) => {
+                      // Apply date range filter
+                      if (dateFrom && job.dateBooked) {
+                        const jobDate = typeof job.dateBooked === 'string' ? job.dateBooked.split('T')[0] : new Date(job.dateBooked).toISOString().split('T')[0];
+                        if (jobDate < dateFrom) return false;
+                      }
+                      if (dateTo && job.dateBooked) {
+                        const jobDate = typeof job.dateBooked === 'string' ? job.dateBooked.split('T')[0] : new Date(job.dateBooked).toISOString().split('T')[0];
+                        if (jobDate > dateTo) return false;
+                      }
+                      // Apply booked date only filter
+                      if (bookedDateOnly && !job.dateBooked) return false;
+                      // Apply search filter
+                      if (searchTerm) {
+                        const searchLower = searchTerm.toLowerCase();
+                        const customerName = typeof job.customer === 'object' && job.customer !== null
+                          ? (job.customer as any).name?.toLowerCase() || ''
+                          : '';
+                        const cashCustomer = job.cashCustomer?.toLowerCase() || '';
+                        const jobNumber = job.jobNumber?.toLowerCase() || '';
+                        if (!customerName.includes(searchLower) && 
+                            !cashCustomer.includes(searchLower) && 
+                            !jobNumber.includes(searchLower)) {
+                          return false;
+                        }
+                      }
+                      return true;
+                    });
+                    return result;
+                  })()
+                : filtered;
+              
+              return calendarJobs.length > 0 ? (
+                <CalendarView 
+                  jobs={calendarJobs} 
+                  statuses={statuses}
+                  branches={branches}
+                  technicians={technicians}
+                  onUpdate={loadData}
+                  selectedTechnician={techFilter !== 'all' ? techFilter : undefined}
+                />
+              ) : (
+                <div className="text-center py-12 bg-gray-50 rounded-xl">
+                  <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-lg font-semibold text-ars-heading mb-2">No bookings found</p>
+                  <p className="text-sm text-ars-body">Try adjusting your filters or check back later</p>
+                </div>
+              );
+            })()
           ) : filtered.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-xl">
               <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -632,10 +699,12 @@ interface CalendarViewProps {
   jobs: Job[];
   statuses: Status[];
   branches: Branch[];
+  technicians: Technician[];
   onUpdate: () => void;
+  selectedTechnician?: string; // Optional technician ID to show in description
 }
 
-function CalendarView({ jobs, statuses, branches, onUpdate }: CalendarViewProps) {
+function CalendarView({ jobs, statuses, branches, technicians, onUpdate, selectedTechnician }: CalendarViewProps) {
   console.log('CalendarView received jobs:', jobs.length);
   console.log('Jobs with dateBooked:', jobs.filter(j => j.dateBooked).map(j => ({
     id: j._id,
@@ -776,7 +845,15 @@ function CalendarView({ jobs, statuses, branches, onUpdate }: CalendarViewProps)
       </div>
       
       <div className="mt-4 text-sm text-gray-600">
-        Showing all technician bookings for {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+        {selectedTechnician ? (
+          (() => {
+            const tech = technicians.find(t => t._id === selectedTechnician);
+            const techName = tech?.name || 'Selected Technician';
+            return `Showing bookings for ${techName} - ${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+          })()
+        ) : (
+          `Showing all technician bookings for ${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`
+        )}
       </div>
       
       {/* Job Details Popup Modal */}

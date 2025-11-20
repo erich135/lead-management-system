@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getJob, updateJob, getMachinesByCustomer, createMachine, getTechnicians, getRepCodes, getCustomers, getActivities, getServiceDescriptions, deleteJob, type Job, type Status, type Branch, type Machine, type Technician, type RepCode, type Customer, type Activity, type ServiceDescription } from '../lib/api';
+import { getJob, updateJob, getMachinesByCustomer, createMachine, getTechnicians, getRepCodes, getCustomers, getActivities, getServiceDescriptions, deleteJob, type Job, type Status, type Branch, type Machine, type Technician, type RepCode, type Customer, type Activity, type ServiceDescription, type OverdueJob } from '../lib/api';
 import { X, Edit, Save, Clock, User, Trash2 } from 'lucide-react';
 
 interface LeadDetailsProps {
@@ -78,6 +78,9 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   const [showActivityHistory, setShowActivityHistory] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [followUpReminder, setFollowUpReminder] = useState<OverdueJob | null>(null);
+  const [followUpSubmitting, setFollowUpSubmitting] = useState(false);
+  const [activeFollowUpLevel, setActiveFollowUpLevel] = useState<number | null>(null);
 
   useEffect(() => {
     loadJobDetails();
@@ -110,6 +113,11 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     try {
       const response = await getJob(initialLead._id);
       setJob(normalizeJob(response.job));
+      if (response.reminder && response.reminder.followUpLevel) {
+        setFollowUpReminder(response.reminder);
+      } else {
+        setFollowUpReminder(null);
+      }
     } catch (err: any) {
       console.error('Error loading job details:', err);
       setError(err.message || 'Failed to load job details');
@@ -207,6 +215,33 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
       setActivities([]);
     } finally {
       setLoadingActivities(false);
+    }
+  }
+
+  /**
+   * Handles marking a follow-up level as completed and refreshes the job details.
+   *
+   * @param level - Follow-up stage to complete (1, 2, or 3)
+   */
+  async function handleFollowUpCompletion(level: number) {
+    if (!job?._id) return;
+    setFollowUpSubmitting(true);
+    setActiveFollowUpLevel(level);
+    setError(null);
+
+    try {
+      const payloadKey = `followUp${level}Date` as const;
+      await updateJob(job._id, {
+        [payloadKey]: new Date().toISOString(),
+      } as Partial<Job>);
+      await loadJobDetails();
+      onUpdate();
+    } catch (err: any) {
+      console.error('Error completing follow-up:', err);
+      setError(err.message || `Failed to mark Follow-up ${level} as completed.`);
+    } finally {
+      setFollowUpSubmitting(false);
+      setActiveFollowUpLevel(null);
     }
   }
 
@@ -514,6 +549,27 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
         {error && (
           <div className="mx-6 mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-sm text-red-800">{error}</p>
+          </div>
+        )}
+
+        {followUpReminder?.followUpLevel && (
+          <div className="mx-6 mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-amber-900">
+                Follow-up {followUpReminder.followUpLevel} {followUpReminder.isOverdue ? 'is overdue' : 'is due soon'}.
+              </p>
+              <p className="text-sm text-amber-800 mt-1">
+                Expected next status: {followUpReminder.expectedNextStatus}. Days in current stage: {followUpReminder.daysInStatus}.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleFollowUpCompletion(followUpReminder.followUpLevel!)}
+              disabled={followUpSubmitting}
+              className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {followUpSubmitting && activeFollowUpLevel === followUpReminder.followUpLevel ? 'Saving…' : `Follow Up ${followUpReminder.followUpLevel}`}
+            </button>
           </div>
         )}
 

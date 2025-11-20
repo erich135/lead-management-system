@@ -334,6 +334,10 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
         missingFields.push('Admin (ADM)');
       }
 
+      if (!formData.repCode) {
+        missingFields.push('Rep Code');
+      }
+
       if (!formData.description) {
         missingFields.push('Service Description');
       }

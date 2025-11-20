@@ -633,7 +633,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
 
                 <div>
                   <label className="block text-sm font-semibold text-ars-body mb-2">Customer</label>
-                  {isEditing && isSuperAdmin ? (
+                  {isEditing && (isAdmin || isSuperAdmin) ? (
                     <select
                       value={job.customer && typeof job.customer === 'object' ? job.customer._id : ''}
                       onChange={(e) => handleCustomerSelect(e.target.value)}

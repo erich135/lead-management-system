@@ -1422,6 +1422,166 @@ export async function logViewActivity(
   }
 }
 
+/**
+ * Chat API types and functions.
+ */
+export interface ChatUser {
+  _id: string;
+  email: string;
+  fullName: string;
+  firstName: string;
+  lastName: string;
+}
+
+export interface ChatMessage {
+  _id: string;
+  sender: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  receiver: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  text: string;
+  attachments: ChatAttachment[];
+  reactions: Array<{
+    emoji: string;
+    userId: string;
+    createdAt: string;
+  }>;
+  isRead: boolean;
+  readAt?: string;
+  status: 'sent' | 'delivered' | 'failed';
+  editedAt?: string;
+  deletedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatAttachment {
+  _id: string;
+  messageId?: string;
+  uploadedBy: string;
+  fileName: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  storageType: 'gridfs' | 's3';
+  storageKey: string;
+  checksum: string;
+  url?: string;
+  expiresAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Get list of users available for chat.
+ */
+export async function getChatUsers(): Promise<ChatUser[]> {
+  const response = await apiRequest<{ users: ChatUser[] }>('/api/chat/users');
+  return response.users;
+}
+
+/**
+ * Get message thread with a specific user.
+ */
+export async function getChatThread(userId: string, cursor?: string, limit = 50): Promise<{
+  messages: ChatMessage[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}> {
+  const params = new URLSearchParams({ limit: limit.toString() });
+  if (cursor) params.append('cursor', cursor);
+  
+  const response = await apiRequest<{
+    messages: ChatMessage[];
+    nextCursor: string | null;
+    hasMore: boolean;
+  }>(`/api/chat/threads/${userId}?${params}`);
+  
+  return response;
+}
+
+/**
+ * Send a chat message (REST fallback).
+ */
+export async function sendChatMessage(receiverId: string, text: string, attachmentIds: string[] = []): Promise<ChatMessage> {
+  const response = await apiRequest<{ message: ChatMessage }>('/api/chat/messages', {
+    method: 'POST',
+    body: JSON.stringify({ receiverId, text, attachmentIds }),
+  });
+  return response.message;
+}
+
+/**
+ * Mark messages as read.
+ */
+export async function markMessagesRead(senderId?: string, messageIds?: string[]): Promise<{ modifiedCount: number }> {
+  const response = await apiRequest<{ modifiedCount: number }>('/api/chat/messages/read', {
+    method: 'POST',
+    body: JSON.stringify({ senderId, messageIds }),
+  });
+  return response;
+}
+
+/**
+ * Get unread message count.
+ */
+export async function getUnreadCount(): Promise<number> {
+  const response = await apiRequest<{ count: number }>('/api/chat/unread-count');
+  return response.count;
+}
+
+/**
+ * Upload chat attachment.
+ */
+export async function uploadChatAttachment(file: File): Promise<ChatAttachment> {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const token = getAuthToken();
+  const response = await fetch(`${API_BASE_URL}/api/chat/attachments`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+    body: formData,
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error?.message || 'Upload failed');
+  }
+  
+  const data = await response.json();
+  return data.data.attachment;
+}
+
+/**
+ * Get download URL for attachment.
+ */
+export function getChatAttachmentUrl(attachmentId: string): string {
+  const token = getAuthToken();
+  return `${API_BASE_URL}/api/chat/attachments/${attachmentId}?token=${token}`;
+}
+
+/**
+ * Search messages.
+ */
+export async function searchChatMessages(query: string, userId?: string, limit = 20): Promise<ChatMessage[]> {
+  const params = new URLSearchParams({ query, limit: limit.toString() });
+  if (userId) params.append('userId', userId);
+  
+  const response = await apiRequest<{ messages: ChatMessage[] }>(`/api/chat/search?${params}`);
+  return response.messages;
+}
+
 export default {
   login,
   logout,
@@ -1468,6 +1628,14 @@ export default {
   updateTechnician,
   deleteTechnician,
   getFollowUpStatuses,
+  getChatUsers,
+  getChatThread,
+  sendChatMessage,
+  markMessagesRead,
+  getUnreadCount,
+  uploadChatAttachment,
+  getChatAttachmentUrl,
+  searchChatMessages,
   apiRequest,
 };
 

@@ -1233,6 +1233,35 @@ export async function importJobs(file: File, clearExisting: boolean, branchId?: 
 }
 
 /**
+ * Updates existing jobs from CSV file.
+ * CSV should contain: Job Number, Service Description, Value Ex VAT
+ */
+export async function updateJobs(file: File): Promise<{ message: string; data: { updated: number; notFound: number; errors: string[]; totalErrors: number } }> {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error('Not authenticated');
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${API_BASE_URL}/api/import/jobs/update`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Failed to update jobs' } }));
+    throw new Error(error.error?.message || 'Failed to update jobs');
+  }
+
+  return response.json();
+}
+
+/**
  * Imports customers from CSV file.
  */
 export async function importCustomers(file: File, clearExisting: boolean): Promise<{ message: string; data: ImportResult }> {

@@ -249,6 +249,48 @@ export async function verifyInvitationToken(token: string): Promise<{ user: { em
 }
 
 /**
+ * Requests a password reset email.
+ * Sends a password reset link to the user's email address.
+ * 
+ * @param email - User's email address
+ * @returns {Promise<{ message: string }>} Success message
+ * @throws {Error} If the request fails
+ */
+export async function requestPasswordReset(email: string): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>('/api/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+/**
+ * Resets the user's password using a reset token.
+ * 
+ * @param token - Password reset token from email link
+ * @param newPassword - New password to set
+ * @returns {Promise<{ message: string }>} Success message
+ * @throws {Error} If the reset fails
+ */
+export async function resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, newPassword }),
+  });
+}
+
+/**
+ * Verifies if a password reset token is valid.
+ * Used to check if a token is valid before showing the password reset form.
+ * 
+ * @param token - Password reset token from email link
+ * @returns {Promise<{ message: string }>} Success message if token is valid
+ * @throws {Error} If token verification fails
+ */
+export async function verifyResetToken(token: string): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>(`/api/auth/verify-reset-token?token=${encodeURIComponent(token)}`);
+}
+
+/**
  * Sets a password for a user using an invitation token.
  * 
  * @param token - Invitation token from email link

@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginPage } from './components/LoginPage';
 import { SetPasswordPage } from './components/SetPasswordPage';
+import { ResetPasswordPage } from './components/ResetPasswordPage';
 import { Dashboard } from './components/Dashboard';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -67,6 +68,11 @@ function AppContent() {
       <Route path="/set-password" element={
         <SetPasswordRoute>
           <SetPasswordPage />
+        </SetPasswordRoute>
+      } />
+      <Route path="/reset-password" element={
+        <SetPasswordRoute>
+          <ResetPasswordPage />
         </SetPasswordRoute>
       } />
       <Route path="/dashboard" element={

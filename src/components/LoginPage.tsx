@@ -1,5 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { ForgotPasswordModal } from './ForgotPasswordModal';
 import { AlertCircle, Lock, Mail, Sparkles, Shield, Zap, X } from 'lucide-react';
 
 /**
@@ -11,6 +12,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const { signIn } = useAuth();
 
   /**
@@ -161,9 +163,18 @@ export function LoginPage() {
 
             {/* Password input */}
             <div className="space-y-2">
-              <label htmlFor="password" className="block text-sm font-semibold text-ars-heading">
-                Password
-              </label>
+              <div className="flex items-center justify-between">
+                <label htmlFor="password" className="block text-sm font-semibold text-ars-heading">
+                  Password
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(true)}
+                  className="text-sm text-ars-primary hover:text-blue-800 font-medium transition-colors"
+                >
+                  Forgot Password?
+                </button>
+              </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   <Lock className="h-5 w-5 text-ars-body" />
@@ -217,6 +228,12 @@ export function LoginPage() {
           </p>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      <ForgotPasswordModal
+        isOpen={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+      />
 
       {/* Add custom animations */}
       <style>{`

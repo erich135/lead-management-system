@@ -1409,7 +1409,7 @@ export interface ChatAttachment {
  * Get list of users available for chat.
  */
 export async function getChatUsers(): Promise<ChatUser[]> {
-  const response = await apiRequest<{ users: ChatUser[] }>('/chat/users');
+  const response = await apiRequest<{ users: ChatUser[] }>('/api/chat/users');
   return response.users;
 }
 
@@ -1428,7 +1428,7 @@ export async function getChatThread(userId: string, cursor?: string, limit = 50)
     messages: ChatMessage[];
     nextCursor: string | null;
     hasMore: boolean;
-  }>(`/chat/threads/${userId}?${params}`);
+  }>(`/api/chat/threads/${userId}?${params}`);
   
   return response;
 }
@@ -1437,7 +1437,7 @@ export async function getChatThread(userId: string, cursor?: string, limit = 50)
  * Send a chat message (REST fallback).
  */
 export async function sendChatMessage(receiverId: string, text: string, attachmentIds: string[] = []): Promise<ChatMessage> {
-  const response = await apiRequest<{ message: ChatMessage }>('/chat/messages', {
+  const response = await apiRequest<{ message: ChatMessage }>('/api/chat/messages', {
     method: 'POST',
     body: JSON.stringify({ receiverId, text, attachmentIds }),
   });
@@ -1448,7 +1448,7 @@ export async function sendChatMessage(receiverId: string, text: string, attachme
  * Mark messages as read.
  */
 export async function markMessagesRead(senderId?: string, messageIds?: string[]): Promise<{ modifiedCount: number }> {
-  const response = await apiRequest<{ modifiedCount: number }>('/chat/messages/read', {
+  const response = await apiRequest<{ modifiedCount: number }>('/api/chat/messages/read', {
     method: 'POST',
     body: JSON.stringify({ senderId, messageIds }),
   });
@@ -1459,7 +1459,7 @@ export async function markMessagesRead(senderId?: string, messageIds?: string[])
  * Get unread message count.
  */
 export async function getUnreadCount(): Promise<number> {
-  const response = await apiRequest<{ count: number }>('/chat/unread-count');
+  const response = await apiRequest<{ count: number }>('/api/chat/unread-count');
   return response.count;
 }
 
@@ -1503,7 +1503,7 @@ export async function searchChatMessages(query: string, userId?: string, limit =
   const params = new URLSearchParams({ query, limit: limit.toString() });
   if (userId) params.append('userId', userId);
   
-  const response = await apiRequest<{ messages: ChatMessage[] }>(`/chat/search?${params}`);
+  const response = await apiRequest<{ messages: ChatMessage[] }>(`/api/chat/search?${params}`);
   return response.messages;
 }
 

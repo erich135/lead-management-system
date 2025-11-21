@@ -12,6 +12,7 @@ interface LeadsListProps {
   refreshKey?: number; // When this changes, refresh the job list
 }
 
+
 export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refreshKey }: LeadsListProps) {
   const { user, isSuperAdmin } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);

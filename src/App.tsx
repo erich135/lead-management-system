@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginPage } from './components/LoginPage';
 import { SetPasswordPage } from './components/SetPasswordPage';
 import { Dashboard } from './components/Dashboard';
+import { ChatWidget } from './components/ChatWidget';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -57,51 +58,58 @@ function SetPasswordRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppContent() {
+  const { user } = useAuth();
+
   return (
-    <Routes>
-      <Route path="/login" element={
-        <PublicRoute>
-          <LoginPage />
-        </PublicRoute>
-      } />
-      <Route path="/set-password" element={
-        <SetPasswordRoute>
-          <SetPasswordPage />
-        </SetPasswordRoute>
-      } />
-      <Route path="/dashboard" element={
-        <ProtectedRoute>
-          <Dashboard view="dashboard" />
-        </ProtectedRoute>
-      } />
-      <Route path="/jobs" element={
-        <ProtectedRoute>
-          <Dashboard view="leads" />
-        </ProtectedRoute>
-      } />
-      <Route path="/reports" element={
-        <ProtectedRoute>
-          <Dashboard view="reports" />
-        </ProtectedRoute>
-      } />
-      <Route path="/diary" element={
-        <ProtectedRoute>
-          <Dashboard view="diary" />
-        </ProtectedRoute>
-      } />
-      <Route path="/admin" element={
-        <ProtectedRoute>
-          <Dashboard view="admin" />
-        </ProtectedRoute>
-      } />
-      <Route path="/activities" element={
-        <ProtectedRoute>
-          <Dashboard view="activities" />
-        </ProtectedRoute>
-      } />
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/login" element={
+          <PublicRoute>
+            <LoginPage />
+          </PublicRoute>
+        } />
+        <Route path="/set-password" element={
+          <SetPasswordRoute>
+            <SetPasswordPage />
+          </SetPasswordRoute>
+        } />
+        <Route path="/dashboard" element={
+          <ProtectedRoute>
+            <Dashboard view="dashboard" />
+          </ProtectedRoute>
+        } />
+        <Route path="/jobs" element={
+          <ProtectedRoute>
+            <Dashboard view="leads" />
+          </ProtectedRoute>
+        } />
+        <Route path="/reports" element={
+          <ProtectedRoute>
+            <Dashboard view="reports" />
+          </ProtectedRoute>
+        } />
+        <Route path="/diary" element={
+          <ProtectedRoute>
+            <Dashboard view="diary" />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin" element={
+          <ProtectedRoute>
+            <Dashboard view="admin" />
+          </ProtectedRoute>
+        } />
+        <Route path="/activities" element={
+          <ProtectedRoute>
+            <Dashboard view="activities" />
+          </ProtectedRoute>
+        } />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+      
+      {/* Chat widget - only show when logged in */}
+      {user && <ChatWidget />}
+    </>
   );
 }
 
@@ -116,3 +124,4 @@ function App() {
 }
 
 export default App;
+

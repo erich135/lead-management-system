@@ -356,14 +356,14 @@ export function Diary() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-white flex items-center justify-center">
-        <div className="text-center bg-white rounded-2xl border border-gray-200 shadow-lg p-8 max-w-md">
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center bg-white rounded-2xl border border-gray-200 p-8 max-w-md">
           <p className="text-red-600 mb-4">Error: {error}</p>
           <button
             onClick={loadData}
-            className="px-6 py-3 bg-gradient-to-r from-ars-primary to-ars-secondary text-white rounded-xl font-medium hover:shadow-lg transition-all"
+            className="px-6 py-3 bg-[#0969a9] text-white rounded-xl font-bold text-[14px] hover:bg-[#0a7bc4] transition-all"
           >
-            Retry
+            RETRY
           </button>
         </div>
       </div>
@@ -371,7 +371,7 @@ export function Diary() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-white p-6">
+    <div className="min-h-screen bg-white p-6">
       <div className="max-w-7xl mx-auto">
         <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
           <div className="flex items-center justify-between mb-6">
@@ -383,34 +383,34 @@ export function Diary() {
               {/* View Toggle Button */}
               <button
                 onClick={() => setViewMode(viewMode === 'calendar' ? 'table' : 'calendar')}
-                className="px-4 py-2 border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition-all flex items-center gap-2 text-sm"
+                className="px-4 py-2 border border-gray-300 rounded-xl font-bold text-[14px] hover:bg-gray-50 transition-all flex items-center gap-2"
                 title={`Switch to ${viewMode === 'calendar' ? 'table' : 'calendar'} view`}
               >
                 {viewMode === 'calendar' ? (
                   <>
                     <Table className="w-4 h-4" />
-                    Table View
+                    TABLE VIEW
                   </>
                 ) : (
                   <>
                     <Calendar className="w-4 h-4" />
-                    Calendar View
+                    CALENDAR VIEW
                   </>
                 )}
               </button>
               <button
                 onClick={toCSV}
-                className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 text-sm"
+                className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-xl font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
               >
                 <Download className="w-4 h-4" />
-                Export CSV
+                EXPORT CSV
               </button>
               <button
                 onClick={toPDF}
-                className="px-4 py-2 border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition-all flex items-center gap-2 text-sm"
+                className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-xl font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
               >
                 <Download className="w-4 h-4" />
-                PDF
+                EXPORT PDF
               </button>
             </div>
           </div>
@@ -429,7 +429,7 @@ export function Diary() {
                 <select
                   value={techFilter}
                   onChange={(e) => setTechFilter(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
                 >
                   <option value="all">
                     {currentUser?.isSuperAdmin ? 'Select Technician' : 'All Technicians'}
@@ -452,7 +452,7 @@ export function Diary() {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
               />
             </div>
             <div>
@@ -461,15 +461,15 @@ export function Diary() {
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
               />
             </div>
             <div className="flex items-end">
               <button
                 onClick={loadData}
-                className="w-full px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all"
+                className="w-full px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all"
               >
-                Refresh
+                REFRESH
               </button>
             </div>
           </div>
@@ -642,10 +642,10 @@ export function Diary() {
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
-                  className="px-4 py-2 border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="px-4 py-2 border border-gray-300 rounded-xl font-bold text-[14px] hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   <ChevronLeft className="w-4 h-4" />
-                  Previous
+                  PREVIOUS
                 </button>
                 <div className="flex items-center gap-1">
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -677,9 +677,9 @@ export function Diary() {
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                   disabled={currentPage === totalPages}
-                  className="px-4 py-2 border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="px-4 py-2 border border-gray-300 rounded-xl font-bold text-[14px] hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  Next
+                  NEXT
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
@@ -817,9 +817,9 @@ function CalendarView({ jobs, statuses, branches, technicians, onUpdate, selecte
           </button>
           <button
             onClick={goToToday}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold text-[14px] hover:bg-blue-700 transition-colors"
           >
-            Today
+            TODAY
           </button>
           <button
             onClick={nextMonth}

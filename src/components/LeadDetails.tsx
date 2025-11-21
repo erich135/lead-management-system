@@ -589,7 +589,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                         const status = statuses.find(s => s._id === e.target.value);
                         setJob({ ...job, status: status ? { _id: status._id, name: status.name, sortOrder: status.sortOrder } : undefined });
                       }}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     >
                       <option value="">Select Status</option>
                       {statuses.map((status) => (
@@ -616,7 +616,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                           setJob({ ...job, branch: { _id: branch._id, name: branch.name } });
                         }
                       }}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     >
                       {branches.map((branch) => (
                         <option key={branch._id} value={branch._id}>
@@ -637,7 +637,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                     <select
                       value={job.customer && typeof job.customer === 'object' ? job.customer._id : ''}
                       onChange={(e) => handleCustomerSelect(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     >
                       <option value="">Select Customer</option>
                       {customers && customers.length > 0 ? (
@@ -672,7 +672,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                           machines: newValue.trim() ? [] : job.machines // Clear machines if switching to cash customer
                         });
                       }}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                       placeholder="Enter cash customer name"
                     />
                   ) : (
@@ -689,7 +689,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       <select
                         value={job.adm || ''}
                         onChange={(e) => setJob({ ...job, adm: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                       >
                         <option value="">Select Admin</option>
                         {adminCodes.map((code) => (
@@ -703,7 +703,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                         type="text"
                         value={job.adm || ''}
                         onChange={(e) => setJob({ ...job, adm: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                         placeholder="Enter admin code"
                       />
                     )
@@ -722,7 +722,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       step="0.01"
                       value={job.valueExVat || ''}
                       onChange={(e) => setJob({ ...job, valueExVat: parseFloat(e.target.value) || undefined })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     />
                   ) : (
                     <div className="px-4 py-3 bg-gray-50 rounded-xl">
@@ -753,7 +753,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                           },
                         });
                       }}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     >
                       <option value="">Unassigned</option>
                       {technicians && technicians.length > 0 ? (
@@ -790,7 +790,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       type="date"
                       value={job.startDate ? (typeof job.startDate === 'string' ? job.startDate.split('T')[0] : new Date(job.startDate).toISOString().split('T')[0]) : ''}
                       onChange={(e) => setJob({ ...job, startDate: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     />
                   ) : (
                     <div className="px-4 py-3 bg-gray-50 rounded-xl">
@@ -806,7 +806,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       type="date"
                       value={job.dateQuoted ? (typeof job.dateQuoted === 'string' ? job.dateQuoted.split('T')[0] : new Date(job.dateQuoted).toISOString().split('T')[0]) : ''}
                       onChange={(e) => setJob({ ...job, dateQuoted: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     />
                   ) : (
                     <div className="px-4 py-3 bg-gray-50 rounded-xl">
@@ -822,7 +822,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       type="date"
                       value={job.registerDate ? (typeof job.registerDate === 'string' ? job.registerDate.split('T')[0] : new Date(job.registerDate).toISOString().split('T')[0]) : ''}
                       onChange={(e) => setJob({ ...job, registerDate: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     />
                   ) : (
                     <div className="px-4 py-3 bg-gray-50 rounded-xl">
@@ -838,7 +838,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       type="date"
                       value={job.dateBooked ? (typeof job.dateBooked === 'string' ? job.dateBooked.split('T')[0] : new Date(job.dateBooked).toISOString().split('T')[0]) : ''}
                       onChange={(e) => setJob({ ...job, dateBooked: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     />
                   ) : (
                     <div className="px-4 py-3 bg-gray-50 rounded-xl">
@@ -854,7 +854,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       type="date"
                       value={job.poDate ? (typeof job.poDate === 'string' ? job.poDate.split('T')[0] : new Date(job.poDate).toISOString().split('T')[0]) : ''}
                       onChange={(e) => setJob({ ...job, poDate: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     />
                   ) : (
                     <div className="px-4 py-3 bg-gray-50 rounded-xl">
@@ -870,7 +870,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       type="date"
                       value={job.invoiceDate ? (typeof job.invoiceDate === 'string' ? job.invoiceDate.split('T')[0] : new Date(job.invoiceDate).toISOString().split('T')[0]) : ''}
                       onChange={(e) => setJob({ ...job, invoiceDate: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     />
                   ) : (
                     <div className="px-4 py-3 bg-gray-50 rounded-xl">
@@ -914,7 +914,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                               },
                         });
                       }}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     >
                       <option value="">Select Rep Code</option>
                       {repCodes.length > 0 ? (
@@ -945,7 +945,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       type="text"
                       value={job.rsrNumber || ''}
                       onChange={(e) => setJob({ ...job, rsrNumber: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     />
                   ) : (
                     <div className="px-4 py-3 bg-gray-50 rounded-xl">
@@ -961,7 +961,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       type="text"
                       value={job.poNumber || ''}
                       onChange={(e) => setJob({ ...job, poNumber: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     />
                   ) : (
                     <div className="px-4 py-3 bg-gray-50 rounded-xl">
@@ -977,7 +977,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       type="text"
                       value={job.oilSampleNumber || ''}
                       onChange={(e) => setJob({ ...job, oilSampleNumber: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     />
                   ) : (
                     <div className="px-4 py-3 bg-gray-50 rounded-xl">
@@ -993,7 +993,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       type="text"
                       value={job.storePack || ''}
                       onChange={(e) => setJob({ ...job, storePack: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     />
                   ) : (
                     <div className="px-4 py-3 bg-gray-50 rounded-xl">
@@ -1009,7 +1009,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       type="text"
                       value={job.invNumber || ''}
                       onChange={(e) => setJob({ ...job, invNumber: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     />
                   ) : (
                     <div className="px-4 py-3 bg-gray-50 rounded-xl">
@@ -1041,7 +1041,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                           description: selectedDescription ? { _id: selectedDescription._id, name: selectedDescription.name } : undefined,
                         });
                       }}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     >
                       <option value="">Select Description</option>
                       {serviceDescriptions && serviceDescriptions.length > 0 ? (
@@ -1439,17 +1439,17 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                 <button
                   onClick={handleDelete}
                   disabled={deleting}
-                  className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-[14px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {deleting ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Deleting...
+                      DELETING...
                     </>
                   ) : (
                     <>
                       <Trash2 className="w-4 h-4" />
-                      Delete Job
+                      DELETE JOB
                     </>
                   )}
                 </button>

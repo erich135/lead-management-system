@@ -770,100 +770,100 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-white">
+    <div className="min-h-screen bg-white">
       {loading ? (
         <div className="text-center py-20">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ars-primary mx-auto mb-4"></div>
           <p className="text-ars-body">Loading jobs...</p>
         </div>
       ) : (
-        <div className="flex gap-6">
+        <div className="flex gap-6 pt-5">
           {/* Left Sidebar - Filters */}
-          <div className="w-80 flex-shrink-0 bg-white rounded-2xl border border-gray-200 shadow-lg p-6 max-h-[calc(100vh-3rem)] overflow-y-auto sticky top-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold text-ars-heading flex items-center gap-2">
-                <Filter className="w-5 h-5 text-ars-primary" />
+          <div className="w-64 flex-shrink-0 bg-white rounded-2xl border border-gray-200 p-4 h-fit sticky top-[115px]">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-ars-heading flex items-center gap-2">
+                <Filter className="w-4 h-4 text-ars-primary" />
                 Filters
               </h3>
             </div>
 
             {/* Priority Checkboxes */}
-            <div className="mb-6">
-              <label className="block text-sm font-semibold text-ars-heading mb-3">Show Jobs</label>
-              <div className="space-y-2">
-                <label className="flex items-center gap-3 cursor-pointer group">
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-ars-heading mb-2">Show Jobs</label>
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-2 cursor-pointer group">
                   <input
                     type="checkbox"
                     checked={priorityFilter.overdue}
                     onChange={(e) => setPriorityFilter({ ...priorityFilter, overdue: e.target.checked, all: false })}
-                    className="w-5 h-5 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                    className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer"
                   />
-                  <div className="flex items-center gap-2 flex-1">
-                    <AlertCircle className="w-4 h-4 text-red-600" />
-                    <span className="text-sm text-ars-body group-hover:text-ars-heading transition-colors">Overdue</span>
+                  <div className="flex items-center gap-1.5 flex-1">
+                    <AlertCircle className="w-3.5 h-3.5 text-red-600" />
+                    <span className="text-xs text-ars-body group-hover:text-ars-heading transition-colors">Overdue</span>
                   </div>
                 </label>
-                <label className="flex items-center gap-3 cursor-pointer group">
+                <label className="flex items-center gap-2 cursor-pointer group">
                   <input
                     type="checkbox"
                     checked={priorityFilter.approaching}
                     onChange={(e) => setPriorityFilter({ ...priorityFilter, approaching: e.target.checked, all: false })}
-                    className="w-5 h-5 rounded border-gray-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                    className="w-4 h-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
                   />
-                  <div className="flex items-center gap-2 flex-1">
-                    <Clock className="w-4 h-4 text-orange-600" />
-                    <span className="text-sm text-ars-body group-hover:text-ars-heading transition-colors">Approaching</span>
+                  <div className="flex items-center gap-1.5 flex-1">
+                    <Clock className="w-3.5 h-3.5 text-orange-600" />
+                    <span className="text-xs text-ars-body group-hover:text-ars-heading transition-colors">Approaching</span>
                   </div>
                 </label>
-                <label className="flex items-center gap-3 cursor-pointer group">
+                <label className="flex items-center gap-2 cursor-pointer group">
                   <input
                     type="checkbox"
                     checked={priorityFilter.open}
                     onChange={(e) => setPriorityFilter({ ...priorityFilter, open: e.target.checked, all: false })}
-                    className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                   />
-                  <div className="flex items-center gap-2 flex-1">
-                    <FileText className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm text-ars-body group-hover:text-ars-heading transition-colors">Open</span>
+                  <div className="flex items-center gap-1.5 flex-1">
+                    <FileText className="w-3.5 h-3.5 text-blue-600" />
+                    <span className="text-xs text-ars-body group-hover:text-ars-heading transition-colors">Open</span>
                   </div>
                 </label>
-                <label className="flex items-center gap-3 cursor-pointer group pt-2 border-t border-gray-200">
+                <label className="flex items-center gap-2 cursor-pointer group pt-1.5 border-t border-gray-200">
                   <input
                     type="checkbox"
                     checked={priorityFilter.all}
                     onChange={(e) => setPriorityFilter({ ...priorityFilter, all: e.target.checked, overdue: !e.target.checked, approaching: !e.target.checked, open: !e.target.checked })}
-                    className="w-5 h-5 rounded border-gray-300 text-ars-primary focus:ring-ars-primary cursor-pointer"
+                    className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary cursor-pointer"
                   />
-                  <div className="flex items-center gap-2 flex-1">
-                    <CheckCircle2 className="w-4 h-4 text-ars-primary" />
-                    <span className="text-sm text-ars-body group-hover:text-ars-heading transition-colors font-medium">All Jobs</span>
+                  <div className="flex items-center gap-1.5 flex-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-ars-primary" />
+                    <span className="text-xs text-ars-body group-hover:text-ars-heading transition-colors font-medium">All Jobs</span>
                   </div>
                 </label>
               </div>
             </div>
 
             {/* Search */}
-            <div className="mb-6">
-              <label className="block text-sm font-semibold text-ars-heading mb-2">Search</label>
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-ars-heading mb-1.5">Search</label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Job #, customer, admin..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                  className="w-full pl-8 pr-3 py-1.5 text-[13px] border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
                 />
               </div>
             </div>
 
             {/* Status Filter */}
-            <div className="mb-6">
-              <label className="block text-sm font-semibold text-ars-heading mb-2">Status</label>
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-ars-heading mb-1.5">Status</label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                className="w-full px-3 py-1.5 text-[13px] border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
               >
                 <option value="all">All Statuses</option>
                 {statuses && statuses.length > 0 ? (
@@ -879,12 +879,12 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
             </div>
 
             {/* Branch Filter */}
-            <div className="mb-6">
-              <label className="block text-sm font-semibold text-ars-heading mb-2">Branch</label>
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-ars-heading mb-1.5">Branch</label>
               <select
                 value={branchFilter}
                 onChange={(e) => setBranchFilter(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                className="w-full px-3 py-1.5 text-[13px] border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
               >
                 <option value="all">All Branches</option>
                 {branches && branches.length > 0 ? (
@@ -900,13 +900,13 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
             </div>
 
             {/* Admin Filter */}
-            <div className="mb-6">
-              <label className="block text-sm font-semibold text-ars-heading mb-2">Admin (ADM)</label>
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-ars-heading mb-1.5">Admin (ADM)</label>
               <select
                 value={admFilter}
                 onChange={(e) => setAdmFilter(e.target.value)}
                 disabled={user?.role?.name === 'admin' && !user?.isSuperAdmin}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
+                className="w-full px-3 py-1.5 text-[13px] border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
               >
                 <option value="all">All Admins</option>
                 {adminCodeOptions.length > 0 ? (
@@ -922,13 +922,13 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
             </div>
 
             {/* Rep Code Filter */}
-            <div className="mb-6">
-              <label className="block text-sm font-semibold text-ars-heading mb-2">Rep Code</label>
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-ars-heading mb-1.5">Rep Code</label>
               <select
                 value={repCodeFilter}
                 onChange={(e) => setRepCodeFilter(e.target.value)}
                 disabled={user?.role?.name === 'rep' && !user?.isSuperAdmin}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
+                className="w-full px-3 py-1.5 text-[13px] border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
               >
                 <option value="all">All Rep Codes</option>
                 {repCodes && repCodes.length > 0 ? (
@@ -946,13 +946,13 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
             </div>
 
             {/* Technician Filter */}
-            <div className="mb-6">
-              <label className="block text-sm font-semibold text-ars-heading mb-2">Technician</label>
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-ars-heading mb-1.5">Technician</label>
               <select
                 value={technicianFilter}
                 onChange={(e) => setTechnicianFilter(e.target.value)}
                 disabled={user?.role?.name === 'technician' && !user?.isSuperAdmin}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
+                className="w-full px-3 py-1.5 text-[13px] border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
               >
                 <option value="all">All Technicians</option>
                 {technicians && technicians.length > 0 ? (
@@ -968,8 +968,8 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
             </div>
 
             {/* Machines Visibility Toggle */}
-            <div className="mb-6 pt-4 border-t border-gray-200">
-              <label className="block text-sm font-semibold text-ars-heading mb-3">Display Options</label>
+            <div className="mb-4 pt-3 border-t border-gray-200">
+              <label className="block text-xs font-semibold text-ars-heading mb-2">Display Options</label>
               <button
                 onClick={() => {
                   const newValue = !showMachinesGlobal;
@@ -1020,13 +1020,13 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                 <p className="text-ars-body">Loading jobs...</p>
               </div>
             ) : filteredJobs.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-12 text-center">
+              <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
                 <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-xl font-bold text-ars-heading mb-2">No jobs found</h3>
                 <p className="text-ars-body mb-6">Try adjusting your filters or search term</p>
                 <button
                   onClick={onCreateNew}
-                  className="inline-flex items-center gap-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                  className="inline-flex items-center gap-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-6 py-3 rounded-xl font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
                 >
                   <Sparkles className="w-5 h-5" />
                   Create New Job
@@ -1081,7 +1081,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                   return (
                     <div
                       key={job._id}
-                      className={`group relative overflow-hidden rounded-xl border-2 transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer ${getStatusColor(job.status?.name)}`}
+                      className={`group relative overflow-hidden rounded-xl border-2 transition-all duration-300 hover:scale-[1.02] cursor-pointer ${getStatusColor(job.status?.name)}`}
                       onClick={() => handleViewJob(job)}
                       style={{
                         animation: `fadeInUp 0.3s ease-out ${index * 0.05}s both`
@@ -1263,20 +1263,20 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                               e.stopPropagation();
                               handleEditJob(job);
                             }}
-                            className="flex-1 px-3 py-2 bg-white/80 hover:bg-white rounded-lg text-xs font-medium text-ars-heading hover:text-ars-primary transition-all flex items-center justify-center gap-1"
+                            className="flex-1 px-3 py-2 bg-white/80 hover:bg-white rounded-lg font-bold text-[14px] text-ars-heading hover:text-ars-primary transition-all flex items-center justify-center gap-1"
                           >
                             <Edit2 className="w-3 h-3" />
-                            Edit
+                            EDIT
                           </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleViewJob(job);
                             }}
-                            className="flex-1 px-3 py-2 bg-white/80 hover:bg-white rounded-lg text-xs font-medium text-ars-heading hover:text-ars-primary transition-all flex items-center justify-center gap-1"
+                            className="flex-1 px-3 py-2 bg-white/80 hover:bg-white rounded-lg font-bold text-[14px] text-ars-heading hover:text-ars-primary transition-all flex items-center justify-center gap-1"
                           >
                             <Eye className="w-3 h-3" />
-                            View
+                            VIEW
                           </button>
                         </div>
                       </div>

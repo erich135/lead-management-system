@@ -99,6 +99,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
+  const [isScrolled, setIsScrolled] = useState(false);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -125,7 +126,21 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
 
   useEffect(() => {
     loadInitialData();
+
+    // Add scroll listener for navigation shadow
+    const handleScroll = () => {
+      // Show shadow when scrolled past the navigation bar (80px height)
+      setIsScrolled(window.scrollY > 80);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Scroll to top when view changes
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [view]);
 
   // Log page view activities
   useEffect(() => {
@@ -569,245 +584,133 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-white pb-20 md:pb-0">
+    <div className="min-h-screen bg-white pb-20 md:pb-0">
       {/* Desktop Navigation */}
-      <nav className="relative bg-gradient-to-r from-[#0969a9] via-[#0a7bc4] to-[#0c8dd9] shadow-xl sticky top-0 z-40 hidden md:block backdrop-blur-md">
+      <nav className={`relative bg-white sticky top-0 z-40 hidden md:block backdrop-blur-md ${isScrolled ? 'shadow-xl' : ''}`}>
         {/* Subtle pattern overlay */}
         <div className="absolute inset-0 opacity-10" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M20 20.5V18H0v-2h20v-2H0v-2h20v-2H0V8h20V6H0V4h20V2H0V0h22v20h2V0h2v20h2V0h2v20h2V0h2v20h2V0h2v22H0v-2h20zM0 20h2v20H0V20zm4 0h2v20H4V20zm4 0h2v20H8V20zm4 0h2v20h-2V20zm4 0h2v20h-2V20zm4 4h20v2H20v-2zm0 4h20v2H20v-2zm0 4h20v2H20v-2zm0 4h20v2H20v-2z'/%3E%3C/g%3E%3C/svg%3E")`,
           backgroundRepeat: 'repeat'
         }}></div>
         
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="relative max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
-            <div className="flex items-center gap-8">
-              {/* Logo Section */}
-              <div className="flex items-center gap-3 group">
-                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg p-2 transition-all duration-300 group-hover:bg-white/30 group-hover:scale-105">
-                  <img src="/Logo.png" alt="ARS Logo" className="w-full h-full object-contain" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold text-white tracking-tight">ARS Management</h1>
-                  <p className="text-xs text-white/70">Job Management System</p>
-                </div>
-              </div>
+            {/* Logo Section */}
+            <div className="flex items-center gap-3 group">
+              <img src="/Logo.png" alt="ARS Logo" className="w-[180px] h-auto object-contain" />
+            </div>
 
-              {/* Navigation Pills */}
-              <div className="hidden md:flex gap-2 bg-white/10 backdrop-blur-sm rounded-xl p-1.5 border border-white/20">
+            {/* Navigation Pills */}
+            <div className="flex items-center gap-8 flex-1 justify-center">
+              <div className="hidden md:flex gap-2">
                 <Link
                   to="/dashboard"
-                  className={`group relative px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
+                  className={`group relative px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
                     view === 'dashboard'
-                      ? 'bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] shadow-lg scale-105'
-                      : 'text-white/80 hover:text-white hover:bg-white/10'
+                      ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
+                      : 'text-[#383838] hover:text-[#f7c12b]'
                   }`}
                 >
                   <LayoutDashboard className={`w-4 h-4 transition-transform ${view === 'dashboard' ? 'scale-110' : ''}`} />
                   <span>Dashboard</span>
-                  {view === 'dashboard' && (
-                    <div className="absolute inset-0 bg-white/20 rounded-lg animate-pulse"></div>
-                  )}
                 </Link>
                 <Link
                   to="/jobs"
-                  className={`group relative px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
+                  className={`group relative px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
                     view === 'leads'
-                      ? 'bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] shadow-lg scale-105'
-                      : 'text-white/80 hover:text-white hover:bg-white/10'
+                      ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
+                      : 'text-[#383838] hover:text-[#f7c12b]'
                   }`}
                 >
                   <FileText className={`w-4 h-4 transition-transform ${view === 'leads' ? 'scale-110' : ''}`} />
                   <span>Jobs</span>
-                  {view === 'leads' && (
-                    <div className="absolute inset-0 bg-white/20 rounded-lg animate-pulse"></div>
-                  )}
                 </Link>
                 {(isSuperAdmin || user?.role?.name?.toLowerCase() === 'manager') && (
                   <Link
                     to="/reports"
-                    className={`group relative px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
+                    className={`group relative px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
                       view === 'reports'
-                        ? 'bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] shadow-lg scale-105'
-                        : 'text-white/80 hover:text-white hover:bg-white/10'
+                        ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
+                        : 'text-[#383838] hover:text-[#f7c12b]'
                     }`}
                   >
                     <BarChart3 className={`w-4 h-4 transition-transform ${view === 'reports' ? 'scale-110' : ''}`} />
                     <span>Reports</span>
-                    {view === 'reports' && (
-                      <div className="absolute inset-0 bg-white/20 rounded-lg animate-pulse"></div>
-                    )}
                   </Link>
                 )}
                 <Link
                   to="/diary"
-                  className={`group relative px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
+                  className={`group relative px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
                     view === 'diary'
-                      ? 'bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] shadow-lg scale-105'
-                      : 'text-white/80 hover:text-white hover:bg-white/10'
+                      ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
+                      : 'text-[#383838] hover:text-[#f7c12b]'
                   }`}
                 >
                   <Calendar className={`w-4 h-4 transition-transform ${view === 'diary' ? 'scale-110' : ''}`} />
                   <span>Diary</span>
-                  {view === 'diary' && (
-                    <div className="absolute inset-0 bg-white/20 rounded-lg animate-pulse"></div>
-                  )}
                 </Link>
                 <Link
                   to="/activities"
-                  className={`group relative px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
+                  className={`group relative px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
                     view === 'activities'
-                      ? 'bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] shadow-lg scale-105'
-                      : 'text-white/80 hover:text-white hover:bg-white/10'
+                      ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
+                      : 'text-[#383838] hover:text-[#f7c12b]'
                   }`}
                 >
                   <Clock className={`w-4 h-4 transition-transform ${view === 'activities' ? 'scale-110' : ''}`} />
                   <span>Activities</span>
-                  {view === 'activities' && (
-                    <div className="absolute inset-0 bg-white/20 rounded-lg animate-pulse"></div>
-                  )}
                 </Link>
                 {isSuperAdmin && (
                   <Link
                     to="/admin"
-                    className={`group relative px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
+                    className={`group relative px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
                       view === 'admin'
-                        ? 'bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] shadow-lg scale-105'
-                        : 'text-white/80 hover:text-white hover:bg-white/10'
+                        ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
+                        : 'text-[#383838] hover:text-[#f7c12b]'
                     }`}
                   >
                     <Shield className={`w-4 h-4 transition-transform ${view === 'admin' ? 'scale-110' : ''}`} />
                     <span>System Admin</span>
-                    {view === 'admin' && (
-                      <div className="absolute inset-0 bg-white/20 rounded-lg animate-pulse"></div>
-                    )}
                   </Link>
                 )}
               </div>
             </div>
-
+            
             {/* Right Side Actions */}
             <div className="flex items-center gap-3">
               {/* Notifications */}
               <div className="relative">
                 <button
-                  onClick={() => setShowNotifications(!showNotifications)}
-                  className="group relative p-2.5 bg-white/10 backdrop-blur-sm hover:bg-white/20 rounded-xl transition-all duration-300 border border-white/20 hover:border-white/30 hover:scale-105"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowNotifications(!showNotifications);
+                  }}
+                  className="group relative p-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all duration-300 hover:scale-105"
                 >
-                  <Bell className="w-5 h-5 text-white transition-transform group-hover:scale-110" />
+                  <Bell className="w-5 h-5 text-[#0969a9] transition-transform group-hover:scale-110" />
                   {stats && (stats.overdueReminders > 0 || stats.approachingReminders > 0) && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-red-500 to-orange-500 rounded-full flex items-center justify-center shadow-lg animate-pulse">
+                    <span className="absolute -top-1 -right-2 min-w-[20px] h-5 bg-gradient-to-r from-red-500 to-orange-500 rounded-full flex items-center justify-center shadow-lg animate-pulse px-1.5">
                       <span className="text-xs font-bold text-white">
                         {stats.overdueReminders + stats.approachingReminders}
                       </span>
                     </span>
                   )}
                 </button>
-
-                {showNotifications && (
-                  <div className="absolute right-0 mt-3 w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 py-4 max-h-96 overflow-y-auto z-50 backdrop-blur-md">
-                    <div className="px-4 pb-3 border-b border-gray-200 mb-2">
-                      <h3 className="text-sm font-bold text-ars-heading mb-1">
-                        Job Reminders
-                      </h3>
-                      <div className="flex items-center gap-3 text-xs">
-                        <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full font-medium">
-                          {stats?.overdueReminders || 0} overdue
-                        </span>
-                        <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-full font-medium">
-                          {stats?.approachingReminders || 0} approaching
-                        </span>
-                      </div>
-                    </div>
-                    {overdueJobs.length === 0 ? (
-                      <div className="px-4 py-8 text-center">
-                        <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
-                        <p className="text-sm font-medium text-ars-heading mb-1">
-                          All jobs on track!
-                        </p>
-                        <p className="text-xs text-ars-body">
-                          No overdue or approaching jobs
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="px-3">
-                        {overdueJobs.slice(0, 10).map((overdue) => (
-                          <div
-                            key={overdue.jobId}
-                            className={`px-3 py-3 mb-2 rounded-xl border-2 cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${getSeverityColor(overdue.severity)}`}
-                            onClick={() => {
-                              if (overdue.job) {
-                                setSelectedLead(overdue.job);
-                                navigateToView('leads');
-                                setShowNotifications(false);
-                              }
-                            }}
-                          >
-                            <div className="flex items-start gap-3">
-                              <div className="flex-shrink-0 mt-0.5">
-                                {getSeverityIcon(overdue.severity)}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between mb-1">
-                                  <p className="text-sm font-bold truncate">
-                                    {overdue.jobNumber}
-                                  </p>
-                                  {overdue.isOverdue && (
-                                    <span className="text-xs font-bold bg-red-200 text-red-800 px-2 py-0.5 rounded-full flex-shrink-0 ml-2">
-                                      {overdue.daysOverdue}d
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-xs text-ars-body mb-2 truncate">
-                                  {overdue.job?.customer?.name || overdue.job?.cashCustomer || 'No customer'}
-                                </p>
-                                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                  <span className="text-xs font-medium px-2 py-0.5 bg-white/60 rounded">
-                                    {overdue.currentStatus}
-                                  </span>
-                                  <span className="text-xs text-ars-body">→</span>
-                                  <span className="text-xs font-medium px-2 py-0.5 bg-white/60 rounded">
-                                    {overdue.expectedNextStatus}
-                                  </span>
-                                </div>
-                                <div className="flex items-center justify-between mt-2">
-                                  <p className="text-xs font-medium">
-                                    {overdue.isOverdue 
-                                      ? `${overdue.daysOverdue} days overdue` 
-                                      : `${overdue.daysInStatus}/${overdue.maxDaysAllowed} days`}
-                                  </p>
-                                  {overdue.followUpLevel && (
-                                    <span className="text-xs bg-white/80 px-2 py-0.5 rounded">
-                                      Follow-up {overdue.followUpLevel}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                        {overdueJobs.length > 10 && (
-                          <p className="text-xs text-ars-body text-center py-2 border-t border-gray-200 mt-2">
-                            +{overdueJobs.length - 10} more jobs
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
 
               {/* User Profile */}
+
               <div className="flex items-center gap-3 pl-4 border-l border-white/20">
                 <div className="text-right">
-                  <p className="text-sm font-semibold text-white">{user?.fullName || 'User'}</p>
-                  <p className="text-xs text-white/70 capitalize">{user?.role?.name || 'user'}</p>
+                  <p className="text-sm font-semibold text-[#383838]">{user?.fullName || 'User'}</p>
+                  <p className="text-xs text-[#383838]/70 capitalize">{user?.role?.name || 'user'}</p>
                 </div>
                 <button
                   onClick={signOut}
-                  className="p-2.5 bg-white/10 backdrop-blur-sm hover:bg-white/20 rounded-xl transition-all duration-300 border border-white/20 hover:border-white/30 hover:scale-105 group"
+                  className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all duration-300 hover:scale-105 group"
                   title="Sign out"
                 >
-                  <LogOut className="w-5 h-5 text-white transition-transform group-hover:scale-110" />
+                  <LogOut className="w-5 h-5 text-[#0969a9] transition-transform group-hover:scale-110" />
                 </button>
               </div>
             </div>
@@ -815,9 +718,111 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
         </div>
       </nav>
 
+      {/* Desktop Notification Drawer Overlay */}
+      {showNotifications && !isMobile && (
+        <>
+          <div 
+            className="fixed inset-0 z-[60]" 
+            onClick={() => setShowNotifications(false)}
+          ></div>
+          <div 
+            className="absolute top-[70px] right-[64px] w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 py-4 max-h-96 overflow-y-auto z-[70] backdrop-blur-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 pb-3 border-b border-gray-200 mb-2">
+              <h3 className="text-sm font-bold text-ars-heading mb-1">
+                Job Reminders
+              </h3>
+              <div className="flex items-center gap-3 text-xs">
+                <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full font-medium">
+                  {stats?.overdueReminders || 0} overdue
+                </span>
+                <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-full font-medium">
+                  {stats?.approachingReminders || 0} approaching
+                </span>
+              </div>
+            </div>
+            {overdueJobs.length === 0 ? (
+              <div className="px-4 py-8 text-center">
+                <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                <p className="text-sm font-medium text-ars-heading mb-1">
+                  All jobs on track!
+                </p>
+                <p className="text-xs text-ars-body">
+                  No overdue or approaching jobs
+                </p>
+              </div>
+            ) : (
+              <div className="px-3">
+                {overdueJobs.slice(0, 10).map((overdue) => (
+                  <div
+                    key={overdue.jobId}
+                    className={`px-3 py-3 mb-2 rounded-xl border-2 cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${getSeverityColor(overdue.severity)}`}
+                    onClick={() => {
+                      if (overdue.job) {
+                        setSelectedLead(overdue.job);
+                        navigateToView('leads');
+                        setShowNotifications(false);
+                      }
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 mt-0.5">
+                        {getSeverityIcon(overdue.severity)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-sm font-bold truncate">
+                            {overdue.jobNumber}
+                          </p>
+                          {overdue.isOverdue && (
+                            <span className="text-xs font-bold bg-red-200 text-red-800 px-2 py-0.5 rounded-full flex-shrink-0 ml-2">
+                              {overdue.daysOverdue}d
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-ars-body mb-2 truncate">
+                          {overdue.job?.customer?.name || overdue.job?.cashCustomer || 'No customer'}
+                        </p>
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="text-xs font-medium px-2 py-0.5 bg-white/60 rounded">
+                            {overdue.currentStatus}
+                          </span>
+                          <span className="text-xs text-ars-body">→</span>
+                          <span className="text-xs font-medium px-2 py-0.5 bg-white/60 rounded">
+                            {overdue.expectedNextStatus}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between mt-2">
+                          <p className="text-xs font-medium">
+                            {overdue.isOverdue 
+                              ? `${overdue.daysOverdue} days overdue` 
+                              : `${overdue.daysInStatus}/${overdue.maxDaysAllowed} days`}
+                          </p>
+                          {overdue.followUpLevel && (
+                            <span className="text-xs bg-white/80 px-2 py-0.5 rounded">
+                              Follow-up {overdue.followUpLevel}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {overdueJobs.length > 10 && (
+                  <p className="text-xs text-ars-body text-center py-2 border-t border-gray-200 mt-2">
+                    +{overdueJobs.length - 10} more jobs
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
       {/* Mobile Top Bar */}
       {isMobile && (
-        <div className="relative bg-gradient-to-r from-[#0969a9] via-[#0a7bc4] to-[#0c8dd9] shadow-xl sticky top-0 z-40 md:hidden backdrop-blur-md">
+        <div className={`relative bg-gradient-to-r from-[#0969a9] via-[#0a7bc4] to-[#0c8dd9] sticky top-0 z-40 md:hidden backdrop-blur-md ${isScrolled ? 'shadow-xl' : ''}`}>
           <div className="absolute inset-0 opacity-10" style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M20 20.5V18H0v-2h20v-2H0v-2h20v-2H0V8h20V6H0V4h20V2H0V0h22v20h2V0h2v20h2V0h2v20h2V0h2v20h2V0h2v22H0v-2h20zM0 20h2v20H0V20zm4 0h2v20H4V20zm4 0h2v20H8V20zm4 0h2v20h-2V20zm4 0h2v20h-2V20zm4 4h20v2H20v-2zm0 4h20v2H20v-2zm0 4h20v2H20v-2zm0 4h20v2H20v-2z'/%3E%3C/g%3E%3C/svg%3E")`,
             backgroundRepeat: 'repeat'
@@ -839,7 +844,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
               >
                 <Bell className="w-5 h-5 text-white" />
                 {stats && (stats.overdueReminders > 0 || stats.approachingReminders > 0) && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-red-500 to-orange-500 rounded-full flex items-center justify-center shadow-lg">
+                  <span className="absolute -top-1 -right-2 min-w-[20px] h-5 bg-gradient-to-r from-red-500 to-orange-500 rounded-full flex items-center justify-center shadow-lg px-1.5">
                     <span className="text-xs font-bold text-white">
                       {stats.overdueReminders + stats.approachingReminders}
                     </span>
@@ -939,7 +944,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
         </div>
       )}
 
-      <main className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${isMobile ? 'pt-4' : ''}`}>
+      <main className={`max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-8 ${isMobile ? 'pt-4' : ''}`}>
         {error && (
           <div className="mb-6 p-4 bg-red-50 border-2 border-red-300 rounded-xl">
             <p className="text-red-800 font-medium">Error: {error}</p>
@@ -964,31 +969,22 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
         {view === 'dashboard' && stats && !loading && (
           <div className="space-y-6">
             {/* Header with Gradient Background */}
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0969a9] via-[#0a7bc4] to-[#0c8dd9] p-8 text-white shadow-2xl">
-              <div className="absolute inset-0 opacity-20" style={{
-                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-                backgroundRepeat: 'repeat'
-              }}></div>
+            <div className="relative overflow-hidden rounded-2xl bg-[#0969a9] p-8 text-white">
               <div className="relative z-10">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                   <div>
                     <h1 className="text-3xl md:text-4xl font-bold mb-2 flex items-center gap-3">
-                      <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
-                        <Ticket className="w-8 h-8" />
-                      </div>
                       Job Management
                     </h1>
                     <p className="text-white/90 text-sm md:text-base">
-                      Manage your jobs efficiently • {getDateRangeText()}
+                      {getDateRangeText()}
                     </p>
                   </div>
                   <button
                     onClick={() => setShowLeadForm(true)}
-                    className="group relative overflow-hidden bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
+                    className="bg-[#f7c12b] text-[#383838] px-6 py-3 rounded-xl font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02] flex items-center gap-2 hover:brightness-95"
                   >
-                    <Sparkles className="w-5 h-5 group-hover:rotate-180 transition-transform duration-300" />
-                    <span>New Job</span>
-                    <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
+                    <span>NEW JOB</span>
                   </button>
                 </div>
 
@@ -997,7 +993,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                   <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('leads')}>
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-white/80 text-xs font-medium">Total Jobs</p>
-                      <FileText className="w-4 h-4 text-white/60" />
+                      <FileText className="w-4 h-4  text-[#ffffff]" />
                     </div>
                     <p className="text-2xl font-bold">{stats.totalJobs}</p>
                   </div>
@@ -1005,7 +1001,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                   <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('leads')}>
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-white/80 text-xs font-medium">Active</p>
-                      <TrendingUp className="w-4 h-4 text-[#f7c12b]" />
+                      <TrendingUp className="w-4 h-4 text-[#ffffff]" />
                     </div>
                     <p className="text-2xl font-bold">{stats.activeJobs}</p>
                   </div>
@@ -1027,7 +1023,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                   >
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-white/80 text-xs font-medium">Needs Attention</p>
-                      <AlertCircle className={`w-4 h-4 ${
+                      <AlertCircle className={`w-4 h-4  text-[#ffffff] ${
                         stats.overdueReminders > 0 ? 'text-red-200' : stats.approachingReminders > 0 ? 'text-orange-200' : 'text-white/60'
                       }`} />
                     </div>
@@ -1041,7 +1037,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                     <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('reports')}>
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-white/80 text-xs font-medium">Total Value</p>
-                        <Banknote className="w-4 h-4 text-[#f7c12b]" />
+                        <Banknote className="w-4 h-4 text-[#ffffff]" />
                       </div>
                       <p className="text-2xl font-bold">R{stats.totalValue.toLocaleString()}</p>
                     </div>
@@ -1051,22 +1047,18 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
             </div>
 
             {/* Priority Filter Tabs */}
-            <div className="space-y-2">
+            <div className="space-y-2 mt-[60px] pt-[30px]">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-semibold text-ars-heading mb-1">Filter by Priority</h3>
-                  <p className="text-xs text-ars-body">
-                    Show jobs that need attention based on how overdue they are. 
-                    Reminders are calculated from the date the status was last changed (or when follow-up was set).
-                  </p>
+                  <h3 className="text-[20px] font-semibold text-ars-heading mb-1">Filter by Priority</h3>
                 </div>
               </div>
-              <div className="flex items-center gap-2 overflow-x-auto pb-2">
+              <div className="flex items-center gap-1.5 pb-2 -mx-1 px-1 overflow-visible">
                 <button
                   onClick={() => setSelectedPriority('all')}
-                  className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all duration-300 ${
+                  className={`px-3 py-1.5 rounded-lg font-medium text-xs whitespace-nowrap transition-all duration-300 ${
                     selectedPriority === 'all'
-                      ? 'bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white shadow-lg scale-105'
+                      ? 'bg-[#0969a9] text-white shadow-lg scale-105 hover:brightness-95'
                       : 'bg-white text-ars-body hover:bg-gray-50 border border-gray-200'
                   }`}
                   title="Show all jobs that need attention"
@@ -1075,38 +1067,38 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                 </button>
                 <button
                   onClick={() => setSelectedPriority('critical')}
-                  className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all duration-300 flex items-center gap-2 ${
+                  className={`px-3 py-1.5 rounded-lg font-medium text-xs whitespace-nowrap transition-all duration-300 flex items-center gap-1.5 ${
                     selectedPriority === 'critical'
-                      ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg scale-105'
+                      ? 'bg-red-500 text-white shadow-lg scale-105 hover:brightness-95'
                       : 'bg-white text-ars-body hover:bg-red-50 border border-gray-200'
                   }`}
                   title="Jobs that are past their deadline (overdue)"
                 >
-                  <Zap className="w-4 h-4" />
+                  <Zap className="w-3.5 h-3.5" />
                   Overdue ({overdueJobs.filter(j => j.severity === 'critical').length})
                 </button>
                 <button
                   onClick={() => setSelectedPriority('warning')}
-                  className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all duration-300 flex items-center gap-2 ${
+                  className={`px-3 py-1.5 rounded-lg font-medium text-xs whitespace-nowrap transition-all duration-300 flex items-center gap-1.5 ${
                     selectedPriority === 'warning'
-                      ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg scale-105'
+                      ? 'bg-orange-500 text-white shadow-lg scale-105 hover:brightness-95'
                       : 'bg-white text-ars-body hover:bg-orange-50 border border-gray-200'
                   }`}
                   title="Jobs approaching their deadline (80% of time limit reached)"
                 >
-                  <Clock className="w-4 h-4" />
+                  <Clock className="w-3.5 h-3.5" />
                   Approaching ({overdueJobs.filter(j => j.severity === 'warning').length})
                 </button>
                 <button
                   onClick={() => setSelectedPriority('info')}
-                  className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all duration-300 flex items-center gap-2 ${
+                  className={`px-3 py-1.5 rounded-lg font-medium text-xs whitespace-nowrap transition-all duration-300 flex items-center gap-1.5 ${
                     selectedPriority === 'info'
-                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg scale-105'
+                      ? 'bg-blue-500 text-white shadow-lg scale-105 hover:brightness-95'
                       : 'bg-white text-ars-body hover:bg-blue-50 border border-gray-200'
                   }`}
                   title="Jobs that are being monitored but not yet urgent"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
+                  <CheckCircle2 className="w-3.5 h-3.5" />
                   Monitored ({overdueJobs.filter(j => j.severity === 'info').length})
                 </button>
               </div>
@@ -1140,24 +1132,24 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
               ) : (
                 <>
                   {/* Filters */}
-                  <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4 mb-4">
-                    <h3 className="text-sm font-semibold text-ars-heading mb-3">Filters</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                  <div className="bg-white rounded-xl border border-gray-200 p-3 mb-4">
+                    <h3 className="text-xs font-semibold text-ars-heading mb-2">Filters</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Job Number</label>
+                        <label className="block text-[11px] font-medium text-gray-600 mb-1">Job Number</label>
                         <input
                           type="text"
                           placeholder="Filter by job number..."
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-[13px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                           value={filters.jobNumber}
                           onChange={(e) => setFilters({...filters, jobNumber: e.target.value})}
                         />
                       </div>
                       
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
+                        <label className="block text-[11px] font-medium text-gray-600 mb-1">Status</label>
                         <select
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-[13px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                           value=""
                           onChange={(e) => {
                             if (e.target.value && !filters.status.includes(e.target.value)) {
@@ -1188,20 +1180,20 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                       </div>
                       
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Customer</label>
+                        <label className="block text-[11px] font-medium text-gray-600 mb-1">Customer</label>
                         <input
                           type="text"
                           placeholder="Filter by customer..."
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-[13px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                           value={filters.customer}
                           onChange={(e) => setFilters({...filters, customer: e.target.value})}
                         />
                       </div>
                       
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Admin</label>
+                        <label className="block text-[11px] font-medium text-gray-600 mb-1">Admin</label>
                         <select
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-[13px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                           value=""
                           onChange={(e) => {
                             if (e.target.value && !filters.admin.includes(e.target.value)) {
@@ -1232,9 +1224,9 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                       </div>
                       
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Rep</label>
+                        <label className="block text-[11px] font-medium text-gray-600 mb-1">Rep</label>
                         <select
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-[13px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                           value=""
                           onChange={(e) => {
                             if (e.target.value && !filters.rep.includes(e.target.value)) {
@@ -1303,13 +1295,13 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                   </div>
 
                   {/* Table View */}
-                  <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+                  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead>
                           <tr className="bg-gray-50 border-b border-gray-200">
                             <th 
-                              className="text-left px-4 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                              className="text-left px-2 py-2 text-xs font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
                               onClick={() => handleSort('jobNumber')}
                             >
                               <div className="flex items-center gap-1">
@@ -1322,7 +1314,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                               </div>
                             </th>
                             <th 
-                              className="text-left px-4 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                              className="text-left px-2 py-2 text-xs font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
                               onClick={() => handleSort('status')}
                             >
                               <div className="flex items-center gap-1">
@@ -1335,7 +1327,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                               </div>
                             </th>
                             <th 
-                              className="text-left px-4 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                              className="text-left px-2 py-2 text-xs font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
                               onClick={() => handleSort('customer')}
                             >
                               <div className="flex items-center gap-1">
@@ -1348,7 +1340,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                               </div>
                             </th>
                             <th 
-                              className="text-left px-4 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                              className="text-left px-2 py-2 text-xs font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
                               onClick={() => handleSort('startDate')}
                             >
                               <div className="flex items-center gap-1">
@@ -1361,7 +1353,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                               </div>
                             </th>
                             <th 
-                              className="text-left px-4 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                              className="text-left px-2 py-2 text-xs font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
                               onClick={() => handleSort('dateQuoted')}
                             >
                               <div className="flex items-center gap-1">
@@ -1374,7 +1366,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                               </div>
                             </th>
                             <th 
-                              className="text-left px-4 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                              className="text-left px-2 py-2 text-xs font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
                               onClick={() => handleSort('city')}
                             >
                               <div className="flex items-center gap-1">
@@ -1387,7 +1379,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                               </div>
                             </th>
                             <th 
-                              className="text-left px-4 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                              className="text-left px-2 py-2 text-xs font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
                               onClick={() => handleSort('admin')}
                             >
                               <div className="flex items-center gap-1">
@@ -1400,7 +1392,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                               </div>
                             </th>
                             <th 
-                              className="text-left px-4 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                              className="text-left px-2 py-2 text-xs font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
                               onClick={() => handleSort('rep')}
                             >
                               <div className="flex items-center gap-1">
@@ -1413,7 +1405,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                               </div>
                             </th>
                             <th 
-                              className="text-right px-4 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                              className="text-right px-2 py-2 text-xs font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
                               onClick={() => handleSort('amount')}
                             >
                               <div className="flex items-center justify-end gap-1">
@@ -1426,7 +1418,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                               </div>
                             </th>
                             <th 
-                              className="text-center px-4 py-3 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                              className="text-center px-2 py-2 text-xs font-medium text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
                               onClick={() => handleSort('daysOverdue')}
                             >
                               <div className="flex items-center justify-center gap-1">
@@ -1461,24 +1453,24 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                                   }}
                                 >
                                   {/* Job Number */}
-                                  <td className="px-4 py-3">
-                                    <div className="font-semibold text-gray-900 group-hover:text-ars-primary transition-colors">
+                                  <td className="px-2 py-2">
+                                    <div className="font-semibold text-[15px] text-gray-900 group-hover:text-ars-primary transition-colors">
                                       {overdue.jobNumber}
                                     </div>
                                   </td>
 
                                   {/* Status */}
-                                  <td className="px-4 py-3">
-                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${textColorClass} bg-white/60 border border-current/20`}>
+                                  <td className="px-2 py-2">
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${textColorClass} bg-white/60 border border-current/20 whitespace-nowrap`}>
                                       {overdue.job?.status?.name || overdue.currentStatus || 'No Status'}
                                     </span>
                                   </td>
 
                                   {/* Customer */}
-                                  <td className="px-4 py-3">
-                                    <div className="flex items-center gap-2">
-                                      <User className="w-4 h-4 text-gray-400" />
-                                      <span className="font-medium text-gray-900">
+                                  <td className="px-2 py-2">
+                                    <div className="flex items-center gap-1">
+                                      <User className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                                      <span className="font-medium text-[15px] text-gray-900">
                                         {(() => {
                                           if (overdue.job?.cashCustomer && overdue.job?.customer?.name) {
                                             return `${overdue.job.cashCustomer} - ${overdue.job.customer.name}`;
@@ -1490,75 +1482,75 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                                   </td>
 
                                   {/* Start Date */}
-                                  <td className="px-4 py-3">
-                                    <div className="flex items-center gap-2">
-                                      <Calendar className="w-4 h-4 text-gray-400" />
-                                      <span className="text-sm text-gray-600">
+                                  <td className="px-2 py-2">
+                                    <div className="flex items-center gap-1">
+                                      <Calendar className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                                      <span className="text-xs text-gray-600 whitespace-nowrap">
                                         {formatDate(overdue.job?.startDate)}
                                       </span>
                                     </div>
                                   </td>
 
                                   {/* Quoted Date */}
-                                  <td className="px-4 py-3">
-                                    <div className="flex items-center gap-2">
-                                      <Calendar className="w-4 h-4 text-gray-400" />
-                                      <span className="text-sm text-gray-600">
+                                  <td className="px-2 py-2">
+                                    <div className="flex items-center gap-1">
+                                      <Calendar className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                                      <span className="text-xs text-gray-600 whitespace-nowrap">
                                         {formatDate(overdue.job?.dateQuoted)}
                                       </span>
                                     </div>
                                   </td>
 
                                   {/* City/Branch */}
-                                  <td className="px-4 py-3">
-                                    <div className="flex items-center gap-2">
-                                      <Building2 className="w-4 h-4 text-gray-400" />
-                                      <span className="text-sm text-gray-600">
+                                  <td className="px-2 py-2">
+                                    <div className="flex items-center gap-1">
+                                      <Building2 className="w-3 h-3 text-gray-400" />
+                                      <span className="text-[15px] text-gray-600">
                                         {overdue.job?.branch?.name || '-'}
                                       </span>
                                     </div>
                                   </td>
 
                                   {/* Admin */}
-                                  <td className="px-4 py-3">
-                                    <div className="flex items-center gap-2">
-                                      <Shield className="w-4 h-4 text-gray-400" />
-                                      <span className="text-sm text-gray-600">
+                                  <td className="px-2 py-2">
+                                    <div className="flex items-center gap-1">
+                                      <Shield className="w-3 h-3 text-gray-400" />
+                                      <span className="text-[15px] text-gray-600">
                                         {overdue.job?.adm || '-'}
                                       </span>
                                     </div>
                                   </td>
 
                                   {/* Rep */}
-                                  <td className="px-4 py-3">
-                                    <div className="flex items-center gap-2">
-                                      <Tag className="w-4 h-4 text-gray-400" />
-                                      <span className="text-sm text-gray-600">
+                                  <td className="px-2 py-2">
+                                    <div className="flex items-center gap-1">
+                                      <Tag className="w-3 h-3 text-gray-400" />
+                                      <span className="text-[15px] text-gray-600">
                                         {repCode?.code || '-'}
                                       </span>
                                     </div>
                                   </td>
 
                                   {/* Amount */}
-                                  <td className="px-4 py-3 text-right">
-                                    <span className="font-semibold text-gray-900">
+                                  <td className="px-2 py-2 text-right">
+                                    <span className="font-semibold text-[15px] text-gray-900 whitespace-nowrap">
                                       {formatCurrency(overdue.job?.valueExVat)}
                                     </span>
                                   </td>
 
                                   {/* Days Overdue */}
-                                  <td className="px-4 py-3 text-center">
+                                  <td className="px-2 py-2 text-center">
                                     {overdue.isOverdue ? (
-                                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800">
-                                        {overdue.daysOverdue}d overdue
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800 whitespace-nowrap">
+                                        {overdue.daysOverdue}d
                                       </span>
                                     ) : overdue.isApproaching ? (
-                                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800">
-                                        Approaching
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-800 whitespace-nowrap">
+                                        Soon
                                       </span>
                                     ) : (
-                                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                        0d overdue
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800 whitespace-nowrap">
+                                        0d
                                       </span>
                                     )}
                                   </td>
@@ -1572,7 +1564,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                   
                   {/* Pagination */}
                   {totalPages > 1 && (
-                    <div className="mt-4 bg-white border-t border-gray-200 px-4 py-3 flex items-center justify-between rounded-b-xl">
+                    <div className="pt-[50px] bg-white px-4 py-3 flex items-center justify-between rounded-b-xl">
                       <div className="flex-1 flex justify-between sm:hidden">
                         <button
                           onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
@@ -1596,6 +1588,15 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                             <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredJobs.length)}</span> of{' '}
                             <span className="font-medium">{filteredJobs.length}</span> results
                           </p>
+                        </div>
+                        <div>
+                          <button
+                            onClick={() => navigateToView('leads')}
+                            className="bg-[#f7c12b] text-[#383838] px-6 py-3 rounded-xl font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02] flex items-center gap-2 hover:brightness-95"
+                          >
+                            <FileText className="w-5 h-5" />
+                            <span>VIEW ALL JOBS</span>
+                          </button>
                         </div>
                         <div>
                           <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
@@ -1643,31 +1644,8 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                       </div>
                     </div>
                   )}
+
                   
-                  {/* Show results count */}
-                  {filteredJobs.length > 0 && (
-                    <div className="mt-4 text-center">
-                      <p className="text-sm text-ars-body">
-                        Showing {filteredJobs.length} job{filteredJobs.length !== 1 ? 's' : ''}
-                        {Object.values(filters).some(filter => Array.isArray(filter) ? filter.length > 0 : filter) && ' (filtered)'}
-                      </p>
-                    </div>
-                  )}
-                  
-                  {/* Show "view all jobs" link */}
-                  <div className="mt-6 text-center">
-                    <button
-                      onClick={() => navigateToView('leads')}
-                      className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300 hover:scale-105"
-                    >
-                      <FileText className="w-5 h-5" />
-                      View All Jobs
-                      <ArrowRight className="w-5 h-5" />
-                    </button>
-                    <p className="mt-2 text-sm text-ars-body">
-                      Go to Jobs page for complete job management
-                    </p>
-                  </div>
                 </>
               )}
             </div>
@@ -1712,9 +1690,9 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
               <p className="text-slate-600 mb-6">You don't have permission to access the Reports page. This page is only available to Managers and Super Admins.</p>
               <button
                 onClick={() => navigate('/dashboard')}
-                className="px-6 py-3 bg-[#0969a9] text-white rounded-xl font-medium hover:bg-[#0a7bc4] transition-colors"
+                className="px-6 py-3 bg-[#0969a9] text-white rounded-xl font-bold text-[14px] hover:bg-[#0a7bc4] transition-colors"
               >
-                Go to Dashboard
+                GO TO DASHBOARD
               </button>
             </div>
           </div>
@@ -1767,6 +1745,28 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           onNotificationsClick={() => setShowNotifications(!showNotifications)}
         />
       )}
+
+      {/* Scroll to Top Button */}
+      <button
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        className="fixed bottom-8 left-8 w-14 h-14 bg-[#0969a9] text-white rounded-full shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-110 flex items-center justify-center z-40 group"
+        title="Scroll to top"
+      >
+        <svg
+          className="w-6 h-6"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M5 10l7-7m0 0l7 7m-7-7v18"
+          />
+        </svg>
+      </button>
     </div>
   );
 }

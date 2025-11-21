@@ -323,13 +323,13 @@ export function StatusWorkflow({ lead, statuses, onStatusChange, onClose }: Stat
 
           {/* Status Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
               New Status
             </label>
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-[15px]"
               required
             >
               <option value="">Select status...</option>
@@ -346,7 +346,7 @@ export function StatusWorkflow({ lead, statuses, onStatusChange, onClose }: Stat
           {/* Reference Number */}
           {newStatus?.requires_reference_number && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Reference Number
                 {newStatus.name === 'Quoted' && ' (Quote Number)'}
                 {newStatus.name === 'Order Received' && ' (Order Number)'}
@@ -356,7 +356,7 @@ export function StatusWorkflow({ lead, statuses, onStatusChange, onClose }: Stat
                 type="text"
                 value={referenceNumber}
                 onChange={(e) => setReferenceNumber(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-[15px]"
                 placeholder="Enter reference number"
               />
             </div>
@@ -364,14 +364,14 @@ export function StatusWorkflow({ lead, statuses, onStatusChange, onClose }: Stat
 
           {/* Notes */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
               Notes (Optional)
             </label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-[15px]"
               placeholder="Add any relevant notes about this status change..."
             />
           </div>

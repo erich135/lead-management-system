@@ -825,7 +825,7 @@ export function SystemManagement() {
 
   if (loading && users.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-white flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ars-primary mx-auto mb-4"></div>
           <p className="text-ars-body">Loading system management...</p>
@@ -835,7 +835,7 @@ export function SystemManagement() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-white p-6">
+    <div className="min-h-screen bg-white p-6">
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-3xl font-bold text-ars-heading flex items-center gap-3">
@@ -922,10 +922,10 @@ export function SystemManagement() {
                       technician: { name: '', email: '', phone: '' },
                     });
                   }}
-                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2"
+                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  Invite User
+                  INVITE USER
                 </button>
               </div>
 
@@ -1074,7 +1074,7 @@ export function SystemManagement() {
                         type="text"
                         value={selectedUser.firstName}
                         onChange={(e) => setSelectedUser({ ...selectedUser, firstName: e.target.value })}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                       />
                     </div>
                     <div>
@@ -1083,7 +1083,7 @@ export function SystemManagement() {
                         type="text"
                         value={selectedUser.lastName}
                         onChange={(e) => setSelectedUser({ ...selectedUser, lastName: e.target.value })}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                       />
                     </div>
                     <div>
@@ -1092,7 +1092,7 @@ export function SystemManagement() {
                         type="email"
                         value={selectedUser.email}
                         onChange={(e) => setSelectedUser({ ...selectedUser, email: e.target.value })}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                       />
                     </div>
                     <div>
@@ -1105,7 +1105,7 @@ export function SystemManagement() {
                             setSelectedUser({ ...selectedUser, role });
                           }
                         }}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                       >
                         {roles.map((role) => (
                           <option key={role._id} value={role._id}>
@@ -1117,16 +1117,16 @@ export function SystemManagement() {
                     <div className="flex items-center gap-2 pt-4">
                       <button
                         onClick={handleSaveUser}
-                        className="flex-1 px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                        className="flex-1 px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center justify-center gap-2"
                       >
                         <Save className="w-4 h-4" />
-                        Save
+                        SAVE
                       </button>
                       <button
                         onClick={() => setIsEditingUser(false)}
-                        className="px-4 py-2.5 border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                        className="px-4 py-2.5 border border-gray-300 rounded-xl font-bold text-[14px] hover:bg-gray-50 transition-colors"
                       >
-                        Cancel
+                        CANCEL
                       </button>
                     </div>
                   </div>
@@ -1168,11 +1168,11 @@ export function SystemManagement() {
                           <button
                             onClick={() => handleResendInvitation(selectedUser._id)}
                             disabled={loading}
-                            className="px-3 py-1.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-lg font-medium hover:shadow-lg transition-all flex items-center gap-2 text-sm disabled:opacity-50"
+                            className="px-3 py-1.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-lg font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
                             title="Resend invitation email"
                           >
                             <Mail className="w-4 h-4" />
-                            Resend Invitation
+                            RESEND INVITATION
                           </button>
                         </div>
                         <p className="text-xs text-ars-body">
@@ -1218,10 +1218,10 @@ export function SystemManagement() {
                     </div>
                     <button
                       onClick={() => setIsEditingUser(true)}
-                      className="w-full px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                      className="w-full px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center justify-center gap-2"
                     >
                       <Edit2 className="w-4 h-4" />
-                      Edit User
+                      EDIT USER
                     </button>
                   </div>
                 )}
@@ -1292,7 +1292,7 @@ export function SystemManagement() {
                           setImportType('jobs');
                         }
                       }}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     />
                   </div>
                   <div>
@@ -1300,7 +1300,7 @@ export function SystemManagement() {
                     <select
                       value={selectedBranch}
                       onChange={(e) => setSelectedBranch(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     >
                       <option value="">Default (JHB)</option>
                       {branches.map((branch) => (
@@ -1333,17 +1333,17 @@ export function SystemManagement() {
                   <button
                     onClick={handleImport}
                     disabled={!selectedFile || importing || importType !== 'jobs'}
-                    className="w-full px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {importing && importType === 'jobs' ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Importing...
+                        IMPORTING...
                       </>
                     ) : (
                       <>
                         <Upload className="w-4 h-4" />
-                        Import Jobs
+                        IMPORT JOBS
                       </>
                     )}
                   </button>
@@ -1381,7 +1381,7 @@ export function SystemManagement() {
                           setImportType('customers');
                         }
                       }}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     />
                   </div>
                   <div className="flex items-center gap-2">
@@ -1404,17 +1404,17 @@ export function SystemManagement() {
                   <button
                     onClick={handleImport}
                     disabled={!selectedFile || importing || importType !== 'customers'}
-                    className="w-full px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {importing && importType === 'customers' ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Importing...
+                        IMPORTING...
                       </>
                     ) : (
                       <>
                         <Upload className="w-4 h-4" />
-                        Import Customers
+                        IMPORT CUSTOMERS
                       </>
                     )}
                   </button>
@@ -1478,9 +1478,9 @@ export function SystemManagement() {
                     setImportType(null);
                     setClearExisting(false);
                   }}
-                  className="mt-4 w-full px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all"
+                  className="mt-4 w-full px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all"
                 >
-                  Done
+                  DONE
                 </button>
               </div>
             )}
@@ -1507,10 +1507,10 @@ export function SystemManagement() {
                     setNewStatus({ name: '', description: '' });
                     setShowStatusForm(true);
                   }}
-                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2"
+                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  Add Status
+                  ADD STATUS
                 </button>
               </div>
 
@@ -1548,7 +1548,7 @@ export function SystemManagement() {
                             setNewStatus({ ...newStatus, name: e.target.value });
                           }
                         }}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                         placeholder="e.g., In Progress"
                       />
                     </div>
@@ -1564,7 +1564,7 @@ export function SystemManagement() {
                             setNewStatus({ ...newStatus, description: e.target.value });
                           }
                         }}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                         placeholder="Optional description"
                       />
                     </div>
@@ -1590,7 +1590,7 @@ export function SystemManagement() {
                           type="number"
                           value={editingStatus.sortOrder || 0}
                           onChange={(e) => setEditingStatus({ ...editingStatus, sortOrder: parseInt(e.target.value) || 0 })}
-                          className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                           min="0"
                         />
                       </div>
@@ -1612,10 +1612,10 @@ export function SystemManagement() {
                     <button
                       onClick={editingStatus ? handleUpdateStatus : handleCreateStatus}
                       disabled={loading}
-                      className="px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+                      className="px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
                     >
                       <Save className="w-4 h-4" />
-                      {editingStatus ? 'Update' : 'Create'}
+                      {editingStatus ? 'UPDATE' : 'CREATE'}
                     </button>
                     <button
                       onClick={() => {
@@ -1623,9 +1623,9 @@ export function SystemManagement() {
                         setNewStatus({ name: '', description: '' });
                         setShowStatusForm(false);
                       }}
-                      className="px-4 py-2.5 border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                      className="px-4 py-2.5 border border-gray-300 rounded-xl font-bold text-[14px] hover:bg-gray-50 transition-colors"
                     >
-                      Cancel
+                      CANCEL
                     </button>
                   </div>
                 </div>
@@ -1702,10 +1702,10 @@ export function SystemManagement() {
                     setNewRepCode({ code: '', description: '' });
                     setShowRepCodeForm(true);
                   }}
-                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2"
+                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  Add Rep Code
+                  ADD REP CODE
                 </button>
               </div>
 
@@ -1742,7 +1742,7 @@ export function SystemManagement() {
                             setNewRepCode({ ...newRepCode, code: e.target.value.toUpperCase() });
                           }
                         }}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                         placeholder="e.g., AP001"
                       />
                     </div>
@@ -1758,7 +1758,7 @@ export function SystemManagement() {
                             setNewRepCode({ ...newRepCode, description: e.target.value });
                           }
                         }}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                         placeholder="Optional description"
                       />
                     </div>
@@ -1781,10 +1781,10 @@ export function SystemManagement() {
                     <button
                       onClick={editingRepCode ? handleUpdateRepCode : handleCreateRepCode}
                       disabled={loading}
-                      className="px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+                      className="px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
                     >
                       <Save className="w-4 h-4" />
-                      {editingRepCode ? 'Update' : 'Create'}
+                      {editingRepCode ? 'UPDATE' : 'CREATE'}
                     </button>
                     <button
                       onClick={() => {
@@ -1792,9 +1792,9 @@ export function SystemManagement() {
                         setNewRepCode({ code: '', description: '' });
                         setShowRepCodeForm(false);
                       }}
-                      className="px-4 py-2.5 border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                      className="px-4 py-2.5 border border-gray-300 rounded-xl font-bold text-[14px] hover:bg-gray-50 transition-colors"
                     >
-                      Cancel
+                      CANCEL
                     </button>
                   </div>
                 </div>
@@ -1868,10 +1868,10 @@ export function SystemManagement() {
                     setNewAdminCode({ code: '', description: '', userId: '' });
                     setShowAdminCodeForm(!showAdminCodeForm);
                   }}
-                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2"
+                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  Add Admin Code
+                  ADD ADMIN CODE
                 </button>
               </div>
               {isAdminCodesExpanded && (
@@ -1901,7 +1901,7 @@ export function SystemManagement() {
                             setNewAdminCode({ ...newAdminCode, code: e.target.value.toUpperCase() });
                           }
                         }}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                         placeholder="e.g., AS, ER, HT"
                         maxLength={10}
                       />
@@ -1918,7 +1918,7 @@ export function SystemManagement() {
                             setNewAdminCode({ ...newAdminCode, description: e.target.value });
                           }
                         }}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                         placeholder="Optional description"
                       />
                     </div>
@@ -1936,7 +1936,7 @@ export function SystemManagement() {
                             setNewAdminCode({ ...newAdminCode, userId: e.target.value });
                           }
                         }}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                       >
                         <option value="">No user linked</option>
                         {users.map((user) => (
@@ -1965,10 +1965,10 @@ export function SystemManagement() {
                     <button
                       onClick={editingAdminCode ? handleUpdateAdminCode : handleCreateAdminCode}
                       disabled={loading}
-                      className="px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+                      className="px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
                     >
                       <Save className="w-4 h-4" />
-                      {editingAdminCode ? 'Update' : 'Create'}
+                      {editingAdminCode ? 'UPDATE' : 'CREATE'}
                     </button>
                     <button
                       onClick={() => {
@@ -1976,9 +1976,9 @@ export function SystemManagement() {
                         setNewAdminCode({ code: '', description: '', userId: '' });
                         setShowAdminCodeForm(false);
                       }}
-                      className="px-4 py-2.5 border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                      className="px-4 py-2.5 border border-gray-300 rounded-xl font-bold text-[14px] hover:bg-gray-50 transition-colors"
                     >
-                      Cancel
+                      CANCEL
                     </button>
                   </div>
                 </div>
@@ -2057,10 +2057,10 @@ export function SystemManagement() {
                     setNewTechnician({ name: '', email: '', phone: '', userId: '' });
                     setShowTechnicianForm(!showTechnicianForm);
                   }}
-                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2"
+                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  Add Technician
+                  ADD TECHNICIAN
                 </button>
               </div>
               {isTechniciansExpanded && (
@@ -2090,7 +2090,7 @@ export function SystemManagement() {
                             setNewTechnician({ ...newTechnician, name: e.target.value });
                           }
                         }}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                         placeholder="e.g., John Smith"
                       />
                     </div>
@@ -2106,7 +2106,7 @@ export function SystemManagement() {
                             setNewTechnician({ ...newTechnician, email: e.target.value });
                           }
                         }}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                         placeholder="technician@example.com"
                       />
                     </div>
@@ -2122,7 +2122,7 @@ export function SystemManagement() {
                             setNewTechnician({ ...newTechnician, phone: e.target.value });
                           }
                         }}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                         placeholder="+1 234 567 8900"
                       />
                     </div>
@@ -2140,7 +2140,7 @@ export function SystemManagement() {
                             setNewTechnician({ ...newTechnician, userId: e.target.value });
                           }
                         }}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                       >
                         <option value="">No user linked</option>
                         {users.map((user) => (
@@ -2169,10 +2169,10 @@ export function SystemManagement() {
                     <button
                       onClick={editingTechnician ? handleUpdateTechnician : handleCreateTechnician}
                       disabled={loading}
-                      className="px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+                      className="px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
                     >
                       <Save className="w-4 h-4" />
-                      {editingTechnician ? 'Update' : 'Create'}
+                      {editingTechnician ? 'UPDATE' : 'CREATE'}
                     </button>
                     <button
                       onClick={() => {
@@ -2180,9 +2180,9 @@ export function SystemManagement() {
                         setNewTechnician({ name: '', email: '', phone: '', userId: '' });
                         setShowTechnicianForm(false);
                       }}
-                      className="px-4 py-2.5 border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                      className="px-4 py-2.5 border border-gray-300 rounded-xl font-bold text-[14px] hover:bg-gray-50 transition-colors"
                     >
-                      Cancel
+                      CANCEL
                     </button>
                   </div>
                 </div>
@@ -2264,10 +2264,10 @@ export function SystemManagement() {
                     setNewDescription({ name: '', description: '' });
                     setShowDescriptionForm(!showDescriptionForm);
                   }}
-                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2"
+                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  Add Description
+                  ADD DESCRIPTION
                 </button>
               </div>
               {isDescriptionsExpanded && (
@@ -2297,7 +2297,7 @@ export function SystemManagement() {
                             setNewDescription({ ...newDescription, name: e.target.value });
                           }
                         }}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                         placeholder="e.g., Air Audit, Parts Supply"
                       />
                     </div>
@@ -2313,7 +2313,7 @@ export function SystemManagement() {
                           }
                         }}
                         rows={3}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                         placeholder="Optional detailed description"
                       />
                     </div>
@@ -2336,10 +2336,10 @@ export function SystemManagement() {
                     <button
                       onClick={editingDescription ? handleUpdateDescription : handleCreateDescription}
                       disabled={loading}
-                      className="px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+                      className="px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
                     >
                       <Save className="w-4 h-4" />
-                      {editingDescription ? 'Update' : 'Create'}
+                      {editingDescription ? 'UPDATE' : 'CREATE'}
                     </button>
                     <button
                       onClick={() => {
@@ -2347,9 +2347,9 @@ export function SystemManagement() {
                         setNewDescription({ name: '', description: '' });
                         setShowDescriptionForm(false);
                       }}
-                      className="px-4 py-2.5 border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                      className="px-4 py-2.5 border border-gray-300 rounded-xl font-bold text-[14px] hover:bg-gray-50 transition-colors"
                     >
-                      Cancel
+                      CANCEL
                     </button>
                   </div>
                 </div>
@@ -2441,7 +2441,7 @@ export function SystemManagement() {
                     type="email"
                     value={inviteFormData.email}
                     onChange={(e) => setInviteFormData({ ...inviteFormData, email: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     placeholder="user@example.com"
                   />
                 </div>
@@ -2450,7 +2450,7 @@ export function SystemManagement() {
                   <select
                     value={inviteFormData.role}
                     onChange={(e) => setInviteFormData({ ...inviteFormData, role: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                   >
                     <option value="">Select Role</option>
                     {roles.map((role) => (
@@ -2466,7 +2466,7 @@ export function SystemManagement() {
                     type="text"
                     value={inviteFormData.firstName}
                     onChange={(e) => setInviteFormData({ ...inviteFormData, firstName: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     placeholder="John"
                   />
                 </div>
@@ -2476,7 +2476,7 @@ export function SystemManagement() {
                     type="text"
                     value={inviteFormData.lastName}
                     onChange={(e) => setInviteFormData({ ...inviteFormData, lastName: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     placeholder="Doe"
                   />
                 </div>
@@ -2501,7 +2501,7 @@ export function SystemManagement() {
                               adminCodeId: e.target.value,
                               adminCode: { code: '', description: '' }
                             })}
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                           >
                             <option value="">Select AdminCode (or create new below)</option>
                             {adminCodes.filter(ac => ac.isActive).map((ac) => (
@@ -2523,7 +2523,7 @@ export function SystemManagement() {
                                 adminCode: { ...inviteFormData.adminCode, code: e.target.value },
                                 adminCodeId: ''
                               })}
-                              className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                              className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                               placeholder="Code (e.g., AS)"
                             />
                             <input
@@ -2533,7 +2533,7 @@ export function SystemManagement() {
                                 ...inviteFormData, 
                                 adminCode: { ...inviteFormData.adminCode, description: e.target.value }
                               })}
-                              className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                              className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                               placeholder="Description (optional)"
                             />
                           </div>
@@ -2555,7 +2555,7 @@ export function SystemManagement() {
                               repCodeId: e.target.value,
                               repCode: { code: '', description: '' }
                             })}
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                           >
                             <option value="">Select RepCode (or create new below)</option>
                             {repCodes.filter(rc => rc.isActive).map((rc) => (
@@ -2577,7 +2577,7 @@ export function SystemManagement() {
                                 repCode: { ...inviteFormData.repCode, code: e.target.value },
                                 repCodeId: ''
                               })}
-                              className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                              className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                               placeholder="Code (e.g., AP001)"
                             />
                             <input
@@ -2587,7 +2587,7 @@ export function SystemManagement() {
                                 ...inviteFormData, 
                                 repCode: { ...inviteFormData.repCode, description: e.target.value }
                               })}
-                              className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                              className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                               placeholder="Description (optional)"
                             />
                           </div>
@@ -2609,7 +2609,7 @@ export function SystemManagement() {
                               technicianId: e.target.value,
                               technician: { name: '', email: '', phone: '' }
                             })}
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                           >
                             <option value="">Select Technician (or create new below)</option>
                             {technicians.filter(t => t.isActive).map((t) => (
@@ -2631,7 +2631,7 @@ export function SystemManagement() {
                                 technician: { ...inviteFormData.technician, name: e.target.value },
                                 technicianId: ''
                               })}
-                              className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                              className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                               placeholder="Name *"
                             />
                             <input
@@ -2641,7 +2641,7 @@ export function SystemManagement() {
                                 ...inviteFormData, 
                                 technician: { ...inviteFormData.technician, email: e.target.value }
                               })}
-                              className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                              className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                               placeholder="Email (optional)"
                             />
                             <input
@@ -2651,7 +2651,7 @@ export function SystemManagement() {
                                 ...inviteFormData, 
                                 technician: { ...inviteFormData.technician, phone: e.target.value }
                               })}
-                              className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                              className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                               placeholder="Phone (optional)"
                             />
                           </div>
@@ -2673,17 +2673,17 @@ export function SystemManagement() {
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
                 <button
                   onClick={() => setShowInviteForm(false)}
-                  className="px-6 py-3 border border-gray-300 rounded-xl font-medium text-ars-body hover:bg-gray-50 transition-colors"
+                  className="px-6 py-3 border border-gray-300 rounded-xl font-bold text-[14px] text-ars-body hover:bg-gray-50 transition-colors"
                   disabled={inviting}
                 >
-                  Cancel
+                  CANCEL
                 </button>
                 <button
                   onClick={handleInviteUser}
                   disabled={inviting}
-                  className="px-6 py-3 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-3 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {inviting ? 'Inviting...' : 'Send Invitation'}
+                  {inviting ? 'INVITING...' : 'SEND INVITATION'}
                 </button>
               </div>
             </div>

@@ -389,7 +389,7 @@ export function LeadsList({
               <select
                 value={filters.status}
                 onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-[15px]"
               >
                 <option value="all">All Statuses</option>
                 <option value="active">Active Only</option>
@@ -407,7 +407,7 @@ export function LeadsList({
               <select
                 value={filters.branch}
                 onChange={(e) => setFilters(prev => ({ ...prev, branch: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-[15px]"
               >
                 <option value="all">All Branches</option>
                 {branches.map(branch => (
@@ -424,7 +424,7 @@ export function LeadsList({
               <select
                 value={filters.assignee}
                 onChange={(e) => setFilters(prev => ({ ...prev, assignee: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-[15px]"
               >
                 <option value="all">Everyone</option>
                 <option value="me">Assigned to Me</option>
@@ -443,7 +443,7 @@ export function LeadsList({
               <select
                 value={filters.dateRange}
                 onChange={(e) => setFilters(prev => ({ ...prev, dateRange: e.target.value as FilterState['dateRange'] }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-[15px]"
               >
                 <option value="all">All Time</option>
                 <option value="7days">Last 7 Days</option>

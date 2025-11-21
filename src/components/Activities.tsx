@@ -177,10 +177,10 @@ export function Activities() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 md:p-6">
+    <div className="min-h-screen bg-white p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white">
+        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
@@ -203,7 +203,7 @@ export function Activities() {
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <div className="flex items-center gap-2 mb-4">
             <Filter className="w-5 h-5 text-slate-600" />
             <h2 className="text-lg font-semibold text-slate-800">Filters</h2>
@@ -219,21 +219,21 @@ export function Activities() {
                   placeholder="Search activities..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0969a9] focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0969a9] focus:border-transparent text-[15px]"
                 />
               </div>
             </div>
 
             {/* Action Filter */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Action</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">Action</label>
               <select
                 value={filterAction}
                 onChange={(e) => {
                   setFilterAction(e.target.value);
                   setPage(1);
                 }}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0969a9] focus:border-transparent"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0969a9] focus:border-transparent text-[15px]"
               >
                 <option value="">All Actions</option>
                 {uniqueActions.map((action) => (
@@ -246,14 +246,14 @@ export function Activities() {
 
             {/* Resource Type Filter */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Resource Type</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">Resource Type</label>
               <select
                 value={filterResourceType}
                 onChange={(e) => {
                   setFilterResourceType(e.target.value);
                   setPage(1);
                 }}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0969a9] focus:border-transparent"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0969a9] focus:border-transparent text-[15px]"
               >
                 <option value="">All Resources</option>
                 {uniqueResourceTypes.map((type) => (
@@ -267,7 +267,7 @@ export function Activities() {
             {/* User Filter (Super Admin Only) */}
             {user?.isSuperAdmin && (
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">User</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">User</label>
                 <select
                   value={filterUserId}
                   onChange={(e) => {
@@ -275,7 +275,7 @@ export function Activities() {
                     setPage(1);
                   }}
                   disabled={loadingUsers}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0969a9] focus:border-transparent disabled:opacity-50"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0969a9] focus:border-transparent text-[15px] disabled:opacity-50"
                 >
                   <option value="">All Users</option>
                   {users.map((u) => (
@@ -289,7 +289,7 @@ export function Activities() {
 
             {/* Start Date Filter */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">Start Date</label>
               <input
                 type="date"
                 value={filterStartDate}
@@ -297,13 +297,13 @@ export function Activities() {
                   setFilterStartDate(e.target.value);
                   setPage(1);
                 }}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0969a9] focus:border-transparent"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0969a9] focus:border-transparent text-[15px]"
               />
             </div>
 
             {/* End Date Filter */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">End Date</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">End Date</label>
               <input
                 type="date"
                 value={filterEndDate}
@@ -311,7 +311,7 @@ export function Activities() {
                   setFilterEndDate(e.target.value);
                   setPage(1);
                 }}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0969a9] focus:border-transparent"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0969a9] focus:border-transparent text-[15px]"
               />
             </div>
           </div>
@@ -341,7 +341,7 @@ export function Activities() {
         )}
 
         {/* Activities List */}
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {loading ? (
             <div className="p-12 text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0969a9] mx-auto mb-4"></div>
@@ -448,10 +448,10 @@ export function Activities() {
                     <button
                       onClick={() => setPage((p) => Math.max(1, p - 1))}
                       disabled={page === 1 || loading}
-                      className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                      className="px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-[14px] text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                     >
                       <ChevronLeft className="w-4 h-4" />
-                      Previous
+                      PREVIOUS
                     </button>
                     <span className="text-sm text-slate-600">
                       Page {page} of {totalPages || 1}
@@ -459,9 +459,9 @@ export function Activities() {
                     <button
                       onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                       disabled={page === totalPages || loading}
-                      className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                      className="px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-[14px] text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                     >
-                      Next
+                      NEXT
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>

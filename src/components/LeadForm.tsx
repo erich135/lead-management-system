@@ -445,7 +445,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                   type="text"
                   value={formData.jobNumber}
                   onChange={(e) => setFormData({ ...formData, jobNumber: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent uppercase"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px] uppercase"
                   placeholder="Leave empty for auto-generation"
                 />
                 <p className="mt-1 text-xs text-ars-body">
@@ -459,7 +459,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
               <select
                 value={customerSelection}
                 onChange={(e) => setCustomerSelection(e.target.value as 'customer' | 'cash')}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
               >
                 <option value="customer">Customer (from list)</option>
                 <option value="cash">Cash Customer</option>
@@ -498,7 +498,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                       }
                     }}
                     placeholder="Search for customer (min 2 characters)..."
-                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                   />
                   {showCustomerDropdown && searchedCustomers.length > 0 && (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
@@ -527,17 +527,17 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                           type="button"
                           onClick={handleCreateCustomer}
                           disabled={isCreatingCustomer}
-                          className="w-full px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-lg font-medium hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                          className="w-full px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-lg font-bold text-[14px] hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                         >
                           {isCreatingCustomer ? (
                             <>
                               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                              Creating...
+                              CREATING...
                             </>
                           ) : (
                             <>
                               <Plus className="w-4 h-4" />
-                              Create "{customerSearchTerm}"
+                              CREATE "{customerSearchTerm.toUpperCase()}"
                             </>
                           )}
                         </button>
@@ -567,7 +567,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                   required={customerSelection === 'cash'}
                   value={formData.cashCustomer}
                   onChange={(e) => setFormData({ ...formData, cashCustomer: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                   placeholder="e.g., John Citizen"
                 />
               </div>
@@ -581,7 +581,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                 required
                 value={formData.branch}
                 onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
               >
                 <option value="">Select Branch</option>
                 {branches && branches.length > 0 ? (
@@ -604,7 +604,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                 required
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
               >
                 {statuses && statuses.length > 0 ? (
                   statuses.map((status) => (
@@ -625,7 +625,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
               <select
                 value={formData.adm}
                 onChange={(e) => setFormData({ ...formData, adm: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
               >
                 <option value="">Select Admin</option>
                 {adminCodes && adminCodes.length > 0 ? (
@@ -649,7 +649,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
               <select
                 value={formData.techBooked}
                 onChange={(e) => setFormData({ ...formData, techBooked: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
               >
                 <option value="">Unassigned</option>
                 {technicians && technicians.length > 0 ? (
@@ -671,7 +671,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
               <select
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
               >
                 <option value="">Select Description</option>
                 {serviceDescriptions && serviceDescriptions.length > 0 ? (
@@ -695,7 +695,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                 step="0.01"
                 value={formData.valueExVat}
                 onChange={(e) => setFormData({ ...formData, valueExVat: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                 placeholder="10000.00"
               />
             </div>
@@ -708,7 +708,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                 type="date"
                 value={formData.startDate || getTodayDate()}
                 onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                 placeholder="YYYY/MM/DD"
               />
             </div>
@@ -721,7 +721,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                 type="date"
                 value={formData.dateQuoted || ''}
                 onChange={(e) => setFormData({ ...formData, dateQuoted: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                 placeholder="yyyy/mm/dd"
               />
             </div>
@@ -733,7 +733,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
               <select
                 value={formData.repCode}
                 onChange={(e) => setFormData({ ...formData, repCode: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
               >
                 <option value="">Select Rep Code</option>
                 {repCodes && repCodes.length > 0 ? (
@@ -801,7 +801,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                           e.target.value = '';
                         }
                       }}
-                      className="flex-1 min-w-0 px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                      className="flex-1 min-w-0 px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px] bg-white"
                     >
                       <option value="">Select Machine to Add</option>
                       {machines && machines.length > 0 ? (
@@ -892,9 +892,9 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                         type="button"
                         onClick={handleCreateMachine}
                         disabled={creatingMachine}
-                        className="w-full px-4 py-2 bg-ars-primary text-white rounded-lg hover:bg-ars-primary/90 transition-colors disabled:opacity-50 text-sm font-medium"
+                        className="w-full px-4 py-2 bg-ars-primary text-white rounded-lg hover:bg-ars-primary/90 transition-colors disabled:opacity-50 font-bold text-[14px]"
                       >
-                        {creatingMachine ? 'Creating...' : 'Create Machine'}
+                        {creatingMachine ? 'CREATING...' : 'CREATE MACHINE'}
                       </button>
                     </div>
                   )}
@@ -910,7 +910,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                 type="date"
                 value={formData.registerDate}
                 onChange={(e) => setFormData({ ...formData, registerDate: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
               />
             </div>
 
@@ -922,7 +922,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                 type="date"
                 value={formData.dateBooked}
                 onChange={(e) => setFormData({ ...formData, dateBooked: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
               />
             </div>
 
@@ -934,7 +934,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                 type="text"
                 value={formData.rsrNumber}
                 onChange={(e) => setFormData({ ...formData, rsrNumber: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                 placeholder="Enter RSR number"
               />
             </div>
@@ -947,7 +947,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                 type="date"
                 value={formData.poDate}
                 onChange={(e) => setFormData({ ...formData, poDate: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
               />
             </div>
 
@@ -959,7 +959,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                 type="text"
                 value={formData.poNumber}
                 onChange={(e) => setFormData({ ...formData, poNumber: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                 placeholder="Enter PO number"
               />
             </div>
@@ -972,7 +972,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                 type="text"
                 value={formData.oilSampleNumber}
                 onChange={(e) => setFormData({ ...formData, oilSampleNumber: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                 placeholder="Enter oil sample number"
               />
             </div>
@@ -985,7 +985,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                 type="date"
                 value={formData.storePack}
                 onChange={(e) => setFormData({ ...formData, storePack: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
               />
             </div>
 
@@ -997,7 +997,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                 type="date"
                 value={formData.invoiceDate}
                 onChange={(e) => setFormData({ ...formData, invoiceDate: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
               />
             </div>
 
@@ -1009,7 +1009,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                 type="text"
                 value={formData.invNumber}
                 onChange={(e) => setFormData({ ...formData, invNumber: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                 placeholder="Enter invoice number"
               />
             </div>
@@ -1022,7 +1022,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                 rows={4}
                 value={formData.feedback}
                 onChange={(e) => setFormData({ ...formData, feedback: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent resize-none"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px] resize-none text-[15px]"
                 placeholder="Enter feedback or notes..."
               />
             </div>
@@ -1032,16 +1032,16 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-3 border border-gray-300 rounded-xl font-medium text-ars-body hover:bg-gray-50 transition-colors"
+              className="px-6 py-3 border border-gray-300 rounded-xl font-bold text-[14px] text-ars-body hover:bg-gray-50 transition-colors"
             >
-              Cancel
+              CANCEL
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-3 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-xl font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Creating...' : 'Create Job'}
+              {loading ? 'CREATING...' : 'CREATE JOB'}
             </button>
           </div>
         </form>

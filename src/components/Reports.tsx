@@ -44,6 +44,7 @@ import {
   Eye,
   Edit2
 } from 'lucide-react';
+import { LeadDetails } from './LeadDetails';
 
 interface ReportsProps {
   statuses: any[];
@@ -95,6 +96,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
 
   /**
    * Loads initial reference data.
@@ -1074,8 +1076,9 @@ export function Reports({ statuses, branches }: ReportsProps) {
                   {userOverdueJobs.slice(0, 10).map(overdue => (
                     <div
                       key={overdue.jobId}
-                      className={`p-4 rounded-lg border-2 ${
-                        overdue.isOverdue ? 'border-red-200 bg-red-50' : 'border-orange-200 bg-orange-50'
+                      onClick={() => overdue.job && setSelectedJob(overdue.job)}
+                      className={`p-4 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${
+                        overdue.isOverdue ? 'border-red-200 bg-red-50 hover:bg-red-100' : 'border-orange-200 bg-orange-50 hover:bg-orange-100'
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -1133,7 +1136,11 @@ export function Reports({ statuses, branches }: ReportsProps) {
                 <h3 className="text-lg font-bold text-ars-heading mb-4">Jobs ({userJobs.length})</h3>
                 <div className="space-y-3 max-h-96 overflow-y-auto">
                   {userJobs.map(job => (
-                    <div key={job._id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div 
+                      key={job._id} 
+                      onClick={() => setSelectedJob(job)}
+                      className="p-4 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer transition-all hover:shadow-md hover:bg-gray-100"
+                    >
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
@@ -1684,6 +1691,27 @@ export function Reports({ statuses, branches }: ReportsProps) {
           </div>
         )}
       </div>
+
+      {/* Job Details Popup Modal */}
+      {selectedJob && (
+        <LeadDetails
+          lead={selectedJob}
+          statuses={statuses}
+          branches={branches}
+          onClose={() => setSelectedJob(null)}
+          onUpdate={() => {
+            // Reload the report data after update
+            if (activeTab === 'user-performance') {
+              loadUserPerformanceData();
+            } else if (activeTab === 'customer') {
+              loadCustomerReport();
+            } else if (activeTab === 'machine') {
+              loadMachineReport();
+            }
+            setSelectedJob(null);
+          }}
+        />
+      )}
     </div>
   );
 }

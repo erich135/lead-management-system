@@ -44,15 +44,6 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
   const isSelectingCustomerRef = useRef(false); // Flag to prevent search when selecting
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
 
-  /**
-   * Gets the default branch ID.
-   * Returns the branch with isDefault: true, or falls back to the first branch if none is marked as default.
-   */
-  const getDefaultBranchId = (): string => {
-    const defaultBranch = branches.find(b => b.isDefault === true);
-    return defaultBranch?._id || branches[0]?._id || '';
-  };
-
   const [formData, setFormData] = useState<{
     jobNumber: string;
     customer: string;
@@ -83,7 +74,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
       jobNumber: '',
       customer: '',
       cashCustomer: '',
-      branch: getDefaultBranchId(),
+      branch: '', // No default - user must select
       status: statuses[0]?._id || '',
       description: '',
       valueExVat: '',
@@ -108,23 +99,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
 
   const [customerSelection, setCustomerSelection] = useState<'customer' | 'cash'>('customer');
 
-  /**
-   * Updates the branch field when branches prop changes or if no branch is currently selected.
-   * This ensures the default branch is set correctly even if branches load asynchronously.
-   */
-  useEffect(() => {
-    if (branches.length > 0) {
-      const defaultBranch = branches.find(b => b.isDefault === true) || branches[0];
-      const currentBranchExists = branches.find(b => b._id === formData.branch);
-      
-      // Only update if no branch is selected or the current branch doesn't exist in the list
-      if (!formData.branch || !currentBranchExists) {
-        if (defaultBranch?._id) {
-          setFormData(prev => ({ ...prev, branch: defaultBranch._id }));
-        }
-      }
-    }
-  }, [branches]);
+
 
   // Load technicians, service descriptions, rep codes, and admin codes on mount
   useEffect(() => {
@@ -342,6 +317,39 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
     setLoading(true);
 
     try {
+      // Collect all missing required fields
+      const missingFields: string[] = [];
+
+      if (!formData.branch) {
+        missingFields.push('Branch');
+      }
+
+      if (customerSelection === 'customer' && !formData.customer) {
+        missingFields.push('Customer');
+      } else if (customerSelection === 'cash' && (!formData.cashCustomer || !formData.cashCustomer.trim())) {
+        missingFields.push('Cash Customer Name');
+      }
+
+      if (!formData.adm) {
+        missingFields.push('Admin (ADM)');
+      }
+
+      if (!formData.repCode) {
+        missingFields.push('Rep Code');
+      }
+
+      if (!formData.description) {
+        missingFields.push('Service Description');
+      }
+
+      // If there are missing fields, show error with list
+      if (missingFields.length > 0) {
+        const fieldsList = missingFields.map(field => `• ${field}`).join('\n');
+        setError(`Please select the following fields before saving:\n\n${fieldsList}`);
+        setLoading(false);
+        return;
+      }
+
       // Validate job number if provided (super admin only)
       if (isSuperAdmin && formData.jobNumber && formData.jobNumber.trim()) {
         const jobNumberExists = await checkJobNumberExists(formData.jobNumber.trim());
@@ -415,25 +423,49 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white px-6 py-4 flex justify-between items-center rounded-t-2xl">
-          <h2 className="text-xl font-bold">Create New Job</h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-              <p className="text-sm text-red-800">{error}</p>
+    <>
+      {error && (
+        <div className="fixed inset-0 flex items-center justify-center p-4 z-[100] pointer-events-none">
+          <div className="bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-2xl shadow-2xl max-w-sm w-full p-6 pointer-events-auto relative">
+            <button
+              onClick={() => setError('')}
+              className="absolute top-4 right-4 text-white hover:bg-white/20 rounded-lg p-1 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-lg font-semibold text-center mb-4 pr-8">
+              Please make sure the following fields are completed before saving.
+            </h3>
+            <div className="text-center space-y-1">
+              {error.split('\n').filter(line => line.startsWith('•')).map((field, index) => (
+                <div key={index} className="text-sm">
+                  {field.replace('• ', '')}
+                </div>
+              ))}
             </div>
-          )}
+            <button
+              onClick={() => setError('')}
+              className="w-full mt-6 px-4 py-2.5 bg-white text-[#0969a9] rounded-lg font-medium hover:bg-gray-100 transition-all"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="sticky top-0 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white px-6 py-4 flex justify-between items-center rounded-t-2xl">
+            <h2 className="text-xl font-bold">Create New Job</h2>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="p-6 space-y-5">{/* Removed inline error display */}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {isSuperAdmin && (
@@ -475,7 +507,6 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
                     type="text"
-                    required={customerSelection === 'customer'}
                     value={customerSearchTerm}
                     onChange={(e) => {
                       const newValue = e.target.value;
@@ -564,7 +595,6 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                 </label>
                 <input
                   type="text"
-                  required={customerSelection === 'cash'}
                   value={formData.cashCustomer}
                   onChange={(e) => setFormData({ ...formData, cashCustomer: e.target.value })}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
@@ -578,7 +608,6 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                 Branch *
               </label>
               <select
-                required
                 value={formData.branch}
                 onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
@@ -601,7 +630,6 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                 Initial Status *
               </label>
               <select
-                required
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
@@ -1047,5 +1075,6 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
         </form>
       </div>
     </div>
+    </>
   );
 }

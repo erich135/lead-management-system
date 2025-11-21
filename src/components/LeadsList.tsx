@@ -1117,6 +1117,10 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                     .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                     .map((job, index) => {
                   const overdueInfo = getOverdueInfo(job._id);
+                  const serviceDescription =
+                    typeof job.description === 'string'
+                      ? job.description
+                      : job.description?.name;
                   return (
                     <div
                       key={job._id}
@@ -1166,6 +1170,14 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                             <p className="text-xs text-ars-body ml-6">Cash: {job.cashCustomer}</p>
                           )}
                         </div>
+
+                        {/* Service Description */}
+                        {serviceDescription && (
+                          <div className="mb-3 flex items-start gap-2 text-sm text-ars-body">
+                            <FileText className="w-4 h-4 text-ars-primary mt-0.5 flex-shrink-0" />
+                            <p className="text-ars-heading font-medium leading-snug">{serviceDescription}</p>
+                          </div>
+                        )}
 
                         {/* Dates */}
                         <div className="space-y-2 mb-3 text-xs text-ars-body">

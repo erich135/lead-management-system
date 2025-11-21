@@ -15,6 +15,7 @@ import {
   getImportHistory,
   importJobs,
   importCustomers,
+  updateJobs,
   downloadExampleCSV,
   getRepCodes,
   createRepCode,
@@ -55,7 +56,8 @@ import {
   UserCheck, 
   UserX, 
   Plus, 
-  X, 
+  X,
+  FileEdit, 
   Save, 
   Shield,
   Upload,
@@ -88,7 +90,7 @@ export function SystemManagement() {
   // Import state
   const [importHistory, setImportHistory] = useState<ImportHistory | null>(null);
   const [importing, setImporting] = useState(false);
-  const [importType, setImportType] = useState<'jobs' | 'customers' | null>(null);
+  const [importType, setImportType] = useState<'jobs' | 'customers' | 'update-jobs' | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [clearExisting, setClearExisting] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState<string>(''); // Branch ID or code
@@ -469,8 +471,10 @@ export function SystemManagement() {
         const branchId = selectedBranch && branches.find(b => b._id === selectedBranch) ? selectedBranch : undefined;
         const branchCode = selectedBranch && !branchId && branches.find(b => b.code === selectedBranch) ? selectedBranch : undefined;
         result = await importJobs(selectedFile, clearExisting, branchId, branchCode);
-      } else {
+      } else if (importType === 'customers') {
         result = await importCustomers(selectedFile, clearExisting);
+      } else if (importType === 'update-jobs') {
+        result = await updateJobs(selectedFile);
       }
 
       setImportResult(result.data);
@@ -1421,6 +1425,64 @@ export function SystemManagement() {
                   </button>
                 </div>
               </div>
+
+              {/* Update Jobs */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-ars-heading flex items-center gap-2">
+                    <FileEdit className="w-5 h-5 text-ars-primary" />
+                    Update Jobs
+                  </h3>
+                </div>
+                <p className="text-sm text-ars-body mb-4">
+                  Update existing jobs from a CSV file. CSV must contain: <strong>Job Number</strong>, <strong>Service Description</strong>, and/or <strong>Value Ex VAT</strong>.
+                </p>
+                <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-xs font-semibold text-ars-heading mb-2">CSV Column Names (Required):</p>
+                  <ul className="text-xs text-ars-body space-y-1 list-disc list-inside">
+                    <li><strong>Job Number</strong> (or <strong>Job #</strong>) - <span className="text-red-600">Required</span>: The job number to update</li>
+                  </ul>
+                  <p className="text-xs font-semibold text-ars-heading mb-2 mt-3">CSV Column Names (Optional):</p>
+                  <ul className="text-xs text-ars-body space-y-1 list-disc list-inside">
+                    <li><strong>Service Description</strong> (or <strong>Description</strong>) - Must match exactly with existing service descriptions in the database. If not found, the existing description will remain unchanged.</li>
+                    <li><strong>Value Ex VAT</strong> (or <strong>Value Ex Vat</strong>) - The value excluding VAT (numeric)</li>
+                  </ul>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-ars-body mb-2">Select CSV File</label>
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setSelectedFile(file);
+                          setImportType('update-jobs');
+                        }
+                      }}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    />
+                  </div>
+                  <button
+                    onClick={handleImport}
+                    disabled={!selectedFile || importing || importType !== 'update-jobs'}
+                    className="w-full px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {importing && importType === 'update-jobs' ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Updating...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        Update Jobs
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Import Result */}
@@ -1441,20 +1503,41 @@ export function SystemManagement() {
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
-                    <CheckCircle2 className="w-6 h-6 text-green-600" />
-                    <div>
-                      <p className="text-2xl font-bold text-green-700">{importResult.imported}</p>
-                      <p className="text-sm text-green-600">Imported</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-                    <CheckCircle2 className="w-6 h-6 text-blue-600" />
-                    <div>
-                      <p className="text-2xl font-bold text-blue-700">{importResult.updated}</p>
-                      <p className="text-sm text-blue-600">Updated</p>
-                    </div>
-                  </div>
+                  {importType === 'update-jobs' ? (
+                    <>
+                      <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+                        <CheckCircle2 className="w-6 h-6 text-green-600" />
+                        <div>
+                          <p className="text-2xl font-bold text-green-700">{importResult.updated || 0}</p>
+                          <p className="text-sm text-green-600">Updated</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 p-3 bg-orange-50 rounded-lg">
+                        <AlertCircle className="w-6 h-6 text-orange-600" />
+                        <div>
+                          <p className="text-2xl font-bold text-orange-700">{importResult.notFound || 0}</p>
+                          <p className="text-sm text-orange-600">Not Found</p>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+                        <CheckCircle2 className="w-6 h-6 text-green-600" />
+                        <div>
+                          <p className="text-2xl font-bold text-green-700">{importResult.imported || 0}</p>
+                          <p className="text-sm text-green-600">Imported</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+                        <CheckCircle2 className="w-6 h-6 text-blue-600" />
+                        <div>
+                          <p className="text-2xl font-bold text-blue-700">{importResult.updated || 0}</p>
+                          <p className="text-sm text-blue-600">Updated</p>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
                 {importResult.errors.length > 0 && (
                   <div className="mt-4">

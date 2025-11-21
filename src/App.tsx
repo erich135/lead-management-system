@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginPage } from './components/LoginPage';
 import { SetPasswordPage } from './components/SetPasswordPage';
+import { ResetPasswordPage } from './components/ResetPasswordPage';
 import { Dashboard } from './components/Dashboard';
 import { ChatWidget } from './components/ChatWidget';
 
@@ -73,6 +74,11 @@ function AppContent() {
             <SetPasswordPage />
           </SetPasswordRoute>
         } />
+        <Route path="/reset-password" element={
+          <SetPasswordRoute>
+            <ResetPasswordPage />
+          </SetPasswordRoute>
+        } />
         <Route path="/dashboard" element={
           <ProtectedRoute>
             <Dashboard view="dashboard" />
@@ -106,7 +112,7 @@ function AppContent() {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
-      
+
       {/* Chat widget - only show when logged in */}
       {user && <ChatWidget />}
     </>

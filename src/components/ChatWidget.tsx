@@ -15,6 +15,10 @@ import { useChatSocket } from '../lib/useChatSocket';
 
 export function ChatWidget() {
   const { user } = useAuth();
+  const allowedRoles = new Set(['super_admin','admin','manager']);
+  if (!user || !allowedRoles.has(user.role.name)) {
+    return null; // Hide chat for disallowed roles
+  }
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [users, setUsers] = useState<ChatUser[]>([]);
@@ -259,12 +263,15 @@ export function ChatWidget() {
     return mimeType.startsWith('image/');
   };
 
+  // Adjusted positioning to avoid overlap with Add Job floating action button
+  // Previous: bottom-6 right-6. New: bottom-24 right-8.
   if (!isOpen) {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-all z-50"
+        className="fixed bottom-24 right-8 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-all z-50"
         title="Open Chat"
+        aria-label="Open Chat"
       >
         <MessageSquare size={24} />
         {unreadCount > 0 && (
@@ -280,7 +287,7 @@ export function ChatWidget() {
   }
 
   return (
-    <div className={`fixed bottom-6 right-6 bg-white rounded-lg shadow-2xl z-50 flex flex-col ${isMinimized ? 'h-14' : 'h-[600px]'} w-96 transition-all`}>
+    <div className={`fixed bottom-24 right-8 bg-white rounded-lg shadow-2xl z-50 flex flex-col ${isMinimized ? 'h-14' : 'h-[600px]'} w-96 transition-all`}>
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b bg-blue-600 text-white rounded-t-lg">
         <div className="flex items-center space-x-2">

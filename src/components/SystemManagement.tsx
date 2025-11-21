@@ -659,6 +659,7 @@ export function SystemManagement() {
         description: editingStatus.description,
         sortOrder: editingStatus.sortOrder,
         isActive: editingStatus.isActive,
+        isHidden: editingStatus.isHidden || false,
       });
       setStatuses(statuses.map(s => s._id === editingStatus._id ? response.status : s).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)));
       setEditingStatus(null);
@@ -1606,6 +1607,21 @@ export function SystemManagement() {
                           Active
                         </label>
                       </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="status-hidden"
+                          checked={editingStatus.isHidden || false}
+                          onChange={(e) => setEditingStatus({ ...editingStatus, isHidden: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary"
+                        />
+                        <label htmlFor="status-hidden" className="text-sm text-ars-body cursor-pointer">
+                          Hide from Job Listings
+                        </label>
+                        <span className="text-xs text-ars-body italic">
+                          (Jobs with this status will be hidden from default job listings)
+                        </span>
+                      </div>
                     </div>
                   )}
                   <div className="flex gap-3 mt-4">
@@ -1654,6 +1670,11 @@ export function SystemManagement() {
                         }`}>
                           {status.isActive ? 'Active' : 'Inactive'}
                         </span>
+                        {status.isHidden && (
+                          <span className="px-2 py-1 text-xs font-medium rounded-lg bg-orange-100 text-orange-700">
+                            Hidden
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">

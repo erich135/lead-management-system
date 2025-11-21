@@ -13,7 +13,7 @@ interface LeadsListProps {
 }
 
 export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refreshKey }: LeadsListProps) {
-  const { user } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
   const [overdueJobs, setOverdueJobs] = useState<OverdueJob[]>([]);
@@ -23,6 +23,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
   const [admFilter, setAdmFilter] = useState<string>('all');
   const [repCodeFilter, setRepCodeFilter] = useState<string>('all');
   const [technicianFilter, setTechnicianFilter] = useState<string>('all');
+  const [showHiddenJobs, setShowHiddenJobs] = useState(false); // Toggle for Super Admins to show hidden jobs
   const [priorityFilter, setPriorityFilter] = useState<{
     overdue: boolean;
     approaching: boolean;
@@ -99,7 +100,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
     } else {
       loadOverdueJobsList();
     }
-  }, [priorityFilter.all]); // Only trigger when all changes, not the whole object
+  }, [priorityFilter.all, showHiddenJobs]); // Reload when all changes OR when showHiddenJobs changes
 
   // Refresh jobs when refreshKey changes (triggered from parent after job creation)
   useEffect(() => {
@@ -251,6 +252,10 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       isLoadingAllJobsRef.current = true; // Prevent filter-change effect from running
       isAllJobsModeRef.current = true; // Mark that we're in "all jobs" mode (prevents overdue requests from overwriting)
       
+      // Clear existing jobs immediately to show loading state
+      setJobs([]);
+      setFilteredJobs([]);
+      
       // Load all jobs without date restrictions
       // We'll need to paginate through multiple pages to get all jobs
       let allJobs: Job[] = [];
@@ -265,6 +270,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
           page: currentPage,
           limit: pageSize,
           allTime: 'true', // Get ALL jobs, not just last 3 months
+          includeHidden: showHiddenJobs ? true : undefined, // If true, show only hidden jobs. If false/undefined, exclude hidden jobs.
         });
         
         const jobsList = data.jobs || [];
@@ -841,6 +847,38 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                 </label>
               </div>
             </div>
+
+            {/* Show Hidden Jobs Toggle (Super Admin Only) */}
+            {isSuperAdmin && (
+              <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-xl">
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={showHiddenJobs}
+                    onChange={(e) => {
+                      const newValue = e.target.checked;
+                      setShowHiddenJobs(newValue);
+                      // Ensure we're in "All Jobs" mode when toggling hidden jobs
+                      if (!priorityFilter.all) {
+                        setPriorityFilter({ ...priorityFilter, all: true, overdue: false, approaching: false, open: false });
+                      }
+                    }}
+                    className="w-5 h-5 rounded border-gray-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                  />
+                  <div className="flex items-center gap-2 flex-1">
+                    <Eye className="w-4 h-4 text-orange-600" />
+                    <span className="text-sm font-medium text-ars-heading group-hover:text-orange-700 transition-colors">
+                      Show Hidden Jobs
+                    </span>
+                  </div>
+                </label>
+                <p className="text-xs text-ars-body mt-2 ml-8">
+                  {showHiddenJobs 
+                    ? 'Showing only jobs with hidden statuses. Toggle off to return to normal view.' 
+                    : 'Toggle to view jobs with statuses marked as "Hidden" in System Admin.'}
+                </p>
+              </div>
+            )}
 
             {/* Search */}
             <div className="mb-6">

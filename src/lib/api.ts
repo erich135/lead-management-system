@@ -396,6 +396,7 @@ export async function getJobs(params?: {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   allTime?: string;
+  includeHidden?: boolean; // If true, show only hidden jobs. If false/undefined, exclude hidden jobs.
 }): Promise<{ jobs: Job[]; pagination: { page: number; limit: number; total: number; pages: number } }> {
   const queryParams = new URLSearchParams();
   if (params?.status) queryParams.append('status', params.status);
@@ -409,6 +410,7 @@ export async function getJobs(params?: {
   if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
   if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
   if (params?.allTime) queryParams.append('allTime', params.allTime);
+  if (params?.includeHidden !== undefined) queryParams.append('includeHidden', params.includeHidden.toString());
   
   const query = queryParams.toString();
   return apiRequest(`/api/jobs${query ? `?${query}` : ''}`);
@@ -459,6 +461,8 @@ export interface Status {
   name: string;
   sortOrder: number;
   description?: string;
+  isActive?: boolean;
+  isHidden?: boolean;
 }
 
 export interface Customer {

@@ -105,17 +105,17 @@ export function UserManagement({ users, branches, onUpdate }: UserManagementProp
         <div className="flex gap-3">
           <button
             onClick={() => setShowBranchForm(true)}
-            className="px-4 py-2 border border-slate-300 rounded-lg font-medium hover:bg-slate-50 transition-colors flex items-center gap-2"
+            className="px-4 py-2 border border-slate-300 rounded-lg font-bold text-[14px] hover:bg-slate-50 transition-colors flex items-center gap-2"
           >
             <Plus className="w-5 h-5" />
-            New Branch
+            NEW BRANCH
           </button>
           <button
             onClick={() => setShowForm(true)}
-            className="bg-slate-900 text-white px-4 py-2 rounded-lg font-medium hover:bg-slate-800 transition-colors flex items-center gap-2"
+            className="bg-slate-900 text-white px-4 py-2 rounded-lg font-bold text-[14px] hover:bg-slate-800 transition-colors flex items-center gap-2"
           >
             <Plus className="w-5 h-5" />
-            New User
+            NEW USER
           </button>
         </div>
       </div>
@@ -198,7 +198,7 @@ export function UserManagement({ users, branches, onUpdate }: UserManagementProp
               )}
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Full Name *
                 </label>
                 <input
@@ -206,25 +206,25 @@ export function UserManagement({ users, branches, onUpdate }: UserManagementProp
                   required
                   value={userForm.full_name}
                   onChange={(e) => setUserForm({ ...userForm, full_name: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent text-[15px]"
                   placeholder="John Doe"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Email *</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Email *</label>
                 <input
                   type="email"
                   required
                   value={userForm.email}
                   onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent text-[15px]"
                   placeholder="john@company.com"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Password *
                 </label>
                 <input
@@ -232,18 +232,18 @@ export function UserManagement({ users, branches, onUpdate }: UserManagementProp
                   required
                   value={userForm.password}
                   onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent text-[15px]"
                   placeholder="••••••••"
                   minLength={6}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Role *</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Role *</label>
                 <select
                   value={userForm.role}
                   onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent text-[15px]"
                 >
                   <option value="user">User</option>
                   <option value="admin">Admin</option>
@@ -251,11 +251,11 @@ export function UserManagement({ users, branches, onUpdate }: UserManagementProp
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Branch</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Branch</label>
                 <select
                   value={userForm.branch_id}
                   onChange={(e) => setUserForm({ ...userForm, branch_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent text-[15px]"
                 >
                   <option value="">No Branch</option>
                   {branches.map((branch) => (
@@ -270,16 +270,16 @@ export function UserManagement({ users, branches, onUpdate }: UserManagementProp
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="flex-1 px-4 py-2 border border-slate-300 rounded-lg font-medium hover:bg-slate-50 transition-colors"
+                  className="flex-1 px-4 py-2 border border-slate-300 rounded-lg font-bold text-[14px] hover:bg-slate-50 transition-colors"
                 >
-                  Cancel
+                  CANCEL
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-lg font-bold text-[14px] hover:bg-slate-800 transition-colors disabled:opacity-50"
                 >
-                  {loading ? 'Creating...' : 'Create User'}
+                  {loading ? 'CREATING...' : 'CREATE USER'}
                 </button>
               </div>
             </form>
@@ -309,7 +309,7 @@ export function UserManagement({ users, branches, onUpdate }: UserManagementProp
               )}
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Branch Name *
                 </label>
                 <input
@@ -317,18 +317,18 @@ export function UserManagement({ users, branches, onUpdate }: UserManagementProp
                   required
                   value={branchForm.name}
                   onChange={(e) => setBranchForm({ ...branchForm, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent text-[15px]"
                   placeholder="Main Office"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Location</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Location</label>
                 <input
                   type="text"
                   value={branchForm.location}
                   onChange={(e) => setBranchForm({ ...branchForm, location: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent text-[15px]"
                   placeholder="123 Main St, City, State"
                 />
               </div>
@@ -337,16 +337,16 @@ export function UserManagement({ users, branches, onUpdate }: UserManagementProp
                 <button
                   type="button"
                   onClick={() => setShowBranchForm(false)}
-                  className="flex-1 px-4 py-2 border border-slate-300 rounded-lg font-medium hover:bg-slate-50 transition-colors"
+                  className="flex-1 px-4 py-2 border border-slate-300 rounded-lg font-bold text-[14px] hover:bg-slate-50 transition-colors"
                 >
-                  Cancel
+                  CANCEL
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-lg font-bold text-[14px] hover:bg-slate-800 transition-colors disabled:opacity-50"
                 >
-                  {loading ? 'Creating...' : 'Create Branch'}
+                  {loading ? 'CREATING...' : 'CREATE BRANCH'}
                 </button>
               </div>
             </form>

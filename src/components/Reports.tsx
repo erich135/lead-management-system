@@ -810,7 +810,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
   if (loading && userJobs.length === 0 && customerJobs.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-white flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ars-primary mx-auto mb-4"></div>
           <p className="text-ars-body">Loading report data...</p>
@@ -820,7 +820,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-white p-6">
+    <div className="min-h-screen bg-white p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
@@ -828,29 +828,29 @@ export function Reports({ statuses, branches }: ReportsProps) {
           {activeTab === 'user-performance' && (
             <button
               onClick={exportUserPerformanceReport}
-              className="bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-4 py-2 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 text-sm"
+              className="bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-4 py-2 rounded-xl font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
             >
               <Download className="w-4 h-4" />
-              Export Report
+              EXPORT REPORT
             </button>
           )}
           {activeTab === 'customer' && (
             <button
               onClick={exportCustomerReport}
               disabled={!selectedCustomerId}
-              className="bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-4 py-2 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-4 py-2 rounded-xl font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Download className="w-4 h-4" />
-              Export Report
+              EXPORT REPORT
             </button>
           )}
           {activeTab === 'machine' && (
             <button
               onClick={exportMachineReport}
-              className="bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-4 py-2 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 text-sm"
+              className="bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-4 py-2 rounded-xl font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
             >
               <Download className="w-4 h-4" />
-              Export Report
+              EXPORT REPORT
             </button>
           )}
         </div>
@@ -920,7 +920,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       setSelectedTechnician('');
                     }}
                     disabled={!currentUser?.isSuperAdmin}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px] disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="admin">Admin</option>
                     <option value="rep">Rep</option>
@@ -939,7 +939,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       value={selectedAdminCode}
                       onChange={(e) => setSelectedAdminCode(e.target.value)}
                       disabled={!currentUser?.isSuperAdmin}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px] disabled:bg-gray-100 disabled:cursor-not-allowed"
                     >
                       <option value="">Select Admin Code</option>
                       {adminCodes.map(ac => (
@@ -958,7 +958,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       value={selectedRepCode}
                       onChange={(e) => setSelectedRepCode(e.target.value)}
                       disabled={!currentUser?.isSuperAdmin}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px] disabled:bg-gray-100 disabled:cursor-not-allowed"
                     >
                       <option value="">Select Rep Code</option>
                       {repCodes.map(rc => (
@@ -977,7 +977,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       value={selectedTechnician}
                       onChange={(e) => setSelectedTechnician(e.target.value)}
                       disabled={!currentUser?.isSuperAdmin}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px] disabled:bg-gray-100 disabled:cursor-not-allowed"
                     >
                       <option value="">Select Technician</option>
                       {technicians.map(t => (
@@ -998,7 +998,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                   <select
                     value={dateRangePreset}
                     onChange={(e) => setDateRangePreset(e.target.value as DateRangePreset)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
                   >
                     <option value="today">Today</option>
                     <option value="this-month">This Month</option>
@@ -1016,7 +1016,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                         type="date"
                         value={customDateFrom}
                         onChange={(e) => setCustomDateFrom(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
                       />
                     </div>
                     <div>
@@ -1025,7 +1025,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                         type="date"
                         value={customDateTo}
                         onChange={(e) => setCustomDateTo(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
                       />
                     </div>
                   </>
@@ -1213,7 +1213,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                   <select
                     value={selectedCustomerId}
                     onChange={(e) => setSelectedCustomerId(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
                   >
                     <option value="">Select Customer</option>
                     {customers.map(customer => (
@@ -1231,7 +1231,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                   <select
                     value={dateRangePreset}
                     onChange={(e) => setDateRangePreset(e.target.value as DateRangePreset)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
                   >
                     <option value="today">Today</option>
                     <option value="this-month">This Month</option>
@@ -1247,7 +1247,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                         type="date"
                         value={customDateFrom}
                         onChange={(e) => setCustomDateFrom(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
                       />
                     </div>
                     <div>
@@ -1256,7 +1256,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                         type="date"
                         value={customDateTo}
                         onChange={(e) => setCustomDateTo(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
                       />
                     </div>
                   </>
@@ -1464,7 +1464,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     placeholder="Filter by make..."
                     value={machineMakeFilter}
                     onChange={(e) => setMachineMakeFilter(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
                   />
                 </div>
                 <div>
@@ -1474,7 +1474,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     placeholder="Filter by model..."
                     value={machineModelFilter}
                     onChange={(e) => setMachineModelFilter(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
                   />
                 </div>
                 <div>
@@ -1484,7 +1484,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     placeholder="Filter by serial number..."
                     value={machineSerialFilter}
                     onChange={(e) => setMachineSerialFilter(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
                   />
                 </div>
               </div>

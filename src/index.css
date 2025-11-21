@@ -4,6 +4,9 @@
 
 /* Mobile app-like styles */
 @layer base {
+  body {
+    font-family: 'Poppins', sans-serif;
+  }
   /* Prevent text selection on mobile for app-like feel */
   @media (max-width: 768px) {
     * {

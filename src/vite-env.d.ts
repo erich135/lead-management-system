@@ -1,1 +1,1 @@
-/// <reference types="vite/client" />
+.env/// <reference types="vite/client" />

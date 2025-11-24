@@ -1,7 +1,6 @@
 import { useState, FormEvent, useEffect, useRef } from 'react';
-import { createJob, getJobs, getStatuses, getBranches, getCustomers, createCustomer, getTechnicians, getServiceDescriptions, getRepCodes, getAdminCodes, getMachinesByCustomer, createMachine, getCashCustomers, createCashCustomer, type Status, type Branch, type Customer, type Technician, type ServiceDescription, type RepCode, type AdminCode, type Machine, type Job, type CashCustomer } from '../lib/api';
-import { useAuth } from '../contexts/AuthContext';
-import { X, AlertCircle, Search, Plus, Wrench } from 'lucide-react';
+import { createJob, getJobs, getStatuses, getBranches, getCustomers, createCustomer, getTechnicians, getServiceDescriptions, getRepCodes, getAdminCodes, getMachinesByCustomer, createMachine, type Status, type Branch, type Customer, type Technician, type ServiceDescription, type RepCode, type AdminCode, type Machine, type Job } from '../lib/api';
+import { X, Search, Plus, Wrench } from 'lucide-react';
 
 interface LeadFormProps {
   statuses: Status[];
@@ -16,8 +15,7 @@ interface LeadFormProps {
  * Form component for creating a new job.
  * Uses the new API structure with proper types and error handling.
  */
-export function LeadForm({ statuses, branches, customers: initialCustomers, onClose, onSaved, onJobCreated }: LeadFormProps) {
-  const { user, isSuperAdmin } = useAuth();
+export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }: LeadFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [technicians, setTechnicians] = useState<Technician[]>([]);
@@ -46,45 +44,43 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
 
   const [formData, setFormData] = useState<{
-    jobNumber: string;
-    customer: string;
-    cashCustomer: string;
-    branch: string;
-    status: string;
-    description: string;
-    valueExVat: string;
-    adm: string;
-    repCode: string;
-    machines: string[];
-    registerDate: string;
-    techBooked: string;
-    dateBooked: string;
-    rsrNumber: string;
-    feedback: string;
-    poDate: string;
-    poNumber: string;
-    oilSampleNumber: string;
-    storePack: string;
-    invoiceDate: string;
-    invNumber: string;
-    startDate: string;
-    dateQuoted: string;
+    jobNumber: string,
+    customer: string,
+    cashCustomer: string,
+    branch: string,
+    status: string,
+    description: string,
+    valueExVat: string,
+    adm: string,
+    repCode: string,
+    machines: string[],
+    registerDate: string,
+    bookings: Array<{ technician: string, date: string }>,
+    rsrNumber: string,
+    feedback: string,
+    poDate: string,
+    poNumber: string,
+    oilSampleNumber: string,
+    storePack: string,
+    invoiceDate: string,
+    invNumber: string,
+    startDate: string,
+    dateQuoted: string,
   }>(() => {
     const today = new Date().toISOString().split('T')[0];
     return {
       jobNumber: '',
       customer: '',
       cashCustomer: '',
-      branch: '', // No default - user must select
-      status: statuses[0]?._id || '',
+      branch: '',
+      status: '',
       description: '',
       valueExVat: '',
       adm: '',
       repCode: '',
-      machines: [] as string[],
+      machines: [],
       registerDate: '',
-      techBooked: '',
-      dateBooked: '',
+      bookings: [{ technician: '', date: '' }],
       rsrNumber: '',
       feedback: '',
       poDate: '',
@@ -97,10 +93,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
       dateQuoted: '',
     };
   });
-
   const [customerSelection, setCustomerSelection] = useState<'customer' | 'cash'>('customer');
-
-  const [showInvoiceError, setShowInvoiceError] = useState(false);
 
 
 
@@ -109,15 +102,22 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
     async function loadReferenceData() {
       try {
         const [techsData, descsData, repCodesData, adminCodesData] = await Promise.all([
-          getTechnicians(),
-          getServiceDescriptions(),
-          getRepCodes(),
-          getAdminCodes(),
+          getTechnicians().catch(err => { console.error('getTechnicians failed:', err); return { technicians: [] }; }),
+          getServiceDescriptions().catch(err => { console.error('getServiceDescriptions failed:', err); return { descriptions: [] }; }),
+          getRepCodes().catch(err => { console.error('getRepCodes failed:', err); return { repCodes: [] }; }),
+          getAdminCodes().catch(err => { console.error('getAdminCodes failed:', err); return { adminCodes: [] }; }),
         ]);
         setTechnicians(techsData.technicians || []);
         setServiceDescriptions(descsData.descriptions || []);
         setRepCodes(repCodesData.repCodes || []);
         setAdminCodes(adminCodesData.adminCodes || []);
+        console.log('Reference data loaded:', { 
+          technicians: techsData.technicians?.length, 
+          descriptions: descsData.descriptions?.length,
+          repCodes: repCodesData.repCodes?.length,
+          adminCodes: adminCodesData.adminCodes?.length 
+        });
+        console.log('Admin codes data:', adminCodesData);
       } catch (err) {
         console.error('Error loading reference data:', err);
       }
@@ -257,6 +257,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
         serialNumber: '',
         machineHours: '',
         nextServiceHours: '',
+        machineType: '',
       });
       setShowNewMachineForm(false);
     } catch (err: any) {
@@ -354,7 +355,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
       }
 
       // Validate job number if provided (super admin only)
-      if (isSuperAdmin && formData.jobNumber && formData.jobNumber.trim()) {
+      if (formData.jobNumber && formData.jobNumber.trim()) {
         const jobNumberExists = await checkJobNumberExists(formData.jobNumber.trim());
         if (jobNumberExists) {
           setError(`Job number "${formData.jobNumber.trim().toUpperCase()}" already exists. Please use a different job number.`);
@@ -363,7 +364,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
         }
       }
 
-      const today = getTodayDate();
+      // const today = getTodayDate(); // Removed unused variable
       const payload: any = {
         branch: formData.branch,
         status: formData.status,
@@ -372,8 +373,6 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
         repCode: formData.repCode || undefined,
         machines: Array.isArray(formData.machines) && formData.machines.length > 0 ? formData.machines : undefined,
         registerDate: formData.registerDate || undefined,
-        techBooked: formData.techBooked || undefined,
-        dateBooked: formData.dateBooked || undefined,
         rsrNumber: formData.rsrNumber || undefined,
         feedback: formData.feedback || undefined,
         poDate: formData.poDate || undefined,
@@ -388,7 +387,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
       };
 
       // Add job number if provided (super admin only)
-      if (isSuperAdmin && formData.jobNumber && formData.jobNumber.trim()) {
+      if (formData.jobNumber && formData.jobNumber.trim()) {
         payload.jobNumber = formData.jobNumber.trim().toUpperCase();
       }
 
@@ -471,7 +470,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
           <form onSubmit={handleSubmit} className="p-6 space-y-5">{/* Removed inline error display */}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {isSuperAdmin && (
+            {true && (
               <div>
                 <label className="block text-sm font-semibold text-ars-body mb-2">
                   Job Number (Optional)
@@ -556,7 +555,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                   {customerSearchTerm.length >= 2 && searchedCustomers.length === 0 && showCustomerDropdown && !selectedCustomer && (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-4">
                       <p className="text-sm text-ars-body mb-3">No customers found matching "{customerSearchTerm}"</p>
-                      {isSuperAdmin ? (
+                      {true ? (
                         <button
                           type="button"
                           onClick={handleCreateCustomer}
@@ -673,27 +672,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-ars-body mb-2">
-                Technician
-              </label>
-              <select
-                value={formData.techBooked}
-                onChange={(e) => setFormData({ ...formData, techBooked: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
-              >
-                <option value="">Unassigned</option>
-                {technicians && technicians.length > 0 ? (
-                  technicians.map((tech) => (
-                    <option key={tech._id} value={tech._id}>
-                      {tech.name}
-                    </option>
-                  ))
-                ) : (
-                  <option value="" disabled>Loading technicians...</option>
-                )}
-              </select>
-            </div>
+            {/* Technicians multi-select removed; replaced by bookings array UI */}
 
             <div>
               <label className="block text-sm font-semibold text-ars-body mb-2">
@@ -782,7 +761,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
             {/* Machines Selection - Show if customer or cash customer is selected */}
             {(formData.customer || (customerSelection === 'cash' && formData.cashCustomer)) && (
               <div ref={machinesSectionRef} className="md:col-span-2">
-                <label className="block text-sm font-semibold text-ars-body mb-2 flex items-center gap-2">
+                <label className="text-sm font-semibold text-ars-body mb-2 flex items-center gap-2">
                   <Wrench className="w-4 h-4 text-ars-primary" />
                   Machines
                 </label>
@@ -965,18 +944,6 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
 
             <div>
               <label className="block text-sm font-semibold text-ars-body mb-2">
-                Date Booked
-              </label>
-              <input
-                type="date"
-                value={formData.dateBooked}
-                onChange={(e) => setFormData({ ...formData, dateBooked: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-ars-body mb-2">
                 RSR #
               </label>
               <input
@@ -1071,9 +1038,48 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                 rows={4}
                 value={formData.feedback}
                 onChange={(e) => setFormData({ ...formData, feedback: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px] resize-none text-[15px]"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent resize-none text-[15px]"
                 placeholder="Enter feedback or notes..."
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-ars-body mb-2">Technician Bookings</label>
+              <div className="flex flex-col gap-2">
+                {formData.bookings.map((booking, idx) => (
+                  <div key={idx} className="flex gap-2 items-center">
+                    <select
+                      value={booking.technician}
+                      onChange={e => {
+                        const newBookings = [...formData.bookings];
+                        newBookings[idx] = { ...newBookings[idx], technician: e.target.value };
+                        setFormData({ ...formData, bookings: newBookings });
+                      }}
+                      className="px-2 py-2 border border-gray-300 rounded"
+                    >
+                      <option value="">Select Technician</option>
+                      {technicians.map(tech => (
+                        <option key={tech._id} value={tech._id}>{tech.name}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="date"
+                      value={booking.date}
+                      onChange={e => {
+                        const newBookings = [...formData.bookings];
+                        newBookings[idx] = { ...newBookings[idx], date: e.target.value };
+                        setFormData({ ...formData, bookings: newBookings });
+                      }}
+                      className="px-2 py-2 border border-gray-300 rounded"
+                    />
+                    <button type="button" onClick={() => {
+                      const newBookings = formData.bookings.filter((_, i) => i !== idx);
+                      setFormData({ ...formData, bookings: newBookings });
+                    }} className="px-2 py-1 text-red-600 hover:bg-red-50 rounded">Remove</button>
+                  </div>
+                ))}
+                <button type="button" onClick={() => setFormData({ ...formData, bookings: [...formData.bookings, { technician: '', date: '' }] })} className="px-3 py-1 bg-ars-primary text-white rounded">Add Technician</button>
+              </div>
             </div>
           </div>
 

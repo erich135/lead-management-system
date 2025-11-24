@@ -112,7 +112,12 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   async function loadJobDetails() {
     try {
       const response = await getJob(initialLead._id);
-      setJob(normalizeJob(response.job));
+      const normalizedJob = normalizeJob(response.job);
+      // Ensure bookings array exists
+      if (!normalizedJob.bookings) {
+        normalizedJob.bookings = [];
+      }
+      setJob(normalizedJob);
       if (response.reminder && response.reminder.followUpLevel) {
         setFollowUpReminder(response.reminder);
       } else {
@@ -423,7 +428,35 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
       } else if (payload.customer) {
         payload.cashCustomer = null;
       }
-      await updateJob(job._id, payload);
+      // Include bookings array (ensure it's properly formatted)
+      if (payload.bookings && Array.isArray(payload.bookings)) {
+        payload.bookings = payload.bookings.map((b: any) => ({
+          technicianId: b.technicianId,
+          startDate: b.startDate,
+          endDate: b.endDate,
+          startTime: b.startTime,
+          endTime: b.endTime,
+          location: b.location,
+          notes: b.notes
+        }));
+        console.log('Sending bookings to API:', payload.bookings);
+      } else {
+        console.log('No bookings in payload or not an array:', payload.bookings);
+      }
+      console.log('Full payload being sent:', payload);
+      const response = await updateJob(job._id, payload);
+      console.log('Update job response:', response);
+      
+      // Update local job state with the response which includes bookings
+      if (response?.job) {
+        const normalizedJob = normalizeJob(response.job);
+        if (!normalizedJob.bookings) {
+          normalizedJob.bookings = [];
+        }
+        setJob(normalizedJob);
+        console.log('Job state updated with bookings:', normalizedJob.bookings);
+      }
+      
       setIsEditing(false);
       onUpdate();
     } catch (err: any) {
@@ -732,47 +765,73 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">Technician</label>
+                  <label className="block text-sm font-semibold text-ars-body mb-2">Technician Bookings</label>
                   {isEditing ? (
-                    <select
-                      value={job.techBooked?._id || ''}
-                      onChange={(e) => {
-                        const selectedId = e.target.value || '';
-                        if (!selectedId) {
-                          setJob({ ...job, techBooked: undefined });
-                          return;
-                        }
-                        const technicianObj = technicians.find((tech) => tech._id === selectedId);
-                        setJob({
-                          ...job,
-                          techBooked: {
-                            _id: selectedId,
-                            name:
-                              technicianObj?.name ||
-                              (typeof job.techBooked === 'object' ? job.techBooked?.name : ''),
-                          },
-                        });
-                      }}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
-                    >
-                      <option value="">Unassigned</option>
-                      {technicians && technicians.length > 0 ? (
-                        technicians
-                          .filter((tech) => tech.isActive !== false)
-                          .map((tech) => (
-                            <option key={tech._id} value={tech._id}>
-                              {tech.name}
-                            </option>
-                          ))
-                      ) : (
-                        <option value="" disabled>
-                          {technicians.length === 0 ? 'Loading technicians...' : 'No technicians available'}
-                        </option>
-                      )}
-                    </select>
+                    <div className="space-y-2">
+                      {(job.bookings || []).map((booking, idx) => (
+                        <div key={idx} className="flex gap-2 items-center">
+                          <select
+                            value={booking.technicianId || ''}
+                            onChange={e => {
+                              const updated = [...(job.bookings || [])];
+                              updated[idx].technicianId = e.target.value;
+                              setJob({ ...job, bookings: updated });
+                            }}
+                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm flex-shrink-0"
+                          >
+                            <option value="">Select Technician</option>
+                            {technicians.map(tech => (
+                              <option key={tech._id} value={tech._id}>{tech.name}</option>
+                            ))}
+                          </select>
+                          <label className="text-xs text-gray-600 flex-shrink-0">From:</label>
+                          <input
+                            type="date"
+                            value={booking.startDate ? booking.startDate.split('T')[0] : ''}
+                            onChange={e => {
+                              const updated = [...(job.bookings || [])];
+                              updated[idx].startDate = e.target.value;
+                              setJob({ ...job, bookings: updated });
+                            }}
+                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                          <label className="text-xs text-gray-600 flex-shrink-0">To:</label>
+                          <input
+                            type="date"
+                            value={booking.endDate ? booking.endDate.split('T')[0] : ''}
+                            onChange={e => {
+                              const updated = [...(job.bookings || [])];
+                              updated[idx].endDate = e.target.value;
+                              setJob({ ...job, bookings: updated });
+                            }}
+                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                          <button type="button" onClick={() => {
+                            const updated = (job.bookings || []).filter((_, i) => i !== idx);
+                            setJob({ ...job, bookings: updated });
+                          }} className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors flex-shrink-0">Remove</button>
+                        </div>
+                      ))}
+                      <button type="button" onClick={() => {
+                        setJob({ ...job, bookings: [...(job.bookings || []), { technicianId: '', startDate: '', endDate: '' }] });
+                      }} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">Add Booking</button>
+                    </div>
                   ) : (
                     <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                      <span className="text-ars-heading">{job.techBooked?.name || '-'}</span>
+                      {(job.bookings || []).length > 0 ? (
+                        <ul className="space-y-1">
+                          {job.bookings.map((booking, idx) => {
+                            const tech = technicians.find(t => t._id === booking.technicianId);
+                            const startDate = booking.startDate ? booking.startDate.split('T')[0] : '';
+                            const endDate = booking.endDate ? booking.endDate.split('T')[0] : '';
+                            return (
+                              <li key={idx} className="text-ars-heading">
+                                <span className="font-medium">{tech?.name || 'Unknown'}</span> - {startDate} to {endDate}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : <span className="text-ars-heading">No bookings</span>}
                     </div>
                   )}
                 </div>
@@ -827,22 +886,6 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                   ) : (
                     <div className="px-4 py-3 bg-gray-50 rounded-xl">
                       <span className="text-ars-heading">{formatDate(job.registerDate)}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">Date Booked</label>
-                  {isEditing ? (
-                    <input
-                      type="date"
-                      value={job.dateBooked ? (typeof job.dateBooked === 'string' ? job.dateBooked.split('T')[0] : new Date(job.dateBooked).toISOString().split('T')[0]) : ''}
-                      onChange={(e) => setJob({ ...job, dateBooked: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
-                    />
-                  ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                      <span className="text-ars-heading">{formatDate(job.dateBooked)}</span>
                     </div>
                   )}
                 </div>

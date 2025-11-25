@@ -1582,6 +1582,176 @@ export async function searchChatMessages(query: string, userId?: string, limit =
   return response.messages;
 }
 
+/**
+ * Job RSR Document and Notes API functions.
+ */
+
+export interface JobRSRDocument {
+  _id: string;
+  jobId: string;
+  title: string;
+  fileName: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  visibility: 'all' | 'private';
+  uploadedBy: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JobNoteAttachment {
+  _id: string;
+  fileName: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+}
+
+export interface JobNote {
+  _id: string;
+  jobId: string;
+  text: string;
+  attachments: JobNoteAttachment[];
+  visibility: 'all' | 'private';
+  createdBy: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Upload RSR document for a job.
+ */
+export async function uploadRSRDocument(
+  jobId: string,
+  file: File,
+  title: string,
+  visibility: 'all' | 'private' = 'all'
+): Promise<JobRSRDocument> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('title', title);
+  formData.append('visibility', visibility);
+
+  const token = getAuthToken();
+  const response = await fetch(`${API_BASE_URL}/api/jobs/${jobId}/rsr-documents`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || 'Failed to upload RSR document');
+  }
+
+  const data = await response.json();
+  return data.data.rsrDocument;
+}
+
+/**
+ * Get all RSR documents for a job.
+ */
+export async function getRSRDocuments(jobId: string): Promise<JobRSRDocument[]> {
+  const response = await apiRequest<{ rsrDocuments: JobRSRDocument[] }>(`/api/jobs/${jobId}/rsr-documents`);
+  return response.rsrDocuments;
+}
+
+/**
+ * Download RSR document.
+ */
+export function getRSRDocumentUrl(documentId: string): string {
+  const token = getAuthToken();
+  return `${API_BASE_URL}/api/rsr-documents/${documentId}?token=${token}`;
+}
+
+/**
+ * Delete RSR document (super admin only).
+ */
+export async function deleteRSRDocument(documentId: string): Promise<void> {
+  await apiRequest(`/api/rsr-documents/${documentId}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Create a note for a job.
+ */
+export async function createJobNote(
+  jobId: string,
+  text: string,
+  visibility: 'all' | 'private' = 'all',
+  attachmentIds: string[] = []
+): Promise<JobNote> {
+  const response = await apiRequest<{ note: JobNote }>(`/api/jobs/${jobId}/notes`, {
+    method: 'POST',
+    body: JSON.stringify({ text, visibility, attachmentIds }),
+  });
+  return response.note;
+}
+
+/**
+ * Get all notes for a job.
+ */
+export async function getJobNotes(jobId: string): Promise<JobNote[]> {
+  const response = await apiRequest<{ notes: JobNote[] }>(`/api/jobs/${jobId}/notes`);
+  return response.notes;
+}
+
+/**
+ * Upload attachment for a note.
+ */
+export async function uploadJobNoteAttachment(file: File): Promise<JobNoteAttachment> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const token = getAuthToken();
+  const response = await fetch(`${API_BASE_URL}/api/notes/attachments`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || 'Failed to upload attachment');
+  }
+
+  const data = await response.json();
+  return data.data.attachment;
+}
+
+/**
+ * Download note attachment.
+ */
+export function getJobNoteAttachmentUrl(attachmentId: string): string {
+  const token = getAuthToken();
+  return `${API_BASE_URL}/api/notes/attachments/${attachmentId}?token=${token}`;
+}
+
+/**
+ * Delete note (super admin only).
+ */
+export async function deleteJobNote(noteId: string): Promise<void> {
+  await apiRequest(`/api/notes/${noteId}`, {
+    method: 'DELETE',
+  });
+}
+
 export default {
   login,
   logout,
@@ -1636,6 +1806,15 @@ export default {
   uploadChatAttachment,
   getChatAttachmentUrl,
   searchChatMessages,
+  uploadRSRDocument,
+  getRSRDocuments,
+  getRSRDocumentUrl,
+  deleteRSRDocument,
+  createJobNote,
+  getJobNotes,
+  uploadJobNoteAttachment,
+  getJobNoteAttachmentUrl,
+  deleteJobNote,
   apiRequest,
 };
 

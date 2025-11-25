@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getJob, updateJob, getMachinesByCustomer, createMachine, getTechnicians, getRepCodes, getCustomers, getActivities, getServiceDescriptions, deleteJob, type Job, type Status, type Branch, type Machine, type Technician, type RepCode, type Customer, type Activity, type ServiceDescription, type OverdueJob } from '../lib/api';
-import { X, Edit, Save, Clock, User, Trash2 } from 'lucide-react';
+import { getJob, updateJob, getMachinesByCustomer, createMachine, getTechnicians, getRepCodes, getCustomers, getActivities, getServiceDescriptions, deleteJob, uploadRSRDocument, getRSRDocuments, getRSRDocumentUrl, deleteRSRDocument, createJobNote, getJobNotes, uploadJobNoteAttachment, getJobNoteAttachmentUrl, deleteJobNote, type Job, type Status, type Branch, type Machine, type Technician, type RepCode, type Customer, type Activity, type ServiceDescription, type OverdueJob, type JobRSRDocument, type JobNote, type JobNoteAttachment } from '../lib/api';
+import { X, Edit, Save, Clock, User, Trash2, FileText, Paperclip, Upload, Download, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface LeadDetailsProps {
   lead: Job;
@@ -53,7 +53,7 @@ function normalizeJob(jobData: Job): Job {
 }
 
 export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes = [], onClose, onUpdate }: LeadDetailsProps) {
-  const { isAdmin, isSuperAdmin } = useAuth();
+  const { user, isAdmin, isSuperAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [job, setJob] = useState<Job>(normalizeJob(initialLead));
@@ -81,6 +81,21 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   const [followUpReminder, setFollowUpReminder] = useState<OverdueJob | null>(null);
   const [followUpSubmitting, setFollowUpSubmitting] = useState(false);
   const [activeFollowUpLevel, setActiveFollowUpLevel] = useState<number | null>(null);
+  const [rsrDocuments, setRsrDocuments] = useState<JobRSRDocument[]>([]);
+  const [loadingRSR, setLoadingRSR] = useState(false);
+  const [showRSRUpload, setShowRSRUpload] = useState(false);
+  const [rsrTitle, setRsrTitle] = useState('');
+  const [rsrVisibility, setRsrVisibility] = useState<'all' | 'private'>('all');
+  const [rsrFile, setRsrFile] = useState<File | null>(null);
+  const [uploadingRSR, setUploadingRSR] = useState(false);
+  const [notes, setNotes] = useState<JobNote[]>([]);
+  const [loadingNotes, setLoadingNotes] = useState(false);
+  const [notesMinimized, setNotesMinimized] = useState(false);
+  const [showNoteForm, setShowNoteForm] = useState(false);
+  const [noteText, setNoteText] = useState('');
+  const [noteVisibility, setNoteVisibility] = useState<'all' | 'private'>('all');
+  const [noteAttachments, setNoteAttachments] = useState<JobNoteAttachment[]>([]);
+  const [uploadingNote, setUploadingNote] = useState(false);
 
   useEffect(() => {
     loadJobDetails();
@@ -89,6 +104,8 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     loadCustomers();
     loadServiceDescriptions();
     loadActivityHistory();
+    loadRSRDocuments();
+    loadNotes();
   }, [initialLead._id]);
 
   // Reload activities when job is updated
@@ -215,6 +232,138 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
       setActivities([]);
     } finally {
       setLoadingActivities(false);
+    }
+  }
+
+  /**
+   * Loads RSR documents for the current job.
+   */
+  async function loadRSRDocuments() {
+    if (!job._id) return;
+    setLoadingRSR(true);
+    try {
+      const documents = await getRSRDocuments(job._id);
+      setRsrDocuments(documents);
+    } catch (err: any) {
+      console.error('Error loading RSR documents:', err);
+    } finally {
+      setLoadingRSR(false);
+    }
+  }
+
+  /**
+   * Handles uploading an RSR document.
+   */
+  async function handleUploadRSR() {
+    if (!job._id || !rsrFile || !rsrTitle.trim()) {
+      setError('Please provide a title and select a PDF file');
+      return;
+    }
+
+    if (rsrFile.type !== 'application/pdf') {
+      setError('Only PDF files are allowed for RSR documents');
+      return;
+    }
+
+    setUploadingRSR(true);
+    setError(null);
+    try {
+      await uploadRSRDocument(job._id, rsrFile, rsrTitle.trim(), rsrVisibility);
+      await loadRSRDocuments();
+      setShowRSRUpload(false);
+      setRsrTitle('');
+      setRsrFile(null);
+      setRsrVisibility('all');
+      onUpdate();
+    } catch (err: any) {
+      setError(err.message || 'Failed to upload RSR document');
+    } finally {
+      setUploadingRSR(false);
+    }
+  }
+
+  /**
+   * Handles deleting an RSR document (super admin only).
+   */
+  async function handleDeleteRSR(documentId: string) {
+    if (!window.confirm('Are you sure you want to delete this RSR document?')) return;
+
+    try {
+      await deleteRSRDocument(documentId);
+      await loadRSRDocuments();
+      onUpdate();
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete RSR document');
+    }
+  }
+
+  /**
+   * Loads notes for the current job.
+   */
+  async function loadNotes() {
+    if (!job._id) return;
+    setLoadingNotes(true);
+    try {
+      const notesData = await getJobNotes(job._id);
+      setNotes(notesData);
+    } catch (err: any) {
+      console.error('Error loading notes:', err);
+    } finally {
+      setLoadingNotes(false);
+    }
+  }
+
+  /**
+   * Handles uploading an attachment for a note.
+   */
+  async function handleUploadNoteAttachment(file: File) {
+    try {
+      const attachment = await uploadJobNoteAttachment(file);
+      setNoteAttachments(prev => [...prev, attachment]);
+    } catch (err: any) {
+      setError(err.message || 'Failed to upload attachment');
+    }
+  }
+
+  /**
+   * Handles creating a note.
+   */
+  async function handleCreateNote() {
+    if (!job._id || !noteText.trim()) {
+      setError('Please enter note text');
+      return;
+    }
+
+    setUploadingNote(true);
+    setError(null);
+    try {
+      const attachmentIds = noteAttachments.map(a => a._id);
+      await createJobNote(job._id, noteText.trim(), noteVisibility, attachmentIds);
+      await loadNotes();
+      setShowNoteForm(false);
+      setNoteText('');
+      setNoteAttachments([]);
+      setNoteVisibility('all');
+      onUpdate();
+    } catch (err: any) {
+      setError(err.message || 'Failed to create note');
+    } finally {
+      setUploadingNote(false);
+    }
+  }
+
+  /**
+   * Handles deleting a note (super admin only).
+   */
+  async function handleDeleteNote(noteId: string) {
+    if (!window.confirm('Are you sure you want to delete this note?')) return;
+
+    try {
+      await deleteJobNote(noteId);
+      await loadNotes();
+      onUpdate();
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete note');
     }
   }
 
@@ -1329,6 +1478,426 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
               </div>
             </div>
           )}
+
+          {/* RSR Documents Section */}
+          <div className="border-t border-gray-200 pt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-2 flex-1">
+                RSR Documents {rsrDocuments.length > 0 && <span className="text-sm font-normal text-gray-500">({rsrDocuments.length})</span>}
+              </h3>
+              {!isEditing && (
+                <button
+                  onClick={() => setShowRSRUpload(!showRSRUpload)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"
+                  type="button"
+                >
+                  <Upload className="w-4 h-4" />
+                  Upload RSR
+                </button>
+              )}
+            </div>
+
+            {showRSRUpload && (
+              <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Title <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={rsrTitle}
+                      onChange={(e) => setRsrTitle(e.target.value)}
+                      placeholder="Enter RSR document title"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      PDF File <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={(e) => setRsrFile(e.target.files?.[0] || null)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Visibility
+                    </label>
+                    <select
+                      value={rsrVisibility}
+                      onChange={(e) => setRsrVisibility(e.target.value as 'all' | 'private')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="all">Show to everyone</option>
+                      <option value="private">Show to me and super admin only</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleUploadRSR}
+                      disabled={uploadingRSR || !rsrTitle.trim() || !rsrFile}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      type="button"
+                    >
+                      {uploadingRSR ? 'Uploading...' : 'Upload'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowRSRUpload(false);
+                        setRsrTitle('');
+                        setRsrFile(null);
+                        setRsrVisibility('all');
+                      }}
+                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                      type="button"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {loadingRSR ? (
+              <div className="text-center py-8 text-gray-500">Loading RSR documents...</div>
+            ) : rsrDocuments.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-gray-200">
+                <FileText className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                <p className="text-sm">No RSR documents uploaded yet</p>
+                <p className="text-xs text-gray-400 mt-1">At least one RSR document is required before sending to invoice</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {rsrDocuments.map((doc) => {
+                  const uploadedBy = typeof doc.uploadedBy === 'object' ? doc.uploadedBy : null;
+                  
+                  return (
+                    <div key={doc._id} className="p-4 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <FileText className="w-5 h-5 text-blue-600" />
+                          <span className="font-semibold text-gray-900">{doc.title}</span>
+                          <span className={`px-2 py-0.5 rounded text-xs ${
+                            doc.visibility === 'private' 
+                              ? 'bg-orange-100 text-orange-700' 
+                              : 'bg-green-100 text-green-700'
+                          }`}>
+                            {doc.visibility === 'private' ? 'Private' : 'All'}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500 ml-7">
+                          {uploadedBy && `${uploadedBy.firstName} ${uploadedBy.lastName}`} • {new Date(doc.createdAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={getRSRDocumentUrl(doc._id)}
+                          download={doc.originalName}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Download"
+                        >
+                          <Download className="w-4 h-4" />
+                        </a>
+                        {isSuperAdmin && (
+                          <button
+                            onClick={() => handleDeleteRSR(doc._id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete"
+                            type="button"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Notes Section */}
+          <div className="border-t border-gray-200 pt-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2 flex-1">
+                <h3 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-2 flex-1">
+                  Notes {notes.length > 0 && <span className="text-sm font-normal text-gray-500">({notes.length})</span>}
+                </h3>
+                <button
+                  onClick={() => setNotesMinimized(!notesMinimized)}
+                  className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                  type="button"
+                  title={notesMinimized ? 'Expand Notes' : 'Minimize Notes'}
+                >
+                  {notesMinimized ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                </button>
+              </div>
+              {!isEditing && !notesMinimized && (
+                <button
+                  onClick={() => setShowNoteForm(!showNoteForm)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"
+                  type="button"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Note
+                </button>
+              )}
+            </div>
+
+            {!notesMinimized && showNoteForm && (
+                <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
+                        Note Text <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        value={noteText}
+                        onChange={(e) => setNoteText(e.target.value)}
+                        placeholder="Enter your note..."
+                        rows={4}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
+                        Attachments (Optional)
+                      </label>
+                      <input
+                        type="file"
+                        multiple
+                        onChange={(e) => {
+                          if (e.target.files) {
+                            Array.from(e.target.files).forEach(file => handleUploadNoteAttachment(file));
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                      {noteAttachments.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          {noteAttachments.map((att) => (
+                            <div key={att._id} className="flex items-center gap-2 text-sm text-gray-600 bg-white p-2 rounded border">
+                              <Paperclip className="w-4 h-4" />
+                              <span className="flex-1 truncate">{att.originalName}</span>
+                              <button
+                                onClick={() => setNoteAttachments(prev => prev.filter(a => a._id !== att._id))}
+                                className="text-red-600 hover:text-red-700"
+                                type="button"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
+                        Visibility
+                      </label>
+                      <select
+                        value={noteVisibility}
+                        onChange={(e) => setNoteVisibility(e.target.value as 'all' | 'private')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="all">Show to everyone</option>
+                        <option value="private">Show to me and super admin only</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleCreateNote}
+                        disabled={uploadingNote || !noteText.trim()}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        type="button"
+                      >
+                        {uploadingNote ? 'Creating...' : 'Create Note'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowNoteForm(false);
+                          setNoteText('');
+                          setNoteAttachments([]);
+                          setNoteVisibility('all');
+                        }}
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                        type="button"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+            {!notesMinimized && (
+              <>
+                {showNoteForm && (
+                  <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">
+                          Note Text <span className="text-red-500">*</span>
+                        </label>
+                        <textarea
+                          value={noteText}
+                          onChange={(e) => setNoteText(e.target.value)}
+                          placeholder="Enter your note..."
+                          rows={4}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">
+                          Attachments (Optional)
+                        </label>
+                        <input
+                          type="file"
+                          multiple
+                          onChange={(e) => {
+                            if (e.target.files) {
+                              Array.from(e.target.files).forEach(file => handleUploadNoteAttachment(file));
+                            }
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                        {noteAttachments.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {noteAttachments.map((att) => (
+                              <div key={att._id} className="flex items-center gap-2 text-sm text-gray-600 bg-white p-2 rounded border">
+                                <Paperclip className="w-4 h-4" />
+                                <span className="flex-1 truncate">{att.originalName}</span>
+                                <button
+                                  onClick={() => setNoteAttachments(prev => prev.filter(a => a._id !== att._id))}
+                                  className="text-red-600 hover:text-red-700"
+                                  type="button"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">
+                          Visibility
+                        </label>
+                        <select
+                          value={noteVisibility}
+                          onChange={(e) => setNoteVisibility(e.target.value as 'all' | 'private')}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="all">Show to everyone</option>
+                          <option value="private">Show to me and super admin only</option>
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleCreateNote}
+                          disabled={uploadingNote || !noteText.trim()}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                          type="button"
+                        >
+                          {uploadingNote ? 'Creating...' : 'Create Note'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowNoteForm(false);
+                            setNoteText('');
+                            setNoteAttachments([]);
+                            setNoteVisibility('all');
+                          }}
+                          className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                          type="button"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {loadingNotes ? (
+                  <div className="text-center py-8 text-gray-500">Loading notes...</div>
+                ) : notes.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-gray-200">
+                    <FileText className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm">No notes yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {notes.map((note) => {
+                      const createdBy = typeof note.createdBy === 'object' ? note.createdBy : null;
+                      
+                      return (
+                        <div key={note._id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <User className="w-4 h-4 text-blue-600" />
+                                <span className="font-semibold text-gray-900">
+                                  {createdBy ? `${createdBy.firstName} ${createdBy.lastName}` : 'Unknown'}
+                                </span>
+                                <span className="text-xs text-gray-400">•</span>
+                                <span className="text-xs text-gray-500">
+                                  {new Date(note.createdAt).toLocaleDateString('en-US', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </span>
+                                <span className={`px-2 py-0.5 rounded text-xs ${
+                                  note.visibility === 'private' 
+                                    ? 'bg-orange-100 text-orange-700' 
+                                    : 'bg-green-100 text-green-700'
+                                }`}>
+                                  {note.visibility === 'private' ? 'Private' : 'All'}
+                                </span>
+                              </div>
+                            </div>
+                            {isSuperAdmin && (
+                              <button
+                                onClick={() => handleDeleteNote(note._id)}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Delete Note"
+                                type="button"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap ml-6 mb-2">{note.text}</p>
+                          {note.attachments && note.attachments.length > 0 && (
+                            <div className="ml-6 space-y-1">
+                              {note.attachments.map((att) => (
+                                <a
+                                  key={att._id}
+                                  href={getJobNoteAttachmentUrl(att._id)}
+                                  download={att.originalName}
+                                  className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 p-2 bg-white rounded border border-gray-200 hover:bg-gray-50 transition-colors"
+                                >
+                                  <Paperclip className="w-4 h-4" />
+                                  <span className="flex-1 truncate">{att.originalName}</span>
+                                  <Download className="w-4 h-4" />
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
 
           {/* Activity History */}
           <div className="space-y-4">

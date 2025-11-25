@@ -115,7 +115,7 @@ export function SetPasswordPage() {
             <p className="text-slate-600 mb-6">{error || 'This invitation link is invalid or has expired.'}</p>
             <button
               onClick={() => navigate('/login')}
-              className="px-6 py-3 bg-[#0969a9] text-white rounded-xl font-bold text-[14px] hover:bg-[#0a7bc4] transition-colors"
+              className="px-6 py-3 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
             >
               GO TO LOGIN
             </button>
@@ -161,7 +161,7 @@ export function SetPasswordPage() {
               onChange={(e) => setPasswordValue(e.target.value)}
               required
               minLength={8}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0969a9] focus:border-transparent text-[15px]"
+              className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-[#0969a9] focus:border-transparent text-[15px]"
               placeholder="Enter your password (min. 8 characters)"
             />
           </div>
@@ -177,7 +177,7 @@ export function SetPasswordPage() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
               minLength={8}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0969a9] focus:border-transparent text-[15px]"
+              className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-[#0969a9] focus:border-transparent text-[15px]"
               placeholder="Confirm your password"
             />
           </div>
@@ -185,7 +185,7 @@ export function SetPasswordPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full px-6 py-3 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-6 py-3 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <>

@@ -124,9 +124,9 @@ export function ResetPasswordPage() {
             <p className="text-ars-body mb-6">{error || 'This reset link is invalid or has expired.'}</p>
             <button
               onClick={() => navigate('/login')}
-              className="px-6 py-3 bg-gradient-to-r from-ars-primary to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all"
+              className="px-6 py-3 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
             >
-              Go to Login
+              GO TO LOGIN
             </button>
           </div>
         </div>
@@ -176,7 +176,7 @@ export function ResetPasswordPage() {
         </div>
 
         {error && (
-          <div className="mb-4 p-4 bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-300 rounded-xl flex items-start gap-3 animate-shake">
+          <div className="mb-4 p-4 bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-300 rounded-[8px] flex items-start gap-3 animate-shake">
             <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-red-800">{error}</p>
           </div>
@@ -198,7 +198,7 @@ export function ResetPasswordPage() {
                 onChange={(e) => setPasswordValue(e.target.value)}
                 required
                 minLength={8}
-                className="w-full pl-12 pr-4 py-3.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-ars-primary transition-all duration-200 bg-gray-50 focus:bg-white text-ars-heading"
+                className="w-full pl-12 pr-4 py-3.5 border-2 border-gray-200 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-ars-primary transition-all duration-200 bg-gray-50 focus:bg-white text-ars-heading"
                 placeholder="Enter your password (min. 8 characters)"
               />
             </div>
@@ -219,7 +219,7 @@ export function ResetPasswordPage() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 minLength={8}
-                className="w-full pl-12 pr-4 py-3.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-ars-primary transition-all duration-200 bg-gray-50 focus:bg-white text-ars-heading"
+                className="w-full pl-12 pr-4 py-3.5 border-2 border-gray-200 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-ars-primary transition-all duration-200 bg-gray-50 focus:bg-white text-ars-heading"
                 placeholder="Confirm your password"
               />
             </div>
@@ -228,7 +228,7 @@ export function ResetPasswordPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-ars-primary text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2"
+            className="w-full px-6 py-4 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <>

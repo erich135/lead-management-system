@@ -225,11 +225,14 @@ export function Diary() {
         }
         
         const hasBookingInRange = job.bookings.some(booking => {
-          const bookingDate = booking.date;
-          if (!bookingDate) return false;
+          // A booking is in range if its date range overlaps with the filter range
+          const bookingStart = booking.startDate;
+          const bookingEnd = booking.endDate;
+          if (!bookingStart || !bookingEnd) return false;
           
-          if (dateFrom && bookingDate < dateFrom) return false;
-          if (dateTo && bookingDate > dateTo) return false;
+          // Check if booking overlaps with filter range
+          if (dateFrom && bookingEnd < dateFrom) return false;
+          if (dateTo && bookingStart > dateTo) return false;
           return true;
         });
         
@@ -316,7 +319,9 @@ export function Diary() {
       } else {
         job.bookings.forEach(booking => {
           const tech = technicians.find(t => t._id === booking.technicianId);
-          const dateRange = `${booking.startDate || '-'} to ${booking.endDate || '-'}`;
+          const startDate = booking.startDate ? new Date(booking.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
+          const endDate = booking.endDate ? new Date(booking.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
+          const dateRange = startDate === endDate ? startDate : `${startDate} to ${endDate}`;
           rows.push([
             dateRange,
             job.jobNumber || '',
@@ -358,7 +363,9 @@ export function Diary() {
       } else {
         job.bookings.forEach(booking => {
           const tech = technicians.find(t => t._id === booking.technicianId);
-          const dateRange = `${booking.startDate || '-'} to ${booking.endDate || '-'}`;
+          const startDate = booking.startDate ? new Date(booking.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
+          const endDate = booking.endDate ? new Date(booking.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
+          const dateRange = startDate === endDate ? startDate : `${startDate} to ${endDate}`;
           printWindow!.document.write(`<tr><td>${dateRange}</td><td>${job.jobNumber || ''}</td><td>${job.customer?.name || job.cashCustomer || ''}</td><td>${tech?.name || booking.technicianName || '-'}</td><td>${job.branch?.name || ''}</td><td>${job.status?.name || ''}</td><td>${job.description?.name || ''}</td></tr>`);
         });
       }
@@ -548,17 +555,31 @@ export function Diary() {
               const calendarJobs = currentUser?.isSuperAdmin && techFilter === 'all' 
                 ? (() => {
                     let result = allJobs.filter((job) => {
-                      // Apply date range filter
-                      if (dateFrom && job.dateBooked) {
-                        const jobDate = typeof job.dateBooked === 'string' ? job.dateBooked.split('T')[0] : new Date(job.dateBooked).toISOString().split('T')[0];
-                        if (jobDate < dateFrom) return false;
-                      }
-                      if (dateTo && job.dateBooked) {
-                        const jobDate = typeof job.dateBooked === 'string' ? job.dateBooked.split('T')[0] : new Date(job.dateBooked).toISOString().split('T')[0];
-                        if (jobDate > dateTo) return false;
+                      // Apply date range filter using bookings
+                      if (dateFrom || dateTo) {
+                        if (!job.bookings || job.bookings.length === 0) {
+                          // If date filter is set but job has no bookings, exclude it
+                          return false;
+                        }
+                        
+                        const hasBookingInRange = job.bookings.some(booking => {
+                          // A booking is in range if its date range overlaps with the filter range
+                          const bookingStart = booking.startDate;
+                          const bookingEnd = booking.endDate;
+                          if (!bookingStart || !bookingEnd) return false;
+                          
+                          // Check if booking overlaps with filter range
+                          if (dateFrom && bookingEnd < dateFrom) return false;
+                          if (dateTo && bookingStart > dateTo) return false;
+                          return true;
+                        });
+                        
+                        if (!hasBookingInRange) {
+                          return false;
+                        }
                       }
                       // Apply booked date only filter
-                      if (bookedDateOnly && !job.dateBooked) return false;
+                      if (bookedDateOnly && (!job.bookings || job.bookings.length === 0)) return false;
                       // Apply search filter
                       if (searchTerm) {
                         const searchLower = searchTerm.toLowerCase();
@@ -647,9 +668,9 @@ export function Diary() {
                     
                     return job.bookings.map((booking, idx) => {
                       const tech = technicians.find(t => t._id === booking.technicianId);
-                      const formattedDate = booking.date 
-                        ? new Date(booking.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                        : '-';
+                      const startDate = booking.startDate ? new Date(booking.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
+                      const endDate = booking.endDate ? new Date(booking.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
+                      const formattedDate = startDate === endDate ? startDate : `${startDate} to ${endDate}`;
                       return (
                         <tr key={`${job._id}-${idx}`} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-ars-heading">
@@ -764,10 +785,9 @@ interface CalendarViewProps {
 
 function CalendarView({ jobs, statuses, branches, technicians, onUpdate, selectedTechnician }: CalendarViewProps) {
   console.log('CalendarView received jobs:', jobs.length);
-  console.log('Jobs with dateBooked:', jobs.filter(j => j.dateBooked).map(j => ({
+  console.log('Jobs with bookings:', jobs.filter(j => j.bookings && j.bookings.length > 0).map(j => ({
     id: j._id,
-    dateBooked: j.dateBooked,
-    techBooked: j.techBooked
+    bookings: j.bookings
   })));
   
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -822,33 +842,13 @@ function CalendarView({ jobs, statuses, branches, technicians, onUpdate, selecte
   
   // Generate calendar cells
   const calendarCells = [];
-  // Helper to find consecutive bookings for a technician
-  function findConsecutiveBookings(techId: string, job: Job) {
-    if (!Array.isArray(job.dateBooked)) return [];
-    const sortedDates = job.dateBooked.map(d => new Date(d)).sort((a, b) => a.getTime() - b.getTime());
-    let ranges: Array<{ start: Date, end: Date }> = [];
-    let rangeStart = sortedDates[0];
-    let prevDate = sortedDates[0];
-    for (let i = 1; i < sortedDates.length; i++) {
-      const currDate = sortedDates[i];
-      if ((currDate.getTime() - prevDate.getTime()) === 86400000) {
-        prevDate = currDate;
-      } else {
-        ranges.push({ start: rangeStart, end: prevDate });
-        rangeStart = currDate;
-        prevDate = currDate;
-      }
-    }
-    ranges.push({ start: rangeStart, end: prevDate });
-    return ranges;
-  }
-
+  
   for (let i = 0; i < totalCells; i++) {
     const dayNumber = i - firstDayWeekday + 1;
     const cellDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), dayNumber);
     const isCurrentMonth = dayNumber > 0 && dayNumber <= daysInMonth;
     const isToday = isCurrentMonth && cellDate.toDateString() === new Date().toDateString();
-    const bookings = isCurrentMonth ? getBookingsForDate(cellDate) : [];
+    const bookingsForDate = isCurrentMonth ? getBookingsForDate(cellDate) : [];
 
     calendarCells.push(
       <div
@@ -858,26 +858,9 @@ function CalendarView({ jobs, statuses, branches, technicians, onUpdate, selecte
         <div className={`text-sm font-semibold mb-1 ${isCurrentMonth ? 'text-gray-900' : 'text-gray-400'} ${isToday ? 'text-blue-600' : ''}`}>
           {isCurrentMonth ? dayNumber : ''}
         </div>
-        <div className="space-y-1 overflow-y-auto max-h-[90px] relative">
-          {bookings.map((booking, idx) => {
-            const { job, techId, techName } = booking;
-            // Find consecutive booking ranges for this technician and job
-            const ranges = findConsecutiveBookings(techId, job);
-            // Is this date the start of a range?
-            const cellDateStr = cellDate.toISOString().split('T')[0];
-            const range = ranges.find(r => r.start.toISOString().split('T')[0] === cellDateStr);
-            if (range && range.start.getTime() !== range.end.getTime()) {
-              // Render a horizontal bar/arrow for the range
-              const daysSpan = (range.end.getTime() - range.start.getTime()) / 86400000 + 1;
-              return (
-                <div key={idx} className="absolute left-0 top-0 w-full h-4 flex items-center">
-                  <div style={{width: `calc(${daysSpan} * 100%)`, height: '4px', background: 'linear-gradient(to right, #a78bfa, #6366f1)', borderRadius: '2px', position: 'absolute', left: 0, top: 0}}></div>
-                  <span className="ml-1 text-xs font-semibold text-purple-800">{techName}</span>
-                  <span className="ml-1 text-xs text-purple-600">→</span>
-                </div>
-              );
-            }
-            // Otherwise, render as a single booking
+        <div className="space-y-1 overflow-y-auto max-h-[90px]">
+          {bookingsForDate.map((bookingInfo, idx) => {
+            const { job, techId, techName } = bookingInfo;
             return (
               <div
                 key={idx}
@@ -885,7 +868,8 @@ function CalendarView({ jobs, statuses, branches, technicians, onUpdate, selecte
                 className="text-xs px-2 py-1 rounded bg-purple-100 text-purple-800 cursor-pointer hover:bg-purple-200 transition-colors"
                 title={`${techName} - ${job.jobNumber}`}
               >
-                <div className="font-semibold">{techName}</div>
+                <div className="font-semibold truncate">{techName}</div>
+                <div className="text-[10px] truncate">{job.jobNumber}</div>
               </div>
             );
           })}

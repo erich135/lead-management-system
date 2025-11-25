@@ -7,6 +7,7 @@ import {
   getChatThread,
   uploadChatAttachment,
   getChatAttachmentUrl,
+  getUnreadCount,
   type ChatUser,
   type ChatMessage,
   type ChatAttachment,
@@ -26,6 +27,8 @@ export function ChatWidget() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({}); // Per-user unread counts
+  const [lastMessages, setLastMessages] = useState<Record<string, ChatMessage>>({}); // Last message per user
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
@@ -35,23 +38,75 @@ export function ChatWidget() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const markReadRef = useRef<((senderId: string, messageIds?: string[]) => Promise<void>) | null>(null);
 
   // Socket.io integration
   const { isConnected, sendMessage: socketSendMessage, markRead, sendTyping, addReaction } = useChatSocket(
     // On new message
     useCallback((message: ChatMessage) => {
-      if (selectedUser && (
-        message.sender._id === selectedUser._id ||
-        message.receiver._id === selectedUser._id
-      )) {
-        setMessages(prev => [...prev, message]);
-        if (message.sender._id === selectedUser._id) {
-          markRead(selectedUser._id);
+      const senderId = message.sender._id;
+      const receiverId = message.receiver._id;
+      const isForMe = receiverId === user?.id;
+      const isFromSelected = selectedUser && (senderId === selectedUser._id || receiverId === selectedUser._id);
+      
+      // Update last message for this conversation
+      const otherUserId = isForMe ? senderId : receiverId;
+      setLastMessages(prev => ({ ...prev, [otherUserId]: message }));
+      
+      if (isFromSelected) {
+        // If message is for currently selected user, add to messages
+        setMessages(prev => {
+          // Check if message already exists (avoid duplicates)
+          const exists = prev.some(m => m._id === message._id);
+          if (exists) return prev;
+          
+          // Check if this is a real message that should replace a temp message
+          // (e.g., sender sent a message, got temp message, now receiving real one)
+          const tempMessageIndex = prev.findIndex(m => 
+            m._id.startsWith('temp-') &&
+            m.sender._id === message.sender._id &&
+            m.receiver._id === message.receiver._id &&
+            m.text === message.text &&
+            Math.abs(new Date(m.createdAt).getTime() - new Date(message.createdAt).getTime()) < 5000 // Within 5 seconds
+          );
+          
+          if (tempMessageIndex !== -1) {
+            // Replace temp message with real message
+            const updated = [...prev];
+            updated[tempMessageIndex] = message;
+            return updated;
+          }
+          
+          return [...prev, message];
+        });
+        
+        // Scroll to bottom when new message arrives for selected user
+        setTimeout(() => scrollToBottom(), 100);
+        
+        // If message is from selected user (they sent it to me), mark as read
+        if (isForMe && senderId === selectedUser._id && markReadRef.current) {
+          markReadRef.current(selectedUser._id).then(() => {
+            // Update unread count after marking as read
+            setUnreadCounts(prev => {
+              const updated = { ...prev };
+              const removedCount = updated[selectedUser._id] || 0;
+              delete updated[selectedUser._id];
+              setUnreadCount(prevTotal => Math.max(0, prevTotal - removedCount));
+              return updated;
+            });
+            // Refresh from server to ensure accuracy
+            getUnreadCount().then(count => setUnreadCount(count)).catch(console.error);
+          });
         }
-      } else {
+      } else if (isForMe) {
+        // Message is for me but from different user - increment unread count
+        setUnreadCounts(prev => ({
+          ...prev,
+          [senderId]: (prev[senderId] || 0) + 1
+        }));
         setUnreadCount(prev => prev + 1);
       }
-    }, [selectedUser]),
+    }, [selectedUser, user?.id]),
     // On message delivered
     undefined,
     // On typing
@@ -74,31 +129,90 @@ export function ChatWidget() {
     }, [])
   );
 
-  // Load users
+  // Store markRead in ref so it can be used in callbacks
+  useEffect(() => {
+    markReadRef.current = markRead;
+  }, [markRead]);
+
+  // Load users and initial unread count
   useEffect(() => {
     if (isOpen) {
       loadUsers();
+      loadInitialUnreadCount();
+    } else {
+      // Reset unread counts when closing to ensure fresh state on reopen
+      setUnreadCounts({});
+      // Also reset the total unread count - it will be refreshed from server on reopen
+      setUnreadCount(0);
     }
-  }, [isOpen]);
+  }, [isOpen]); // Only reload when opening/closing
+
+  // Update user list sorting when lastMessages change
+  useEffect(() => {
+    if (isOpen && users.length > 0) {
+      const sortedUsers = [...users].sort((a, b) => {
+        const lastMsgA = lastMessages[a._id];
+        const lastMsgB = lastMessages[b._id];
+        if (!lastMsgA && !lastMsgB) return 0;
+        if (!lastMsgA) return 1;
+        if (!lastMsgB) return -1;
+        return new Date(lastMsgB.createdAt).getTime() - new Date(lastMsgA.createdAt).getTime();
+      });
+      setUsers(sortedUsers);
+    }
+  }, [lastMessages]); // Update sorting when lastMessages change
 
   // Load messages when user selected
   useEffect(() => {
     if (selectedUser) {
+      // Clear messages first to ensure fresh load
+      setMessages([]);
       loadMessages();
+    } else {
+      // Clear messages when no user selected
+      setMessages([]);
     }
   }, [selectedUser]);
 
-  // Auto-scroll
+  // Auto-scroll - use setTimeout to ensure DOM is updated
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (messages.length > 0 && !loading) {
+      // Use setTimeout to ensure messages are rendered before scrolling
+      const timer = setTimeout(() => {
+        scrollToBottom();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [messages, selectedUser, loading]);
 
   const loadUsers = async () => {
     try {
       const usersData = await getChatUsers();
       setUsers(usersData);
+      
+      // Load last message for each user
+      for (const chatUser of usersData) {
+        try {
+          const { messages } = await getChatThread(chatUser._id, undefined, 1);
+          if (messages.length > 0) {
+            setLastMessages(prev => ({ ...prev, [chatUser._id]: messages[messages.length - 1] }));
+          }
+        } catch (err) {
+          // Silently fail for individual user threads
+          console.debug(`Could not load last message for ${chatUser._id}:`, err);
+        }
+      }
     } catch (err) {
       console.error('Error loading users:', err);
+    }
+  };
+
+  const loadInitialUnreadCount = async () => {
+    try {
+      const totalUnread = await getUnreadCount();
+      setUnreadCount(totalUnread);
+    } catch (err) {
+      console.error('Error loading unread count:', err);
     }
   };
 
@@ -108,9 +222,68 @@ export function ChatWidget() {
     setLoading(true);
     try {
       const { messages: messagesData } = await getChatThread(selectedUser._id);
-      setMessages(messagesData);
-      if (messagesData.some(m => m.sender._id === selectedUser._id && !m.isRead)) {
+      // Merge with existing messages, removing duplicates
+      setMessages(prev => {
+        const loadedIds = new Set(messagesData.map(m => m._id));
+        
+        // Keep temp messages that don't have a corresponding real message yet
+        // (messages that were just sent but socket hasn't confirmed yet)
+        const tempMessages = prev.filter(m => {
+          if (!m._id.startsWith('temp-')) return false;
+          // Check if this temp message has been replaced by a real one
+          const hasRealVersion = messagesData.some(realMsg =>
+            realMsg.sender._id === m.sender._id &&
+            realMsg.receiver._id === m.receiver._id &&
+            realMsg.text === m.text &&
+            Math.abs(new Date(m.createdAt).getTime() - new Date(realMsg.createdAt).getTime()) < 5000
+          );
+          return !hasRealVersion;
+        });
+        
+        // Keep existing socket messages that aren't in the loaded data
+        const existingMessages = prev.filter(m => 
+          !m._id.startsWith('temp-') && !loadedIds.has(m._id)
+        );
+        
+        // Combine: existing socket messages + loaded REST messages + temp messages
+        const allMessages = [...existingMessages, ...messagesData, ...tempMessages];
+        
+        // Remove duplicates by ID and sort by createdAt
+        const uniqueMessages = Array.from(
+          new Map(allMessages.map(m => [m._id, m])).values()
+        ).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        
+        return uniqueMessages;
+      });
+      
+      // Mark messages as read if there are unread ones
+      const unreadMessages = messagesData.filter(m => m.sender._id === selectedUser._id && !m.isRead);
+      if (unreadMessages.length > 0) {
+        // Mark as read on server first
         await markRead(selectedUser._id);
+        
+        // Clear unread count for this user
+        setUnreadCounts(prev => {
+          const updated = { ...prev };
+          delete updated[selectedUser._id];
+          return updated;
+        });
+        
+        // Always refresh from server to ensure accuracy after marking as read
+        try {
+          const serverUnreadCount = await getUnreadCount();
+          setUnreadCount(serverUnreadCount);
+        } catch (err) {
+          console.error('Error refreshing unread count:', err);
+          // Fallback: calculate locally if server refresh fails
+          setUnreadCounts(prev => {
+            const removedCount = prev[selectedUser._id] || 0;
+            setUnreadCount(prevTotal => Math.max(0, prevTotal - removedCount));
+            const updated = { ...prev };
+            delete updated[selectedUser._id];
+            return updated;
+          });
+        }
       }
     } catch (err) {
       console.error('Error loading messages:', err);
@@ -327,21 +500,71 @@ export function ChatWidget() {
             <div className="flex-1 overflow-y-auto p-4">
               <p className="text-sm text-gray-600 mb-3">Select a user to chat with:</p>
               <div className="space-y-2">
-                {users.map((chatUser) => (
-                  <button
-                    key={chatUser._id}
-                    onClick={() => setSelectedUser(chatUser)}
-                    className="w-full flex items-center space-x-3 p-3 hover:bg-gray-100 rounded-lg transition-colors text-left"
-                  >
-                    <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white">
-                      <User size={20} />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">{chatUser.fullName}</p>
-                      <p className="text-xs text-gray-500">{chatUser.email}</p>
-                    </div>
-                  </button>
-                ))}
+                {users.map((chatUser) => {
+                  const unread = unreadCounts[chatUser._id] || 0;
+                  const lastMsg = lastMessages[chatUser._id];
+                  const isUnread = unread > 0;
+                  
+                  return (
+                    <button
+                      key={chatUser._id}
+                      onClick={async () => {
+                        setSelectedUser(chatUser);
+                        // Clear unread count when selecting user
+                        if (unread > 0) {
+                          setUnreadCounts(prev => {
+                            const updated = { ...prev };
+                            delete updated[chatUser._id];
+                            return updated;
+                          });
+                          // Refresh from server to ensure accuracy
+                          try {
+                            const serverUnreadCount = await getUnreadCount();
+                            setUnreadCount(serverUnreadCount);
+                          } catch (err) {
+                            console.error('Error refreshing unread count:', err);
+                            // Fallback to local calculation
+                            setUnreadCount(prev => Math.max(0, prev - unread));
+                          }
+                        }
+                      }}
+                      className={`w-full flex items-center space-x-3 p-3 hover:bg-gray-100 rounded-lg transition-colors text-left ${
+                        isUnread ? 'bg-blue-50 border-l-4 border-blue-500' : ''
+                      }`}
+                    >
+                      <div className="relative">
+                        <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white">
+                          <User size={20} />
+                        </div>
+                        {unread > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                            {unread > 99 ? '99+' : unread}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className={`font-medium ${isUnread ? 'text-blue-900' : 'text-gray-900'}`}>
+                            {chatUser.fullName}
+                          </p>
+                          {lastMsg && (
+                            <span className="text-xs text-gray-400 ml-2">
+                              {formatTime(lastMsg.createdAt)}
+                            </span>
+                          )}
+                        </div>
+                        {lastMsg ? (
+                          <p className={`text-xs truncate ${isUnread ? 'text-blue-700 font-medium' : 'text-gray-500'}`}>
+                            {lastMsg.sender._id === user?.id ? 'You: ' : `${lastMsg.sender.firstName}: `}
+                            {lastMsg.text || (lastMsg.attachments && lastMsg.attachments.length > 0 ? '📎 Attachment' : '')}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-gray-500">{chatUser.email}</p>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ) : (

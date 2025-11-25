@@ -786,7 +786,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       ) : (
         <div className="flex gap-6 pt-5">
           {/* Left Sidebar - Filters */}
-          <div className="w-64 flex-shrink-0 bg-white rounded-2xl border border-gray-200 p-4 h-fit sticky top-[115px]">
+          <div className="w-64 flex-shrink-0 bg-white rounded-2xl border border-gray-200 p-4 max-h-[calc(100vh-140px)] overflow-y-auto sticky top-[115px]">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-bold text-ars-heading flex items-center gap-2">
                 <Filter className="w-4 h-4 text-ars-primary" />

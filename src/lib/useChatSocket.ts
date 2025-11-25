@@ -27,6 +27,20 @@ export function useChatSocket(
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
+  
+  // Use refs to store callbacks so they don't trigger reconnections
+  const onNewMessageRef = useRef(onNewMessage);
+  const onMessageDeliveredRef = useRef(onMessageDelivered);
+  const onTypingRef = useRef(onTyping);
+  const onReactionUpdateRef = useRef(onReactionUpdate);
+
+  // Update refs when callbacks change
+  useEffect(() => {
+    onNewMessageRef.current = onNewMessage;
+    onMessageDeliveredRef.current = onMessageDelivered;
+    onTypingRef.current = onTyping;
+    onReactionUpdateRef.current = onReactionUpdate;
+  }, [onNewMessage, onMessageDelivered, onTyping, onReactionUpdate]);
 
   useEffect(() => {
     const token = getAuthToken();
@@ -36,6 +50,10 @@ export function useChatSocket(
       path: '/socket.io',
       auth: { token },
       transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
     });
 
     socketRef.current = newSocket;
@@ -46,8 +64,8 @@ export function useChatSocket(
       setIsConnected(true);
     });
 
-    newSocket.on('disconnect', () => {
-      console.log('Chat socket disconnected');
+    newSocket.on('disconnect', (reason) => {
+      console.log('Chat socket disconnected:', reason);
       setIsConnected(false);
     });
 
@@ -56,28 +74,37 @@ export function useChatSocket(
       setIsConnected(false);
     });
 
-    // Message events
-    if (onNewMessage) {
-      newSocket.on('message:new', onNewMessage);
-    }
+    // Message events - use refs to access latest callbacks
+    newSocket.on('message:new', (message: ChatMessage) => {
+      if (onNewMessageRef.current) {
+        onNewMessageRef.current(message);
+      }
+    });
 
-    if (onMessageDelivered) {
-      newSocket.on('message:delivered', onMessageDelivered);
-    }
+    newSocket.on('message:delivered', (data: { receiverId: string; count: number }) => {
+      if (onMessageDeliveredRef.current) {
+        onMessageDeliveredRef.current(data);
+      }
+    });
 
-    if (onTyping) {
-      newSocket.on('typing:user', onTyping);
-    }
+    newSocket.on('typing:user', (data: { userId: string; isTyping: boolean }) => {
+      if (onTypingRef.current) {
+        onTypingRef.current(data);
+      }
+    });
 
-    if (onReactionUpdate) {
-      newSocket.on('message:reaction:update', onReactionUpdate);
-    }
+    newSocket.on('message:reaction:update', (data: { messageId: string; reactions: any[] }) => {
+      if (onReactionUpdateRef.current) {
+        onReactionUpdateRef.current(data);
+      }
+    });
 
     return () => {
+      newSocket.removeAllListeners();
       newSocket.close();
       socketRef.current = null;
     };
-  }, [onNewMessage, onMessageDelivered, onTyping, onReactionUpdate]);
+  }, []); // Empty dependency array - socket only created once
 
   const sendMessage = async (
     receiverId: string,

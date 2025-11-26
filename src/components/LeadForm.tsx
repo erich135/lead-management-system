@@ -125,6 +125,19 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
     loadReferenceData();
   }, []);
 
+  // Set default status when statuses are loaded (only once)
+  useEffect(() => {
+    if (statuses && statuses.length > 0 && !formData.status) {
+      // Try to find "In Progress" status first, otherwise use the first status
+      const inProgressStatus = statuses.find(s => s.name.toLowerCase().includes('progress'));
+      const defaultStatus = inProgressStatus || statuses[0];
+      if (defaultStatus) {
+        setFormData(prev => ({ ...prev, status: defaultStatus._id }));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statuses]);
+
   // Get today's date in YYYY-MM-DD format for default dates
   const getTodayDate = () => {
     const today = new Date();
@@ -367,7 +380,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
       // const today = getTodayDate(); // Removed unused variable
       const payload: any = {
         branch: formData.branch,
-        status: formData.status,
+        status: formData.status && formData.status.trim() ? formData.status : undefined,
         valueExVat: formData.valueExVat ? parseFloat(formData.valueExVat) : undefined,
         adm: formData.adm || undefined,
         repCode: formData.repCode || undefined,

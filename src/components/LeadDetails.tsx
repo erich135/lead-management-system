@@ -63,6 +63,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   const [showNewMachineForm, setShowNewMachineForm] = useState(false);
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
   const [newMachine, setNewMachine] = useState({
+    machineType: '',
     make: '',
     model: '',
     serialNumber: '',
@@ -361,6 +362,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
       }
       
       setNewMachine({
+        machineType: '',
         make: '',
         model: '',
         serialNumber: '',
@@ -1154,6 +1156,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                                 onClick={() => {
                                   setEditingMachine(machine);
                                   setNewMachine({
+                                    machineType: machine.machineType || '',
                                     make: machine.make || '',
                                     model: machine.model || '',
                                     serialNumber: machine.serialNumber || '',
@@ -1222,6 +1225,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       onClick={() => {
                         setEditingMachine(null);
                         setNewMachine({
+                          machineType: '',
                           make: '',
                           model: '',
                           serialNumber: '',
@@ -1241,6 +1245,24 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                     <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
                       <h4 className="font-semibold text-ars-heading">{editingMachine ? 'Edit Machine' : 'Add New Machine'}</h4>
                       <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-ars-body mb-1">Machine Type *</label>
+                          <select
+                            value={newMachine.machineType}
+                            onChange={e => setNewMachine({ ...newMachine, machineType: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          >
+                            <option value="">Select type</option>
+                            <option value="Generator">Generator</option>
+                            <option value="Genset">Genset</option>
+                            <option value="Compressor oil free">Compressor oil free</option>
+                            <option value="Compressor oil injection">Compressor oil injection</option>
+                            <option value="Diesel reciprocating compressor">Diesel reciprocating compressor</option>
+                            <option value="Dryer">Dryer</option>
+                            <option value="Blower">Blower</option>
+                            <option value="Vacuum pump">Vacuum pump</option>
+                          </select>
+                        </div>
                         <div>
                           <label className="block text-xs font-semibold text-ars-body mb-1">Make *</label>
                           <input

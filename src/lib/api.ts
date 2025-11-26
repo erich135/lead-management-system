@@ -339,11 +339,16 @@ export interface Job {
   };
   machines?: (Machine | string)[];
   registerDate?: string | Date;
-  techBooked?: {
-    _id: string;
-    name: string;
-  };
-  dateBooked?: string | Date;
+  bookings?: Array<{
+    technicianId: string;
+    technicianName?: string;
+    startDate: string;
+    endDate: string;
+    startTime?: string;
+    endTime?: string;
+    location?: string;
+    notes?: string;
+  }>;
   rsrNumber?: string;
   feedback?: string;
   followUp1Date?: string | Date;

@@ -86,6 +86,7 @@ export function SystemManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 20;
+  const [updatingPermissions, setUpdatingPermissions] = useState(false);
   
   // Import state
   const [importHistory, setImportHistory] = useState<ImportHistory | null>(null);
@@ -287,19 +288,24 @@ export function SystemManagement() {
    */
   async function handleUpdatePermissions(userId: string, newPermissions: string[]) {
     try {
-      setLoading(true);
+      setUpdatingPermissions(true);
       await updateUserPermissions(userId, newPermissions);
+      // Update selected user's permissions immediately for responsive UI
+      if (selectedUser?._id === userId) {
+        setSelectedUser({ ...selectedUser, permissions: newPermissions });
+      }
+      // Reload full data in background
       await loadData();
+    } catch (err: any) {
+      console.error('Error updating permissions:', err);
+      alert('Failed to update permissions: ' + (err.message || 'Unknown error'));
+      // Reload to revert UI changes on error
       if (selectedUser?._id === userId) {
         const response = await getUser(userId);
         setSelectedUser(response.user);
       }
-      alert('Permissions updated successfully');
-    } catch (err: any) {
-      console.error('Error updating permissions:', err);
-      alert('Failed to update permissions: ' + (err.message || 'Unknown error'));
     } finally {
-      setLoading(false);
+      setUpdatingPermissions(false);
     }
   }
 
@@ -1202,13 +1208,14 @@ export function SystemManagement() {
                                     <input
                                       type="checkbox"
                                       checked={hasPermission}
+                                      disabled={updatingPermissions}
                                       onChange={(e) => {
                                         const newPerms = e.target.checked
                                           ? [...selectedUser.permissions, perm.name]
                                           : selectedUser.permissions.filter(p => p !== perm.name);
                                         handleUpdatePermissions(selectedUser._id, newPerms);
                                       }}
-                                      className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary cursor-pointer"
+                                      className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                     />
                                     <span className="text-sm text-ars-body group-hover:text-ars-heading">
                                       {perm.description || perm.name}

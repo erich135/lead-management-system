@@ -12,12 +12,14 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
+    "@types/mocha": "^10.0.10",
     "emoji-picker-react": "^4.15.1",
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.9.5",
-    "socket.io-client": "^4.8.1"
+    "socket.io-client": "^4.8.1",
+    "ts-node": "^10.9.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",

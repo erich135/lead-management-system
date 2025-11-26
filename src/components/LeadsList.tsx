@@ -1187,12 +1187,6 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                               <span>Start: {formatDate(job.startDate)}</span>
                             </div>
                           )}
-                          {job.dateQuoted && (
-                            <div className="flex items-center gap-2">
-                              <Calendar className="w-3 h-3" />
-                              <span>Quoted: {formatDate(job.dateQuoted)}</span>
-                            </div>
-                          )}
                           {job.statusChangedAt && (
                             <div className="flex items-center gap-2">
                               <Clock className="w-3 h-3" />
@@ -1259,7 +1253,18 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                               <div className="flex items-center gap-2 text-xs text-ars-body">
                                 <Wrench className="w-3 h-3 flex-shrink-0" />
                                 <span className="font-medium">
-                                  {job.machines.length} Machine{job.machines.length !== 1 ? 's' : ''}
+                                  {(() => {
+                                    // Get machine types from job.machines
+                                    const typeCounts: Record<string, number> = {};
+                                    job.machines.forEach(m => {
+                                      const type = m.machineType || 'Machine';
+                                      typeCounts[type] = (typeCounts[type] || 0) + 1;
+                                    });
+                                    const typeLabels = Object.entries(typeCounts)
+                                      .map(([type, count]) => `${count} ${type}${count > 1 ? 's' : ''}`)
+                                      .join(', ');
+                                    return typeLabels || `${job.machines.length} Machine${job.machines.length !== 1 ? 's' : ''}`;
+                                  })()}
                                 </span>
                               </div>
                               {showMachinesGlobal || expandedMachines.has(job._id) ? (
@@ -1299,10 +1304,11 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                         )}
 
                         {/* Value */}
-                        {job.valueExVat && (
+                        {(job.valueExVat || job.invNumber) && (
                           <div className="mb-3 pt-2 border-t border-gray-200">
-                            <div className="flex items-center gap-1 text-xs text-ars-body font-medium">
-                              <span>{formatCurrency(job.valueExVat)}</span>
+                            <div className="flex items-center gap-2 text-xs text-ars-body font-medium">
+                              {job.valueExVat && <span>{formatCurrency(job.valueExVat)}</span>}
+                              {job.invNumber && <span className="ml-2 px-2 py-1 bg-gray-100 rounded text-ars-primary">Inv #: {job.invNumber}</span>}
                             </div>
                           </div>
                         )}

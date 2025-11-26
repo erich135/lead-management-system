@@ -68,9 +68,9 @@ export function Diary() {
         if (currentPage > 10) break;
       }
       
-      // Filter to only jobs with techBooked
-      const jobsWithTechnician = allJobsList.filter(job => job.techBooked);
-      setAllJobs(jobsWithTechnician);
+      // Filter to only jobs with bookings
+      const jobsWithBookings = allJobsList.filter(job => job.bookings && Array.isArray(job.bookings) && job.bookings.length > 0);
+      setAllJobs(jobsWithBookings);
 
       // Load all technicians
       const techsResponse = await getTechnicians();
@@ -96,11 +96,9 @@ export function Diary() {
         });
         if (userTechnician) {
           setTechFilter(userTechnician._id);
-          const techJobs = jobsWithTechnician.filter(job => {
-            const techId = typeof job.techBooked === 'object' && job.techBooked !== null
-              ? (job.techBooked as any)._id
-              : job.techBooked;
-            return techId === userTechnician._id;
+          const techJobs = jobsWithBookings.filter(job => {
+            // Check if any booking has this technician
+            return job.bookings?.some(b => b.technicianId === userTechnician._id);
           });
           setJobs(techJobs);
           setTechnicians([userTechnician]); // Only show themselves
@@ -110,14 +108,13 @@ export function Diary() {
         }
       } else if (roleName === 'admin' || roleName === 'rep') {
         // Admin/Rep: Show only technicians linked to their jobs
-        const userJobs = jobsWithTechnician;
+        const userJobs = jobsWithBookings;
         const techIds = new Set<string>();
         userJobs.forEach(job => {
-          if (job.techBooked) {
-            const techId = typeof job.techBooked === 'object' && job.techBooked !== null
-              ? (job.techBooked as any)._id
-              : job.techBooked;
-            if (techId) techIds.add(techId);
+          if (job.bookings && Array.isArray(job.bookings)) {
+            job.bookings.forEach(booking => {
+              if (booking.technicianId) techIds.add(booking.technicianId);
+            });
           }
         });
         const linkedTechnicians = allTechs.filter(t => techIds.has(t._id));
@@ -152,10 +149,8 @@ export function Diary() {
       });
       if (userTechnician) {
         const techJobs = allJobs.filter(job => {
-          const techId = typeof job.techBooked === 'object' && job.techBooked !== null
-            ? (job.techBooked as any)._id
-            : job.techBooked;
-          return techId === userTechnician._id;
+          // Check if any booking has this technician
+          return job.bookings?.some(b => b.technicianId === userTechnician._id);
         });
         setJobs(techJobs);
       }
@@ -168,13 +163,9 @@ export function Diary() {
         setJobs([]);
       }
     } else {
-      // Filter by selected technician - handle both string ID and object formats
+      // Filter by selected technician using bookings array
       const filtered = allJobs.filter(job => {
-        const techId = typeof job.techBooked === 'object' && job.techBooked !== null
-          ? String((job.techBooked as any)._id)
-          : String(job.techBooked || '');
-        const filterId = String(techFilter);
-        return techId === filterId;
+        return job.bookings?.some(b => b.technicianId === techFilter);
       });
       setJobs(filtered);
     }
@@ -213,34 +204,39 @@ export function Diary() {
     if (!jobs || jobs.length === 0) return [];
     
     let result = jobs.filter((job) => {
-      // Filter by technician - handle both string ID and object formats
+      // Filter by technician using bookings array
       if (techFilter !== 'all') {
-        const techId = typeof job.techBooked === 'object' && job.techBooked !== null
-          ? String((job.techBooked as any)._id)
-          : String(job.techBooked || '');
-        const filterId = String(techFilter);
-        if (techId !== filterId) {
+        const hasMatchingTech = job.bookings?.some(b => b.technicianId === techFilter);
+        if (!hasMatchingTech) {
           return false;
         }
       }
       
-      // If "Booked Date Only" toggle is checked, only show jobs with dateBooked
-      if (bookedDateOnly && !job.dateBooked) {
+      // If "Booked Date Only" toggle is checked, only show jobs with bookings
+      if (bookedDateOnly && (!job.bookings || job.bookings.length === 0)) {
         return false;
       }
       
-      // Filter by date range (only applies to jobs WITH dateBooked)
-      // Jobs without dateBooked will pass the date filter if dateFrom/dateTo are set
-      if (dateFrom && job.dateBooked) {
-        const jobDate = typeof job.dateBooked === 'string' ? job.dateBooked.split('T')[0] : new Date(job.dateBooked).toISOString().split('T')[0];
-        if (jobDate < dateFrom) {
+      // Filter by date range (check if any booking falls within the range)
+      if (dateFrom || dateTo) {
+        if (!job.bookings || job.bookings.length === 0) {
+          // If date filter is set but job has no bookings, exclude it
           return false;
         }
-      }
-      
-      if (dateTo && job.dateBooked) {
-        const jobDate = typeof job.dateBooked === 'string' ? job.dateBooked.split('T')[0] : new Date(job.dateBooked).toISOString().split('T')[0];
-        if (jobDate > dateTo) {
+        
+        const hasBookingInRange = job.bookings.some(booking => {
+          // A booking is in range if its date range overlaps with the filter range
+          const bookingStart = booking.startDate;
+          const bookingEnd = booking.endDate;
+          if (!bookingStart || !bookingEnd) return false;
+          
+          // Check if booking overlaps with filter range
+          if (dateFrom && bookingEnd < dateFrom) return false;
+          if (dateTo && bookingStart > dateTo) return false;
+          return true;
+        });
+        
+        if (!hasBookingInRange) {
           return false;
         }
       }
@@ -264,10 +260,16 @@ export function Diary() {
       return true;
     });
     
-    // Sort by dateBooked (if exists), then by job number
+    // Sort by earliest booking date (if exists), then by job number
     result = result.sort((a, b) => {
-      const dateA = a.dateBooked ? new Date(a.dateBooked).getTime() : 0;
-      const dateB = b.dateBooked ? new Date(b.dateBooked).getTime() : 0;
+      const getEarliestDate = (job: Job) => {
+        if (!job.bookings || job.bookings.length === 0) return 0;
+        const dates = job.bookings.map(b => new Date(b.date).getTime()).filter(d => !isNaN(d));
+        return dates.length > 0 ? Math.min(...dates) : 0;
+      };
+      
+      const dateA = getEarliestDate(a);
+      const dateB = getEarliestDate(b);
       if (dateA !== dateB) return dateA - dateB;
       return (a.jobNumber || '').localeCompare(b.jobNumber || '');
     });
@@ -301,15 +303,38 @@ export function Diary() {
    */
   function toCSV() {
     const header = ['Date Booked', 'Job #', 'Customer', 'Technician', 'Branch', 'Status', 'Description'];
-    const rows = filtered.map((job) => [
-      formatDate(job.dateBooked),
-      job.jobNumber || '',
-      job.customer?.name || job.cashCustomer || '',
-      job.techBooked?.name || '',
-      job.branch?.name || '',
-      job.status?.name || '',
-      job.description?.name || '',
-    ]);
+    const rows: string[][] = [];
+    
+    filtered.forEach((job) => {
+      if (!job.bookings || job.bookings.length === 0) {
+        rows.push([
+          '-',
+          job.jobNumber || '',
+          job.customer?.name || job.cashCustomer || '',
+          '-',
+          job.branch?.name || '',
+          job.status?.name || '',
+          job.description?.name || '',
+        ]);
+      } else {
+        job.bookings.forEach(booking => {
+          const tech = technicians.find(t => t._id === booking.technicianId);
+          const startDate = booking.startDate ? new Date(booking.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
+          const endDate = booking.endDate ? new Date(booking.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
+          const dateRange = startDate === endDate ? startDate : `${startDate} to ${endDate}`;
+          rows.push([
+            dateRange,
+            job.jobNumber || '',
+            job.customer?.name || job.cashCustomer || '',
+            tech?.name || booking.technicianName || '-',
+            job.branch?.name || '',
+            job.status?.name || '',
+            job.description?.name || '',
+          ]);
+        });
+      }
+    });
+    
     const csv = [header, ...rows].map((r) => r.map((x) => `"${(x || '').toString().replace(/"/g, '""')}"`).join(','))
       .join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -333,7 +358,17 @@ export function Diary() {
     printWindow.document.write(`<h3>Technician Diary</h3>`);
     printWindow.document.write(`<table><thead><tr><th>Date Booked</th><th>Job #</th><th>Customer</th><th>Technician</th><th>Branch</th><th>Status</th><th>Description</th></tr></thead><tbody>`);
     filtered.forEach((job) => {
-      printWindow!.document.write(`<tr><td>${formatDate(job.dateBooked)}</td><td>${job.jobNumber || ''}</td><td>${job.customer?.name || job.cashCustomer || ''}</td><td>${job.techBooked?.name || ''}</td><td>${job.branch?.name || ''}</td><td>${job.status?.name || ''}</td><td>${job.description?.name || ''}</td></tr>`);
+      if (!job.bookings || job.bookings.length === 0) {
+        printWindow!.document.write(`<tr><td>-</td><td>${job.jobNumber || ''}</td><td>${job.customer?.name || job.cashCustomer || ''}</td><td>-</td><td>${job.branch?.name || ''}</td><td>${job.status?.name || ''}</td><td>${job.description?.name || ''}</td></tr>`);
+      } else {
+        job.bookings.forEach(booking => {
+          const tech = technicians.find(t => t._id === booking.technicianId);
+          const startDate = booking.startDate ? new Date(booking.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
+          const endDate = booking.endDate ? new Date(booking.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
+          const dateRange = startDate === endDate ? startDate : `${startDate} to ${endDate}`;
+          printWindow!.document.write(`<tr><td>${dateRange}</td><td>${job.jobNumber || ''}</td><td>${job.customer?.name || job.cashCustomer || ''}</td><td>${tech?.name || booking.technicianName || '-'}</td><td>${job.branch?.name || ''}</td><td>${job.status?.name || ''}</td><td>${job.description?.name || ''}</td></tr>`);
+        });
+      }
     });
     printWindow.document.write(`</tbody></table>`);
     printWindow.document.write(`</body></html>`);
@@ -419,7 +454,7 @@ export function Diary() {
             {/* Technician Filter - Hidden for technicians, required for super admin */}
             {currentUser?.role?.name?.toLowerCase() !== 'technician' && (
               <div>
-                <label className="block text-sm font-semibold text-ars-heading mb-2 flex items-center gap-2">
+                <label className="text-sm font-semibold text-ars-heading mb-2 flex items-center gap-2">
                   <Filter className="w-4 h-4" />
                   Technician
                   {currentUser?.isSuperAdmin && (
@@ -496,7 +531,7 @@ export function Diary() {
 
           {/* Search */}
           <div className="mb-6">
-            <label className="block text-sm font-semibold text-ars-heading mb-2 flex items-center gap-2">
+            <label className="text-sm font-semibold text-ars-heading mb-2 flex items-center gap-2">
               <Search className="w-4 h-4" />
               Search
             </label>
@@ -520,17 +555,31 @@ export function Diary() {
               const calendarJobs = currentUser?.isSuperAdmin && techFilter === 'all' 
                 ? (() => {
                     let result = allJobs.filter((job) => {
-                      // Apply date range filter
-                      if (dateFrom && job.dateBooked) {
-                        const jobDate = typeof job.dateBooked === 'string' ? job.dateBooked.split('T')[0] : new Date(job.dateBooked).toISOString().split('T')[0];
-                        if (jobDate < dateFrom) return false;
-                      }
-                      if (dateTo && job.dateBooked) {
-                        const jobDate = typeof job.dateBooked === 'string' ? job.dateBooked.split('T')[0] : new Date(job.dateBooked).toISOString().split('T')[0];
-                        if (jobDate > dateTo) return false;
+                      // Apply date range filter using bookings
+                      if (dateFrom || dateTo) {
+                        if (!job.bookings || job.bookings.length === 0) {
+                          // If date filter is set but job has no bookings, exclude it
+                          return false;
+                        }
+                        
+                        const hasBookingInRange = job.bookings.some(booking => {
+                          // A booking is in range if its date range overlaps with the filter range
+                          const bookingStart = booking.startDate;
+                          const bookingEnd = booking.endDate;
+                          if (!bookingStart || !bookingEnd) return false;
+                          
+                          // Check if booking overlaps with filter range
+                          if (dateFrom && bookingEnd < dateFrom) return false;
+                          if (dateTo && bookingStart > dateTo) return false;
+                          return true;
+                        });
+                        
+                        if (!hasBookingInRange) {
+                          return false;
+                        }
                       }
                       // Apply booked date only filter
-                      if (bookedDateOnly && !job.dateBooked) return false;
+                      if (bookedDateOnly && (!job.bookings || job.bookings.length === 0)) return false;
                       // Apply search filter
                       if (searchTerm) {
                         const searchLower = searchTerm.toLowerCase();
@@ -590,36 +639,66 @@ export function Diary() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {paginatedJobs.map((job) => {
-                    const formattedDate = job.dateBooked 
-                      ? new Date(job.dateBooked).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                      : '-';
-                    return (
-                    <tr key={job._id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-ars-heading">
-                        {formattedDate}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-ars-body font-semibold">
-                        {job.jobNumber || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-ars-body">
-                        {job.customer?.name || job.cashCustomer || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-ars-body">
-                        {job.techBooked?.name || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-ars-body">
-                        {job.branch?.name || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className="px-2 py-1 rounded-lg bg-blue-50 text-blue-700 font-medium">
-                          {job.status?.name || '-'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-ars-body">
-                        {job.description?.name || '-'}
-                      </td>
-                    </tr>
-                    );
+                    // Show each booking as a separate row
+                    if (!job.bookings || job.bookings.length === 0) {
+                      return (
+                        <tr key={job._id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-ars-heading">-</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-ars-body font-semibold">
+                            {job.jobNumber || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-ars-body">
+                            {job.customer?.name || job.cashCustomer || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-ars-body">-</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-ars-body">
+                            {job.branch?.name || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <span className="px-2 py-1 rounded-lg bg-blue-50 text-blue-700 font-medium">
+                              {job.status?.name || '-'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-ars-body">
+                            {job.description?.name || '-'}
+                          </td>
+                        </tr>
+                      );
+                    }
+                    
+                    return job.bookings.map((booking, idx) => {
+                      const tech = technicians.find(t => t._id === booking.technicianId);
+                      const startDate = booking.startDate ? new Date(booking.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
+                      const endDate = booking.endDate ? new Date(booking.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
+                      const formattedDate = startDate === endDate ? startDate : `${startDate} to ${endDate}`;
+                      return (
+                        <tr key={`${job._id}-${idx}`} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-ars-heading">
+                            {formattedDate}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-ars-body font-semibold">
+                            {job.jobNumber || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-ars-body">
+                            {job.customer?.name || job.cashCustomer || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-ars-body">
+                            {tech?.name || booking.technicianName || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-ars-body">
+                            {job.branch?.name || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <span className="px-2 py-1 rounded-lg bg-blue-50 text-blue-700 font-medium">
+                              {job.status?.name || '-'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-ars-body">
+                            {job.description?.name || '-'}
+                          </td>
+                        </tr>
+                      );
+                    });
                   })}
                 </tbody>
               </table>
@@ -706,10 +785,9 @@ interface CalendarViewProps {
 
 function CalendarView({ jobs, statuses, branches, technicians, onUpdate, selectedTechnician }: CalendarViewProps) {
   console.log('CalendarView received jobs:', jobs.length);
-  console.log('Jobs with dateBooked:', jobs.filter(j => j.dateBooked).map(j => ({
+  console.log('Jobs with bookings:', jobs.filter(j => j.bookings && j.bookings.length > 0).map(j => ({
     id: j._id,
-    dateBooked: j.dateBooked,
-    techBooked: j.techBooked
+    bookings: j.bookings
   })));
   
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -742,54 +820,56 @@ function CalendarView({ jobs, statuses, branches, technicians, onUpdate, selecte
   };
   
   // Get bookings for a specific date
-  const getBookingsForDate = (date: Date): Job[] => {
+  // Get bookings for a specific date (multiple bookings per job)
+  const getBookingsForDate = (date: Date): Array<{ job: Job, techId: string, techName: string }> => {
     const dateStr = date.toISOString().split('T')[0];
-    return jobs.filter(job => {
-      if (!job.dateBooked) return false;
-      const jobDateStr = typeof job.dateBooked === 'string' 
-        ? job.dateBooked.split('T')[0] 
-        : new Date(job.dateBooked).toISOString().split('T')[0];
-      return jobDateStr === dateStr;
+    const bookings: Array<{ job: Job, techId: string, techName: string }> = [];
+    jobs.forEach(job => {
+      if (Array.isArray(job.bookings)) {
+        job.bookings.forEach(booking => {
+          // Check if the date falls within the booking range (startDate to endDate)
+          if (booking.startDate && booking.endDate) {
+            if (dateStr >= booking.startDate && dateStr <= booking.endDate) {
+              const techName = (technicians.find(t => t._id === booking.technicianId)?.name) || 'Unknown Tech';
+              bookings.push({ job, techId: booking.technicianId, techName });
+            }
+          }
+        });
+      }
     });
+    return bookings;
   };
   
   // Generate calendar cells
   const calendarCells = [];
+  
   for (let i = 0; i < totalCells; i++) {
     const dayNumber = i - firstDayWeekday + 1;
     const cellDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), dayNumber);
     const isCurrentMonth = dayNumber > 0 && dayNumber <= daysInMonth;
-    const isToday = isCurrentMonth && 
-      cellDate.toDateString() === new Date().toDateString();
-    const bookings = isCurrentMonth ? getBookingsForDate(cellDate) : [];
-    
+    const isToday = isCurrentMonth && cellDate.toDateString() === new Date().toDateString();
+    const bookingsForDate = isCurrentMonth ? getBookingsForDate(cellDate) : [];
+
     calendarCells.push(
       <div
         key={i}
-        className={`min-h-[120px] border border-gray-200 p-2 ${
-          isCurrentMonth ? 'bg-white' : 'bg-gray-50'
-        } ${isToday ? 'ring-2 ring-blue-500' : ''}`}
+        className={`min-h-[120px] border border-gray-200 p-2 ${isCurrentMonth ? 'bg-white' : 'bg-gray-50'} ${isToday ? 'ring-2 ring-blue-500' : ''}`}
       >
-        <div className={`text-sm font-semibold mb-1 ${
-          isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
-        } ${isToday ? 'text-blue-600' : ''}`}>
+        <div className={`text-sm font-semibold mb-1 ${isCurrentMonth ? 'text-gray-900' : 'text-gray-400'} ${isToday ? 'text-blue-600' : ''}`}>
           {isCurrentMonth ? dayNumber : ''}
         </div>
         <div className="space-y-1 overflow-y-auto max-h-[90px]">
-          {bookings.map((job, idx) => {
-            const techName = typeof job.techBooked === 'object' && job.techBooked !== null
-              ? (job.techBooked as any).name || 'Unknown Tech'
-              : 'Unknown Tech';
-            const time = job.dateBooked ? formatTimeShort(new Date(job.dateBooked)) : '';
-            
+          {bookingsForDate.map((bookingInfo, idx) => {
+            const { job, techId, techName } = bookingInfo;
             return (
               <div
                 key={idx}
                 onClick={() => setSelectedJob(job)}
                 className="text-xs px-2 py-1 rounded bg-purple-100 text-purple-800 cursor-pointer hover:bg-purple-200 transition-colors"
-                title={`${time} ${techName} - ${job.jobNumber}`}
+                title={`${techName} - ${job.jobNumber}`}
               >
-                <div className="font-semibold">{time} {techName}</div>
+                <div className="font-semibold truncate">{techName}</div>
+                <div className="text-[10px] truncate">{job.jobNumber}</div>
               </div>
             );
           })}

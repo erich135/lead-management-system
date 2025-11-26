@@ -5,6 +5,21 @@ All notable changes to the ARS Lead Management System will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2025-11-26
+
+### Added
+- **Machine Type Dropdown in Edit Job Form**: Added Machine Type field to LeadDetails component
+  - Matches the create job form functionality
+  - Required field with predefined options (Generator, Genset, Compressor types, etc.)
+  - Properly initializes when editing existing machines
+
+### Fixed
+- **Technician Booking Controls**: Fixed interactive elements in edit job form
+  - Remove button now properly deletes technician bookings from the list
+  - From/To date pickers now open calendar popup correctly
+  - Added proper event handling to prevent modal interference
+  - Improved spacing and layout for better usability
+
 ## Development Branches
 
 ### Branch: `chatbot` - 2025-11-25

@@ -771,7 +771,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                   {isEditing ? (
                     <div className="space-y-2">
                       {(job.bookings || []).map((booking, idx) => (
-                        <div key={idx} className="flex gap-2 items-center">
+                        <div key={idx} className="flex gap-2 items-center flex-wrap" onClick={(e) => e.stopPropagation()}>
                           <select
                             value={booking.technicianId || ''}
                             onChange={e => {
@@ -779,6 +779,8 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                               updated[idx].technicianId = e.target.value;
                               setJob({ ...job, bookings: updated });
                             }}
+                            onClick={e => e.stopPropagation()}
+                            onFocus={e => e.stopPropagation()}
                             className="px-3 py-2 border border-gray-300 rounded-lg text-sm flex-shrink-0"
                           >
                             <option value="">Select Technician</option>
@@ -806,12 +808,26 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                               updated[idx].endDate = e.target.value;
                               setJob({ ...job, bookings: updated });
                             }}
-                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-40"
                           />
-                          <button type="button" onClick={() => {
-                            const updated = (job.bookings || []).filter((_, i) => i !== idx);
-                            setJob({ ...job, bookings: updated });
-                          }} className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors flex-shrink-0">Remove</button>
+                          <button 
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              console.log('Remove button clicked for booking index:', idx);
+                              const updated = (job.bookings || []).filter((_, i) => i !== idx);
+                              setJob({ ...job, bookings: updated });
+                            }}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors flex-shrink-0 cursor-pointer"
+                            style={{ pointerEvents: 'auto', zIndex: 10 }}
+                          >
+                            Remove
+                          </button>
                         </div>
                       ))}
                       <button type="button" onClick={() => {

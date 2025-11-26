@@ -846,17 +846,16 @@ export function SystemManagement() {
   }
 
   return (
-    <div className="min-h-screen bg-white p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-white">
+      <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-8 border border-gray-200 rounded-xl">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-3xl font-bold text-ars-heading flex items-center gap-3">
-            <Shield className="w-8 h-8 text-ars-primary" />
+      <h3 className="text-2xl font-bold text-ars-heading flex items-center gap-2">
             System Management
-          </h2>
+          </h3>
         </div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-md mb-6">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
           <div className="flex border-b border-gray-200">
             <button
               onClick={() => setActiveTab('users')}
@@ -914,7 +913,7 @@ export function SystemManagement() {
         {activeTab === 'users' && (
           <div className="flex gap-6">
             {/* Left Side - User List */}
-            <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-md p-6">
+            <div className="flex-1 bg-white rounded-xl border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold text-ars-heading">Users</h3>
                 <button
@@ -933,7 +932,7 @@ export function SystemManagement() {
                       technician: { name: '', email: '', phone: '' },
                     });
                   }}
-                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2"
+                  className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   INVITE USER
@@ -942,7 +941,7 @@ export function SystemManagement() {
 
               {/* Search */}
               <div className="relative mb-6">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Search users by name or email..."
@@ -951,7 +950,7 @@ export function SystemManagement() {
                     setSearchTerm(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                  className="w-full pl-8 pr-2 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[13px] h-[38px]"
                 />
               </div>
 
@@ -1063,7 +1062,7 @@ export function SystemManagement() {
 
             {/* Right Side - User Details */}
             {selectedUser && (
-              <div className="w-96 bg-white rounded-xl border border-gray-200 shadow-md p-6 h-fit sticky top-6">
+              <div className="w-96 bg-white rounded-xl border border-gray-200 p-6 h-fit sticky top-6">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-bold text-ars-heading">User Details</h3>
                   <button
@@ -1080,34 +1079,34 @@ export function SystemManagement() {
                 {isEditingUser ? (
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-2">First Name</label>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-1">First Name</label>
                       <input
                         type="text"
                         value={selectedUser.firstName}
                         onChange={(e) => setSelectedUser({ ...selectedUser, firstName: e.target.value })}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                        className="w-full pl-2 pr-2 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[13px] h-[38px]"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Last Name</label>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-1">Last Name</label>
                       <input
                         type="text"
                         value={selectedUser.lastName}
                         onChange={(e) => setSelectedUser({ ...selectedUser, lastName: e.target.value })}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                        className="w-full pl-2 pr-2 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[13px] h-[38px]"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Email</label>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-1">Email</label>
                       <input
                         type="email"
                         value={selectedUser.email}
                         onChange={(e) => setSelectedUser({ ...selectedUser, email: e.target.value })}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                        className="w-full pl-2 pr-2 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[13px] h-[38px]"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Role</label>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-1">Role</label>
                       <select
                         value={selectedUser.role._id}
                         onChange={(e) => {
@@ -1116,7 +1115,13 @@ export function SystemManagement() {
                             setSelectedUser({ ...selectedUser, role });
                           }
                         }}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                        className="w-full pl-2 pr-10 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[13px] h-[38px] appearance-none"
+                        style={{
+                          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'right 0.75rem center',
+                          backgroundSize: '1rem'
+                        }}
                       >
                         {roles.map((role) => (
                           <option key={role._id} value={role._id}>
@@ -1128,14 +1133,14 @@ export function SystemManagement() {
                     <div className="flex items-center gap-2 pt-4">
                       <button
                         onClick={handleSaveUser}
-                        className="flex-1 px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                        className="flex-1 px-4 py-2.5 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2"
                       >
                         <Save className="w-4 h-4" />
                         SAVE
                       </button>
                       <button
                         onClick={() => setIsEditingUser(false)}
-                        className="px-4 py-2.5 border border-gray-300 rounded-xl font-bold text-[14px] hover:bg-gray-50 transition-colors"
+                        className="px-4 py-2.5 border border-gray-300 rounded-[8px] font-bold text-[14px] hover:bg-gray-50 transition-colors"
                       >
                         CANCEL
                       </button>
@@ -1179,7 +1184,7 @@ export function SystemManagement() {
                           <button
                             onClick={() => handleResendInvitation(selectedUser._id)}
                             disabled={loading}
-                            className="px-3 py-1.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-lg font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+                            className="px-3 py-1.5 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 disabled:opacity-50"
                             title="Resend invitation email"
                           >
                             <Mail className="w-4 h-4" />
@@ -1230,7 +1235,7 @@ export function SystemManagement() {
                     </div>
                     <button
                       onClick={() => setIsEditingUser(true)}
-                      className="w-full px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                      className="w-full px-4 py-2.5 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2"
                     >
                       <Edit2 className="w-4 h-4" />
                       EDIT USER
@@ -1248,7 +1253,7 @@ export function SystemManagement() {
             {/* Import History/Stats */}
             {importHistory && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+                <div className="bg-white rounded-xl border border-gray-200 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold text-ars-heading flex items-center gap-2">
                       <FileText className="w-5 h-5 text-ars-primary" />
@@ -1258,7 +1263,7 @@ export function SystemManagement() {
                   <p className="text-3xl font-bold text-ars-primary mb-2">{importHistory.jobs.total.toLocaleString()}</p>
                   <p className="text-sm text-ars-body">Total jobs in system</p>
                 </div>
-                <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+                <div className="bg-white rounded-xl border border-gray-200 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold text-ars-heading flex items-center gap-2">
                       <Users className="w-5 h-5 text-ars-primary" />
@@ -1274,7 +1279,7 @@ export function SystemManagement() {
             {/* Import Sections */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Import Jobs */}
-              <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-bold text-ars-heading flex items-center gap-2">
                     <FileText className="w-5 h-5 text-ars-primary" />
@@ -1293,7 +1298,7 @@ export function SystemManagement() {
                 </p>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-semibold text-ars-body mb-2">Select CSV File</label>
+                    <label className="block text-[11px] font-medium text-gray-600 mb-1">Select CSV File</label>
                     <input
                       type="file"
                       accept=".csv"
@@ -1304,15 +1309,21 @@ export function SystemManagement() {
                           setImportType('jobs');
                         }
                       }}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      className="w-full px-2 py-2 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[13px] file:mr-4 file:py-1.5 file:px-4 file:rounded-[6px] file:border-0 file:text-[13px] file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 cursor-pointer"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-ars-body mb-2">Branch</label>
+                    <label className="block text-[11px] font-medium text-gray-600 mb-1">Branch</label>
                     <select
                       value={selectedBranch}
                       onChange={(e) => setSelectedBranch(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      className="w-full pl-2 pr-10 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[13px] h-[38px] appearance-none"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 0.75rem center',
+                        backgroundSize: '1rem'
+                      }}
                     >
                       <option value="">Default (JHB)</option>
                       {branches.map((branch) => (
@@ -1345,7 +1356,7 @@ export function SystemManagement() {
                   <button
                     onClick={handleImport}
                     disabled={!selectedFile || importing || importType !== 'jobs'}
-                    className="w-full px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-2.5 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {importing && importType === 'jobs' ? (
                       <>
@@ -1363,7 +1374,7 @@ export function SystemManagement() {
               </div>
 
               {/* Import Customers */}
-              <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-bold text-ars-heading flex items-center gap-2">
                     <Users className="w-5 h-5 text-ars-primary" />
@@ -1382,7 +1393,7 @@ export function SystemManagement() {
                 </p>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-semibold text-ars-body mb-2">Select CSV File</label>
+                    <label className="block text-[11px] font-medium text-gray-600 mb-1">Select CSV File</label>
                     <input
                       type="file"
                       accept=".csv"
@@ -1393,7 +1404,7 @@ export function SystemManagement() {
                           setImportType('customers');
                         }
                       }}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      className="w-full px-2 py-2 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[13px] file:mr-4 file:py-1.5 file:px-4 file:rounded-[6px] file:border-0 file:text-[13px] file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 cursor-pointer"
                     />
                   </div>
                   <div className="flex items-center gap-2">
@@ -1416,7 +1427,7 @@ export function SystemManagement() {
                   <button
                     onClick={handleImport}
                     disabled={!selectedFile || importing || importType !== 'customers'}
-                    className="w-full px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-2.5 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {importing && importType === 'customers' ? (
                       <>
@@ -1434,7 +1445,7 @@ export function SystemManagement() {
               </div>
 
               {/* Update Jobs */}
-              <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-bold text-ars-heading flex items-center gap-2">
                     <FileEdit className="w-5 h-5 text-ars-primary" />
@@ -1457,7 +1468,7 @@ export function SystemManagement() {
                 </div>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-semibold text-ars-body mb-2">Select CSV File</label>
+                    <label className="block text-[11px] font-medium text-gray-600 mb-1">Select CSV File</label>
                     <input
                       type="file"
                       accept=".csv"
@@ -1468,23 +1479,23 @@ export function SystemManagement() {
                           setImportType('update-jobs');
                         }
                       }}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      className="w-full px-2 py-2 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[13px] file:mr-4 file:py-1.5 file:px-4 file:rounded-[6px] file:border-0 file:text-[13px] file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 cursor-pointer"
                     />
                   </div>
                   <button
                     onClick={handleImport}
                     disabled={!selectedFile || importing || importType !== 'update-jobs'}
-                    className="w-full px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-2.5 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {importing && importType === 'update-jobs' ? (
                       <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Updating...
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#383838]"></div>
+                        UPDATING...
                       </>
                     ) : (
                       <>
                         <Upload className="w-4 h-4" />
-                        Update Jobs
+                        UPDATE JOBS
                       </>
                     )}
                   </button>
@@ -1494,7 +1505,7 @@ export function SystemManagement() {
 
             {/* Import Result */}
             {importResult && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-bold text-ars-heading">Import Result</h3>
                   <button
@@ -1569,7 +1580,7 @@ export function SystemManagement() {
                     setImportType(null);
                     setClearExisting(false);
                   }}
-                  className="mt-4 w-full px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all"
+                  className="mt-4 w-full px-4 py-2.5 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
                 >
                   DONE
                 </button>
@@ -1582,31 +1593,31 @@ export function SystemManagement() {
         {activeTab === 'reference' && (
           <div className="space-y-6">
             {/* Job Statuses Section */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-              <div className="flex items-center justify-between mb-6">
-                <button
-                  onClick={() => setIsStatusesExpanded(!isStatusesExpanded)}
-                  className="flex items-center gap-2 text-xl font-bold text-ars-heading hover:text-ars-primary transition-colors"
-                >
-                  {isStatusesExpanded ? <ChevronUp className="w-6 h-6 text-ars-primary" /> : <ChevronDown className="w-6 h-6 text-ars-primary" />}
-                  <Tag className="w-6 h-6 text-ars-primary" />
-                  Job Statuses
-                </button>
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <button
+                onClick={() => setIsStatusesExpanded(!isStatusesExpanded)}
+                className="w-full flex items-center gap-2 text-xl font-bold text-ars-heading hover:text-ars-primary transition-colors"
+              >
+                {isStatusesExpanded ? <ChevronUp className="w-6 h-6 text-ars-primary" /> : <ChevronDown className="w-6 h-6 text-ars-primary" />}
+                <Tag className="w-6 h-6 text-ars-primary" />
+                Job Statuses
+              </button>
+
+              {isStatusesExpanded && (
+                <>
+              <div className="mt-5 mb-4">
                 <button
                   onClick={() => {
                     setEditingStatus(null);
                     setNewStatus({ name: '', description: '' });
                     setShowStatusForm(true);
                   }}
-                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2"
+                  className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   ADD STATUS
                 </button>
               </div>
-
-              {isStatusesExpanded && (
-                <>
 
               {/* Add/Edit Status Form */}
               {(editingStatus || showStatusForm) && (
@@ -1718,7 +1729,7 @@ export function SystemManagement() {
                     <button
                       onClick={editingStatus ? handleUpdateStatus : handleCreateStatus}
                       disabled={loading}
-                      className="px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+                      className="px-4 py-2.5 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 disabled:opacity-50"
                     >
                       <Save className="w-4 h-4" />
                       {editingStatus ? 'UPDATE' : 'CREATE'}
@@ -1729,7 +1740,7 @@ export function SystemManagement() {
                         setNewStatus({ name: '', description: '' });
                         setShowStatusForm(false);
                       }}
-                      className="px-4 py-2.5 border border-gray-300 rounded-xl font-bold text-[14px] hover:bg-gray-50 transition-colors"
+                      className="px-4 py-2.5 border border-gray-300 rounded-[8px] font-bold text-[14px] hover:bg-gray-50 transition-colors"
                     >
                       CANCEL
                     </button>
@@ -1797,31 +1808,31 @@ export function SystemManagement() {
             </div>
 
             {/* Rep Codes Section */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-              <div className="flex items-center justify-between mb-6">
-                <button
-                  onClick={() => setIsRepCodesExpanded(!isRepCodesExpanded)}
-                  className="flex items-center gap-2 text-xl font-bold text-ars-heading hover:text-ars-primary transition-colors"
-                >
-                  {isRepCodesExpanded ? <ChevronUp className="w-6 h-6 text-ars-primary" /> : <ChevronDown className="w-6 h-6 text-ars-primary" />}
-                  <Key className="w-6 h-6 text-ars-primary" />
-                  Rep Codes
-                </button>
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <button
+                onClick={() => setIsRepCodesExpanded(!isRepCodesExpanded)}
+                className="w-full flex items-center gap-2 text-xl font-bold text-ars-heading hover:text-ars-primary transition-colors"
+              >
+                {isRepCodesExpanded ? <ChevronUp className="w-6 h-6 text-ars-primary" /> : <ChevronDown className="w-6 h-6 text-ars-primary" />}
+                <Key className="w-6 h-6 text-ars-primary" />
+                Rep Codes
+              </button>
+
+              {isRepCodesExpanded && (
+                <>
+              <div className="mt-5 mb-4">
                 <button
                   onClick={() => {
                     setEditingRepCode(null);
                     setNewRepCode({ code: '', description: '' });
                     setShowRepCodeForm(true);
                   }}
-                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2"
+                  className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   ADD REP CODE
                 </button>
               </div>
-
-              {isRepCodesExpanded && (
-                <>
               {/* Add/Edit Rep Code Form */}
               {(editingRepCode || showRepCodeForm) && (
                 <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
@@ -1892,7 +1903,7 @@ export function SystemManagement() {
                     <button
                       onClick={editingRepCode ? handleUpdateRepCode : handleCreateRepCode}
                       disabled={loading}
-                      className="px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+                      className="px-4 py-2.5 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 disabled:opacity-50"
                     >
                       <Save className="w-4 h-4" />
                       {editingRepCode ? 'UPDATE' : 'CREATE'}
@@ -1903,7 +1914,7 @@ export function SystemManagement() {
                         setNewRepCode({ code: '', description: '' });
                         setShowRepCodeForm(false);
                       }}
-                      className="px-4 py-2.5 border border-gray-300 rounded-xl font-bold text-[14px] hover:bg-gray-50 transition-colors"
+                      className="px-4 py-2.5 border border-gray-300 rounded-[8px] font-bold text-[14px] hover:bg-gray-50 transition-colors"
                     >
                       CANCEL
                     </button>
@@ -1963,33 +1974,34 @@ export function SystemManagement() {
             </div>
 
             {/* Admin Codes Section */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-              <div className="flex items-center justify-between mb-6">
-                <button
-                  onClick={() => setIsAdminCodesExpanded(!isAdminCodesExpanded)}
-                  className="flex items-center gap-2 text-xl font-bold text-ars-heading hover:text-ars-primary transition-colors"
-                >
-                  {isAdminCodesExpanded ? <ChevronUp className="w-6 h-6 text-ars-primary" /> : <ChevronDown className="w-6 h-6 text-ars-primary" />}
-                  <Shield className="w-6 h-6 text-ars-primary" />
-                  Admin Codes (ADM)
-                </button>
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <button
+                onClick={() => setIsAdminCodesExpanded(!isAdminCodesExpanded)}
+                className="w-full flex items-center gap-2 text-xl font-bold text-ars-heading hover:text-ars-primary transition-colors"
+              >
+                {isAdminCodesExpanded ? <ChevronUp className="w-6 h-6 text-ars-primary" /> : <ChevronDown className="w-6 h-6 text-ars-primary" />}
+                <Shield className="w-6 h-6 text-ars-primary" />
+                Admin Codes (ADM)
+              </button>
+              {isAdminCodesExpanded && (
+                <>
+              <p className="mt-5 text-sm text-ars-body mb-4">
+                Admin codes are used in jobs. Link them to users to track which admin is responsible for each code.
+              </p>
+
+              <div className="mb-4">
                 <button
                   onClick={() => {
                     setEditingAdminCode(null);
                     setNewAdminCode({ code: '', description: '', userId: '' });
                     setShowAdminCodeForm(!showAdminCodeForm);
                   }}
-                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2"
+                  className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   ADD ADMIN CODE
                 </button>
               </div>
-              {isAdminCodesExpanded && (
-                <>
-              <p className="text-sm text-ars-body mb-4">
-                Admin codes are used in jobs. Link them to users to track which admin is responsible for each code.
-              </p>
 
               {/* Admin Code Form */}
               {(showAdminCodeForm || editingAdminCode) && (
@@ -2076,7 +2088,7 @@ export function SystemManagement() {
                     <button
                       onClick={editingAdminCode ? handleUpdateAdminCode : handleCreateAdminCode}
                       disabled={loading}
-                      className="px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+                      className="px-4 py-2.5 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 disabled:opacity-50"
                     >
                       <Save className="w-4 h-4" />
                       {editingAdminCode ? 'UPDATE' : 'CREATE'}
@@ -2087,7 +2099,7 @@ export function SystemManagement() {
                         setNewAdminCode({ code: '', description: '', userId: '' });
                         setShowAdminCodeForm(false);
                       }}
-                      className="px-4 py-2.5 border border-gray-300 rounded-xl font-bold text-[14px] hover:bg-gray-50 transition-colors"
+                      className="px-4 py-2.5 border border-gray-300 rounded-[8px] font-bold text-[14px] hover:bg-gray-50 transition-colors"
                     >
                       CANCEL
                     </button>
@@ -2152,33 +2164,34 @@ export function SystemManagement() {
             </div>
 
             {/* Technicians Section */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-              <div className="flex items-center justify-between mb-6">
-                <button
-                  onClick={() => setIsTechniciansExpanded(!isTechniciansExpanded)}
-                  className="flex items-center gap-2 text-xl font-bold text-ars-heading hover:text-ars-primary transition-colors"
-                >
-                  {isTechniciansExpanded ? <ChevronUp className="w-6 h-6 text-ars-primary" /> : <ChevronDown className="w-6 h-6 text-ars-primary" />}
-                  <Users className="w-6 h-6 text-ars-primary" />
-                  Technicians
-                </button>
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <button
+                onClick={() => setIsTechniciansExpanded(!isTechniciansExpanded)}
+                className="w-full flex items-center gap-2 text-xl font-bold text-ars-heading hover:text-ars-primary transition-colors"
+              >
+                {isTechniciansExpanded ? <ChevronUp className="w-6 h-6 text-ars-primary" /> : <ChevronDown className="w-6 h-6 text-ars-primary" />}
+                <Users className="w-6 h-6 text-ars-primary" />
+                Technicians
+              </button>
+              {isTechniciansExpanded && (
+                <>
+              <p className="mt-5 text-sm text-ars-body mb-4">
+                Manage technicians who can be assigned to jobs.
+              </p>
+
+              <div className="mb-4">
                 <button
                   onClick={() => {
                     setEditingTechnician(null);
                     setNewTechnician({ name: '', email: '', phone: '', userId: '' });
                     setShowTechnicianForm(!showTechnicianForm);
                   }}
-                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2"
+                  className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   ADD TECHNICIAN
                 </button>
               </div>
-              {isTechniciansExpanded && (
-                <>
-              <p className="text-sm text-ars-body mb-4">
-                Manage technicians who can be assigned to jobs.
-              </p>
 
               {/* Technician Form */}
               {(showTechnicianForm || editingTechnician) && (
@@ -2280,7 +2293,7 @@ export function SystemManagement() {
                     <button
                       onClick={editingTechnician ? handleUpdateTechnician : handleCreateTechnician}
                       disabled={loading}
-                      className="px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+                      className="px-4 py-2.5 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 disabled:opacity-50"
                     >
                       <Save className="w-4 h-4" />
                       {editingTechnician ? 'UPDATE' : 'CREATE'}
@@ -2291,7 +2304,7 @@ export function SystemManagement() {
                         setNewTechnician({ name: '', email: '', phone: '', userId: '' });
                         setShowTechnicianForm(false);
                       }}
-                      className="px-4 py-2.5 border border-gray-300 rounded-xl font-bold text-[14px] hover:bg-gray-50 transition-colors"
+                      className="px-4 py-2.5 border border-gray-300 rounded-[8px] font-bold text-[14px] hover:bg-gray-50 transition-colors"
                     >
                       CANCEL
                     </button>
@@ -2359,33 +2372,34 @@ export function SystemManagement() {
             </div>
 
             {/* Service Descriptions Section */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-              <div className="flex items-center justify-between mb-6">
-                <button
-                  onClick={() => setIsDescriptionsExpanded(!isDescriptionsExpanded)}
-                  className="flex items-center gap-2 text-xl font-bold text-ars-heading hover:text-ars-primary transition-colors"
-                >
-                  {isDescriptionsExpanded ? <ChevronUp className="w-6 h-6 text-ars-primary" /> : <ChevronDown className="w-6 h-6 text-ars-primary" />}
-                  <FileText className="w-6 h-6 text-ars-primary" />
-                  Service Descriptions
-                </button>
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <button
+                onClick={() => setIsDescriptionsExpanded(!isDescriptionsExpanded)}
+                className="w-full flex items-center gap-2 text-xl font-bold text-ars-heading hover:text-ars-primary transition-colors"
+              >
+                {isDescriptionsExpanded ? <ChevronUp className="w-6 h-6 text-ars-primary" /> : <ChevronDown className="w-6 h-6 text-ars-primary" />}
+                <FileText className="w-6 h-6 text-ars-primary" />
+                Service Descriptions
+              </button>
+              {isDescriptionsExpanded && (
+                <>
+              <p className="mt-5 text-sm text-ars-body mb-4">
+                Manage service descriptions for job categorization.
+              </p>
+
+              <div className="mb-4">
                 <button
                   onClick={() => {
                     setEditingDescription(null);
                     setNewDescription({ name: '', description: '' });
                     setShowDescriptionForm(!showDescriptionForm);
                   }}
-                  className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2"
+                  className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   ADD DESCRIPTION
                 </button>
               </div>
-              {isDescriptionsExpanded && (
-                <>
-              <p className="text-sm text-ars-body mb-4">
-                Manage service descriptions for job categorization.
-              </p>
 
               {/* Description Form */}
               {(showDescriptionForm || editingDescription) && (
@@ -2447,7 +2461,7 @@ export function SystemManagement() {
                     <button
                       onClick={editingDescription ? handleUpdateDescription : handleCreateDescription}
                       disabled={loading}
-                      className="px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+                      className="px-4 py-2.5 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 disabled:opacity-50"
                     >
                       <Save className="w-4 h-4" />
                       {editingDescription ? 'UPDATE' : 'CREATE'}
@@ -2458,7 +2472,7 @@ export function SystemManagement() {
                         setNewDescription({ name: '', description: '' });
                         setShowDescriptionForm(false);
                       }}
-                      className="px-4 py-2.5 border border-gray-300 rounded-xl font-bold text-[14px] hover:bg-gray-50 transition-colors"
+                      className="px-4 py-2.5 border border-gray-300 rounded-[8px] font-bold text-[14px] hover:bg-gray-50 transition-colors"
                     >
                       CANCEL
                     </button>
@@ -2792,7 +2806,7 @@ export function SystemManagement() {
                 <button
                   onClick={handleInviteUser}
                   disabled={inviting}
-                  className="px-6 py-3 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-3 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {inviting ? 'INVITING...' : 'SEND INVITATION'}
                 </button>

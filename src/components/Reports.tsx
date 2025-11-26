@@ -27,7 +27,6 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { 
   Download, 
-  Filter, 
   TrendingUp, 
   Banknote,
   Search,
@@ -810,7 +809,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
   if (loading && userJobs.length === 0 && customerJobs.length === 0) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ars-primary mx-auto mb-4"></div>
           <p className="text-ars-body">Loading report data...</p>
@@ -820,15 +819,15 @@ export function Reports({ statuses, branches }: ReportsProps) {
   }
 
   return (
-    <div className="min-h-screen bg-white p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-white">
+      <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-8 border border-gray-200 rounded-xl">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-ars-heading">Reports & Analytics</h2>
           {activeTab === 'user-performance' && (
             <button
               onClick={exportUserPerformanceReport}
-              className="bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-4 py-2 rounded-xl font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
+              className="bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-4 py-2 rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
             >
               <Download className="w-4 h-4" />
               EXPORT REPORT
@@ -838,7 +837,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
             <button
               onClick={exportCustomerReport}
               disabled={!selectedCustomerId}
-              className="bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-4 py-2 rounded-xl font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-4 py-2 rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Download className="w-4 h-4" />
               EXPORT REPORT
@@ -847,7 +846,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
           {activeTab === 'machine' && (
             <button
               onClick={exportMachineReport}
-              className="bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-4 py-2 rounded-xl font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
+              className="bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-4 py-2 rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
             >
               <Download className="w-4 h-4" />
               EXPORT REPORT
@@ -902,15 +901,14 @@ export function Reports({ statuses, branches }: ReportsProps) {
         {activeTab === 'user-performance' && (
           <div className="space-y-6">
             {/* Filters */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-              <h3 className="text-lg font-bold text-ars-heading mb-4 flex items-center gap-2">
-                <Filter className="w-5 h-5" />
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h3 className="text-lg font-bold text-ars-heading mb-4">
                 Filters
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Role Selection */}
                 <div>
-                  <label className="block text-sm font-semibold text-ars-heading mb-2">Role</label>
+                  <label className="block text-[11px] font-medium text-gray-600 mb-1">Role</label>
                   <select
                     value={selectedRole}
                     onChange={(e) => {
@@ -920,7 +918,13 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       setSelectedTechnician('');
                     }}
                     disabled={!currentUser?.isSuperAdmin}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px] disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full pl-2 pr-10 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white appearance-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    style={{
+                      backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27currentColor%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')",
+                      backgroundPosition: 'right 0.75rem center',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '1rem 1rem'
+                    }}
                   >
                     <option value="admin">Admin</option>
                     <option value="rep">Rep</option>
@@ -934,12 +938,18 @@ export function Reports({ statuses, branches }: ReportsProps) {
                 {/* Role-specific Selection */}
                 {selectedRole === 'admin' && (
                   <div>
-                    <label className="block text-sm font-semibold text-ars-heading mb-2">Admin Code</label>
+                    <label className="block text-[11px] font-medium text-gray-600 mb-1">Admin Code</label>
                     <select
                       value={selectedAdminCode}
                       onChange={(e) => setSelectedAdminCode(e.target.value)}
                       disabled={!currentUser?.isSuperAdmin}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px] disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      className="w-full pl-2 pr-10 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white appearance-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      style={{
+                        backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27currentColor%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')",
+                        backgroundPosition: 'right 0.75rem center',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: '1rem 1rem'
+                      }}
                     >
                       <option value="">Select Admin Code</option>
                       {adminCodes.map(ac => (
@@ -953,12 +963,18 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
                 {selectedRole === 'rep' && (
                   <div>
-                    <label className="block text-sm font-semibold text-ars-heading mb-2">Rep Code</label>
+                    <label className="block text-[11px] font-medium text-gray-600 mb-1">Rep Code</label>
                     <select
                       value={selectedRepCode}
                       onChange={(e) => setSelectedRepCode(e.target.value)}
                       disabled={!currentUser?.isSuperAdmin}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px] disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      className="w-full pl-2 pr-10 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white appearance-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      style={{
+                        backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27currentColor%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')",
+                        backgroundPosition: 'right 0.75rem center',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: '1rem 1rem'
+                      }}
                     >
                       <option value="">Select Rep Code</option>
                       {repCodes.map(rc => (
@@ -972,12 +988,18 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
                 {selectedRole === 'technician' && (
                   <div>
-                    <label className="block text-sm font-semibold text-ars-heading mb-2">Technician</label>
+                    <label className="block text-[11px] font-medium text-gray-600 mb-1">Technician</label>
                     <select
                       value={selectedTechnician}
                       onChange={(e) => setSelectedTechnician(e.target.value)}
                       disabled={!currentUser?.isSuperAdmin}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px] disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      className="w-full pl-2 pr-10 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white appearance-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      style={{
+                        backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27currentColor%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')",
+                        backgroundPosition: 'right 0.75rem center',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: '1rem 1rem'
+                      }}
                     >
                       <option value="">Select Technician</option>
                       {technicians.map(t => (
@@ -991,14 +1013,19 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
                 {/* Date Range Preset */}
                 <div>
-                  <label className="block text-sm font-semibold text-ars-heading mb-2 flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
+                  <label className="block text-[11px] font-medium text-gray-600 mb-1">
                     Date Range
                   </label>
                   <select
                     value={dateRangePreset}
                     onChange={(e) => setDateRangePreset(e.target.value as DateRangePreset)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
+                    className="w-full pl-2 pr-10 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white appearance-none"
+                    style={{
+                      backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27currentColor%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')",
+                      backgroundPosition: 'right 0.75rem center',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '1rem 1rem'
+                    }}
                   >
                     <option value="today">Today</option>
                     <option value="this-month">This Month</option>
@@ -1011,21 +1038,21 @@ export function Reports({ statuses, branches }: ReportsProps) {
                 {dateRangePreset === 'custom' && (
                   <>
                     <div>
-                      <label className="block text-sm font-semibold text-ars-heading mb-2">From Date</label>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-1">From Date</label>
                       <input
                         type="date"
                         value={customDateFrom}
                         onChange={(e) => setCustomDateFrom(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
+                        className="w-full pl-2 pr-2 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-ars-heading mb-2">To Date</label>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-1">To Date</label>
                       <input
                         type="date"
                         value={customDateTo}
                         onChange={(e) => setCustomDateTo(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
+                        className="w-full pl-2 pr-2 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
                       />
                     </div>
                   </>
@@ -1035,42 +1062,42 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
             {/* Statistics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-sm font-medium text-ars-body">Total Jobs</p>
-                  <FileText className="w-5 h-5 text-ars-primary" />
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-3 gap-2">
+                  <p className="text-sm font-medium text-ars-body truncate">Total Jobs</p>
+                  <FileText className="w-5 h-5 text-[#f7c12b] flex-shrink-0" />
                 </div>
-                <p className="text-3xl font-bold text-ars-heading">{userStats.totalJobs.toLocaleString()}</p>
+                <p className="text-3xl font-bold text-ars-heading truncate">{userStats.totalJobs.toLocaleString()}</p>
               </div>
 
-              <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-sm font-medium text-ars-body">Total Value</p>
-                  <Banknote className="w-5 h-5 text-green-500" />
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-3 gap-2">
+                  <p className="text-sm font-medium text-ars-body truncate">Total Value</p>
+                  <Banknote className="w-5 h-5 text-[#f7c12b] flex-shrink-0" />
                 </div>
-                <p className="text-3xl font-bold text-ars-heading">R{userStats.totalValue.toLocaleString()}</p>
+                <p className="text-3xl font-bold text-ars-heading truncate">R{userStats.totalValue.toLocaleString()}</p>
               </div>
 
-              <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-sm font-medium text-ars-body">Total Activities</p>
-                  <TrendingUp className="w-5 h-5 text-blue-500" />
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-3 gap-2">
+                  <p className="text-sm font-medium text-ars-body truncate">Total Activities</p>
+                  <TrendingUp className="w-5 h-5 text-[#f7c12b] flex-shrink-0" />
                 </div>
-                <p className="text-3xl font-bold text-ars-heading">{userStats.totalActivities.toLocaleString()}</p>
+                <p className="text-3xl font-bold text-ars-heading truncate">{userStats.totalActivities.toLocaleString()}</p>
               </div>
 
-              <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-sm font-medium text-ars-body">Overdue Jobs</p>
-                  <AlertCircle className="w-5 h-5 text-red-500" />
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-3 gap-2">
+                  <p className="text-sm font-medium text-ars-body truncate">Overdue Jobs</p>
+                  <AlertCircle className="w-5 h-5 text-[#f7c12b] flex-shrink-0" />
                 </div>
-                <p className="text-3xl font-bold text-ars-heading">{userStats.overdueCount.toLocaleString()}</p>
+                <p className="text-3xl font-bold text-ars-heading truncate">{userStats.overdueCount.toLocaleString()}</p>
               </div>
             </div>
 
             {/* Overdue Jobs */}
             {userOverdueJobs.length > 0 && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <h3 className="text-lg font-bold text-ars-heading mb-4">Overdue Jobs</h3>
                 <div className="space-y-3">
                   {userOverdueJobs.slice(0, 10).map(overdue => (
@@ -1104,7 +1131,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
             {/* Recent Activities */}
             {userActivities.length > 0 && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <h3 className="text-lg font-bold text-ars-heading mb-4">Recent Activities</h3>
                 <div className="space-y-2 max-h-96 overflow-y-auto">
                   {userActivities.slice(0, 50).map(activity => (
@@ -1132,7 +1159,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
             {/* Jobs List */}
             {userJobs.length > 0 && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <h3 className="text-lg font-bold text-ars-heading mb-4">Jobs ({userJobs.length})</h3>
                 <div className="space-y-3 max-h-96 overflow-y-auto">
                   {userJobs.map(job => (
@@ -1202,18 +1229,23 @@ export function Reports({ statuses, branches }: ReportsProps) {
         {activeTab === 'customer' && (
           <div className="space-y-6">
             {/* Customer Selection */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-              <h3 className="text-lg font-bold text-ars-heading mb-4 flex items-center gap-2">
-                <Filter className="w-5 h-5" />
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h3 className="text-lg font-bold text-ars-heading mb-4">
                 Select Customer
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-ars-heading mb-2">Customer</label>
+                  <label className="block text-[11px] font-medium text-gray-600 mb-1">Customer</label>
                   <select
                     value={selectedCustomerId}
                     onChange={(e) => setSelectedCustomerId(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
+                    className="w-full pl-2 pr-10 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white appearance-none"
+                    style={{
+                      backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27currentColor%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')",
+                      backgroundPosition: 'right 0.75rem center',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '1rem 1rem'
+                    }}
                   >
                     <option value="">Select Customer</option>
                     {customers.map(customer => (
@@ -1224,14 +1256,19 @@ export function Reports({ statuses, branches }: ReportsProps) {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-ars-heading mb-2 flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
+                  <label className="block text-[11px] font-medium text-gray-600 mb-1">
                     Date Range
                   </label>
                   <select
                     value={dateRangePreset}
                     onChange={(e) => setDateRangePreset(e.target.value as DateRangePreset)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
+                    className="w-full pl-2 pr-10 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white appearance-none"
+                    style={{
+                      backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27currentColor%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')",
+                      backgroundPosition: 'right 0.75rem center',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '1rem 1rem'
+                    }}
                   >
                     <option value="today">Today</option>
                     <option value="this-month">This Month</option>
@@ -1242,21 +1279,21 @@ export function Reports({ statuses, branches }: ReportsProps) {
                 {dateRangePreset === 'custom' && (
                   <>
                     <div>
-                      <label className="block text-sm font-semibold text-ars-heading mb-2">From Date</label>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-1">From Date</label>
                       <input
                         type="date"
                         value={customDateFrom}
                         onChange={(e) => setCustomDateFrom(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
+                        className="w-full pl-2 pr-2 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-ars-heading mb-2">To Date</label>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-1">To Date</label>
                       <input
                         type="date"
                         value={customDateTo}
                         onChange={(e) => setCustomDateTo(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
+                        className="w-full pl-2 pr-2 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
                       />
                     </div>
                   </>
@@ -1268,41 +1305,41 @@ export function Reports({ statuses, branches }: ReportsProps) {
               <>
                 {/* Statistics Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-sm font-medium text-ars-body">Total Jobs</p>
-                      <FileText className="w-5 h-5 text-ars-primary" />
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <div className="flex items-center justify-between mb-3 gap-2">
+                      <p className="text-sm font-medium text-ars-body truncate">Total Jobs</p>
+                      <FileText className="w-5 h-5 text-[#f7c12b] flex-shrink-0" />
                     </div>
-                    <p className="text-3xl font-bold text-ars-heading">{customerStats.totalJobs.toLocaleString()}</p>
+                    <p className="text-3xl font-bold text-ars-heading truncate">{customerStats.totalJobs.toLocaleString()}</p>
                   </div>
 
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-sm font-medium text-ars-body">Total Value</p>
-                      <Banknote className="w-5 h-5 text-green-500" />
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <div className="flex items-center justify-between mb-3 gap-2">
+                      <p className="text-sm font-medium text-ars-body truncate">Total Value</p>
+                      <Banknote className="w-5 h-5 text-[#f7c12b] flex-shrink-0" />
                     </div>
-                    <p className="text-3xl font-bold text-ars-heading">R{customerStats.totalValue.toLocaleString()}</p>
+                    <p className="text-3xl font-bold text-ars-heading truncate">R{customerStats.totalValue.toLocaleString()}</p>
                   </div>
 
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-sm font-medium text-ars-body">Machines</p>
-                      <Wrench className="w-5 h-5 text-blue-500" />
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <div className="flex items-center justify-between mb-3 gap-2">
+                      <p className="text-sm font-medium text-ars-body truncate">Machines</p>
+                      <Wrench className="w-5 h-5 text-[#f7c12b] flex-shrink-0" />
                     </div>
-                    <p className="text-3xl font-bold text-ars-heading">{customerStats.totalMachines.toLocaleString()}</p>
+                    <p className="text-3xl font-bold text-ars-heading truncate">{customerStats.totalMachines.toLocaleString()}</p>
                   </div>
 
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-sm font-medium text-ars-body">Activities</p>
-                      <TrendingUp className="w-5 h-5 text-purple-500" />
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <div className="flex items-center justify-between mb-3 gap-2">
+                      <p className="text-sm font-medium text-ars-body truncate">Activities</p>
+                      <TrendingUp className="w-5 h-5 text-[#f7c12b] flex-shrink-0" />
                     </div>
-                    <p className="text-3xl font-bold text-ars-heading">{customerStats.totalActivities.toLocaleString()}</p>
+                    <p className="text-3xl font-bold text-ars-heading truncate">{customerStats.totalActivities.toLocaleString()}</p>
                   </div>
                 </div>
 
                 {/* Who Worked on This Customer */}
-                <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+                <div className="bg-white rounded-xl border border-gray-200 p-6">
                   <h3 className="text-lg font-bold text-ars-heading mb-4">Who Worked on This Customer</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="p-4 bg-blue-50 rounded-lg">
@@ -1322,7 +1359,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
                 {/* Machines */}
                 {customerMachines.length > 0 && (
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <h3 className="text-lg font-bold text-ars-heading mb-4">Machines ({customerMachines.length})</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {customerMachines.map(machine => (
@@ -1345,7 +1382,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
                 {/* Jobs List */}
                 {customerJobs.length > 0 && (
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <h3 className="text-lg font-bold text-ars-heading mb-4">Jobs ({customerJobs.length})</h3>
                     <div className="space-y-2 max-h-96 overflow-y-auto">
                       {customerJobs.map(job => (
@@ -1415,7 +1452,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
                 {/* Activities */}
                 {customerActivities.length > 0 && (
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <h3 className="text-lg font-bold text-ars-heading mb-4">Activity History</h3>
                     <div className="space-y-2 max-h-96 overflow-y-auto">
                       {customerActivities.map(activity => (
@@ -1451,40 +1488,39 @@ export function Reports({ statuses, branches }: ReportsProps) {
         {activeTab === 'machine' && (
           <div className="space-y-6">
             {/* Filters */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-              <h3 className="text-lg font-bold text-ars-heading mb-4 flex items-center gap-2">
-                <Filter className="w-5 h-5" />
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h3 className="text-lg font-bold text-ars-heading mb-4">
                 Machine Filters
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-ars-body mb-2">Make</label>
+                  <label className="block text-[11px] font-medium text-gray-600 mb-1">Make</label>
                   <input
                     type="text"
                     placeholder="Filter by make..."
                     value={machineMakeFilter}
                     onChange={(e) => setMachineMakeFilter(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
+                    className="w-full pl-2 pr-2 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-ars-body mb-2">Model</label>
+                  <label className="block text-[11px] font-medium text-gray-600 mb-1">Model</label>
                   <input
                     type="text"
                     placeholder="Filter by model..."
                     value={machineModelFilter}
                     onChange={(e) => setMachineModelFilter(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
+                    className="w-full pl-2 pr-2 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-ars-body mb-2">Serial Number</label>
+                  <label className="block text-[11px] font-medium text-gray-600 mb-1">Serial Number</label>
                   <input
                     type="text"
                     placeholder="Filter by serial number..."
                     value={machineSerialFilter}
                     onChange={(e) => setMachineSerialFilter(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
+                    className="w-full pl-2 pr-2 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
                   />
                 </div>
               </div>
@@ -1505,33 +1541,33 @@ export function Reports({ statuses, branches }: ReportsProps) {
               <>
                 {/* Statistics */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-sm font-medium text-ars-body">Total Machines</p>
-                      <Wrench className="w-5 h-5 text-ars-primary" />
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <div className="flex items-center justify-between mb-3 gap-2">
+                      <p className="text-sm font-medium text-ars-body truncate">Total Machines</p>
+                      <Wrench className="w-5 h-5 text-[#f7c12b] flex-shrink-0" />
                     </div>
-                    <p className="text-3xl font-bold text-ars-heading">{allMachines.length.toLocaleString()}</p>
+                    <p className="text-3xl font-bold text-ars-heading truncate">{allMachines.length.toLocaleString()}</p>
                   </div>
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-sm font-medium text-ars-body">Total Jobs</p>
-                      <FileText className="w-5 h-5 text-blue-500" />
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <div className="flex items-center justify-between mb-3 gap-2">
+                      <p className="text-sm font-medium text-ars-body truncate">Total Jobs</p>
+                      <FileText className="w-5 h-5 text-[#f7c12b] flex-shrink-0" />
                     </div>
-                    <p className="text-3xl font-bold text-ars-heading">{machineJobs.length.toLocaleString()}</p>
+                    <p className="text-3xl font-bold text-ars-heading truncate">{machineJobs.length.toLocaleString()}</p>
                   </div>
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-sm font-medium text-ars-body">Total Value</p>
-                      <Banknote className="w-5 h-5 text-green-500" />
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <div className="flex items-center justify-between mb-3 gap-2">
+                      <p className="text-sm font-medium text-ars-body truncate">Total Value</p>
+                      <Banknote className="w-5 h-5 text-[#f7c12b] flex-shrink-0" />
                     </div>
-                    <p className="text-3xl font-bold text-ars-heading">
+                    <p className="text-3xl font-bold text-ars-heading truncate">
                       R{machineJobs.reduce((sum, job) => sum + (job.valueExVat || 0), 0).toLocaleString()}
                     </p>
                   </div>
                 </div>
 
                 {/* Machines List */}
-                <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+                <div className="bg-white rounded-xl border border-gray-200 p-6">
                   <h3 className="text-lg font-bold text-ars-heading mb-4">Machines & Jobs</h3>
                   <div className="space-y-6">
                     {allMachines.map((machine) => {
@@ -1690,7 +1726,6 @@ export function Reports({ statuses, branches }: ReportsProps) {
             )}
           </div>
         )}
-      </div>
 
       {/* Job Details Popup Modal */}
       {selectedJob && (
@@ -1704,14 +1739,15 @@ export function Reports({ statuses, branches }: ReportsProps) {
             if (activeTab === 'user-performance') {
               loadUserPerformanceData();
             } else if (activeTab === 'customer') {
-              loadCustomerReport();
+              loadCustomerData();
             } else if (activeTab === 'machine') {
-              loadMachineReport();
+              loadMachineData();
             }
             setSelectedJob(null);
           }}
         />
       )}
+      </div>
     </div>
   );
 }

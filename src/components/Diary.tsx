@@ -264,7 +264,7 @@ export function Diary() {
     result = result.sort((a, b) => {
       const getEarliestDate = (job: Job) => {
         if (!job.bookings || job.bookings.length === 0) return 0;
-        const dates = job.bookings.map(b => new Date(b.date).getTime()).filter(d => !isNaN(d));
+        const dates = job.bookings.map(b => b.startDate ? new Date(b.startDate).getTime() : 0).filter(d => !isNaN(d) && d > 0);
         return dates.length > 0 ? Math.min(...dates) : 0;
       };
       
@@ -380,7 +380,7 @@ export function Diary() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-white flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ars-primary mx-auto mb-4"></div>
           <p className="text-ars-body">Loading diary...</p>
@@ -396,7 +396,7 @@ export function Diary() {
           <p className="text-red-600 mb-4">Error: {error}</p>
           <button
             onClick={loadData}
-            className="px-6 py-3 bg-[#0969a9] text-white rounded-xl font-bold text-[14px] hover:bg-[#0a7bc4] transition-all"
+            className="px-6 py-3 bg-[#0969a9] text-white rounded-[8px] font-bold text-[14px] hover:bg-[#0a7bc4] transition-all"
           >
             RETRY
           </button>
@@ -406,19 +406,17 @@ export function Diary() {
   }
 
   return (
-    <div className="min-h-screen bg-white p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+    <div className="min-h-screen bg-white">
+      <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-8 border border-gray-200 rounded-xl">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-2xl font-bold text-ars-heading flex items-center gap-2">
-              <Calendar className="w-6 h-6 text-ars-primary" />
               Technician Diary
             </h3>
             <div className="flex gap-2">
               {/* View Toggle Button */}
               <button
                 onClick={() => setViewMode(viewMode === 'calendar' ? 'table' : 'calendar')}
-                className="px-4 py-2 border border-gray-300 rounded-xl font-bold text-[14px] hover:bg-gray-50 transition-all flex items-center gap-2"
+                className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
                 title={`Switch to ${viewMode === 'calendar' ? 'table' : 'calendar'} view`}
               >
                 {viewMode === 'calendar' ? (
@@ -435,14 +433,14 @@ export function Diary() {
               </button>
               <button
                 onClick={toCSV}
-                className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-xl font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
+                className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
               >
                 <Download className="w-4 h-4" />
                 EXPORT CSV
               </button>
               <button
                 onClick={toPDF}
-                className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-xl font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
+                className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
               >
                 <Download className="w-4 h-4" />
                 EXPORT PDF
@@ -454,17 +452,23 @@ export function Diary() {
             {/* Technician Filter - Hidden for technicians, required for super admin */}
             {currentUser?.role?.name?.toLowerCase() !== 'technician' && (
               <div>
-                <label className="text-sm font-semibold text-ars-heading mb-2 flex items-center gap-2">
+                <label className="text-[11px] font-medium text-gray-600 mb-1 flex items-center gap-2">
                   <Filter className="w-4 h-4" />
                   Technician
                   {currentUser?.isSuperAdmin && (
-                    <span className="text-xs text-red-600 font-normal">(Required)</span>
+                    <span className="text-[11px] text-red-600 font-normal ml-1">(Required)</span>
                   )}
                 </label>
                 <select
                   value={techFilter}
                   onChange={(e) => setTechFilter(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
+                  className="w-full pl-2 pr-10 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[13px] appearance-none h-[38px]"
+                  style={{
+                    backgroundImage: `url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"%3e%3cpolyline points="6 9 12 15 18 9"%3e%3c/polyline%3e%3c/svg%3e')`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 0.75rem center',
+                    backgroundSize: '1rem 1rem'
+                  }}
                 >
                   <option value="all">
                     {currentUser?.isSuperAdmin ? 'Select Technician' : 'All Technicians'}
@@ -482,27 +486,27 @@ export function Diary() {
               </div>
             )}
             <div>
-              <label className="block text-sm font-semibold text-ars-heading mb-2">From Date</label>
+              <label className="text-[11px] font-medium text-gray-600 mb-1 block">From Date</label>
               <input
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
+                className="w-full pl-2 pr-2 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[13px] h-[38px]"
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-ars-heading mb-2">To Date</label>
+              <label className="text-[11px] font-medium text-gray-600 mb-1 block">To Date</label>
               <input
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[15px]"
+                className="w-full pl-2 pr-2 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[13px] h-[38px]"
               />
             </div>
             <div className="flex items-end">
               <button
                 onClick={loadData}
-                className="w-full px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all"
+                className="w-full px-4 py-2.5 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] hover:shadow-lg transition-all h-[38px]"
               >
                 REFRESH
               </button>
@@ -518,31 +522,26 @@ export function Diary() {
                 onChange={(e) => setBookedDateOnly(e.target.checked)}
                 className="w-5 h-5 rounded border-gray-300 text-ars-primary focus:ring-ars-primary cursor-pointer"
               />
-              <span className="text-sm text-ars-body group-hover:text-ars-heading transition-colors">
+              <span className="font-medium text-ars-heading transition-colors" style={{ fontSize: '15px' }}>
                 Display Booked Date Only
               </span>
             </label>
-            <p className="text-xs text-ars-body mt-1 ml-8">
-              {bookedDateOnly 
-                ? 'Showing only jobs with booking dates' 
-                : 'Showing all jobs assigned to technicians'}
-            </p>
           </div>
 
           {/* Search */}
           <div className="mb-6">
-            <label className="text-sm font-semibold text-ars-heading mb-2 flex items-center gap-2">
+            <label className="text-[11px] font-medium text-gray-600 mb-1 flex items-center gap-2">
               <Search className="w-4 h-4" />
               Search
             </label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search by customer, cash customer, or job number..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                className="w-full pl-8 pr-2 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[13px]"
               />
             </div>
           </div>
@@ -721,7 +720,7 @@ export function Diary() {
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
-                  className="px-4 py-2 border border-gray-300 rounded-xl font-bold text-[14px] hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="px-4 py-2 border border-gray-300 rounded-[8px] font-bold text-[14px] hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   <ChevronLeft className="w-4 h-4" />
                   PREVIOUS
@@ -756,7 +755,7 @@ export function Diary() {
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                   disabled={currentPage === totalPages}
-                  className="px-4 py-2 border border-gray-300 rounded-xl font-bold text-[14px] hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="px-4 py-2 border border-gray-300 rounded-[8px] font-bold text-[14px] hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   NEXT
                   <ChevronRight className="w-4 h-4" />
@@ -764,7 +763,6 @@ export function Diary() {
               </div>
             </div>
           )}
-        </div>
       </div>
     </div>
   );
@@ -853,9 +851,13 @@ function CalendarView({ jobs, statuses, branches, technicians, onUpdate, selecte
     calendarCells.push(
       <div
         key={i}
-        className={`min-h-[120px] border border-gray-200 p-2 ${isCurrentMonth ? 'bg-white' : 'bg-gray-50'} ${isToday ? 'ring-2 ring-blue-500' : ''}`}
+        className={`min-h-[120px] border p-2 ${
+          isCurrentMonth ? 'bg-white' : 'bg-gray-50'
+        } ${isToday ? 'border-[#0969a9] border-2 bg-blue-50' : 'border-gray-200'}`}
       >
-        <div className={`text-sm font-semibold mb-1 ${isCurrentMonth ? 'text-gray-900' : 'text-gray-400'} ${isToday ? 'text-blue-600' : ''}`}>
+        <div className={`text-sm font-semibold mb-1 ${
+          isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
+        } ${isToday ? 'text-[#0969a9]' : ''}`}>
           {isCurrentMonth ? dayNumber : ''}
         </div>
         <div className="space-y-1 overflow-y-auto max-h-[90px]">
@@ -897,7 +899,7 @@ function CalendarView({ jobs, statuses, branches, technicians, onUpdate, selecte
           </button>
           <button
             onClick={goToToday}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold text-[14px] hover:bg-blue-700 transition-colors"
+            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-bold text-[14px]"
           >
             TODAY
           </button>

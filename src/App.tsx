@@ -8,7 +8,6 @@ import { ChatWidget } from './components/ChatWidget';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-
   
   if (loading) {
     return (

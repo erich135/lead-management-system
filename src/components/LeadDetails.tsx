@@ -1528,7 +1528,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
               <h3 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-2 flex-1">
                 RSR Documents {rsrDocuments.length > 0 && <span className="text-sm font-normal text-gray-500">({rsrDocuments.length})</span>}
               </h3>
-              {!isEditing && (
+              {isEditing && (
                 <button
                   onClick={() => setShowRSRUpload(!showRSRUpload)}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"
@@ -1679,7 +1679,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                   {notesMinimized ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
                 </button>
               </div>
-              {!isEditing && !notesMinimized && (
+              {isEditing && !notesMinimized && (
                 <button
                   onClick={() => setShowNoteForm(!showNoteForm)}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"

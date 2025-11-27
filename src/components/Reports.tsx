@@ -25,6 +25,7 @@ import {
   OverdueJob
 } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { formatDate, formatDateTime } from '../utils/dateFormat';
 import { 
   Download, 
   Filter, 
@@ -489,8 +490,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
       job.status?.name || '',
       typeof job.customer === 'object' ? job.customer?.name || '' : '',
       job.cashCustomer || '',
-      job.startDate ? new Date(job.startDate).toLocaleDateString() : '',
-      job.dateQuoted ? new Date(job.dateQuoted).toLocaleDateString() : '',
+      job.startDate ? formatDate(job.startDate) : '',
+      job.dateQuoted ? formatDate(job.dateQuoted) : '',
       job.valueExVat || 0,
       job.adm || '',
       typeof job.repCode === 'object' ? (job.repCode as any)?.code || '' : '',
@@ -500,15 +501,15 @@ export function Reports({ statuses, branches }: ReportsProps) {
       job.feedback || '',
       job.rsrNumber || '',
       job.poNumber || '',
-      job.poDate ? new Date(job.poDate).toLocaleDateString() : '',
+      job.poDate ? formatDate(job.poDate) : '',
       job.invNumber || '',
-      job.invoiceDate ? new Date(job.invoiceDate).toLocaleDateString() : '',
+      job.invoiceDate ? formatDate(job.invoiceDate) : '',
     ]);
 
     // Activities CSV
     const activityHeaders = ['Date', 'Time', 'Action', 'Resource Type', 'Description', 'IP Address'];
     const activityRows = userActivities.map(act => [
-      act.createdAt ? new Date(act.createdAt).toLocaleDateString() : '',
+      act.createdAt ? formatDate(act.createdAt) : '',
       act.createdAt ? new Date(act.createdAt).toLocaleTimeString() : '',
       act.action || '',
       act.resourceType || '',
@@ -571,8 +572,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
     const jobRows = customerJobs.map(job => [
       job.jobNumber || '',
       job.status?.name || '',
-      job.startDate ? new Date(job.startDate).toLocaleDateString() : '',
-      job.dateQuoted ? new Date(job.dateQuoted).toLocaleDateString() : '',
+      job.startDate ? formatDate(job.startDate) : '',
+      job.dateQuoted ? formatDate(job.dateQuoted) : '',
       job.valueExVat || 0,
       job.adm || '',
       typeof job.repCode === 'object' ? (job.repCode as any)?.code || '' : '',
@@ -582,9 +583,9 @@ export function Reports({ statuses, branches }: ReportsProps) {
       job.feedback || '',
       job.rsrNumber || '',
       job.poNumber || '',
-      job.poDate ? new Date(job.poDate).toLocaleDateString() : '',
+      job.poDate ? formatDate(job.poDate) : '',
       job.invNumber || '',
-      job.invoiceDate ? new Date(job.invoiceDate).toLocaleDateString() : '',
+      job.invoiceDate ? formatDate(job.invoiceDate) : '',
     ]);
 
     // Machines CSV
@@ -600,7 +601,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
     // Activities CSV
     const activityHeaders = ['Date', 'Time', 'Action', 'Description', 'User'];
     const activityRows = customerActivities.map(act => [
-      act.createdAt ? new Date(act.createdAt).toLocaleDateString() : '',
+      act.createdAt ? formatDate(act.createdAt) : '',
       act.createdAt ? new Date(act.createdAt).toLocaleTimeString() : '',
       act.action || '',
       act.description || '',
@@ -689,8 +690,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
             machine.nextServiceHours?.toString() || '',
             job.jobNumber || '',
             job.status?.name || '',
-            job.startDate ? new Date(job.startDate).toLocaleDateString() : '',
-            job.dateQuoted ? new Date(job.dateQuoted).toLocaleDateString() : '',
+            job.startDate ? formatDate(job.startDate) : '',
+            job.dateQuoted ? formatDate(job.dateQuoted) : '',
             job.valueExVat?.toString() || '0',
             job.adm || '',
             typeof job.repCode === 'object' ? (job.repCode as any)?.code || '' : '',
@@ -699,9 +700,9 @@ export function Reports({ statuses, branches }: ReportsProps) {
             typeof job.description === 'object' ? (job.description as any)?.name || '' : '',
             job.rsrNumber || '',
             job.poNumber || '',
-            job.poDate ? new Date(job.poDate).toLocaleDateString() : '',
+            job.poDate ? formatDate(job.poDate) : '',
             job.invNumber || '',
-            job.invoiceDate ? new Date(job.invoiceDate).toLocaleDateString() : ''
+            job.invoiceDate ? formatDate(job.invoiceDate) : ''
           ]);
         });
       }
@@ -1423,12 +1424,12 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       )}
                       {overdueStatusChangedFrom && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">
-                          From: {new Date(overdueStatusChangedFrom).toLocaleDateString()}
+                          From: {formatDate(overdueStatusChangedFrom)}
                         </span>
                       )}
                       {overdueStatusChangedTo && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">
-                          To: {new Date(overdueStatusChangedTo).toLocaleDateString()}
+                          To: {formatDate(overdueStatusChangedTo)}
                         </span>
                       )}
                       <button
@@ -1506,7 +1507,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-ars-heading">{activity.description}</p>
                         <p className="text-xs text-ars-body mt-1">
-                          {activity.createdAt ? new Date(activity.createdAt).toLocaleString() : ''}
+                          {formatDateTime(activity.createdAt)}
                         </p>
                       </div>
                     </div>
@@ -1587,12 +1588,12 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       )}
                       {jobsStatusChangedFrom && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">
-                          From: {new Date(jobsStatusChangedFrom).toLocaleDateString()}
+                          From: {formatDate(jobsStatusChangedFrom)}
                         </span>
                       )}
                       {jobsStatusChangedTo && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">
-                          To: {new Date(jobsStatusChangedTo).toLocaleDateString()}
+                          To: {formatDate(jobsStatusChangedTo)}
                         </span>
                       )}
                       <button
@@ -1640,16 +1641,16 @@ export function Reports({ statuses, branches }: ReportsProps) {
                           </p>
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-ars-body">
                             {job.startDate && (
-                              <div><span className="font-medium">Start:</span> {new Date(job.startDate).toLocaleDateString()}</div>
+                              <div><span className="font-medium">Start:</span> {formatDate(job.startDate)}</div>
                             )}
                             {job.dateQuoted && (
-                              <div><span className="font-medium">Quoted:</span> {new Date(job.dateQuoted).toLocaleDateString()}</div>
+                              <div><span className="font-medium">Quoted:</span> {formatDate(job.dateQuoted)}</div>
                             )}
                             {job.poDate && (
-                              <div><span className="font-medium">PO Date:</span> {new Date(job.poDate).toLocaleDateString()}</div>
+                              <div><span className="font-medium">PO Date:</span> {formatDate(job.poDate)}</div>
                             )}
                             {job.invoiceDate && (
-                              <div><span className="font-medium">Invoice Date:</span> {new Date(job.invoiceDate).toLocaleDateString()}</div>
+                              <div><span className="font-medium">Invoice Date:</span> {formatDate(job.invoiceDate)}</div>
                             )}
                             {job.poNumber && (
                               <div><span className="font-medium">PO #:</span> {job.poNumber}</div>
@@ -1737,12 +1738,12 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       )}
                       {conversionDateFrom && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">
-                          From: {new Date(conversionDateFrom).toLocaleDateString()}
+                          From: {formatDate(conversionDateFrom)}
                         </span>
                       )}
                       {conversionDateTo && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">
-                          To: {new Date(conversionDateTo).toLocaleDateString()}
+                          To: {formatDate(conversionDateTo)}
                         </span>
                       )}
                       <button
@@ -2075,16 +2076,16 @@ export function Reports({ statuses, branches }: ReportsProps) {
                               </div>
                               <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-ars-body mt-2">
                                 {job.startDate && (
-                                  <div><span className="font-medium">Start:</span> {new Date(job.startDate).toLocaleDateString()}</div>
+                                  <div><span className="font-medium">Start:</span> {formatDate(job.startDate)}</div>
                                 )}
                                 {job.dateQuoted && (
-                                  <div><span className="font-medium">Quoted:</span> {new Date(job.dateQuoted).toLocaleDateString()}</div>
+                                  <div><span className="font-medium">Quoted:</span> {formatDate(job.dateQuoted)}</div>
                                 )}
                                 {job.poDate && (
-                                  <div><span className="font-medium">PO Date:</span> {new Date(job.poDate).toLocaleDateString()}</div>
+                                  <div><span className="font-medium">PO Date:</span> {formatDate(job.poDate)}</div>
                                 )}
                                 {job.invoiceDate && (
-                                  <div><span className="font-medium">Invoice Date:</span> {new Date(job.invoiceDate).toLocaleDateString()}</div>
+                                  <div><span className="font-medium">Invoice Date:</span> {formatDate(job.invoiceDate)}</div>
                                 )}
                                 {job.poNumber && (
                                   <div><span className="font-medium">PO #:</span> {job.poNumber}</div>
@@ -2314,22 +2315,22 @@ export function Reports({ statuses, branches }: ReportsProps) {
                                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-ars-body mt-2">
                                           {job.startDate && (
                                             <div>
-                                              <span className="font-medium">Start:</span> {new Date(job.startDate).toLocaleDateString()}
+                                              <span className="font-medium">Start:</span> {formatDate(job.startDate)}
                                             </div>
                                           )}
                                           {job.dateQuoted && (
                                             <div>
-                                              <span className="font-medium">Quoted:</span> {new Date(job.dateQuoted).toLocaleDateString()}
+                                              <span className="font-medium">Quoted:</span> {formatDate(job.dateQuoted)}
                                             </div>
                                           )}
                                           {job.poDate && (
                                             <div>
-                                              <span className="font-medium">PO Date:</span> {new Date(job.poDate).toLocaleDateString()}
+                                              <span className="font-medium">PO Date:</span> {formatDate(job.poDate)}
                                             </div>
                                           )}
                                           {job.invoiceDate && (
                                             <div>
-                                              <span className="font-medium">Invoice Date:</span> {new Date(job.invoiceDate).toLocaleDateString()}
+                                              <span className="font-medium">Invoice Date:</span> {formatDate(job.invoiceDate)}
                                             </div>
                                           )}
                                           {job.valueExVat && (

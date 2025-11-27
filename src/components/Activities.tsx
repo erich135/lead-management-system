@@ -8,6 +8,7 @@ import { useState, useEffect, useRef } from 'react';
 import { getActivities, getUsers, Activity, User } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Clock, User as UserIcon, Filter, Search, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { formatDateTime } from '../utils/dateFormat';
 
 export function Activities() {
   
@@ -129,16 +130,7 @@ export function Activities() {
   /**
    * Formats date for display.
    */
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  // Date formatting moved to utils/dateFormat.ts
 
   /**
    * Gets action badge color.
@@ -386,7 +378,7 @@ export function Activities() {
                           className="hover:bg-slate-50 transition-colors"
                         >
                           <td className="px-6 py-4 text-sm text-slate-600">
-                            {formatDate(activity.createdAt)}
+                            {formatDateTime(activity.createdAt)}
                           </td>
                           {user?.isSuperAdmin && (
                             <td className="px-6 py-4 text-sm">

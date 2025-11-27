@@ -79,6 +79,18 @@ export function Reports({ statuses, branches }: ReportsProps) {
   const [machineModelFilter, setMachineModelFilter] = useState<string>('');
   const [machineSerialFilter, setMachineSerialFilter] = useState<string>('');
   
+  // Overdue Jobs Filters
+  const [overdueStatusFilter, setOverdueStatusFilter] = useState<string>('');
+  const [overdueAdminFilter, setOverdueAdminFilter] = useState<string>('');
+  const [overdueStatusChangedFrom, setOverdueStatusChangedFrom] = useState<string>('');
+  const [overdueStatusChangedTo, setOverdueStatusChangedTo] = useState<string>('');
+  
+  // All Jobs Filters
+  const [jobsStatusFilter, setJobsStatusFilter] = useState<string>('');
+  const [jobsAdminFilter, setJobsAdminFilter] = useState<string>('');
+  const [jobsStatusChangedFrom, setJobsStatusChangedFrom] = useState<string>('');
+  const [jobsStatusChangedTo, setJobsStatusChangedTo] = useState<string>('');
+  
   // Data State
   const [users, setUsers] = useState<User[]>([]);
   const [adminCodes, setAdminCodes] = useState<AdminCode[]>([]);
@@ -654,6 +666,138 @@ export function Reports({ statuses, branches }: ReportsProps) {
   }
 
   /**
+   * Filters overdue jobs by status and date range.
+   */
+  function getFilteredOverdueJobs(): OverdueJob[] {
+    let filtered = userOverdueJobs;
+    
+    // Filter by status
+    if (overdueStatusFilter) {
+      filtered = filtered.filter(oj => {
+        const jobStatus = oj.job?.status?.name || oj.currentStatus || '';
+        return jobStatus.toLowerCase().includes(overdueStatusFilter.toLowerCase());
+      });
+    }
+    
+    // Filter by admin
+    if (overdueAdminFilter) {
+      filtered = filtered.filter(oj => {
+        const jobAdmin = oj.job?.adm || '';
+        return jobAdmin.toLowerCase().includes(overdueAdminFilter.toLowerCase());
+      });
+    }
+    
+    // Filter by status changed date range
+    if (overdueStatusChangedFrom) {
+      filtered = filtered.filter(oj => {
+        const statusChangedAt = oj.job?.statusChangedAt;
+        if (!statusChangedAt) return false;
+        return new Date(statusChangedAt) >= new Date(overdueStatusChangedFrom);
+      });
+    }
+    
+    if (overdueStatusChangedTo) {
+      filtered = filtered.filter(oj => {
+        const statusChangedAt = oj.job?.statusChangedAt;
+        if (!statusChangedAt) return false;
+        return new Date(statusChangedAt) <= new Date(overdueStatusChangedTo);
+      });
+    }
+    
+    return filtered;
+  }
+
+  /**
+   * Filters all jobs by status, admin, and date range.
+   */
+  function getFilteredJobs(): Job[] {
+    let filtered = userJobs;
+    
+    // Filter by status
+    if (jobsStatusFilter) {
+      filtered = filtered.filter(job => {
+        const jobStatus = job.status?.name || '';
+        return jobStatus.toLowerCase().includes(jobsStatusFilter.toLowerCase());
+      });
+    }
+    
+    // Filter by admin
+    if (jobsAdminFilter) {
+      filtered = filtered.filter(job => {
+        const jobAdmin = job.adm || '';
+        return jobAdmin.toLowerCase().includes(jobsAdminFilter.toLowerCase());
+      });
+    }
+    
+    // Filter by status changed date range
+    if (jobsStatusChangedFrom) {
+      filtered = filtered.filter(job => {
+        const statusChangedAt = job.statusChangedAt;
+        if (!statusChangedAt) return false;
+        return new Date(statusChangedAt) >= new Date(jobsStatusChangedFrom);
+      });
+    }
+    
+    if (jobsStatusChangedTo) {
+      filtered = filtered.filter(job => {
+        const statusChangedAt = job.statusChangedAt;
+        if (!statusChangedAt) return false;
+        return new Date(statusChangedAt) <= new Date(jobsStatusChangedTo);
+      });
+    }
+    
+    return filtered;
+  }
+
+  /**
+   * Gets unique statuses from overdue jobs.
+   */
+  function getUniqueOverdueStatuses(): string[] {
+    const statusSet = new Set<string>();
+    userOverdueJobs.forEach(oj => {
+      const status = oj.job?.status?.name || oj.currentStatus;
+      if (status) statusSet.add(status);
+    });
+    return Array.from(statusSet).sort();
+  }
+
+  /**
+   * Gets unique admin codes from overdue jobs.
+   */
+  function getUniqueOverdueAdmins(): string[] {
+    const adminSet = new Set<string>();
+    userOverdueJobs.forEach(oj => {
+      const admin = oj.job?.adm;
+      if (admin) adminSet.add(admin);
+    });
+    return Array.from(adminSet).sort();
+  }
+
+  /**
+   * Gets unique statuses from all jobs.
+   */
+  function getUniqueJobStatuses(): string[] {
+    const statusSet = new Set<string>();
+    userJobs.forEach(job => {
+      const status = job.status?.name;
+      if (status) statusSet.add(status);
+    });
+    return Array.from(statusSet).sort();
+  }
+
+  /**
+   * Gets unique admin codes from all jobs.
+   */
+  function getUniqueJobAdmins(): string[] {
+    const adminSet = new Set<string>();
+    userJobs.forEach(job => {
+      const admin = job.adm;
+      if (admin) adminSet.add(admin);
+    });
+    return Array.from(adminSet).sort();
+  }
+
+  /**
    * Calculates user performance statistics.
    */
   function calculateUserStats() {
@@ -1072,8 +1216,104 @@ export function Reports({ statuses, branches }: ReportsProps) {
             {userOverdueJobs.length > 0 && (
               <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
                 <h3 className="text-lg font-bold text-ars-heading mb-4">Overdue Jobs</h3>
+                
+                {/* Overdue Jobs Filters */}
+                <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                  <h4 className="text-sm font-semibold text-ars-heading mb-3 flex items-center gap-2">
+                    <Filter className="w-4 h-4" />
+                    Filter Overdue Jobs
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
+                      <select
+                        value={overdueStatusFilter}
+                        onChange={(e) => setOverdueStatusFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        <option value="">All Statuses</option>
+                        {getUniqueOverdueStatuses().map(status => (
+                          <option key={status} value={status}>{status}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Admin</label>
+                      <select
+                        value={overdueAdminFilter}
+                        onChange={(e) => setOverdueAdminFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        <option value="">All Admins</option>
+                        {getUniqueOverdueAdmins().map(admin => (
+                          <option key={admin} value={admin}>{admin}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Status Changed From</label>
+                      <input
+                        type="date"
+                        value={overdueStatusChangedFrom}
+                        onChange={(e) => setOverdueStatusChangedFrom(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Status Changed To</label>
+                      <input
+                        type="date"
+                        value={overdueStatusChangedTo}
+                        onChange={(e) => setOverdueStatusChangedTo(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                  {(overdueStatusFilter || overdueAdminFilter || overdueStatusChangedFrom || overdueStatusChangedTo) && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <span className="text-xs text-gray-600">Active filters:</span>
+                      {overdueStatusFilter && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                          Status: {overdueStatusFilter}
+                        </span>
+                      )}
+                      {overdueAdminFilter && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
+                          Admin: {overdueAdminFilter}
+                        </span>
+                      )}
+                      {overdueStatusChangedFrom && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">
+                          From: {new Date(overdueStatusChangedFrom).toLocaleDateString()}
+                        </span>
+                      )}
+                      {overdueStatusChangedTo && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">
+                          To: {new Date(overdueStatusChangedTo).toLocaleDateString()}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => {
+                          setOverdueStatusFilter('');
+                          setOverdueAdminFilter('');
+                          setOverdueStatusChangedFrom('');
+                          setOverdueStatusChangedTo('');
+                        }}
+                        className="text-xs text-ars-primary hover:text-ars-primary/80 underline"
+                      >
+                        Clear all
+                      </button>
+                    </div>
+                  )}
+                </div>
+                
                 <div className="space-y-3">
-                  {userOverdueJobs.slice(0, 10).map(overdue => (
+                  {getFilteredOverdueJobs().length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p className="text-sm">No overdue jobs match the selected filters.</p>
+                    </div>
+                  ) : (
+                    getFilteredOverdueJobs().slice(0, 10).map(overdue => (
                     <div
                       key={overdue.jobId}
                       onClick={() => overdue.job && setSelectedJob(overdue.job)}
@@ -1097,7 +1337,13 @@ export function Reports({ statuses, branches }: ReportsProps) {
                         </div>
                       </div>
                     </div>
-                  ))}
+                  ))
+                  )}
+                  {getFilteredOverdueJobs().length > 10 && (
+                    <p className="text-xs text-center text-gray-500 mt-4">
+                      Showing 10 of {getFilteredOverdueJobs().length} filtered jobs
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -1134,8 +1380,104 @@ export function Reports({ statuses, branches }: ReportsProps) {
             {userJobs.length > 0 && (
               <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
                 <h3 className="text-lg font-bold text-ars-heading mb-4">Jobs ({userJobs.length})</h3>
+                
+                {/* Jobs Filters */}
+                <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                  <h4 className="text-sm font-semibold text-ars-heading mb-3 flex items-center gap-2">
+                    <Filter className="w-4 h-4" />
+                    Filter Jobs
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
+                      <select
+                        value={jobsStatusFilter}
+                        onChange={(e) => setJobsStatusFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        <option value="">All Statuses</option>
+                        {getUniqueJobStatuses().map(status => (
+                          <option key={status} value={status}>{status}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Admin</label>
+                      <select
+                        value={jobsAdminFilter}
+                        onChange={(e) => setJobsAdminFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        <option value="">All Admins</option>
+                        {getUniqueJobAdmins().map(admin => (
+                          <option key={admin} value={admin}>{admin}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Status Changed From</label>
+                      <input
+                        type="date"
+                        value={jobsStatusChangedFrom}
+                        onChange={(e) => setJobsStatusChangedFrom(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Status Changed To</label>
+                      <input
+                        type="date"
+                        value={jobsStatusChangedTo}
+                        onChange={(e) => setJobsStatusChangedTo(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                  {(jobsStatusFilter || jobsAdminFilter || jobsStatusChangedFrom || jobsStatusChangedTo) && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <span className="text-xs text-gray-600">Active filters:</span>
+                      {jobsStatusFilter && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                          Status: {jobsStatusFilter}
+                        </span>
+                      )}
+                      {jobsAdminFilter && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
+                          Admin: {jobsAdminFilter}
+                        </span>
+                      )}
+                      {jobsStatusChangedFrom && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">
+                          From: {new Date(jobsStatusChangedFrom).toLocaleDateString()}
+                        </span>
+                      )}
+                      {jobsStatusChangedTo && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">
+                          To: {new Date(jobsStatusChangedTo).toLocaleDateString()}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => {
+                          setJobsStatusFilter('');
+                          setJobsAdminFilter('');
+                          setJobsStatusChangedFrom('');
+                          setJobsStatusChangedTo('');
+                        }}
+                        className="text-xs text-ars-primary hover:text-ars-primary/80 underline"
+                      >
+                        Clear all
+                      </button>
+                    </div>
+                  )}
+                </div>
+                
                 <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {userJobs.map(job => (
+                  {getFilteredJobs().length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p className="text-sm">No jobs match the selected filters.</p>
+                    </div>
+                  ) : (
+                    getFilteredJobs().map(job => (
                     <div 
                       key={job._id} 
                       onClick={() => setSelectedJob(job)}
@@ -1191,7 +1533,13 @@ export function Reports({ statuses, branches }: ReportsProps) {
                         </div>
                       </div>
                     </div>
-                  ))}
+                  ))
+                  )}
+                  {getFilteredJobs().length > 0 && (jobsStatusFilter || jobsAdminFilter || jobsStatusChangedFrom || jobsStatusChangedTo) && (
+                    <p className="text-xs text-center text-gray-500 mt-4 pt-4 border-t">
+                      Showing {getFilteredJobs().length} of {userJobs.length} jobs
+                    </p>
+                  )}
                 </div>
               </div>
             )}

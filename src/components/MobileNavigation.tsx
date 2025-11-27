@@ -132,7 +132,7 @@ export function MobileNavigation({
                 <Link
                   to="/activities"
                   onClick={() => setShowMenu(false)}
-                  className={`w-full flex items-center gap-4 p-4 rounded-xl transition-all ${
+                  className={`w-full flex items-center gap-4 p-4 rounded-[8px] transition-all ${
                     activeView === 'activities'
                       ? 'bg-ars-secondary/20 text-ars-heading'
                       : 'bg-gray-50 text-ars-heading hover:bg-gray-100'
@@ -147,7 +147,7 @@ export function MobileNavigation({
                   <Link
                     to="/admin"
                     onClick={() => setShowMenu(false)}
-                    className={`w-full flex items-center gap-4 p-4 rounded-xl transition-all ${
+                    className={`w-full flex items-center gap-4 p-4 rounded-[8px] transition-all ${
                       activeView === 'admin'
                         ? 'bg-ars-secondary/20 text-ars-heading'
                         : 'bg-gray-50 text-ars-heading hover:bg-gray-100'
@@ -164,7 +164,7 @@ export function MobileNavigation({
                     onNotificationsClick();
                     setShowMenu(false);
                   }}
-                  className="w-full flex items-center gap-4 p-4 rounded-xl bg-gray-50 text-ars-heading hover:bg-gray-100 transition-all"
+                  className="w-full flex items-center gap-4 p-4 rounded-[8px] bg-gray-50 text-ars-heading hover:bg-gray-100 transition-all"
                 >
                   <div className="relative">
                     <Bell className="w-5 h-5" />
@@ -183,7 +183,7 @@ export function MobileNavigation({
                     signOut();
                     setShowMenu(false);
                   }}
-                  className="w-full flex items-center gap-4 p-4 rounded-xl bg-red-50 text-red-700 hover:bg-red-100 transition-all mt-4"
+                  className="w-full flex items-center gap-4 p-4 rounded-[8px] bg-red-50 text-red-700 hover:bg-red-100 transition-all mt-4"
                 >
                   <LogOut className="w-5 h-5" />
                   <span className="font-medium">Sign Out</span>

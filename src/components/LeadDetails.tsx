@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getJob, updateJob, getMachinesByCustomer, createMachine, getTechnicians, getRepCodes, getCustomers, getActivities, getServiceDescriptions, deleteJob, type Job, type Status, type Branch, type Machine, type Technician, type RepCode, type Customer, type Activity, type ServiceDescription, type OverdueJob } from '../lib/api';
+import { getJob, updateJob, getMachinesByCustomer, createMachine, updateMachine, getTechnicians, getRepCodes, getCustomers, getActivities, getServiceDescriptions, deleteJob, type Job, type Status, type Branch, type Machine, type Technician, type RepCode, type Customer, type Activity, type ServiceDescription, type OverdueJob } from '../lib/api';
 import { X, Edit, Save, Clock, User, Trash2 } from 'lucide-react';
 
 interface LeadDetailsProps {
@@ -488,18 +488,18 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       }
                     }}
                     disabled={loading}
-                    className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-[14px] uppercase"
                     type="button"
                   >
                     {isEditing ? (
                       <>
                         <Save className="w-4 h-4" />
-                        {loading ? 'Saving...' : 'Save'}
+                        {loading ? 'SAVING...' : 'SAVE'}
                       </>
                     ) : (
                       <>
                         <Edit className="w-4 h-4" />
-                        Edit
+                        EDIT
                       </>
                     )}
                   </button>
@@ -510,10 +510,10 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                         setIsEditing(false);
                         loadJobDetails(); // Reload to reset changes
                       }}
-                      className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-all"
+                      className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-all font-bold text-[14px] uppercase"
                       type="button"
                     >
-                      Cancel
+                      CANCEL
                     </button>
                   )}
                   {isSuperAdmin && !isEditing && (
@@ -523,11 +523,11 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                         setShowDeleteConfirm(true);
                       }}
                       disabled={loading || deleting}
-                      className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-red-100 hover:text-white"
+                      className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-red-100 hover:text-white font-bold text-[14px] uppercase"
                       type="button"
                     >
                       <Trash2 className="w-4 h-4" />
-                      Delete Job
+                      DELETE JOB
                     </button>
                   )}
                 </>
@@ -566,9 +566,9 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
               type="button"
               onClick={() => handleFollowUpCompletion(followUpReminder.followUpLevel!)}
               disabled={followUpSubmitting}
-              className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-bold text-[14px] uppercase"
             >
-              {followUpSubmitting && activeFollowUpLevel === followUpReminder.followUpLevel ? 'Saving…' : `Follow Up ${followUpReminder.followUpLevel}`}
+              {followUpSubmitting && activeFollowUpLevel === followUpReminder.followUpLevel ? 'SAVING…' : `FOLLOW UP ${followUpReminder.followUpLevel}`}
             </button>
           </div>
         )}
@@ -581,7 +581,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
 
               <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">Status</label>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">Status</label>
                   {isEditing ? (
                     <select
                       value={job.status?._id || ''}
@@ -589,7 +589,8 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                         const status = statuses.find(s => s._id === e.target.value);
                         setJob({ ...job, status: status ? { _id: status._id, name: status.name, sortOrder: status.sortOrder } : undefined });
                       }}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      style={{ fontSize: '15px' }}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                     >
                       <option value="">Select Status</option>
                       {statuses.map((status) => (
@@ -599,14 +600,14 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       ))}
                     </select>
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                      <span className="text-ars-heading">{job.status?.name || '-'}</span>
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">{job.status?.name || '-'}</span>
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">Branch</label>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">Branch</label>
                   {isEditing ? (
                     <select
                       value={job.branch._id}
@@ -616,7 +617,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                           setJob({ ...job, branch: { _id: branch._id, name: branch.name } });
                         }
                       }}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                     >
                       {branches.map((branch) => (
                         <option key={branch._id} value={branch._id}>
@@ -625,19 +626,19 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       ))}
                     </select>
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                      <span className="text-ars-heading">{job.branch?.name || '-'}</span>
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">{job.branch?.name || '-'}</span>
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">Customer</label>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">Customer</label>
                   {isEditing && (isAdmin || isSuperAdmin) ? (
                     <select
                       value={job.customer && typeof job.customer === 'object' ? job.customer._id : ''}
                       onChange={(e) => handleCustomerSelect(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                     >
                       <option value="">Select Customer</option>
                       {customers && customers.length > 0 ? (
@@ -651,14 +652,14 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       )}
                     </select>
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                      <span className="text-ars-heading">{job.customer?.name || '-'}</span>
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">{job.customer?.name || '-'}</span>
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">Cash Customer</label>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">Cash Customer</label>
                   {isEditing ? (
                     <input
                       type="text"
@@ -672,24 +673,24 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                           machines: newValue.trim() ? [] : job.machines // Clear machines if switching to cash customer
                         });
                       }}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                       placeholder="Enter cash customer name"
                     />
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                      <span className="text-ars-heading">{job.cashCustomer || '-'}</span>
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">{job.cashCustomer || '-'}</span>
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">Admin (ADM)</label>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">Admin (ADM)</label>
                   {isEditing ? (
                     adminCodes.length > 0 ? (
                       <select
                         value={job.adm || ''}
                         onChange={(e) => setJob({ ...job, adm: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                        style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                       >
                         <option value="">Select Admin</option>
                         {adminCodes.map((code) => (
@@ -703,36 +704,36 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                         type="text"
                         value={job.adm || ''}
                         onChange={(e) => setJob({ ...job, adm: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                        style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                         placeholder="Enter admin code"
                       />
                     )
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                      <span className="text-ars-heading">{job.adm || '-'}</span>
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">{job.adm || '-'}</span>
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">Value (ex VAT)</label>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">Value (ex VAT)</label>
                   {isEditing ? (
                     <input
                       type="number"
                       step="0.01"
                       value={job.valueExVat || ''}
                       onChange={(e) => setJob({ ...job, valueExVat: parseFloat(e.target.value) || undefined })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                     />
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
                       <span className="text-ars-heading font-medium">{job.valueExVat ? `R${job.valueExVat.toLocaleString()}` : '-'}</span>
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">Technician</label>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">Technician</label>
                   {isEditing ? (
                     <select
                       value={job.techBooked?._id || ''}
@@ -753,7 +754,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                           },
                         });
                       }}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                     >
                       <option value="">Unassigned</option>
                       {technicians && technicians.length > 0 ? (
@@ -771,8 +772,8 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       )}
                     </select>
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                      <span className="text-ars-heading">{job.techBooked?.name || '-'}</span>
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">{job.techBooked?.name || '-'}</span>
                     </div>
                   )}
                 </div>
@@ -784,97 +785,97 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
 
               <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">Start Date</label>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">Start Date</label>
                   {isEditing ? (
                     <input
                       type="date"
                       value={job.startDate ? (typeof job.startDate === 'string' ? job.startDate.split('T')[0] : new Date(job.startDate).toISOString().split('T')[0]) : ''}
                       onChange={(e) => setJob({ ...job, startDate: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                     />
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                      <span className="text-ars-heading">{formatDate(job.startDate)}</span>
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">{formatDate(job.startDate)}</span>
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">Date Quoted</label>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">Date Quoted</label>
                   {isEditing ? (
                     <input
                       type="date"
                       value={job.dateQuoted ? (typeof job.dateQuoted === 'string' ? job.dateQuoted.split('T')[0] : new Date(job.dateQuoted).toISOString().split('T')[0]) : ''}
                       onChange={(e) => setJob({ ...job, dateQuoted: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                     />
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                      <span className="text-ars-heading">{formatDate(job.dateQuoted)}</span>
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">{formatDate(job.dateQuoted)}</span>
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">Register Date</label>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">Register Date</label>
                   {isEditing ? (
                     <input
                       type="date"
                       value={job.registerDate ? (typeof job.registerDate === 'string' ? job.registerDate.split('T')[0] : new Date(job.registerDate).toISOString().split('T')[0]) : ''}
                       onChange={(e) => setJob({ ...job, registerDate: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                     />
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                      <span className="text-ars-heading">{formatDate(job.registerDate)}</span>
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">{formatDate(job.registerDate)}</span>
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">Date Booked</label>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">Date Booked</label>
                   {isEditing ? (
                     <input
                       type="date"
                       value={job.dateBooked ? (typeof job.dateBooked === 'string' ? job.dateBooked.split('T')[0] : new Date(job.dateBooked).toISOString().split('T')[0]) : ''}
                       onChange={(e) => setJob({ ...job, dateBooked: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                     />
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                      <span className="text-ars-heading">{formatDate(job.dateBooked)}</span>
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">{formatDate(job.dateBooked)}</span>
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">PO Date</label>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">PO Date</label>
                   {isEditing ? (
                     <input
                       type="date"
                       value={job.poDate ? (typeof job.poDate === 'string' ? job.poDate.split('T')[0] : new Date(job.poDate).toISOString().split('T')[0]) : ''}
                       onChange={(e) => setJob({ ...job, poDate: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                     />
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                      <span className="text-ars-heading">{formatDate(job.poDate)}</span>
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">{formatDate(job.poDate)}</span>
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">Invoice Date</label>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">Invoice Date</label>
                   {isEditing ? (
                     <input
                       type="date"
                       value={job.invoiceDate ? (typeof job.invoiceDate === 'string' ? job.invoiceDate.split('T')[0] : new Date(job.invoiceDate).toISOString().split('T')[0]) : ''}
                       onChange={(e) => setJob({ ...job, invoiceDate: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                     />
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                      <span className="text-ars-heading">{formatDate(job.invoiceDate)}</span>
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">{formatDate(job.invoiceDate)}</span>
                     </div>
                   )}
                 </div>
@@ -889,7 +890,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
 
               <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">Rep Code</label>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">Rep Code</label>
                   {isEditing ? (
                     <select
                       value={
@@ -914,7 +915,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                               },
                         });
                       }}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                     >
                       <option value="">Select Rep Code</option>
                       {repCodes.length > 0 ? (
@@ -932,88 +933,88 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       )}
                     </select>
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                      <span className="text-ars-heading">{job.repCode?.code || '-'}</span>
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">{job.repCode?.code || '-'}</span>
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">RSR #</label>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">RSR #</label>
                   {isEditing ? (
                     <input
                       type="text"
                       value={job.rsrNumber || ''}
                       onChange={(e) => setJob({ ...job, rsrNumber: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                     />
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                      <span className="text-ars-heading">{job.rsrNumber || '-'}</span>
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">{job.rsrNumber || '-'}</span>
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">PO Number</label>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">PO Number</label>
                   {isEditing ? (
                     <input
                       type="text"
                       value={job.poNumber || ''}
                       onChange={(e) => setJob({ ...job, poNumber: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                     />
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                      <span className="text-ars-heading">{job.poNumber || '-'}</span>
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">{job.poNumber || '-'}</span>
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">Oil Sample #</label>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">Oil Sample #</label>
                   {isEditing ? (
                     <input
                       type="text"
                       value={job.oilSampleNumber || ''}
                       onChange={(e) => setJob({ ...job, oilSampleNumber: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                     />
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                      <span className="text-ars-heading">{job.oilSampleNumber || '-'}</span>
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">{job.oilSampleNumber || '-'}</span>
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">Store Pack</label>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">Store Pack</label>
                   {isEditing ? (
                     <input
                       type="text"
                       value={job.storePack || ''}
                       onChange={(e) => setJob({ ...job, storePack: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                     />
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                      <span className="text-ars-heading">{job.storePack || '-'}</span>
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">{job.storePack || '-'}</span>
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">Inv #</label>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">Inv #</label>
                   {isEditing ? (
                     <input
                       type="text"
                       value={job.invNumber || ''}
                       onChange={(e) => setJob({ ...job, invNumber: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                     />
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                      <span className="text-ars-heading">{job.invNumber || '-'}</span>
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">{job.invNumber || '-'}</span>
                     </div>
                   )}
                 </div>
@@ -1025,7 +1026,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
 
               <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">Description</label>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">Description</label>
                   {isEditing && (isAdmin || isSuperAdmin) ? (
                     <select
                       value={job.description && typeof job.description === 'object' ? job.description._id : (typeof job.description === 'string' ? job.description : '')}
@@ -1041,7 +1042,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                           description: selectedDescription ? { _id: selectedDescription._id, name: selectedDescription.name } : undefined,
                         });
                       }}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                     >
                       <option value="">Select Description</option>
                       {serviceDescriptions && serviceDescriptions.length > 0 ? (
@@ -1055,24 +1056,24 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       )}
                     </select>
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                      <span className="text-ars-heading">{job.description?.name || '-'}</span>
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">{job.description?.name || '-'}</span>
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-ars-body mb-2">Feedback</label>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">Feedback</label>
                   {isEditing ? (
                     <textarea
                       rows={6}
                       value={job.feedback || ''}
                       onChange={(e) => setJob({ ...job, feedback: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent resize-none"
+                      style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent resize-none"
                       placeholder="Enter feedback..."
                     />
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl min-h-[100px]">
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px] min-h-[100px]">
                       <span className="text-ars-heading whitespace-pre-wrap">{job.feedback || '-'}</span>
                     </div>
                   )}
@@ -1114,14 +1115,14 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                                     make: machine.make || '',
                                     model: machine.model || '',
                                     serialNumber: machine.serialNumber || '',
-                                    machineHours: machine.machineHours || 0,
-                                    nextServiceHours: machine.nextServiceHours || 0,
+                                    machineHours: String(machine.machineHours || 0),
+                                    nextServiceHours: String(machine.nextServiceHours || 0),
                                   });
                                   setShowNewMachineForm(true);
                                 }}
-                                className="px-2 py-1 text-ars-primary hover:bg-blue-50 rounded transition-colors"
+                                className="px-2 py-1 text-ars-primary hover:bg-blue-50 rounded transition-colors font-bold text-[14px] uppercase"
                               >
-                                Edit
+                                EDIT
                               </button>
                               <button
                                 type="button"
@@ -1133,9 +1134,9 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                                   }) || [];
                                   setJob({ ...job, machines: updatedMachines });
                                 }}
-                                className="px-2 py-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                className="px-2 py-1 text-red-600 hover:bg-red-50 rounded transition-colors font-bold text-[14px] uppercase"
                               >
-                                Remove
+                                REMOVE
                               </button>
                             </div>
                           </div>
@@ -1158,7 +1159,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                           e.target.value = '';
                         }
                       }}
-                      className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                      className="flex-1 px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
                     >
                       <option value="">Select Machine to Add</option>
                       {machines
@@ -1187,19 +1188,19 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                         });
                         setShowNewMachineForm(!showNewMachineForm);
                       }}
-                      className="px-4 py-3 bg-ars-primary text-white rounded-xl hover:bg-ars-primary/90 transition-colors whitespace-nowrap flex-shrink-0"
+                      className="px-4 py-3 bg-ars-primary text-white rounded-[8px] hover:bg-ars-primary/90 transition-colors whitespace-nowrap flex-shrink-0 font-bold text-[14px] uppercase"
                     >
-                      {showNewMachineForm ? 'Cancel' : '+ New'}
+                      {showNewMachineForm ? 'CANCEL' : '+ NEW'}
                     </button>
                   </div>
                   
                   {/* New Machine Form */}
                   {showNewMachineForm && (
-                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
+                    <div className="p-4 bg-gray-50 rounded-[8px] border border-gray-200 space-y-3">
                       <h4 className="font-semibold text-ars-heading">{editingMachine ? 'Edit Machine' : 'Add New Machine'}</h4>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-xs font-semibold text-ars-body mb-1">Make *</label>
+                          <label className="block text-[14px] font-semibold text-slate-900 mb-1">Make *</label>
                           <input
                             type="text"
                             value={newMachine.make}
@@ -1209,7 +1210,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-ars-body mb-1">Model *</label>
+                          <label className="block text-[14px] font-semibold text-slate-900 mb-1">Model *</label>
                           <input
                             type="text"
                             value={newMachine.model}
@@ -1219,7 +1220,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-ars-body mb-1">Serial Number *</label>
+                          <label className="block text-[14px] font-semibold text-slate-900 mb-1">Serial Number *</label>
                           <input
                             type="text"
                             value={newMachine.serialNumber}
@@ -1229,7 +1230,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-ars-body mb-1">Machine Hours</label>
+                          <label className="block text-[14px] font-semibold text-slate-900 mb-1">Machine Hours</label>
                           <input
                             type="number"
                             value={newMachine.machineHours}
@@ -1240,7 +1241,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-ars-body mb-1">Next Service Hours</label>
+                          <label className="block text-[14px] font-semibold text-slate-900 mb-1">Next Service Hours</label>
                           <input
                             type="number"
                             value={newMachine.nextServiceHours}
@@ -1255,9 +1256,9 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                         type="button"
                         onClick={handleCreateMachine}
                         disabled={creatingMachine}
-                        className="w-full px-4 py-2 bg-ars-primary text-white rounded-lg hover:bg-ars-primary/90 transition-colors disabled:opacity-50"
+                        className="w-full px-4 py-2 bg-ars-primary text-white rounded-lg hover:bg-ars-primary/90 transition-colors disabled:opacity-50 font-bold text-[14px] uppercase"
                       >
-                        {creatingMachine ? (editingMachine ? 'Updating...' : 'Creating...') : (editingMachine ? 'Update Machine' : 'Create Machine')}
+                        {creatingMachine ? (editingMachine ? 'UPDATING...' : 'CREATING...') : (editingMachine ? 'UPDATE MACHINE' : 'CREATE MACHINE')}
                       </button>
                     </div>
                   )}
@@ -1271,7 +1272,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                         : machines.find(m => m._id === machineRef);
                       if (!machine) return null;
                       return (
-                        <div key={machine._id || index} className="px-4 py-3 bg-gray-50 rounded-xl border border-gray-200">
+                        <div key={machine._id || index} className="px-4 py-3 bg-gray-50 rounded-[8px] border border-gray-200">
                           <div className="space-y-1">
                             <div className="text-ars-heading font-semibold">
                               {machine.make} {machine.model}
@@ -1288,8 +1289,8 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       );
                     })
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-xl">
-                      <span className="text-ars-heading">-</span>
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">-</span>
                     </div>
                   )}
                 </div>
@@ -1333,12 +1334,12 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
           {/* Activity History */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-2 flex-1">Activity History</h3>
+              <h3 className="text-lg font-bold text-slate-900 pb-2 flex-1">Activity History</h3>
               <button
                 onClick={() => setShowActivityHistory(!showActivityHistory)}
-                className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-bold text-[14px] uppercase"
               >
-                {showActivityHistory ? 'Hide' : 'Show'} History
+                {showActivityHistory ? 'HIDE' : 'SHOW'} HISTORY
               </button>
             </div>
             
@@ -1365,7 +1366,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                     return (
                       <div
                         key={activity._id}
-                        className="p-4 bg-gray-50 rounded-xl border border-gray-200 hover:bg-gray-100 transition-colors"
+                        className="p-4 bg-gray-50 rounded-[8px] border border-gray-200 hover:bg-gray-100 transition-colors"
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1">
@@ -1432,9 +1433,9 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
                   disabled={deleting}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800 disabled:opacity-50"
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 disabled:opacity-50 font-bold text-[14px] uppercase"
                 >
-                  Cancel
+                  CANCEL
                 </button>
                 <button
                   onClick={handleDelete}

@@ -605,7 +605,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
               <div className="hidden md:flex gap-2">
                 <Link
                   to="/dashboard"
-                  className={`group relative px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
+                  className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
                     view === 'dashboard'
                       ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
                       : 'text-[#383838] hover:text-[#f7c12b]'
@@ -616,7 +616,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                 </Link>
                 <Link
                   to="/jobs"
-                  className={`group relative px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
+                  className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
                     view === 'leads'
                       ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
                       : 'text-[#383838] hover:text-[#f7c12b]'
@@ -628,7 +628,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                 {(isSuperAdmin || user?.role?.name?.toLowerCase() === 'manager') && (
                   <Link
                     to="/reports"
-                    className={`group relative px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
+                    className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
                       view === 'reports'
                         ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
                         : 'text-[#383838] hover:text-[#f7c12b]'
@@ -640,7 +640,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                 )}
                 <Link
                   to="/diary"
-                  className={`group relative px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
+                  className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
                     view === 'diary'
                       ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
                       : 'text-[#383838] hover:text-[#f7c12b]'
@@ -651,7 +651,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                 </Link>
                 <Link
                   to="/activities"
-                  className={`group relative px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
+                  className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
                     view === 'activities'
                       ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
                       : 'text-[#383838] hover:text-[#f7c12b]'
@@ -663,7 +663,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                 {isSuperAdmin && (
                   <Link
                     to="/admin"
-                    className={`group relative px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
+                    className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
                       view === 'admin'
                         ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
                         : 'text-[#383838] hover:text-[#f7c12b]'
@@ -685,7 +685,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                     e.stopPropagation();
                     setShowNotifications(!showNotifications);
                   }}
-                  className="group relative p-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all duration-300 hover:scale-105"
+                  className="group relative p-2.5 bg-gray-100 hover:bg-gray-200 rounded-[8px] transition-all duration-300 hover:scale-105"
                 >
                   <Bell className="w-5 h-5 text-[#0969a9] transition-transform group-hover:scale-110" />
                   {stats && (stats.overdueReminders > 0 || stats.approachingReminders > 0) && (
@@ -707,7 +707,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                 </div>
                 <button
                   onClick={signOut}
-                  className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all duration-300 hover:scale-105 group"
+                  className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-[8px] transition-all duration-300 hover:scale-105 group"
                   title="Sign out"
                 >
                   <LogOut className="w-5 h-5 text-[#0969a9] transition-transform group-hover:scale-110" />
@@ -726,7 +726,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
             onClick={() => setShowNotifications(false)}
           ></div>
           <div 
-            className="absolute top-[70px] right-[64px] w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 py-4 max-h-96 overflow-y-auto z-[70] backdrop-blur-md"
+            className="absolute top-[70px] right-[64px] w-96 bg-white rounded-[8px] shadow-2xl border border-gray-200 py-4 max-h-96 overflow-y-auto z-[70] backdrop-blur-md"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-4 pb-3 border-b border-gray-200 mb-2">
@@ -757,7 +757,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                 {overdueJobs.slice(0, 10).map((overdue) => (
                   <div
                     key={overdue.jobId}
-                    className={`px-3 py-3 mb-2 rounded-xl border-2 cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${getSeverityColor(overdue.severity)}`}
+                    className={`px-3 py-3 mb-2 rounded-[8px] border-2 cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${getSeverityColor(overdue.severity)}`}
                     onClick={() => {
                       if (overdue.job) {
                         setSelectedLead(overdue.job);
@@ -829,7 +829,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           }}></div>
           <div className="relative flex items-center justify-between h-16 px-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg p-2">
+              <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-[8px] flex items-center justify-center shadow-lg p-2">
                 <img src="/Logo.png" alt="ARS Logo" className="w-full h-full object-contain" />
               </div>
               <div>
@@ -840,7 +840,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="relative p-2.5 bg-white/10 backdrop-blur-sm hover:bg-white/20 rounded-xl transition-all duration-300 border border-white/20"
+                className="relative p-2.5 bg-white/10 backdrop-blur-sm hover:bg-white/20 rounded-[8px] transition-all duration-300 border border-white/20"
               >
                 <Bell className="w-5 h-5 text-white" />
                 {stats && (stats.overdueReminders > 0 || stats.approachingReminders > 0) && (
@@ -887,7 +887,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
               {overdueJobs.slice(0, 10).map((overdue) => (
                 <div
                   key={overdue.jobId}
-                  className={`px-3 py-3 mb-2 rounded-lg border-2 ${getSeverityColor(overdue.severity)}`}
+                  className={`px-3 py-3 mb-2 rounded-[8px] border-2 ${getSeverityColor(overdue.severity)}`}
                   onClick={() => {
                     if (overdue.job) {
                       setSelectedLead(overdue.job);
@@ -946,7 +946,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
 
       <main className={`max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-8 ${isMobile ? 'pt-4' : ''}`}>
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border-2 border-red-300 rounded-xl">
+          <div className="mb-6 p-4 bg-red-50 border-2 border-red-300 rounded-[8px]">
             <p className="text-red-800 font-medium">Error: {error}</p>
             <button
               onClick={loadInitialData}
@@ -969,7 +969,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
         {view === 'dashboard' && stats && !loading && (
           <div className="space-y-6">
             {/* Header with Gradient Background */}
-            <div className="relative overflow-hidden rounded-2xl bg-[#0969a9] p-8 text-white">
+            <div className="relative overflow-hidden rounded-[16px] bg-[#0969a9] p-8 text-white">
               <div className="relative z-10">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                   <div>
@@ -982,7 +982,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                   </div>
                   <button
                     onClick={() => setShowLeadForm(true)}
-                    className="bg-[#f7c12b] text-[#383838] px-6 py-3 rounded-xl font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02] flex items-center gap-2 hover:brightness-95"
+                    className="bg-[#f7c12b] text-[#383838] px-6 py-3 rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02] flex items-center gap-2 hover:brightness-95"
                   >
                     <span>NEW JOB</span>
                   </button>
@@ -990,24 +990,24 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
 
                 {/* Quick Stats Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('leads')}>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-white/80 text-xs font-medium">Total Jobs</p>
-                      <FileText className="w-4 h-4  text-[#ffffff]" />
+                  <div className="bg-white/10 backdrop-blur-md rounded-[8px] p-3 sm:p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('leads')}>
+                    <div className="flex items-center justify-between mb-2 gap-2">
+                      <p className="text-white/80 text-[10px] sm:text-xs font-medium truncate">Total Jobs</p>
+                      <FileText className="w-4 h-4 text-[#ffffff] flex-shrink-0" />
                     </div>
-                    <p className="text-2xl font-bold">{stats.totalJobs}</p>
+                    <p className="text-xl sm:text-2xl font-bold truncate">{stats.totalJobs}</p>
                   </div>
 
-                  <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('leads')}>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-white/80 text-xs font-medium">Active</p>
-                      <TrendingUp className="w-4 h-4 text-[#ffffff]" />
+                  <div className="bg-white/10 backdrop-blur-md rounded-[8px] p-3 sm:p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('leads')}>
+                    <div className="flex items-center justify-between mb-2 gap-2">
+                      <p className="text-white/80 text-[10px] sm:text-xs font-medium truncate">Active</p>
+                      <TrendingUp className="w-4 h-4 text-[#ffffff] flex-shrink-0" />
                     </div>
-                    <p className="text-2xl font-bold">{stats.activeJobs}</p>
+                    <p className="text-xl sm:text-2xl font-bold truncate">{stats.activeJobs}</p>
                   </div>
 
                   <div 
-                    className={`backdrop-blur-md rounded-xl p-4 border transition-all duration-300 hover:scale-105 cursor-pointer ${
+                    className={`backdrop-blur-md rounded-[8px] p-3 sm:p-4 border transition-all duration-300 hover:scale-105 cursor-pointer ${
                       stats.overdueReminders > 0
                         ? 'bg-red-500/30 border-red-400/50 hover:bg-red-500/40'
                         : stats.approachingReminders > 0
@@ -1021,25 +1021,22 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                       }
                     }}
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-white/80 text-xs font-medium">Needs Attention</p>
-                      <AlertCircle className={`w-4 h-4  text-[#ffffff] ${
+                    <div className="flex items-center justify-between mb-2 gap-2">
+                      <p className="text-white/80 text-[10px] sm:text-xs font-medium truncate">Needs Attention</p>
+                      <AlertCircle className={`w-4 h-4 text-[#ffffff] flex-shrink-0 ${
                         stats.overdueReminders > 0 ? 'text-red-200' : stats.approachingReminders > 0 ? 'text-orange-200' : 'text-white/60'
                       }`} />
                     </div>
-                    <p className="text-2xl font-bold">{stats.overdueReminders + stats.approachingReminders}</p>
-                    {stats.overdueReminders > 0 && (
-                      <p className="text-xs text-red-200 mt-1">{stats.overdueReminders} overdue</p>
-                    )}
+                    <p className="text-xl sm:text-2xl font-bold truncate">{stats.overdueReminders + stats.approachingReminders}</p>
                   </div>
 
                   {(isSuperAdmin || user?.role?.name?.toLowerCase() === 'manager') && (
-                    <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('reports')}>
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-white/80 text-xs font-medium">Total Value</p>
-                        <Banknote className="w-4 h-4 text-[#ffffff]" />
+                    <div className="bg-white/10 backdrop-blur-md rounded-[8px] p-3 sm:p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('reports')}>
+                      <div className="flex items-center justify-between mb-2 gap-2">
+                        <p className="text-white/80 text-[10px] sm:text-xs font-medium truncate">Total Value</p>
+                        <Banknote className="w-4 h-4 text-[#ffffff] flex-shrink-0" />
                       </div>
-                      <p className="text-2xl font-bold">R{stats.totalValue.toLocaleString()}</p>
+                      <p className="text-xl sm:text-2xl font-bold truncate">R{stats.totalValue.toLocaleString()}</p>
                     </div>
                   )}
                 </div>
@@ -1056,9 +1053,9 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
               <div className="flex items-center gap-1.5 pb-2 -mx-1 px-1 overflow-visible">
                 <button
                   onClick={() => setSelectedPriority('all')}
-                  className={`px-3 py-1.5 rounded-lg font-medium text-xs whitespace-nowrap transition-all duration-300 ${
+                  className={`px-3 py-1.5 rounded-[8px] font-medium text-xs whitespace-nowrap transition-all duration-300 ${
                     selectedPriority === 'all'
-                      ? 'bg-[#0969a9] text-white shadow-lg scale-105 hover:brightness-95'
+                      ? 'bg-ars-secondary text-ars-heading shadow-lg scale-105 hover:brightness-95'
                       : 'bg-white text-ars-body hover:bg-gray-50 border border-gray-200'
                   }`}
                   title="Show all jobs that need attention"
@@ -1067,38 +1064,35 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                 </button>
                 <button
                   onClick={() => setSelectedPriority('critical')}
-                  className={`px-3 py-1.5 rounded-lg font-medium text-xs whitespace-nowrap transition-all duration-300 flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-[8px] font-medium text-xs whitespace-nowrap transition-all duration-300 flex items-center gap-1.5 ${
                     selectedPriority === 'critical'
-                      ? 'bg-red-500 text-white shadow-lg scale-105 hover:brightness-95'
+                      ? 'bg-ars-secondary text-ars-heading shadow-lg scale-105 hover:brightness-95'
                       : 'bg-white text-ars-body hover:bg-red-50 border border-gray-200'
                   }`}
                   title="Jobs that are past their deadline (overdue)"
                 >
-                  <Zap className="w-3.5 h-3.5" />
                   Overdue ({overdueJobs.filter(j => j.severity === 'critical').length})
                 </button>
                 <button
                   onClick={() => setSelectedPriority('warning')}
-                  className={`px-3 py-1.5 rounded-lg font-medium text-xs whitespace-nowrap transition-all duration-300 flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-[8px] font-medium text-xs whitespace-nowrap transition-all duration-300 flex items-center gap-1.5 ${
                     selectedPriority === 'warning'
-                      ? 'bg-orange-500 text-white shadow-lg scale-105 hover:brightness-95'
+                      ? 'bg-ars-secondary text-ars-heading shadow-lg scale-105 hover:brightness-95'
                       : 'bg-white text-ars-body hover:bg-orange-50 border border-gray-200'
                   }`}
                   title="Jobs approaching their deadline (80% of time limit reached)"
                 >
-                  <Clock className="w-3.5 h-3.5" />
                   Approaching ({overdueJobs.filter(j => j.severity === 'warning').length})
                 </button>
                 <button
                   onClick={() => setSelectedPriority('info')}
-                  className={`px-3 py-1.5 rounded-lg font-medium text-xs whitespace-nowrap transition-all duration-300 flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-[8px] font-medium text-xs whitespace-nowrap transition-all duration-300 flex items-center gap-1.5 ${
                     selectedPriority === 'info'
-                      ? 'bg-blue-500 text-white shadow-lg scale-105 hover:brightness-95'
+                      ? 'bg-ars-secondary text-ars-heading shadow-lg scale-105 hover:brightness-95'
                       : 'bg-white text-ars-body hover:bg-blue-50 border border-gray-200'
                   }`}
                   title="Jobs that are being monitored but not yet urgent"
                 >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
                   Monitored ({overdueJobs.filter(j => j.severity === 'info').length})
                 </button>
               </div>
@@ -1107,13 +1101,13 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
             {/* Job List - Table View */}
             <div className="space-y-4">
               {overdueJobs.length === 0 ? (
-                <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl p-12 text-center">
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-[8px] p-12 text-center">
                   <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4 animate-pulse">
                     <CheckCircle2 className="w-10 h-10 text-green-600" />
                   </div>
                   <h3 className="text-2xl font-bold text-green-900 mb-2">All Clear! 🎉</h3>
                   <p className="text-green-700 mb-4">No jobs need attention right now. Great job!</p>
-                  <div className="mt-6 p-4 bg-white/60 rounded-lg text-left max-w-md mx-auto">
+                  <div className="mt-6 p-4 bg-white/60 rounded-[8px] text-left max-w-md mx-auto">
                     <p className="text-sm text-green-800 font-medium mb-2">What does this mean?</p>
                     <p className="text-xs text-green-700">
                       This means all your jobs are either on track or have already moved to their next status within the expected timeframes. 
@@ -1122,7 +1116,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                   </div>
                 </div>
               ) : overdueJobs.filter(job => selectedPriority === 'all' || job.severity === selectedPriority).length === 0 ? (
-                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-2xl p-12 text-center">
+                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-[8px] p-12 text-center">
                   <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full mb-4">
                     <FileText className="w-10 h-10 text-blue-600" />
                   </div>
@@ -1132,7 +1126,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
               ) : (
                 <>
                   {/* Filters */}
-                  <div className="bg-white rounded-xl border border-gray-200 p-3 mb-4">
+                  <div className="bg-white rounded-[8px] border border-gray-200 p-3 mb-4">
                     <h3 className="text-xs font-semibold text-ars-heading mb-2">Filters</h3>
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
                       <div>
@@ -1140,7 +1134,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                         <input
                           type="text"
                           placeholder="Filter by job number..."
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-[13px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          className="w-full pl-2 pr-2 py-1.5 border border-gray-300 rounded-[8px] text-[13px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
                           value={filters.jobNumber}
                           onChange={(e) => setFilters({...filters, jobNumber: e.target.value})}
                         />
@@ -1149,7 +1143,13 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                       <div>
                         <label className="block text-[11px] font-medium text-gray-600 mb-1">Status</label>
                         <select
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-[13px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          className="w-full pl-2 pr-10 py-1.5 border border-gray-300 rounded-[8px] text-[13px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white appearance-none"
+                          style={{
+                            backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27currentColor%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')",
+                            backgroundPosition: 'right 0.75rem center',
+                            backgroundRepeat: 'no-repeat',
+                            backgroundSize: '1rem 1rem'
+                          }}
                           value=""
                           onChange={(e) => {
                             if (e.target.value && !filters.status.includes(e.target.value)) {
@@ -1165,7 +1165,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                         {filters.status.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-1">
                             {filters.status.map(status => (
-                              <span key={status} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-md text-xs">
+                              <span key={status} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-[8px] text-xs">
                                 {status}
                                 <button
                                   onClick={() => setFilters({...filters, status: filters.status.filter(s => s !== status)})}
@@ -1184,7 +1184,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                         <input
                           type="text"
                           placeholder="Filter by customer..."
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-[13px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          className="w-full pl-2 pr-2 py-1.5 border border-gray-300 rounded-[8px] text-[13px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
                           value={filters.customer}
                           onChange={(e) => setFilters({...filters, customer: e.target.value})}
                         />
@@ -1193,7 +1193,13 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                       <div>
                         <label className="block text-[11px] font-medium text-gray-600 mb-1">Admin</label>
                         <select
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-[13px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          className="w-full pl-2 pr-10 py-1.5 border border-gray-300 rounded-[8px] text-[13px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white appearance-none"
+                          style={{
+                            backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27currentColor%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')",
+                            backgroundPosition: 'right 0.75rem center',
+                            backgroundRepeat: 'no-repeat',
+                            backgroundSize: '1rem 1rem'
+                          }}
                           value=""
                           onChange={(e) => {
                             if (e.target.value && !filters.admin.includes(e.target.value)) {
@@ -1209,7 +1215,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                         {filters.admin.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-1">
                             {filters.admin.map(admin => (
-                              <span key={admin} className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded-md text-xs">
+                              <span key={admin} className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded-[8px] text-xs">
                                 {admin}
                                 <button
                                   onClick={() => setFilters({...filters, admin: filters.admin.filter(a => a !== admin)})}
@@ -1226,7 +1232,13 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                       <div>
                         <label className="block text-[11px] font-medium text-gray-600 mb-1">Rep</label>
                         <select
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-[13px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          className="w-full pl-2 pr-10 py-1.5 border border-gray-300 rounded-[8px] text-[13px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white appearance-none"
+                          style={{
+                            backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27currentColor%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')",
+                            backgroundPosition: 'right 0.75rem center',
+                            backgroundRepeat: 'no-repeat',
+                            backgroundSize: '1rem 1rem'
+                          }}
                           value=""
                           onChange={(e) => {
                             if (e.target.value && !filters.rep.includes(e.target.value)) {
@@ -1242,7 +1254,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                         {filters.rep.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-1">
                             {filters.rep.map(rep => (
-                              <span key={rep} className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 rounded-md text-xs">
+                              <span key={rep} className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 rounded-[8px] text-xs">
                                 {rep}
                                 <button
                                   onClick={() => setFilters({...filters, rep: filters.rep.filter(r => r !== rep)})}
@@ -1295,7 +1307,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                   </div>
 
                   {/* Table View */}
-                  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="bg-white border border-gray-200 overflow-hidden rounded-[8px]">
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead>
@@ -1437,11 +1449,12 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                               const rowColorClass = getStatusColor(overdue.job?.status?.name);
                               const textColorClass = getStatusTextColor(overdue.job?.status?.name);
                               const repCode = overdue.job ? getRepCodeFromJob(overdue.job) : null;
+                              const isLastRow = index === paginatedJobs.length - 1;
                               
                               return (
                                 <tr 
                                   key={overdue.jobId}
-                                  className={`${rowColorClass} border-b border-gray-100 hover:shadow-md transition-all duration-200 cursor-pointer group`}
+                                  className={`${rowColorClass} ${isLastRow ? '' : 'border-b border-gray-100'} hover:shadow-md transition-all duration-200 cursor-pointer group`}
                                   onClick={() => {
                                     if (overdue.job) {
                                       setSelectedLead(overdue.job);
@@ -1454,7 +1467,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                                 >
                                   {/* Job Number */}
                                   <td className="px-2 py-2">
-                                    <div className="font-semibold text-[15px] text-gray-900 group-hover:text-ars-primary transition-colors">
+                                    <div className="font-semibold text-[15px] text-gray-900">
                                       {overdue.jobNumber}
                                     </div>
                                   </td>
@@ -1564,24 +1577,24 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                   
                   {/* Pagination */}
                   {totalPages > 1 && (
-                    <div className="pt-[50px] bg-white px-4 py-3 flex items-center justify-between rounded-b-xl">
+                    <div className="bg-white px-4 py-3 mt-4 -mx-4">
                       <div className="flex-1 flex justify-between sm:hidden">
                         <button
                           onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                           disabled={currentPage === 1}
-                          className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="relative inline-flex items-center px-4 py-2 border border-gray-300 font-bold text-[14px] rounded-[8px] text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed uppercase"
                         >
                           Previous
                         </button>
                         <button
                           onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                           disabled={currentPage === totalPages}
-                          className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 font-bold text-[14px] rounded-[8px] text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed uppercase"
                         >
                           Next
                         </button>
                       </div>
-                      <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                      <div className="hidden sm:grid sm:grid-cols-3 sm:gap-4 sm:items-center">
                         <div>
                           <p className="text-sm text-gray-700">
                             Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
@@ -1589,21 +1602,20 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                             <span className="font-medium">{filteredJobs.length}</span> results
                           </p>
                         </div>
-                        <div>
+                        <div className="flex justify-center">
                           <button
                             onClick={() => navigateToView('leads')}
-                            className="bg-[#f7c12b] text-[#383838] px-6 py-3 rounded-xl font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02] flex items-center gap-2 hover:brightness-95"
+                            className="bg-[#f7c12b] text-[#383838] px-6 py-3 rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02] flex items-center gap-2 hover:brightness-95"
                           >
-                            <FileText className="w-5 h-5" />
                             <span>VIEW ALL JOBS</span>
                           </button>
                         </div>
-                        <div>
-                          <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                        <div className="flex justify-end">
+                          <nav className="flex items-center gap-2" aria-label="Pagination">
                             <button
                               onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                               disabled={currentPage === 1}
-                              className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
                             >
                               Previous
                             </button>
@@ -1622,9 +1634,9 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                                 <button
                                   key={pageNum}
                                   onClick={() => setCurrentPage(pageNum)}
-                                  className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                                  className={`px-4 py-2 border rounded-[8px] font-bold text-[14px] transition-colors ${
                                     currentPage === pageNum
-                                      ? 'z-10 bg-ars-primary border-ars-primary text-white'
+                                      ? 'bg-ars-primary border-ars-primary text-white'
                                       : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
                                   }`}
                                 >
@@ -1635,7 +1647,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                             <button
                               onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                               disabled={currentPage === totalPages}
-                              className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
                             >
                               Next
                             </button>
@@ -1684,13 +1696,13 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
         )}
         {view === 'reports' && !isSuperAdmin && user?.role?.name?.toLowerCase() !== 'manager' && (
           <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+            <div className="bg-white rounded-[8px] shadow-xl p-8 max-w-md w-full text-center">
               <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
               <h1 className="text-2xl font-bold text-slate-900 mb-2">Access Denied</h1>
               <p className="text-slate-600 mb-6">You don't have permission to access the Reports page. This page is only available to Managers and Super Admins.</p>
               <button
                 onClick={() => navigate('/dashboard')}
-                className="px-6 py-3 bg-[#0969a9] text-white rounded-xl font-bold text-[14px] hover:bg-[#0a7bc4] transition-colors"
+                className="px-6 py-3 bg-[#0969a9] text-white rounded-[8px] font-bold text-[14px] hover:bg-[#0a7bc4] transition-colors"
               >
                 GO TO DASHBOARD
               </button>

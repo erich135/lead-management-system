@@ -445,7 +445,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
             </div>
             <button
               onClick={() => setError('')}
-              className="w-full mt-6 px-4 py-2.5 bg-white text-[#0969a9] rounded-lg font-medium hover:bg-gray-100 transition-all"
+              className="w-full mt-6 px-4 py-2.5 bg-white text-[#0969a9] rounded-lg font-bold text-[14px] hover:bg-gray-100 transition-all uppercase"
             >
               OK
             </button>
@@ -459,7 +459,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
             <h2 className="text-xl font-bold">Create New Job</h2>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              className="p-2 hover:bg-white/20 rounded-lg transition-all"
             >
               <X className="w-5 h-5" />
             </button>
@@ -470,14 +470,14 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {isSuperAdmin && (
               <div>
-                <label className="block text-sm font-semibold text-ars-body mb-2">
+                <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                   Job Number (Optional)
                 </label>
                 <input
                   type="text"
                   value={formData.jobNumber}
                   onChange={(e) => setFormData({ ...formData, jobNumber: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px] uppercase"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px] uppercase"
                   placeholder="Leave empty for auto-generation"
                 />
                 <p className="mt-1 text-xs text-ars-body">
@@ -487,11 +487,11 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
             )}
 
             <div>
-              <label className="block text-sm font-semibold text-ars-body mb-2">Customer Type</label>
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2">Customer Type</label>
               <select
                 value={customerSelection}
                 onChange={(e) => setCustomerSelection(e.target.value as 'customer' | 'cash')}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
               >
                 <option value="customer">Customer (from list)</option>
                 <option value="cash">Cash Customer</option>
@@ -500,7 +500,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
 
             {customerSelection === 'customer' && (
               <div className="relative" ref={customerDropdownRef}>
-                <label className="block text-sm font-semibold text-ars-body mb-2">
+                <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                   Customer *
                 </label>
                 <div className="relative">
@@ -529,10 +529,10 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                       }
                     }}
                     placeholder="Search for customer (min 2 characters)..."
-                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                   />
                   {showCustomerDropdown && searchedCustomers.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-[8px] shadow-lg max-h-60 overflow-y-auto">
                       {searchedCustomers.map((customer) => (
                         <button
                           key={customer._id}
@@ -551,7 +551,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                     </div>
                   )}
                   {customerSearchTerm.length >= 2 && searchedCustomers.length === 0 && showCustomerDropdown && !selectedCustomer && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-4">
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-[8px] shadow-lg p-4">
                       <p className="text-sm text-ars-body mb-3">No customers found matching "{customerSearchTerm}"</p>
                       {isSuperAdmin ? (
                         <button
@@ -590,27 +590,27 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
 
             {customerSelection === 'cash' && (
               <div>
-                <label className="block text-sm font-semibold text-ars-body mb-2">
+                <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                   Cash Customer Name *
                 </label>
                 <input
                   type="text"
                   value={formData.cashCustomer}
                   onChange={(e) => setFormData({ ...formData, cashCustomer: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                  style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                   placeholder="e.g., John Citizen"
                 />
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-semibold text-ars-body mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 Branch *
               </label>
               <select
                 value={formData.branch}
                 onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
               >
                 <option value="">Select Branch</option>
                 {branches && branches.length > 0 ? (
@@ -626,13 +626,13 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-ars-body mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 Initial Status *
               </label>
               <select
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
               >
                 {statuses && statuses.length > 0 ? (
                   statuses.map((status) => (
@@ -647,13 +647,13 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-ars-body mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 Admin (ADM)
               </label>
               <select
                 value={formData.adm}
                 onChange={(e) => setFormData({ ...formData, adm: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
               >
                 <option value="">Select Admin</option>
                 {adminCodes && adminCodes.length > 0 ? (
@@ -671,13 +671,13 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-ars-body mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 Technician
               </label>
               <select
                 value={formData.techBooked}
                 onChange={(e) => setFormData({ ...formData, techBooked: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
               >
                 <option value="">Unassigned</option>
                 {technicians && technicians.length > 0 ? (
@@ -693,13 +693,13 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-ars-body mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 Service Description
               </label>
               <select
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
               >
                 <option value="">Select Description</option>
                 {serviceDescriptions && serviceDescriptions.length > 0 ? (
@@ -715,7 +715,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-ars-body mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 Value (ex VAT)
               </label>
               <input
@@ -723,45 +723,45 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                 step="0.01"
                 value={formData.valueExVat}
                 onChange={(e) => setFormData({ ...formData, valueExVat: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                 placeholder="10000.00"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-ars-body mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 Start Date
               </label>
               <input
                 type="date"
                 value={formData.startDate || getTodayDate()}
                 onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                 placeholder="YYYY/MM/DD"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-ars-body mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 Date Quoted
               </label>
               <input
                 type="date"
                 value={formData.dateQuoted || ''}
                 onChange={(e) => setFormData({ ...formData, dateQuoted: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                 placeholder="yyyy/mm/dd"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-ars-body mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 Rep Code
               </label>
               <select
                 value={formData.repCode}
                 onChange={(e) => setFormData({ ...formData, repCode: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
               >
                 <option value="">Select Rep Code</option>
                 {repCodes && repCodes.length > 0 ? (
@@ -779,7 +779,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
             {/* Machines Selection - Show if customer or cash customer is selected */}
             {(formData.customer || (customerSelection === 'cash' && formData.cashCustomer)) && (
               <div ref={machinesSectionRef} className="md:col-span-2">
-                <label className="block text-sm font-semibold text-ars-body mb-2 flex items-center gap-2">
+                <label className="block text-[14px] font-semibold text-slate-900 mb-2 flex items-center gap-2">
                   <Wrench className="w-4 h-4 text-ars-primary" />
                   Machines
                 </label>
@@ -829,7 +829,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                           e.target.value = '';
                         }
                       }}
-                      className="flex-1 min-w-0 px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px] bg-white"
+                      className="flex-1 min-w-0 px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px] bg-white"
                     >
                       <option value="">Select Machine to Add</option>
                       {machines && machines.length > 0 ? (
@@ -851,7 +851,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                     <button
                       type="button"
                       onClick={() => setShowNewMachineForm(!showNewMachineForm)}
-                      className="px-4 py-2.5 bg-ars-primary text-white rounded-xl hover:bg-ars-primary/90 transition-colors whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-1 sm:w-auto w-full"
+                      className="px-4 py-2.5 bg-ars-primary text-white rounded-[8px] hover:bg-ars-primary/90 transition-colors whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-1 sm:w-auto w-full"
                     >
                       <Plus className="w-4 h-4" />
                       {showNewMachineForm ? 'Cancel' : 'New Machine'}
@@ -860,7 +860,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
                   
                   {/* New Machine Form */}
                   {showNewMachineForm && (
-                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
+                    <div className="p-4 bg-gray-50 rounded-[8px] border border-gray-200 space-y-3">
                       <h4 className="font-semibold text-ars-heading text-sm">Add New Machine</h4>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -931,143 +931,143 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
             )}
 
             <div>
-              <label className="block text-sm font-semibold text-ars-body mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 Register Date
               </label>
               <input
                 type="date"
                 value={formData.registerDate}
                 onChange={(e) => setFormData({ ...formData, registerDate: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-ars-body mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 Date Booked
               </label>
               <input
                 type="date"
                 value={formData.dateBooked}
                 onChange={(e) => setFormData({ ...formData, dateBooked: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-ars-body mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 RSR #
               </label>
               <input
                 type="text"
                 value={formData.rsrNumber}
                 onChange={(e) => setFormData({ ...formData, rsrNumber: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                 placeholder="Enter RSR number"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-ars-body mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 PO Date
               </label>
               <input
                 type="date"
                 value={formData.poDate}
                 onChange={(e) => setFormData({ ...formData, poDate: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-ars-body mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 PO Number
               </label>
               <input
                 type="text"
                 value={formData.poNumber}
                 onChange={(e) => setFormData({ ...formData, poNumber: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                 placeholder="Enter PO number"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-ars-body mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 Oil Sample #
               </label>
               <input
                 type="text"
                 value={formData.oilSampleNumber}
                 onChange={(e) => setFormData({ ...formData, oilSampleNumber: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                 placeholder="Enter oil sample number"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-ars-body mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 Store Pack
               </label>
               <input
                 type="date"
                 value={formData.storePack}
                 onChange={(e) => setFormData({ ...formData, storePack: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-ars-body mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 Invoice Date
               </label>
               <input
                 type="date"
                 value={formData.invoiceDate}
                 onChange={(e) => setFormData({ ...formData, invoiceDate: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-ars-body mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 Inv #
               </label>
               <input
                 type="text"
                 value={formData.invNumber}
                 onChange={(e) => setFormData({ ...formData, invNumber: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                 placeholder="Enter invoice number"
               />
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-sm font-semibold text-ars-body mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 Feedback
               </label>
               <textarea
                 rows={4}
                 value={formData.feedback}
                 onChange={(e) => setFormData({ ...formData, feedback: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px] resize-none text-[15px]"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px] resize-none text-[15px]"
                 placeholder="Enter feedback or notes..."
               />
             </div>
           </div>
 
-          <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
+          <div className="flex gap-3 justify-end pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-3 border border-gray-300 rounded-xl font-bold text-[14px] text-ars-body hover:bg-gray-50 transition-colors"
+              className="px-6 py-3 border border-gray-300 rounded-[8px] font-bold text-[14px] text-ars-body hover:bg-gray-50 transition-colors"
             >
               CANCEL
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-3 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-xl font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'CREATING...' : 'CREATE JOB'}
             </button>

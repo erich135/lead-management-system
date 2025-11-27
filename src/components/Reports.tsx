@@ -91,6 +91,11 @@ export function Reports({ statuses, branches }: ReportsProps) {
   const [jobsStatusChangedFrom, setJobsStatusChangedFrom] = useState<string>('');
   const [jobsStatusChangedTo, setJobsStatusChangedTo] = useState<string>('');
   
+  // Conversion Time Tracker State
+  const [conversionAdminFilter, setConversionAdminFilter] = useState<string>('');
+  const [conversionDateFrom, setConversionDateFrom] = useState<string>('');
+  const [conversionDateTo, setConversionDateTo] = useState<string>('');
+  
   // Data State
   const [users, setUsers] = useState<User[]>([]);
   const [adminCodes, setAdminCodes] = useState<AdminCode[]>([]);
@@ -105,6 +110,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
   const [customerActivities, setCustomerActivities] = useState<Activity[]>([]);
   const [allMachines, setAllMachines] = useState<Machine[]>([]);
   const [machineJobs, setMachineJobs] = useState<Job[]>([]);
+  const [conversionJobs, setConversionJobs] = useState<Job[]>([]);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -143,6 +149,13 @@ export function Reports({ statuses, branches }: ReportsProps) {
       loadMachineData();
     }
   }, [activeTab, machineMakeFilter, machineModelFilter, machineSerialFilter]);
+
+  /**
+   * Loads conversion data initially with all jobs.
+   */
+  useEffect(() => {
+    loadConversionData();
+  }, []);
 
   /**
    * Loads reference data (users, codes, technicians, customers).
@@ -266,6 +279,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
         allTime: 'true',
         startDate,
         endDate,
+        limit: 10000, // Get all jobs, not just 50
       };
 
       // Build activity filters
@@ -348,6 +362,47 @@ export function Reports({ statuses, branches }: ReportsProps) {
     } catch (err: any) {
       console.error('Error loading user performance data:', err);
       setError(err.message || 'Failed to load user performance data');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
+   * Loads conversion tracker data.
+   */
+  async function loadConversionData() {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Build job filters
+      const jobFilters: any = {
+        allTime: 'true',
+        limit: 10000, // Get all jobs
+      };
+
+      // Add date filters if specified
+      if (conversionDateFrom) {
+        jobFilters.startDate = conversionDateFrom;
+      }
+      if (conversionDateTo) {
+        jobFilters.endDate = conversionDateTo;
+      }
+
+      // Load jobs (admin filtering will happen in calculateConversionMetrics)
+      const jobsResponse = await getJobs(jobFilters);
+      let jobs = jobsResponse.jobs || [];
+      
+      // Filter by admin on frontend if specified
+      if (conversionAdminFilter) {
+        jobs = jobs.filter(job => job.adm === conversionAdminFilter);
+      }
+      
+      setConversionJobs(jobs);
+
+    } catch (err: any) {
+      console.error('Error loading conversion data:', err);
+      setError(err.message || 'Failed to load conversion data');
     } finally {
       setLoading(false);
     }
@@ -795,6 +850,90 @@ export function Reports({ statuses, branches }: ReportsProps) {
       if (admin) adminSet.add(admin);
     });
     return Array.from(adminSet).sort();
+  }
+
+  /**
+   * Calculates conversion time metrics.
+   */
+  function calculateConversionMetrics() {
+    // Use conversionJobs instead of filtering userJobs
+    const filteredJobs = conversionJobs;
+    
+    // Calculate average days between status transitions
+    const metrics = {
+      startToQuoted: [] as number[],
+      quotedToSentToClient: [] as number[],
+      sentToClientToAwaitingPO: [] as number[],
+      awaitingPOToInProgress: [] as number[],
+      inProgressToJobDone: [] as number[],
+      jobDoneToRSRNeeded: [] as number[],
+      rsrNeededToInvoiced: [] as number[],
+      startToInvoiced: [] as number[],
+    };
+    
+    filteredJobs.forEach(job => {
+      if (!job.startDate) return;
+      
+      const startDate = new Date(job.startDate).getTime();
+      const quotedDate = job.dateQuoted ? new Date(job.dateQuoted).getTime() : null;
+      const poDate = job.poDate ? new Date(job.poDate).getTime() : null;
+      const invoiceDate = job.invoiceDate ? new Date(job.invoiceDate).getTime() : null;
+      
+      // Start to Quoted
+      if (quotedDate) {
+        const days = (quotedDate - startDate) / (1000 * 60 * 60 * 24);
+        if (days >= 0) metrics.startToQuoted.push(days);
+      }
+      
+      // For other transitions, we'd need status change history
+      // For now, using available date fields
+      
+      // Awaiting PO (using PO date as proxy)
+      if (quotedDate && poDate) {
+        const days = (poDate - quotedDate) / (1000 * 60 * 60 * 24);
+        if (days >= 0) metrics.awaitingPOToInProgress.push(days);
+      }
+      
+      // Job Done to Invoiced (using invoice date)
+      if (poDate && invoiceDate) {
+        const days = (invoiceDate - poDate) / (1000 * 60 * 60 * 24);
+        if (days >= 0) metrics.inProgressToJobDone.push(days);
+      }
+      
+      // Start to Invoiced (total conversion time)
+      if (invoiceDate) {
+        const days = (invoiceDate - startDate) / (1000 * 60 * 60 * 24);
+        if (days >= 0) metrics.startToInvoiced.push(days);
+      }
+    });
+    
+    // Calculate averages
+    const calculateAverage = (arr: number[]) => {
+      if (arr.length === 0) return 0;
+      return arr.reduce((sum, val) => sum + val, 0) / arr.length;
+    };
+    
+    return {
+      avgStartToQuoted: calculateAverage(metrics.startToQuoted),
+      avgQuotedToSentToClient: calculateAverage(metrics.quotedToSentToClient),
+      avgSentToClientToAwaitingPO: calculateAverage(metrics.sentToClientToAwaitingPO),
+      avgAwaitingPOToInProgress: calculateAverage(metrics.awaitingPOToInProgress),
+      avgInProgressToJobDone: calculateAverage(metrics.inProgressToJobDone),
+      avgJobDoneToRSRNeeded: calculateAverage(metrics.jobDoneToRSRNeeded),
+      avgRSRNeededToInvoiced: calculateAverage(metrics.rsrNeededToInvoiced),
+      avgStartToInvoiced: calculateAverage(metrics.startToInvoiced),
+      jobCount: filteredJobs.length,
+      counts: {
+        startToQuoted: metrics.startToQuoted.length,
+        quotedToSentToClient: metrics.quotedToSentToClient.length,
+        sentToClientToAwaitingPO: metrics.sentToClientToAwaitingPO.length,
+        awaitingPOToInProgress: metrics.awaitingPOToInProgress.length,
+        inProgressToJobDone: metrics.inProgressToJobDone.length,
+        jobDoneToRSRNeeded: metrics.jobDoneToRSRNeeded.length,
+        rsrNeededToInvoiced: metrics.rsrNeededToInvoiced.length,
+        startToInvoiced: metrics.startToInvoiced.length,
+      }
+    };
   }
 
   /**
@@ -1541,6 +1680,230 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     </p>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Conversion Time Tracker */}
+            {userJobs.length > 0 && (
+              <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+                <h3 className="text-lg font-bold text-ars-heading mb-4">Conversion Time Tracker</h3>
+                
+                {/* Conversion Tracker Filters */}
+                <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                  <h4 className="text-sm font-semibold text-ars-heading mb-3 flex items-center gap-2">
+                    <Filter className="w-4 h-4" />
+                    Filter Analysis
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Admin</label>
+                      <select
+                        value={conversionAdminFilter}
+                        onChange={(e) => setConversionAdminFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        <option value="">All Admins</option>
+                        {getUniqueJobAdmins().map(admin => (
+                          <option key={admin} value={admin}>{admin}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Date From</label>
+                      <input
+                        type="date"
+                        value={conversionDateFrom}
+                        onChange={(e) => setConversionDateFrom(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Date To</label>
+                      <input
+                        type="date"
+                        value={conversionDateTo}
+                        onChange={(e) => setConversionDateTo(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                  {(conversionAdminFilter || conversionDateFrom || conversionDateTo) && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <span className="text-xs text-gray-600">Active filters:</span>
+                      {conversionAdminFilter && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
+                          Admin: {conversionAdminFilter}
+                        </span>
+                      )}
+                      {conversionDateFrom && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">
+                          From: {new Date(conversionDateFrom).toLocaleDateString()}
+                        </span>
+                      )}
+                      {conversionDateTo && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">
+                          To: {new Date(conversionDateTo).toLocaleDateString()}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => {
+                          setConversionAdminFilter('');
+                          setConversionDateFrom('');
+                          setConversionDateTo('');
+                          loadConversionData();
+                        }}
+                        className="text-xs text-ars-primary hover:text-ars-primary/80 underline"
+                      >
+                        Clear all
+                      </button>
+                    </div>
+                  )}
+                  <div className="mt-3">
+                    <button
+                      onClick={loadConversionData}
+                      className="px-4 py-2 bg-ars-primary text-white rounded-lg hover:bg-ars-primary/90 transition-colors text-sm font-medium"
+                    >
+                      Load Data
+                    </button>
+                  </div>
+                </div>
+
+                {/* Conversion Metrics */}
+                {(() => {
+                  const metrics = calculateConversionMetrics();
+                  return (
+                    <>
+                      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-semibold text-blue-900">
+                            Analyzing {metrics.jobCount} jobs
+                          </p>
+                          {conversionAdminFilter && (
+                            <p className="text-xs text-blue-700">Admin: {conversionAdminFilter}</p>
+                          )}
+                        </div>
+                        {(conversionDateFrom || conversionDateTo) && (
+                          <p className="text-xs text-blue-700 mt-1">
+                            Period: {conversionDateFrom || 'Start'} to {conversionDateTo || 'End'}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Metrics Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* Start to Quoted */}
+                        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-semibold text-blue-900">Start → Quoted</p>
+                            <Clock className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <p className="text-2xl font-bold text-blue-900">
+                            {metrics.avgStartToQuoted > 0 ? metrics.avgStartToQuoted.toFixed(1) : '0'}
+                          </p>
+                          <p className="text-xs text-blue-700 mt-1">days average</p>
+                          <p className="text-xs text-blue-600 mt-1">({metrics.counts.startToQuoted} jobs)</p>
+                        </div>
+
+                        {/* Awaiting PO to In Progress */}
+                        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 border border-orange-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-semibold text-orange-900">Awaiting PO → In Progress</p>
+                            <Clock className="w-4 h-4 text-orange-600" />
+                          </div>
+                          <p className="text-2xl font-bold text-orange-900">
+                            {metrics.avgAwaitingPOToInProgress > 0 ? metrics.avgAwaitingPOToInProgress.toFixed(1) : '0'}
+                          </p>
+                          <p className="text-xs text-orange-700 mt-1">days average</p>
+                          <p className="text-xs text-orange-600 mt-1">({metrics.counts.awaitingPOToInProgress} jobs)</p>
+                        </div>
+
+                        {/* In Progress to Job Done */}
+                        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-semibold text-purple-900">In Progress → Job Done</p>
+                            <Clock className="w-4 h-4 text-purple-600" />
+                          </div>
+                          <p className="text-2xl font-bold text-purple-900">
+                            {metrics.avgInProgressToJobDone > 0 ? metrics.avgInProgressToJobDone.toFixed(1) : '0'}
+                          </p>
+                          <p className="text-xs text-purple-700 mt-1">days average</p>
+                          <p className="text-xs text-purple-600 mt-1">({metrics.counts.inProgressToJobDone} jobs)</p>
+                        </div>
+
+                        {/* Start to Invoiced (Total) */}
+                        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border-2 border-green-300">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-semibold text-green-900">Start → Invoiced</p>
+                            <CheckCircle2 className="w-4 h-4 text-green-600" />
+                          </div>
+                          <p className="text-2xl font-bold text-green-900">
+                            {metrics.avgStartToInvoiced > 0 ? metrics.avgStartToInvoiced.toFixed(1) : '0'}
+                          </p>
+                          <p className="text-xs text-green-700 mt-1">days average (Total)</p>
+                          <p className="text-xs text-green-600 mt-1">({metrics.counts.startToInvoiced} jobs)</p>
+                        </div>
+                      </div>
+
+                      {/* Visual Timeline */}
+                      <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <h4 className="text-sm font-semibold text-ars-heading mb-4">Average Workflow Timeline</h4>
+                        <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                          <div className="flex-shrink-0 text-center">
+                            <div className="w-24 bg-blue-500 text-white text-xs font-medium px-2 py-1 rounded">
+                              Start Date
+                            </div>
+                          </div>
+                          <div className="flex-shrink-0 flex items-center gap-2">
+                            <div className="text-xs font-bold text-blue-600">
+                              {metrics.avgStartToQuoted > 0 ? `${metrics.avgStartToQuoted.toFixed(0)}d` : '0d'}
+                            </div>
+                            <div className="h-0.5 w-16 bg-blue-400"></div>
+                          </div>
+                          <div className="flex-shrink-0 text-center">
+                            <div className="w-24 bg-blue-500 text-white text-xs font-medium px-2 py-1 rounded">
+                              Quoted
+                            </div>
+                          </div>
+                          <div className="flex-shrink-0 flex items-center gap-2">
+                            <div className="text-xs font-bold text-orange-600">
+                              {metrics.avgAwaitingPOToInProgress > 0 ? `${metrics.avgAwaitingPOToInProgress.toFixed(0)}d` : '0d'}
+                            </div>
+                            <div className="h-0.5 w-16 bg-orange-400"></div>
+                          </div>
+                          <div className="flex-shrink-0 text-center">
+                            <div className="w-28 bg-orange-500 text-white text-xs font-medium px-2 py-1 rounded">
+                              In Progress
+                            </div>
+                          </div>
+                          <div className="flex-shrink-0 flex items-center gap-2">
+                            <div className="text-xs font-bold text-purple-600">
+                              {metrics.avgInProgressToJobDone > 0 ? `${metrics.avgInProgressToJobDone.toFixed(0)}d` : '0d'}
+                            </div>
+                            <div className="h-0.5 w-16 bg-purple-400"></div>
+                          </div>
+                          <div className="flex-shrink-0 text-center">
+                            <div className="w-24 bg-purple-500 text-white text-xs font-medium px-2 py-1 rounded">
+                              Job Done
+                            </div>
+                          </div>
+                          <div className="flex-shrink-0 flex items-center gap-2">
+                            <div className="h-0.5 w-16 bg-green-400"></div>
+                          </div>
+                          <div className="flex-shrink-0 text-center">
+                            <div className="w-24 bg-green-600 text-white text-xs font-medium px-2 py-1 rounded">
+                              Invoiced
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-3 text-center">
+                          <p className="text-sm font-semibold text-gray-700">
+                            Total Average: <span className="text-green-600">{metrics.avgStartToInvoiced > 0 ? metrics.avgStartToInvoiced.toFixed(1) : '0'} days</span>
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             )}
           </div>

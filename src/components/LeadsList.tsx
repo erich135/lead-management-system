@@ -19,7 +19,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
   const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
   const [overdueJobs, setOverdueJobs] = useState<OverdueJob[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string[]>([]); // Array of selected status IDs
   const [branchFilter, setBranchFilter] = useState<string>('all');
   const [admFilter, setAdmFilter] = useState<string>('all');
   const [repCodeFilter, setRepCodeFilter] = useState<string>('all');
@@ -47,6 +47,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
   const [isLoadingJobs, setIsLoadingJobs] = useState(false); // Track if we're actively loading jobs
   const isLoadingAllJobsRef = useRef(false); // Ref to track if we're loading all jobs (prevents race conditions)
   const isAllJobsModeRef = useRef(false); // Ref to track if we're in "all jobs" mode (prevents overdue requests from overwriting)
+  const preservePageRef = useRef<number | null>(null); // Ref to preserve page number during job updates
   
   // Machines visibility state - load from localStorage
   const [showMachinesGlobal, setShowMachinesGlobal] = useState<boolean>(() => {
@@ -150,6 +151,16 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
     }
   }, [user, technicians]);
 
+  // Restore page after job update
+  useEffect(() => {
+    if (preservePageRef.current !== null && filteredJobs.length > 0 && !loading) {
+      const totalPages = Math.ceil(filteredJobs.length / itemsPerPage) || 1;
+      const validPage = Math.min(preservePageRef.current, totalPages);
+      setCurrentPage(validPage > 0 ? validPage : 1);
+      preservePageRef.current = null; // Clear the ref
+    }
+  }, [filteredJobs.length, loading, itemsPerPage]);
+
   useEffect(() => {
     // Only apply filters if not loading and not actively loading jobs
     // This prevents applyFilters from running while loadAllJobs is setting state
@@ -187,8 +198,8 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       }
       
       // Apply status filter
-      if (statusFilter !== 'all') {
-        filtered = filtered.filter(job => job.status?._id === statusFilter);
+      if (statusFilter.length > 0) {
+        filtered = filtered.filter(job => job.status?._id && statusFilter.includes(job.status._id));
       }
       
       // Apply branch filter
@@ -311,8 +322,8 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       }
       
       // Apply status filter
-      if (statusFilter !== 'all') {
-        filtered = filtered.filter(job => job.status?._id === statusFilter);
+      if (statusFilter.length > 0) {
+        filtered = filtered.filter(job => job.status?._id && statusFilter.includes(job.status._id));
       }
       
       // Apply branch filter
@@ -360,7 +371,10 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       // Use React's batching to ensure both updates happen together
       setJobs(allJobs);
       setFilteredJobs(filtered);
-      setCurrentPage(1);
+      // Only reset page if we're not preserving it (i.e., not during a job update)
+      if (preservePageRef.current === null) {
+        setCurrentPage(1);
+      }
       
       // Set loading states - use setTimeout to ensure state updates are batched
       // This prevents the useEffect from running before jobs and filteredJobs are set
@@ -446,8 +460,8 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       }
       
       // Apply status filter
-      if (statusFilter !== 'all') {
-        filtered = filtered.filter(job => job.status?._id === statusFilter);
+      if (statusFilter.length > 0) {
+        filtered = filtered.filter(job => job.status?._id && statusFilter.includes(job.status._id));
       }
       
       // Apply branch filter
@@ -498,7 +512,10 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       // Set both jobs and filteredJobs in the same batch
       setJobs(uniqueJobs);
       setFilteredJobs(filtered);
-      setCurrentPage(1);
+      // Only reset page if we're not preserving it (i.e., not during a job update)
+      if (preservePageRef.current === null) {
+        setCurrentPage(1);
+      }
       
       // Set loading states after a microtask to ensure state updates are batched
       setTimeout(() => {
@@ -606,8 +623,8 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
     }
 
     // Apply status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(job => job.status?._id === statusFilter);
+    if (statusFilter.length > 0) {
+      filtered = filtered.filter(job => job.status?._id && statusFilter.includes(job.status._id));
     }
 
     // Apply branch filter
@@ -659,10 +676,14 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
   }
 
   async function handleJobUpdate() {
+    // Store current page before reloading
+    preservePageRef.current = currentPage;
+    
     await loadOverdueJobsList();
     if (priorityFilter.all) {
       await loadAllJobs();
     }
+    // Page restoration is handled by useEffect watching filteredJobs
   }
 
   function getStatusColor(statusName?: string): string {
@@ -898,23 +919,74 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
 
             {/* Status Filter */}
             <div className="mb-4">
-              <label className="block text-xs font-semibold text-ars-heading mb-1.5">Status</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-1.5 text-[13px] border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
-              >
-                <option value="all">All Statuses</option>
-                {statuses && statuses.length > 0 ? (
-                  statuses.map((status) => (
-                    <option key={status._id} value={status._id}>
-                      {status.name}
-                    </option>
-                  ))
-                ) : (
-                  <option value="" disabled>Loading...</option>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-ars-heading">Status</label>
+                {statusFilter.length > 0 && (
+                  <button
+                    onClick={() => setStatusFilter([])}
+                    className="text-xs text-ars-primary hover:text-ars-primary/80 font-medium"
+                  >
+                    Clear all
+                  </button>
                 )}
-              </select>
+              </div>
+              
+              {/* Selected Status Pills */}
+              {statusFilter.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {statusFilter.map((statusId) => {
+                    const status = statuses.find(s => s._id === statusId);
+                    if (!status) return null;
+                    return (
+                      <span
+                        key={statusId}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-ars-primary/10 text-ars-primary text-xs font-medium rounded-full"
+                      >
+                        {status.name}
+                        <button
+                          onClick={() => setStatusFilter(statusFilter.filter(id => id !== statusId))}
+                          className="hover:bg-ars-primary/20 rounded-full p-0.5 transition-colors"
+                          aria-label={`Remove ${status.name} filter`}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+              
+              {/* Status Checkboxes */}
+              <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-white">
+                {statuses && statuses.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {statuses
+                      .filter(status => status.isActive && !status.isHidden)
+                      .map((status) => (
+                        <label
+                          key={status._id}
+                          className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer text-sm"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={statusFilter.includes(status._id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setStatusFilter([...statusFilter, status._id]);
+                              } else {
+                                setStatusFilter(statusFilter.filter(id => id !== status._id));
+                              }
+                            }}
+                            className="w-4 h-4 text-ars-primary border-gray-300 rounded focus:ring-ars-primary focus:ring-2"
+                          />
+                          <span className="text-ars-body">{status.name}</span>
+                        </label>
+                      ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-500 text-center py-2">Loading statuses...</div>
+                )}
+              </div>
             </div>
 
             {/* Branch Filter */}

@@ -63,6 +63,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   const [showNewMachineForm, setShowNewMachineForm] = useState(false);
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
   const [newMachine, setNewMachine] = useState({
+    machineType: '',
     make: '',
     model: '',
     serialNumber: '',
@@ -88,6 +89,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   const [rsrVisibility, setRsrVisibility] = useState<'all' | 'private'>('all');
   const [rsrFile, setRsrFile] = useState<File | null>(null);
   const [uploadingRSR, setUploadingRSR] = useState(false);
+  const [rsrDragActive, setRsrDragActive] = useState(false);
   const [notes, setNotes] = useState<JobNote[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(false);
   const [notesMinimized, setNotesMinimized] = useState(false);
@@ -510,6 +512,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
       }
       
       setNewMachine({
+        machineType: '',
         make: '',
         model: '',
         serialNumber: '',
@@ -918,7 +921,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                   {isEditing ? (
                     <div className="space-y-2">
                       {(job.bookings || []).map((booking, idx) => (
-                        <div key={idx} className="flex gap-2 items-center">
+                        <div key={idx} className="flex gap-2 items-center flex-wrap" onClick={(e) => e.stopPropagation()}>
                           <select
                             value={booking.technicianId || ''}
                             onChange={e => {
@@ -926,6 +929,8 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                               updated[idx].technicianId = e.target.value;
                               setJob({ ...job, bookings: updated });
                             }}
+                            onClick={e => e.stopPropagation()}
+                            onFocus={e => e.stopPropagation()}
                             className="px-3 py-2 border border-gray-300 rounded-lg text-sm flex-shrink-0"
                           >
                             <option value="">Select Technician</option>
@@ -953,12 +958,26 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                               updated[idx].endDate = e.target.value;
                               setJob({ ...job, bookings: updated });
                             }}
-                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-40"
                           />
-                          <button type="button" onClick={() => {
-                            const updated = (job.bookings || []).filter((_, i) => i !== idx);
-                            setJob({ ...job, bookings: updated });
-                          }} className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors flex-shrink-0">Remove</button>
+                          <button 
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              console.log('Remove button clicked for booking index:', idx);
+                              const updated = (job.bookings || []).filter((_, i) => i !== idx);
+                              setJob({ ...job, bookings: updated });
+                            }}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors flex-shrink-0 cursor-pointer"
+                            style={{ pointerEvents: 'auto', zIndex: 10 }}
+                          >
+                            Remove
+                          </button>
                         </div>
                       ))}
                       <button type="button" onClick={() => {
@@ -1303,6 +1322,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                                 onClick={() => {
                                   setEditingMachine(machine);
                                   setNewMachine({
+                                    machineType: machine.machineType || '',
                                     make: machine.make || '',
                                     model: machine.model || '',
                                     serialNumber: machine.serialNumber || '',
@@ -1371,6 +1391,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       onClick={() => {
                         setEditingMachine(null);
                         setNewMachine({
+                          machineType: '',
                           make: '',
                           model: '',
                           serialNumber: '',
@@ -1390,6 +1411,24 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                     <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
                       <h4 className="font-semibold text-ars-heading">{editingMachine ? 'Edit Machine' : 'Add New Machine'}</h4>
                       <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-ars-body mb-1">Machine Type *</label>
+                          <select
+                            value={newMachine.machineType}
+                            onChange={e => setNewMachine({ ...newMachine, machineType: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          >
+                            <option value="">Select type</option>
+                            <option value="Generator">Generator</option>
+                            <option value="Genset">Genset</option>
+                            <option value="Compressor oil free">Compressor oil free</option>
+                            <option value="Compressor oil injection">Compressor oil injection</option>
+                            <option value="Diesel reciprocating compressor">Diesel reciprocating compressor</option>
+                            <option value="Dryer">Dryer</option>
+                            <option value="Blower">Blower</option>
+                            <option value="Vacuum pump">Vacuum pump</option>
+                          </select>
+                        </div>
                         <div>
                           <label className="block text-xs font-semibold text-ars-body mb-1">Make *</label>
                           <input
@@ -1559,12 +1598,72 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                     <label className="block text-sm font-semibold text-gray-700 mb-1">
                       PDF File <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="file"
-                      accept=".pdf"
-                      onChange={(e) => setRsrFile(e.target.files?.[0] || null)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                    <div
+                      className={`border-2 border-dashed rounded-lg p-6 transition-colors ${
+                        rsrDragActive
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-300 bg-gray-50 hover:border-gray-400'
+                      }`}
+                      onDragEnter={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setRsrDragActive(true);
+                      }}
+                      onDragLeave={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setRsrDragActive(false);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setRsrDragActive(false);
+                        
+                        const file = e.dataTransfer.files?.[0];
+                        if (file) {
+                          if (file.type === 'application/pdf') {
+                            setRsrFile(file);
+                          } else {
+                            setError('Only PDF files are allowed for RSR documents');
+                          }
+                        }
+                      }}
+                    >
+                      <div className="text-center">
+                        <Upload className={`mx-auto h-10 w-10 mb-3 ${rsrDragActive ? 'text-blue-500' : 'text-gray-400'}`} />
+                        <div className="flex text-sm text-gray-600 justify-center items-center gap-1">
+                          <label className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 px-2 py-1">
+                            <span>Click to upload</span>
+                            <input
+                              type="file"
+                              accept=".pdf"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  if (file.type === 'application/pdf') {
+                                    setRsrFile(file);
+                                  } else {
+                                    setError('Only PDF files are allowed for RSR documents');
+                                  }
+                                }
+                              }}
+                              className="sr-only"
+                            />
+                          </label>
+                          <span>or drag and drop</span>
+                        </div>
+                        {rsrFile && (
+                          <p className="text-sm text-gray-700 mt-2 font-medium">
+                            Selected: {rsrFile.name}
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-500 mt-2">PDF files only</p>
+                      </div>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">

@@ -70,8 +70,10 @@ import {
   XCircle,
   ChevronDown,
   ChevronUp,
-  Tag
+  Tag,
+  History
 } from 'lucide-react';
+import { ChangelogViewer } from './ChangelogViewer';
 
 export function SystemManagement() {
   const [users, setUsers] = useState<User[]>([]);
@@ -82,7 +84,7 @@ export function SystemManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditingUser, setIsEditingUser] = useState(false);
-  const [activeTab, setActiveTab] = useState<'users' | 'imports' | 'reference'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'imports' | 'reference' | 'changelog'>('users');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 20;
@@ -246,7 +248,19 @@ export function SystemManagement() {
    */
   async function handleViewUser(userId: string) {
     try {
+      // Ensure admin codes are loaded when viewing/editing a user
+      if (adminCodes.length === 0) {
+        console.log('[SystemManagement] Loading admin codes for user edit...');
+        const adminCodesResponse = await getAdminCodes();
+        console.log('[SystemManagement] Admin codes loaded:', adminCodesResponse.adminCodes?.length || 0, adminCodesResponse.adminCodes);
+        setAdminCodes(adminCodesResponse.adminCodes || []);
+      } else {
+        console.log('[SystemManagement] Admin codes already loaded:', adminCodes.length);
+      }
+      
       const response = await getUser(userId);
+      console.log('[SystemManagement] User loaded:', response.user);
+      console.log('[SystemManagement] User adminCode:', response.user.adminCode);
       setSelectedUser(response.user);
       setIsEditingUser(false);
     } catch (err: any) {
@@ -269,6 +283,7 @@ export function SystemManagement() {
         email: selectedUser.email,
         role: selectedUser.role._id,
         isActive: selectedUser.isActive,
+        adminCodeId: selectedUser.adminCode && typeof selectedUser.adminCode === 'object' ? selectedUser.adminCode._id : (selectedUser.adminCode || null),
       });
       
       // Reload users
@@ -896,6 +911,19 @@ export function SystemManagement() {
                 Reference Data
               </div>
             </button>
+            <button
+              onClick={() => setActiveTab('changelog')}
+              className={`flex-1 px-6 py-4 font-semibold transition-all ${
+                activeTab === 'changelog'
+                  ? 'text-ars-primary border-b-2 border-ars-primary bg-blue-50'
+                  : 'text-ars-body hover:text-ars-heading hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <History className="w-5 h-5" />
+                Changelog
+              </div>
+            </button>
           </div>
         </div>
 
@@ -992,10 +1020,15 @@ export function SystemManagement() {
                           )}
                         </div>
                         <p className="text-sm text-ars-body mb-1">{user.email}</p>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-lg">
                             {user.role.name}
                           </span>
+                          {user.adminCode && (
+                            <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-lg">
+                              {typeof user.adminCode === 'object' ? user.adminCode.code : user.adminCode}
+                            </span>
+                          )}
                           <span className="text-xs text-ars-body">
                             {user.permissions.length} permission{user.permissions.length !== 1 ? 's' : ''}
                           </span>
@@ -1130,6 +1163,61 @@ export function SystemManagement() {
                         ))}
                       </select>
                     </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-1">Admin Code</label>
+                      {(() => {
+                        console.log('[SystemManagement] Rendering Admin Code field. adminCodes.length:', adminCodes.length);
+                        console.log('[SystemManagement] adminCodes:', adminCodes);
+                        console.log('[SystemManagement] selectedUser.adminCode:', selectedUser.adminCode);
+                        const activeAdminCodes = adminCodes.filter(ac => ac.isActive);
+                        console.log('[SystemManagement] Active admin codes:', activeAdminCodes.length);
+                        
+                        if (adminCodes.length === 0) {
+                          return (
+                            <div className="w-full pl-2 pr-2 py-2.5 border border-gray-300 rounded-[8px] bg-gray-50 text-[13px] h-[38px] flex items-center text-gray-500">
+                              No admin codes available. Create one in the Admin Codes section first.
+                            </div>
+                          );
+                        }
+                        
+                        if (activeAdminCodes.length === 0) {
+                          return (
+                            <div className="w-full pl-2 pr-2 py-2.5 border border-gray-300 rounded-[8px] bg-gray-50 text-[13px] h-[38px] flex items-center text-gray-500">
+                              No active admin codes. Activate one in the Admin Codes section first.
+                            </div>
+                          );
+                        }
+                        
+                        return (
+                          <select
+                            value={selectedUser.adminCode && typeof selectedUser.adminCode === 'object' ? selectedUser.adminCode._id : (selectedUser.adminCode || '')}
+                            onChange={(e) => {
+                              const adminCodeId = e.target.value || null;
+                              const adminCode = adminCodeId ? adminCodes.find(ac => ac._id === adminCodeId) : null;
+                              console.log('[SystemManagement] Admin code changed:', adminCodeId, adminCode);
+                              setSelectedUser({ 
+                                ...selectedUser, 
+                                adminCode: adminCode ? { _id: adminCode._id, code: adminCode.code, description: adminCode.description } : null 
+                              });
+                            }}
+                            className="w-full pl-2 pr-10 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[13px] h-[38px] appearance-none bg-white"
+                            style={{
+                              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                              backgroundRepeat: 'no-repeat',
+                              backgroundPosition: 'right 0.75rem center',
+                              backgroundSize: '1rem'
+                            }}
+                          >
+                            <option value="">No Admin Code</option>
+                            {activeAdminCodes.map((adminCode) => (
+                              <option key={adminCode._id} value={adminCode._id}>
+                                {adminCode.code} {adminCode.description ? `- ${adminCode.description}` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        );
+                      })()}
+                    </div>
                     <div className="flex items-center gap-2 pt-4">
                       <button
                         onClick={handleSaveUser}
@@ -1163,6 +1251,16 @@ export function SystemManagement() {
                       <p className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg inline-block font-medium">
                         {selectedUser.role.name}
                       </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-1">Admin Code</label>
+                      {selectedUser.adminCode ? (
+                        <p className="px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg inline-block font-medium">
+                          {typeof selectedUser.adminCode === 'object' ? selectedUser.adminCode.code : selectedUser.adminCode}
+                        </p>
+                      ) : (
+                        <p className="text-ars-body italic">No admin code assigned</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-ars-body mb-1">Status</label>
@@ -2530,6 +2628,13 @@ export function SystemManagement() {
                 </>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Changelog Tab */}
+        {activeTab === 'changelog' && (
+          <div className="space-y-6">
+            <ChangelogViewer />
           </div>
         )}
       </div>

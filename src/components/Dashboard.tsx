@@ -62,7 +62,7 @@ interface DashboardProps {
 }
 
 export function Dashboard({ view: initialView }: DashboardProps = {}) {
-  const { user, signOut, isSuperAdmin } = useAuth();
+  const { user, signOut, isSuperAdmin, hasPermission } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile();
@@ -625,7 +625,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                   <FileText className={`w-4 h-4 transition-transform ${view === 'leads' ? 'scale-110' : ''}`} />
                   <span>Jobs</span>
                 </Link>
-                {(isSuperAdmin || user?.role?.name?.toLowerCase() === 'manager') && (
+                {(isSuperAdmin || hasPermission('reports.read')) && (
                   <Link
                     to="/reports"
                     className={`group relative px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
@@ -1033,7 +1033,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                     )}
                   </div>
 
-                  {(isSuperAdmin || user?.role?.name?.toLowerCase() === 'manager') && (
+                  {(isSuperAdmin || hasPermission('reports.read')) && (
                     <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('reports')}>
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-white/80 text-xs font-medium">Total Value</p>
@@ -1676,18 +1676,18 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           />
         )}
 
-        {view === 'reports' && (isSuperAdmin || user?.role?.name?.toLowerCase() === 'manager') && (
+        {view === 'reports' && (isSuperAdmin || hasPermission('reports.read')) && (
           <Reports
             statuses={statuses}
             branches={branches}
           />
         )}
-        {view === 'reports' && !isSuperAdmin && user?.role?.name?.toLowerCase() !== 'manager' && (
+        {view === 'reports' && !isSuperAdmin && !hasPermission('reports.read') && (
           <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
               <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
               <h1 className="text-2xl font-bold text-slate-900 mb-2">Access Denied</h1>
-              <p className="text-slate-600 mb-6">You don't have permission to access the Reports page. This page is only available to Managers and Super Admins.</p>
+              <p className="text-slate-600 mb-6">You don't have permission to access the Reports page. Please contact a Super Admin to grant you the "reports.read" permission.</p>
               <button
                 onClick={() => navigate('/dashboard')}
                 className="px-6 py-3 bg-[#0969a9] text-white rounded-xl font-bold text-[14px] hover:bg-[#0a7bc4] transition-colors"

@@ -22,7 +22,7 @@ export function MobileNavigation({
   notificationsCount,
   onNotificationsClick,
 }: MobileNavigationProps) {
-  const { user, signOut } = useAuth();
+  const { user, signOut, hasPermission } = useAuth();
   const location = useLocation();
   const [showMenu, setShowMenu] = useState(false);
 
@@ -39,13 +39,13 @@ export function MobileNavigation({
 
   const activeView = getViewFromPath();
 
-  // Only show Reports to Managers and Super Admins
-  const isManagerOrSuperAdmin = user?.isSuperAdmin || user?.role?.name?.toLowerCase() === 'manager';
+  // Only show Reports to users with reports.read permission or Super Admins
+  const canViewReports = user?.isSuperAdmin || hasPermission('reports.read');
 
   const navItems = [
     { id: 'dashboard' as View, label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
     { id: 'leads' as View, label: 'Jobs', icon: FileText, path: '/jobs' },
-    ...(isManagerOrSuperAdmin ? [{ id: 'reports' as View, label: 'Reports', icon: BarChart3, path: '/reports' }] : []),
+    ...(canViewReports ? [{ id: 'reports' as View, label: 'Reports', icon: BarChart3, path: '/reports' }] : []),
     { id: 'diary' as View, label: 'Diary', icon: Calendar, path: '/diary' },
   ];
 

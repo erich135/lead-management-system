@@ -47,6 +47,8 @@
 - Follow-up reminder buttons and overdue warnings no longer show for jobs in final/completed statuses (Sent to Inv, Invoiced, Job Done, etc.)
 - Admin filter dropdown now correctly displays selected admin code instead of showing "All Admins" when filtered
 - Resolved merge conflicts in ChatWidget, Dashboard, LeadDetails, LeadForm, and LeadsList components while preserving all functionality and applying updated styling standards
+- Job cards now display service description names correctly even when filtering overdue jobs (no more ObjectId strings)
+- Admin filter no longer auto-selects the signed-in admin's code; it defaults to "All Admins" so admins can see the full list before filtering
 
 ### Changed
 - Applied consistent styling standards across components (label styling, border radius, input/select padding, brand colors, filter dropdowns, responsive text sizing)

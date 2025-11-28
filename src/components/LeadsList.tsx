@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getJobs, updateJob, getCustomers, getTechnicians, getOverdueJobs, getRepCodes, getAdminCodes, type Job, type Status, type Branch, type Customer, type Technician, type OverdueJob, type RepCode, type AdminCode } from '../lib/api';
+import { getJobs, updateJob, getCustomers, getTechnicians, getOverdueJobs, getRepCodes, getAdminCodes, getServiceDescriptions, type Job, type Status, type Branch, type Customer, type Technician, type OverdueJob, type RepCode, type AdminCode, type ServiceDescription } from '../lib/api';
 import { Search, Filter, Plus, AlertCircle, Calendar, Eye, Clock, CheckCircle2, X, Zap, FileText, User, Building2, DollarSign, Wrench, Sparkles, ArrowRight, Tag, ChevronDown, ChevronUp } from 'lucide-react';
 import { LeadDetails } from './LeadDetails';
 import { useAuth } from '../contexts/AuthContext';
@@ -42,6 +42,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [repCodes, setRepCodes] = useState<RepCode[]>([]);
   const [adminCodes, setAdminCodes] = useState<AdminCode[]>([]);
+  const [serviceDescriptions, setServiceDescriptions] = useState<ServiceDescription[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(24); // 24 items per page (good for grid)
   const [isLoadingJobs, setIsLoadingJobs] = useState(false); // Track if we're actively loading jobs
@@ -120,6 +121,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
     loadTechnicians();
     loadRepCodes();
     loadAdminCodes();
+    loadServiceDescriptions();
   }, []);
 
   // Admin filter auto-selection removed - admins now see "All Admins" by default
@@ -561,6 +563,15 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       setAdminCodes(data.adminCodes || []);
     } catch (error) {
       console.error('Error loading admin codes:', error);
+    }
+  }
+
+  async function loadServiceDescriptions() {
+    try {
+      const data = await getServiceDescriptions();
+      setServiceDescriptions(data.descriptions || []);
+    } catch (error) {
+      console.error('Error loading service descriptions:', error);
     }
   }
 
@@ -1181,10 +1192,37 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                     .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                     .map((job, index) => {
                   const overdueInfo = getOverdueInfo(job._id);
-                  const serviceDescription =
-                    typeof job.description === 'string'
-                      ? job.description
-                      : job.description?.name;
+                  const serviceDescription = (() => {
+                    if (!job.description) return undefined;
+
+                    const descriptionField = job.description as unknown;
+
+                    // Description is a string (could be plain text or ObjectId)
+                    if (typeof descriptionField === 'string') {
+                      const isObjectId = /^[0-9a-fA-F]{24}$/.test(descriptionField);
+                      if (isObjectId) {
+                        const match = serviceDescriptions.find(desc => desc._id === descriptionField);
+                        return match?.name;
+                      }
+                      return descriptionField;
+                    }
+
+                    // Description is an object (may or may not have name populated)
+                    if (descriptionField && typeof descriptionField === 'object') {
+                      const descriptionObj = descriptionField as { _id?: string; name?: string };
+
+                      if (descriptionObj.name) {
+                        return descriptionObj.name;
+                      }
+
+                      if (descriptionObj._id) {
+                        const match = serviceDescriptions.find(desc => desc._id === descriptionObj._id);
+                        return match?.name;
+                      }
+                    }
+
+                    return undefined;
+                  })();
                   return (
                     <div
                       key={job._id}

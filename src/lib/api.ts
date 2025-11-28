@@ -329,7 +329,7 @@ export interface Job {
   description?: {
     _id: string;
     name: string;
-  };
+  } | string;
   valueExVat?: number;
   adm?: string;
   repCode?: {

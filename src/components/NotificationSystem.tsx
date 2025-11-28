@@ -325,8 +325,7 @@ export function NotificationSystem({ onLeadClick }: NotificationSystemProps) {
                               </p>
                               <div className="flex items-center gap-4 mt-1">
                                 <p className="text-xs text-gray-500">
-                                  {new Date(notification.created_at).toLocaleDateString()} at{' '}
-                                  {new Date(notification.created_at).toLocaleTimeString()}
+                                  {formatDateTime(notification.created_at)}
                                 </p>
                                 {notification.lead && (
                                   <div className="flex items-center gap-1">

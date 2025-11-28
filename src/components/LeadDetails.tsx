@@ -2064,14 +2064,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                     const userName = activity.userId
                       ? `${activity.userId.firstName || ''} ${activity.userId.lastName || ''}`.trim() || activity.userId.email
                       : 'System';
-                    const activityDate = new Date(activity.createdAt);
-                    const formattedDate = activityDate.toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    });
+                    const formattedDate = formatDateTime(activity.createdAt);
 
                     return (
                       <div

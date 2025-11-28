@@ -115,7 +115,9 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
     status: [] as string[],
     customer: '',
     admin: [] as string[],
-    rep: [] as string[]
+    rep: [] as string[],
+    startDateFrom: '',
+    startDateTo: ''
   });
   const [sortConfig, setSortConfig] = useState<{
     field: 'jobNumber' | 'status' | 'customer' | 'startDate' | 'dateQuoted' | 'city' | 'admin' | 'rep' | 'amount' | 'daysOverdue' | null;
@@ -460,14 +462,31 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
         return filters.rep.some(rep => repCodeStr.includes(rep.toLowerCase()));
       });
     }
+    if (filters.startDateFrom) {
+      filteredJobs = filteredJobs.filter(job => {
+        const startDate = job.job?.startDate ? new Date(job.job.startDate) : null;
+        if (!startDate) return false;
+        return startDate >= new Date(filters.startDateFrom);
+      });
+    }
+    if (filters.startDateTo) {
+      filteredJobs = filteredJobs.filter(job => {
+        const startDate = job.job?.startDate ? new Date(job.job.startDate) : null;
+        if (!startDate) return false;
+        return startDate <= new Date(filters.startDateTo);
+      });
+    }
 
-    // Apply sorting
-    if (sortConfig.field) {
-      filteredJobs.sort((a, b) => {
+    // Apply sorting - default to startDate descending if no sort is selected
+    const fieldToSort = sortConfig.field || 'startDate';
+    const directionToSort = sortConfig.field ? sortConfig.direction : 'desc';
+    
+    filteredJobs.sort((a, b) => {
+      if (fieldToSort) {
         let aValue: any = '';
         let bValue: any = '';
 
-        switch (sortConfig.field) {
+        switch (fieldToSort) {
           case 'jobNumber':
             aValue = a.jobNumber;
             bValue = b.jobNumber;
@@ -512,13 +531,13 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
             break;
         }
 
-        if (sortConfig.direction === 'asc') {
+        if (directionToSort === 'asc') {
           return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
         } else {
           return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
         }
-      });
-    }
+      }
+    });
 
     return filteredJobs;
   }
@@ -553,7 +572,9 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
       status: [],
       customer: '',
       admin: [],
-      rep: []
+      rep: [],
+      startDateFrom: '',
+      startDateTo: ''
     });
   }
 
@@ -1134,7 +1155,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                   {/* Filters */}
                   <div className="bg-white rounded-xl border border-gray-200 p-3 mb-4">
                     <h3 className="text-xs font-semibold text-ars-heading mb-2">Filters</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                    <div className="grid grid-cols-1 md:grid-cols-7 gap-2">
                       <div>
                         <label className="block text-[11px] font-medium text-gray-600 mb-1">Job Number</label>
                         <input
@@ -1255,6 +1276,26 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                           </div>
                         )}
                       </div>
+                      
+                      <div>
+                        <label className="block text-[11px] font-medium text-gray-600 mb-1">Start Date From</label>
+                        <input
+                          type="date"
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-[13px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          value={filters.startDateFrom}
+                          onChange={(e) => setFilters({...filters, startDateFrom: e.target.value})}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-[11px] font-medium text-gray-600 mb-1">Start Date To</label>
+                        <input
+                          type="date"
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-[13px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                          value={filters.startDateTo}
+                          onChange={(e) => setFilters({...filters, startDateTo: e.target.value})}
+                        />
+                      </div>
                     </div>
                     {(Object.values(filters).some(filter => Array.isArray(filter) ? filter.length > 0 : filter)) && (
                       <div className="mt-3 flex items-center gap-2">
@@ -1282,6 +1323,16 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                         {filters.customer && (
                           <span className="inline-flex items-center gap-1 px-2 py-1 bg-pink-100 text-pink-800 rounded text-xs">
                             Customer
+                          </span>
+                        )}
+                        {filters.startDateFrom && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">
+                            Start Date From
+                          </span>
+                        )}
+                        {filters.startDateTo && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">
+                            Start Date To
                           </span>
                         )}
                         <button

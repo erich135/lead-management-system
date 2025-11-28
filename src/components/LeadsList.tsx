@@ -125,11 +125,24 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
   // Auto-set admin filter for admin users
   useEffect(() => {
     if (user?.role?.name === 'admin' && !user?.isSuperAdmin && user?.adminCode?.code) {
-      if (admFilter === 'all') {
-        setAdmFilter(user.adminCode.code);
+      // Wait for admin codes to load
+      if (adminCodeOptions.length > 0) {
+        const userAdminCode = user.adminCode.code;
+        // If filter is 'all', set it to user's admin code (if it exists in options)
+        if (admFilter === 'all' && adminCodeOptions.includes(userAdminCode)) {
+          setAdmFilter(userAdminCode);
+        }
+        // If current filter value doesn't exist in options, reset to user's admin code or 'all'
+        else if (admFilter !== 'all' && !adminCodeOptions.includes(admFilter)) {
+          if (adminCodeOptions.includes(userAdminCode)) {
+            setAdmFilter(userAdminCode);
+          } else {
+            setAdmFilter('all');
+          }
+        }
       }
     }
-  }, [user, adminCodes]);
+  }, [user, adminCodeOptions, admFilter]);
 
   // Auto-set rep code filter for rep users
   useEffect(() => {
@@ -1016,8 +1029,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
               <select
                 value={admFilter}
                 onChange={(e) => setAdmFilter(e.target.value)}
-                disabled={user?.role?.name === 'admin' && !user?.isSuperAdmin}
-                className="w-full px-3 py-1.5 text-[13px] border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
+                className="w-full px-3 py-1.5 text-[13px] border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
               >
                 <option value="all">All Admins</option>
                 {adminCodeOptions.length > 0 ? (

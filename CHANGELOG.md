@@ -36,3 +36,13 @@
 - CORS configuration for cross-subdomain API access. Improve RSR Uploads
 - Removed RSR document requirement for "Sent to Inv" status
 - Page navigation now preserves current page when editing and saving a job (no longer jumps back to page 1)
+
+## [1.0.3] - 2025-11-28
+
+### Added
+- Collapsible sections on Reports page (Overdue Jobs, Recent Activities, Jobs, Conversion Time Tracker)
+- Admin users can now view and filter all jobs (not just their own) while defaulting to their own jobs on page load
+
+### Fixed
+- Follow-up reminder buttons and overdue warnings no longer show for jobs in final/completed statuses (Sent to Inv, Invoiced, Job Done, etc.)
+- Admin filter dropdown now correctly displays selected admin code instead of showing "All Admins" when filtered

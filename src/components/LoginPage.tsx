@@ -98,7 +98,7 @@ export function LoginPage() {
 
           {/* Error message */}
           {error && (
-            <div className="mb-6 p-4 bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-300 rounded-xl flex items-start gap-3 animate-shake shadow-md relative overflow-hidden group">
+            <div className="mb-6 p-4 bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-300 rounded-[8px] flex items-start gap-3 animate-shake shadow-md relative overflow-hidden group">
               {/* Decorative background pattern */}
               <div className="absolute inset-0 opacity-5">
                 <div className="absolute top-0 left-0 w-20 h-20 bg-red-500 rounded-full -translate-x-1/2 -translate-y-1/2"></div>
@@ -141,7 +141,7 @@ export function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   autoComplete="email"
-                  className="w-full pl-12 pr-4 py-3.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-ars-primary transition-all duration-200 bg-white focus:bg-white text-ars-heading text-[15px]"
+                  className="w-full pl-12 pr-4 py-3.5 border-2 border-gray-200 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-ars-primary transition-all duration-200 bg-white focus:bg-white text-ars-heading text-[15px]"
                   placeholder="Email Address"
                 />
               </div>
@@ -173,7 +173,7 @@ export function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
-                  className="w-full pl-12 pr-4 py-3.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-ars-primary transition-all duration-200 bg-white focus:bg-white text-ars-heading text-[15px]"
+                  className="w-full pl-12 pr-4 py-3.5 border-2 border-gray-200 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-ars-primary transition-all duration-200 bg-white focus:bg-white text-ars-heading text-[15px]"
                   placeholder="Password"
                 />
               </div>
@@ -183,7 +183,7 @@ export function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#f7c12b] text-[#383838] py-4 rounded-xl font-bold text-[14px] shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2 group hover:brightness-95"
+              className="w-full bg-[#f7c12b] text-[#383838] py-4 rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2 group hover:brightness-95"
             >
               {loading ? (
                 <>

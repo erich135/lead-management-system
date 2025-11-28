@@ -106,7 +106,7 @@ export function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordModalProp
         ) : (
           <>
             {error && (
-              <div className="mb-4 p-4 bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-300 rounded-xl flex items-start gap-3 animate-shake">
+              <div className="mb-4 p-4 bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-300 rounded-[8px] flex items-start gap-3 animate-shake">
                 <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-red-800">{error}</p>
               </div>
@@ -128,7 +128,7 @@ export function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordModalProp
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     autoComplete="email"
-                    className="w-full pl-12 pr-4 py-3.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-ars-primary transition-all duration-200 bg-gray-50 focus:bg-white text-ars-heading"
+                    className="w-full pl-12 pr-4 py-3.5 border-2 border-gray-200 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-ars-primary transition-all duration-200 bg-gray-50 focus:bg-white text-ars-heading"
                     placeholder="you@company.com"
                   />
                 </div>
@@ -137,7 +137,7 @@ export function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordModalProp
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-ars-primary text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2"
+                className="w-full bg-ars-primary text-white py-4 rounded-[8px] font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>

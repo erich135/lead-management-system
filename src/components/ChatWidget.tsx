@@ -442,7 +442,7 @@ export function ChatWidget() {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-24 right-8 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-all z-50"
+        className="fixed bottom-24 right-8 bg-[#0969a9] text-white p-4 rounded-full hover:bg-[#0969a9]/90 transition-all z-30"
         title="Open Chat"
         aria-label="Open Chat"
       >
@@ -460,9 +460,20 @@ export function ChatWidget() {
   }
 
   return (
-    <div className={`fixed bottom-24 right-8 bg-white rounded-lg shadow-2xl z-50 flex flex-col ${isMinimized ? 'h-14' : 'h-[600px]'} w-96 transition-all`}>
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b bg-blue-600 text-white rounded-t-lg">
+    <>
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 z-40"
+        onClick={() => {
+          setIsOpen(false);
+          setSelectedUser(null);
+        }}
+      />
+      
+      {/* Chat Widget */}
+      <div className={`fixed bottom-24 right-8 bg-white rounded-lg z-30 flex flex-col ${isMinimized ? 'h-14' : 'h-[600px]'} w-96 transition-all`}>
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b bg-[#0969a9] text-white rounded-t-lg">
         <div className="flex items-center space-x-2">
           <MessageSquare size={20} />
           <span className="font-semibold">
@@ -475,7 +486,7 @@ export function ChatWidget() {
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setIsMinimized(!isMinimized)}
-            className="hover:bg-blue-700 p-1 rounded"
+            className="hover:bg-[#0969a9]/80 p-1 rounded"
             title="Minimize"
           >
             <Minimize2 size={16} />
@@ -485,7 +496,7 @@ export function ChatWidget() {
               setIsOpen(false);
               setSelectedUser(null);
             }}
-            className="hover:bg-blue-700 p-1 rounded"
+            className="hover:bg-[#0969a9]/80 p-1 rounded"
             title="Close"
           >
             <X size={16} />
@@ -529,11 +540,11 @@ export function ChatWidget() {
                         }
                       }}
                       className={`w-full flex items-center space-x-3 p-3 hover:bg-gray-100 rounded-lg transition-colors text-left ${
-                        isUnread ? 'bg-blue-50 border-l-4 border-blue-500' : ''
+                        isUnread ? 'bg-blue-50 border-l-4 border-[#0969a9]' : ''
                       }`}
                     >
                       <div className="relative">
-                        <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white">
+                        <div className="w-10 h-10 bg-[#0969a9] rounded-full flex items-center justify-center text-white">
                           <User size={20} />
                         </div>
                         {unread > 0 && (
@@ -544,7 +555,7 @@ export function ChatWidget() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <p className={`font-medium ${isUnread ? 'text-blue-900' : 'text-gray-900'}`}>
+                          <p className={`font-medium ${isUnread ? 'text-[#0969a9]' : 'text-gray-900'}`}>
                             {chatUser.fullName}
                           </p>
                           {lastMsg && (
@@ -554,7 +565,7 @@ export function ChatWidget() {
                           )}
                         </div>
                         {lastMsg ? (
-                          <p className={`text-xs truncate ${isUnread ? 'text-blue-700 font-medium' : 'text-gray-500'}`}>
+                          <p className={`text-xs truncate ${isUnread ? 'text-[#0969a9] font-medium' : 'text-gray-500'}`}>
                             {lastMsg.sender._id === user?.id ? 'You: ' : `${lastMsg.sender.firstName}: `}
                             {lastMsg.text || (lastMsg.attachments && lastMsg.attachments.length > 0 ? '📎 Attachment' : '')}
                           </p>
@@ -572,7 +583,7 @@ export function ChatWidget() {
               {/* Back button */}
               <button
                 onClick={() => setSelectedUser(null)}
-                className="px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 border-b text-left"
+                className="px-4 py-2 text-sm text-[#0969a9] hover:bg-gray-50 border-b text-left"
               >
                 ← Back to users
               </button>
@@ -581,7 +592,7 @@ export function ChatWidget() {
               <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
                 {loading ? (
                   <div className="flex items-center justify-center h-full">
-                    <Loader2 className="animate-spin text-blue-600" size={32} />
+                    <Loader2 className="animate-spin text-[#0969a9]" size={32} />
                   </div>
                 ) : (
                   <>
@@ -595,7 +606,7 @@ export function ChatWidget() {
                           <div
                             className={`max-w-[75%] rounded-lg px-4 py-2 ${
                               isMyMessage
-                                ? 'bg-blue-600 text-white'
+                                ? 'bg-[#0969a9] text-white'
                                 : 'bg-white text-gray-900 border'
                             }`}
                           >
@@ -627,7 +638,7 @@ export function ChatWidget() {
                                         href={getChatAttachmentUrl(att._id)}
                                         download={att.originalName}
                                         className={`flex items-center space-x-2 p-2 rounded ${
-                                          isMyMessage ? 'bg-blue-700' : 'bg-gray-100'
+                                          isMyMessage ? 'bg-[#0969a9]/80' : 'bg-gray-100'
                                         } hover:opacity-80`}
                                       >
                                         <span className="text-lg">{getFileIcon(att.mimeType)}</span>
@@ -663,7 +674,7 @@ export function ChatWidget() {
                               </div>
                             )}
 
-                            <p className={`text-xs mt-1 ${isMyMessage ? 'text-blue-100' : 'text-gray-500'}`}>
+                            <p className={`text-xs mt-1 ${isMyMessage ? 'text-white/70' : 'text-gray-500'}`}>
                               {formatTime(msg.createdAt)}
                             </p>
                           </div>
@@ -749,13 +760,13 @@ export function ChatWidget() {
                       }
                     }}
                     placeholder="Type a message..."
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm resize-none"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0969a9] focus:border-[#0969a9] text-sm resize-none"
                     rows={2}
                   />
                   <button
                     onClick={handleSendMessage}
                     disabled={!newMessage.trim() && attachments.length === 0}
-                    className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    className="p-2 bg-[#0969a9] text-white rounded-lg hover:bg-[#0969a9]/90 disabled:bg-gray-300 disabled:cursor-not-allowed"
                     title="Send message"
                   >
                     <Send size={20} />
@@ -766,6 +777,7 @@ export function ChatWidget() {
           )}
         </>
       )}
-    </div>
+      </div>
+    </>
   );
 }

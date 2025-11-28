@@ -121,7 +121,7 @@ export function UserManagement({ users, branches, onUpdate }: UserManagementProp
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <div className="bg-white rounded-[8px] border border-slate-200 p-6">
           <h3 className="text-lg font-bold text-slate-900 mb-4">Users</h3>
           <div className="space-y-3">
             {users.map((user) => (
@@ -163,7 +163,7 @@ export function UserManagement({ users, branches, onUpdate }: UserManagementProp
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <div className="bg-white rounded-[8px] border border-slate-200 p-6">
           <h3 className="text-lg font-bold text-slate-900 mb-4">Branches</h3>
           <div className="space-y-3">
             {branches.map((branch) => (
@@ -178,7 +178,7 @@ export function UserManagement({ users, branches, onUpdate }: UserManagementProp
 
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+          <div className="bg-white rounded-[8px] shadow-2xl max-w-md w-full">
             <div className="border-b border-slate-200 px-6 py-4 flex justify-between items-center">
               <h3 className="text-xl font-bold text-slate-900">Create New User</h3>
               <button
@@ -289,7 +289,7 @@ export function UserManagement({ users, branches, onUpdate }: UserManagementProp
 
       {showBranchForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+          <div className="bg-white rounded-[8px] shadow-2xl max-w-md w-full">
             <div className="border-b border-slate-200 px-6 py-4 flex justify-between items-center">
               <h3 className="text-xl font-bold text-slate-900">Create New Branch</h3>
               <button

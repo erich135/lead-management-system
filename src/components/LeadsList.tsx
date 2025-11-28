@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { getJobs, updateJob, getCustomers, getTechnicians, getOverdueJobs, getRepCodes, getAdminCodes, type Job, type Status, type Branch, type Customer, type Technician, type OverdueJob, type RepCode, type AdminCode } from '../lib/api';
-import { Search, Filter, Plus, AlertCircle, Calendar, Edit2, Eye, Clock, CheckCircle2, X, Zap, FileText, User, Building2, DollarSign, Wrench, Sparkles, ArrowRight, Tag, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
+import { Search, Filter, Plus, AlertCircle, Calendar, Eye, Clock, CheckCircle2, X, Zap, FileText, User, Building2, DollarSign, Wrench, Sparkles, ArrowRight, Tag, ChevronDown, ChevronUp } from 'lucide-react';
 import { LeadDetails } from './LeadDetails';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -684,10 +684,6 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
     setSelectedJob(job);
   }
 
-  function handleEditJob(job: Job) {
-    setSelectedJob(job);
-  }
-
   async function handleJobUpdate() {
     // Store current page before reloading
     preservePageRef.current = currentPage;
@@ -822,7 +818,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
           {/* Left Sidebar - Filters */}
           <div className="w-64 flex-shrink-0 bg-white rounded-2xl border border-gray-200 p-4 max-h-[calc(100vh-140px)] overflow-y-auto sticky top-[115px]">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-bold text-ars-heading flex items-center gap-2">
+              <h3 className="text-base font-semibold text-ars-heading flex items-center gap-2">
                 <Filter className="w-4 h-4 text-ars-primary" />
                 Filters
               </h3>
@@ -830,7 +826,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
 
             {/* Priority Checkboxes */}
             <div className="mb-4">
-              <label className="block text-xs font-semibold text-ars-heading mb-2">Show Jobs</label>
+              <label className="block text-[11px] font-medium text-gray-600 mb-2">Show Jobs</label>
               <div className="space-y-1.5">
                 <label className="flex items-center gap-2 cursor-pointer group">
                   <input
@@ -868,6 +864,27 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                     <span className="text-xs text-ars-body group-hover:text-ars-heading transition-colors">Open</span>
                   </div>
                 </label>
+                {isSuperAdmin && (
+                  <label className="flex items-center gap-2 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={showHiddenJobs}
+                      onChange={(e) => {
+                        const newValue = e.target.checked;
+                        setShowHiddenJobs(newValue);
+                        // Ensure we're in "All Jobs" mode when toggling hidden jobs
+                        if (!priorityFilter.all) {
+                          setPriorityFilter({ ...priorityFilter, all: true, overdue: false, approaching: false, open: false });
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                    />
+                    <div className="flex items-center gap-1.5 flex-1">
+                      <Eye className="w-3.5 h-3.5 text-orange-600" />
+                      <span className="text-xs text-ars-body group-hover:text-ars-heading transition-colors">Show Hidden</span>
+                    </div>
+                  </label>
+                )}
                 <label className="flex items-center gap-2 cursor-pointer group pt-1.5 border-t border-gray-200">
                   <input
                     type="checkbox"
@@ -883,41 +900,9 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
               </div>
             </div>
 
-            {/* Show Hidden Jobs Toggle (Super Admin Only) */}
-            {isSuperAdmin && (
-              <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-xl">
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={showHiddenJobs}
-                    onChange={(e) => {
-                      const newValue = e.target.checked;
-                      setShowHiddenJobs(newValue);
-                      // Ensure we're in "All Jobs" mode when toggling hidden jobs
-                      if (!priorityFilter.all) {
-                        setPriorityFilter({ ...priorityFilter, all: true, overdue: false, approaching: false, open: false });
-                      }
-                    }}
-                    className="w-5 h-5 rounded border-gray-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
-                  />
-                  <div className="flex items-center gap-2 flex-1">
-                    <Eye className="w-4 h-4 text-orange-600" />
-                    <span className="text-sm font-medium text-ars-heading group-hover:text-orange-700 transition-colors">
-                      Show Hidden Jobs
-                    </span>
-                  </div>
-                </label>
-                <p className="text-xs text-ars-body mt-2 ml-8">
-                  {showHiddenJobs 
-                    ? 'Showing only jobs with hidden statuses. Toggle off to return to normal view.' 
-                    : 'Toggle to view jobs with statuses marked as "Hidden" in System Admin.'}
-                </p>
-              </div>
-            )}
-
             {/* Search */}
             <div className="mb-4">
-              <label className="block text-xs font-semibold text-ars-heading mb-1.5">Search</label>
+              <label className="block text-[11px] font-medium text-gray-600 mb-1">Search</label>
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
@@ -925,7 +910,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                   placeholder="Job #, customer, admin..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 text-[13px] border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                  className="w-full pl-8 pr-3 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
                 />
               </div>
             </div>
@@ -933,7 +918,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
             {/* Status Filter */}
             <div className="mb-4">
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-semibold text-ars-heading">Status</label>
+                <label className="block text-[11px] font-medium text-gray-600">Status</label>
                 {statusFilter.length > 0 && (
                   <button
                     onClick={() => setStatusFilter([])}
@@ -1004,11 +989,17 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
 
             {/* Branch Filter */}
             <div className="mb-4">
-              <label className="block text-xs font-semibold text-ars-heading mb-1.5">Branch</label>
+              <label className="block text-[11px] font-medium text-gray-600 mb-1">Branch</label>
               <select
                 value={branchFilter}
                 onChange={(e) => setBranchFilter(e.target.value)}
-                className="w-full px-3 py-1.5 text-[13px] border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                className="w-full pl-2 pr-10 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white appearance-none"
+                style={{ 
+                  backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27currentColor%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')",
+                  backgroundPosition: 'right 0.75rem center',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundSize: '1rem 1rem'
+                }}
               >
                 <option value="all">All Branches</option>
                 {branches && branches.length > 0 ? (
@@ -1025,11 +1016,17 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
 
             {/* Admin Filter */}
             <div className="mb-4">
-              <label className="block text-xs font-semibold text-ars-heading mb-1.5">Admin (ADM)</label>
+              <label className="block text-[11px] font-medium text-gray-600 mb-1">Admin</label>
               <select
                 value={admFilter}
                 onChange={(e) => setAdmFilter(e.target.value)}
-                className="w-full px-3 py-1.5 text-[13px] border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                className="w-full pl-2 pr-10 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white appearance-none"
+                style={{ 
+                  backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27currentColor%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')",
+                  backgroundPosition: 'right 0.75rem center',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundSize: '1rem 1rem'
+                }}
               >
                 <option value="all">All Admins</option>
                 {adminCodeOptions.length > 0 ? (
@@ -1046,12 +1043,18 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
 
             {/* Rep Code Filter */}
             <div className="mb-4">
-              <label className="block text-xs font-semibold text-ars-heading mb-1.5">Rep Code</label>
+              <label className="block text-[11px] font-medium text-gray-600 mb-1">Rep</label>
               <select
                 value={repCodeFilter}
                 onChange={(e) => setRepCodeFilter(e.target.value)}
                 disabled={user?.role?.name === 'rep' && !user?.isSuperAdmin}
-                className="w-full px-3 py-1.5 text-[13px] border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
+                className="w-full pl-2 pr-10 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500 appearance-none"
+                style={{ 
+                  backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27currentColor%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')",
+                  backgroundPosition: 'right 0.75rem center',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundSize: '1rem 1rem'
+                }}
               >
                 <option value="all">All Rep Codes</option>
                 {repCodes && repCodes.length > 0 ? (
@@ -1070,12 +1073,18 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
 
             {/* Technician Filter */}
             <div className="mb-4">
-              <label className="block text-xs font-semibold text-ars-heading mb-1.5">Technician</label>
+              <label className="block text-[11px] font-medium text-gray-600 mb-1">Technician</label>
               <select
                 value={technicianFilter}
                 onChange={(e) => setTechnicianFilter(e.target.value)}
                 disabled={user?.role?.name === 'technician' && !user?.isSuperAdmin}
-                className="w-full px-3 py-1.5 text-[13px] border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
+                className="w-full pl-2 pr-10 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500 appearance-none"
+                style={{ 
+                  backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27currentColor%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')",
+                  backgroundPosition: 'right 0.75rem center',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundSize: '1rem 1rem'
+                }}
               >
                 <option value="all">All Technicians</option>
                 {technicians && technicians.length > 0 ? (
@@ -1092,7 +1101,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
 
             {/* Machines Visibility Toggle */}
             <div className="mb-4 pt-3 border-t border-gray-200">
-              <label className="block text-xs font-semibold text-ars-heading mb-2">Display Options</label>
+              <label className="block text-[11px] font-medium text-gray-600 mb-2">Display Options</label>
               <button
                 onClick={() => {
                   const newValue = !showMachinesGlobal;
@@ -1103,17 +1112,18 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                     setExpandedMachines(new Set());
                   }
                 }}
-                className="w-full flex items-center justify-between px-4 py-2.5 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors bg-white"
+                className="w-full flex items-center justify-between pl-2 pr-10 py-1.5 border border-gray-300 rounded-[8px] hover:bg-gray-50 transition-colors bg-white appearance-none"
+                style={{ 
+                  backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27currentColor%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')",
+                  backgroundPosition: 'right 0.75rem center',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundSize: '1rem 1rem'
+                }}
               >
                 <div className="flex items-center gap-2">
                   <Wrench className="w-4 h-4 text-ars-primary" />
-                  <span className="text-sm text-ars-body">Show Machines</span>
+                  <span className="text-[13px] text-gray-900">Show Machines</span>
                 </div>
-                {showMachinesGlobal ? (
-                  <ChevronDown className="w-4 h-4 text-ars-primary" />
-                ) : (
-                  <ChevronRight className="w-4 h-4 text-gray-400" />
-                )}
               </button>
             </div>
 
@@ -1122,16 +1132,6 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
               <p className="text-sm text-ars-body">
                 <span className="font-semibold text-ars-heading">{filteredJobs.length}</span> jobs found
               </p>
-              {priorityFilter.all && (
-                <p className="text-xs text-ars-body bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-                  <span className="font-medium text-blue-900">Showing all jobs</span> (no date restrictions)
-                </p>
-              )}
-              {!priorityFilter.all && (
-                <p className="text-xs text-ars-body bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
-                  <span className="font-medium text-orange-900">Showing priority jobs only</span> (overdue, approaching, or open - no date restrictions)
-                </p>
-              )}
             </div>
           </div>
 
@@ -1149,7 +1149,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                 <p className="text-ars-body mb-6">Try adjusting your filters or search term</p>
                 <button
                   onClick={onCreateNew}
-                  className="inline-flex items-center gap-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-6 py-3 rounded-xl font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                  className="inline-flex items-center gap-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-6 py-3 rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
                 >
                   <Sparkles className="w-5 h-5" />
                   Create New Job
@@ -1179,7 +1179,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                     <button
                       onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                       disabled={currentPage === 1}
-                      className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-ars-body"
+                      className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
                     >
                       Previous
                     </button>
@@ -1189,7 +1189,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                     <button
                       onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredJobs.length / itemsPerPage), prev + 1))}
                       disabled={currentPage >= Math.ceil(filteredJobs.length / itemsPerPage)}
-                      className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-ars-body"
+                      className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
                     >
                       Next
                     </button>
@@ -1233,7 +1233,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                         {/* Job Number & Status */}
                         <div className="flex items-start justify-between mb-3">
                           <div>
-                            <h3 className="text-lg font-bold text-ars-heading group-hover:text-ars-primary transition-colors mb-1">
+                            <h3 className="text-lg font-bold text-ars-heading mb-1">
                               {job.jobNumber}
                             </h3>
                             <span className={`inline-block px-3 py-1 rounded-lg text-xs font-semibold ${getStatusTextColor(job.status?.name)} bg-white/60 border border-current/20`}>
@@ -1244,7 +1244,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
 
                         {/* Customer */}
                         <div className="mb-3">
-                          <div className="flex items-center gap-2 text-sm text-ars-body mb-1">
+                          <div className="flex items-center gap-2 text-xs text-ars-body mb-1">
                             <User className="w-4 h-4" />
                             <span className="font-medium text-ars-heading">
                               {job.customer?.name || job.cashCustomer || 'No customer'}
@@ -1257,8 +1257,8 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
 
                         {/* Service Description */}
                         {serviceDescription && (
-                          <div className="mb-3 flex items-start gap-2 text-sm text-ars-body">
-                            <FileText className="w-4 h-4 text-ars-primary mt-0.5 flex-shrink-0" />
+                          <div className="mb-3 flex items-start gap-2 text-xs text-ars-body">
+                            <FileText className="w-4 h-4 flex-shrink-0" />
                             <p className="text-ars-heading font-medium leading-snug">{serviceDescription}</p>
                           </div>
                         )}
@@ -1332,7 +1332,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                                 }
                                 setExpandedMachines(newExpanded);
                               }}
-                              className="w-full flex items-center justify-between mb-2 hover:bg-gray-50 -mx-2 px-2 py-1 rounded transition-colors"
+                              className="w-full flex items-center justify-between mb-2 hover:bg-gray-50 pl-2 pr-4 py-1.5 rounded transition-colors"
                             >
                               <div className="flex items-center gap-2 text-xs text-ars-body">
                                 <Wrench className="w-3 h-3 flex-shrink-0" />
@@ -1352,9 +1352,9 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                                 </span>
                               </div>
                               {showMachinesGlobal || expandedMachines.has(job._id) ? (
-                                <ChevronUp className="w-3 h-3 text-ars-body" />
+                                <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" />
                               ) : (
-                                <ChevronDown className="w-3 h-3 text-ars-body" />
+                                <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
                               )}
                             </button>
                             {(showMachinesGlobal || expandedMachines.has(job._id)) && (
@@ -1398,28 +1398,16 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                         )}
 
                         {/* Actions */}
-                        <div className="flex items-center gap-2 pt-3 border-t border-gray-200">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditJob(job);
-                            }}
-                            className="flex-1 px-3 py-2 bg-white/80 hover:bg-white rounded-lg font-bold text-[14px] text-ars-heading hover:text-ars-primary transition-all flex items-center justify-center gap-1"
-                          >
-                            <Edit2 className="w-3 h-3" />
-                            EDIT
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewJob(job);
-                            }}
-                            className="flex-1 px-3 py-2 bg-white/80 hover:bg-white rounded-lg font-bold text-[14px] text-ars-heading hover:text-ars-primary transition-all flex items-center justify-center gap-1"
-                          >
-                            <Eye className="w-3 h-3" />
-                            VIEW
-                          </button>
-                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewJob(job);
+                          }}
+                          className="w-full px-3 py-2 bg-white/80 hover:bg-white rounded-lg font-bold text-[14px] text-ars-heading transition-all flex items-center justify-center gap-1 mt-3"
+                        >
+                          <Eye className="w-3 h-3" />
+                          VIEW
+                        </button>
                       </div>
                     </div>
                   );
@@ -1432,18 +1420,18 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                     <button
                       onClick={() => setCurrentPage(1)}
                       disabled={currentPage === 1}
-                      className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-ars-body"
+                      className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
                     >
                       First
                     </button>
                     <button
                       onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                       disabled={currentPage === 1}
-                      className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-ars-body"
+                      className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
                     >
                       Previous
                     </button>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       {Array.from({ length: Math.min(5, Math.ceil(filteredJobs.length / itemsPerPage)) }, (_, i) => {
                         const totalPages = Math.ceil(filteredJobs.length / itemsPerPage);
                         let pageNum;
@@ -1460,10 +1448,10 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                           <button
                             key={pageNum}
                             onClick={() => setCurrentPage(pageNum)}
-                            className={`px-4 py-2 rounded-lg transition-all ${
+                            className={`px-4 py-2 border rounded-[8px] font-bold text-[14px] transition-colors ${
                               currentPage === pageNum
-                                ? 'bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white shadow-lg'
-                                : 'border border-gray-300 hover:bg-gray-50 text-ars-body'
+                                ? 'bg-ars-primary border-ars-primary text-white'
+                                : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
                             }`}
                           >
                             {pageNum}
@@ -1474,14 +1462,14 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                     <button
                       onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredJobs.length / itemsPerPage), prev + 1))}
                       disabled={currentPage >= Math.ceil(filteredJobs.length / itemsPerPage)}
-                      className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-ars-body"
+                      className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
                     >
                       Next
                     </button>
                     <button
                       onClick={() => setCurrentPage(Math.ceil(filteredJobs.length / itemsPerPage))}
                       disabled={currentPage >= Math.ceil(filteredJobs.length / itemsPerPage)}
-                      className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-ars-body"
+                      className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
                     >
                       Last
                     </button>
@@ -1496,9 +1484,9 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       {/* Floating Action Button */}
       <button
         onClick={onCreateNew}
-        className="fixed bottom-8 right-8 w-14 h-14 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-full shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-110 flex items-center justify-center z-40 group"
+        className="fixed bottom-8 right-8 w-14 h-14 bg-ars-primary text-white rounded-full shadow-2xl flex items-center justify-center z-40"
       >
-        <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
+        <Plus className="w-6 h-6" />
       </button>
 
       {/* Job Details Modal */}

@@ -122,27 +122,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
     loadAdminCodes();
   }, []);
 
-  // Auto-set admin filter for admin users
-  useEffect(() => {
-    if (user?.role?.name === 'admin' && !user?.isSuperAdmin && user?.adminCode?.code) {
-      // Wait for admin codes to load
-      if (adminCodeOptions.length > 0) {
-        const userAdminCode = user.adminCode.code;
-        // If filter is 'all', set it to user's admin code (if it exists in options)
-        if (admFilter === 'all' && adminCodeOptions.includes(userAdminCode)) {
-          setAdmFilter(userAdminCode);
-        }
-        // If current filter value doesn't exist in options, reset to user's admin code or 'all'
-        else if (admFilter !== 'all' && !adminCodeOptions.includes(admFilter)) {
-          if (adminCodeOptions.includes(userAdminCode)) {
-            setAdmFilter(userAdminCode);
-          } else {
-            setAdmFilter('all');
-          }
-        }
-      }
-    }
-  }, [user, adminCodeOptions, admFilter]);
+  // Admin filter auto-selection removed - admins now see "All Admins" by default
 
   // Auto-set rep code filter for rep users
   useEffect(() => {

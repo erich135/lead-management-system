@@ -1,0 +1,24 @@
+{
+  "name": "lead-management-e2e-tests",
+  "version": "1.0.0",
+  "description": "End-to-end tests for lead management system",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "test:report": "playwright show-report ../test-results/html-report",
+    "test:auth": "playwright test auth.spec.ts",
+    "test:dashboard": "playwright test dashboard.spec.ts",
+    "test:jobs": "playwright test jobs-list.spec.ts job-form.spec.ts",
+    "test:reports": "playwright test reports.spec.ts",
+    "test:chat": "playwright test chat.spec.ts",
+    "test:admin": "playwright test admin-settings.spec.ts",
+    "install-browsers": "playwright install"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@types/node": "^20.0.0",
+    "dotenv": "^16.0.0"
+  }
+}

@@ -8,7 +8,16 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "test": "cd e2e && npm test",
+    "test:install": "cd e2e && npm install && npx playwright install",
+    "test:e2e": "cd e2e && npx playwright test",
+    "test:e2e:headed": "cd e2e && npx playwright test --headed",
+    "test:e2e:ui": "cd e2e && npx playwright test --ui",
+    "test:quick": "node e2e/run-tests.js quick",
+    "test:full": "node e2e/run-tests.js full",
+    "test:overnight": "node e2e/run-tests.js overnight",
+    "test:report": "cd e2e && npx playwright show-report ../test-results/html-report"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

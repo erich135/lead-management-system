@@ -52,6 +52,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
     description: string,
     valueExVat: string,
     adm: string,
+    assistingAdm: string,
     repCode: string,
     machines: string[],
     registerDate: string,
@@ -77,6 +78,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
       description: '',
       valueExVat: '',
       adm: '',
+      assistingAdm: '',
       repCode: '',
       machines: [],
       registerDate: '',
@@ -370,6 +372,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
         status: formData.status,
         valueExVat: formData.valueExVat ? parseFloat(formData.valueExVat) : undefined,
         adm: formData.adm || undefined,
+        assistingAdm: formData.assistingAdm || undefined,
         repCode: formData.repCode || undefined,
         machines: Array.isArray(formData.machines) && formData.machines.length > 0 ? formData.machines : undefined,
         registerDate: formData.registerDate || undefined,
@@ -607,6 +610,51 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
 
             <div>
               <label className="block text-sm font-semibold text-ars-body mb-2">
+                Rep Code
+              </label>
+              <select
+                value={formData.repCode}
+                onChange={(e) => {
+                  const selectedRepCodeId = e.target.value;
+                  const selectedRepCode = repCodes.find(rc => rc._id === selectedRepCodeId);
+                  
+                  // Auto-populate branch and admin code if rep has them linked
+                  if (selectedRepCode) {
+                    const updates: any = { repCode: selectedRepCodeId };
+                    
+                    if (selectedRepCode.adminCode) {
+                      updates.adm = selectedRepCode.adminCode;
+                    }
+                    
+                    if (selectedRepCode.branch) {
+                      const branchId = typeof selectedRepCode.branch === 'object' 
+                        ? selectedRepCode.branch._id 
+                        : selectedRepCode.branch;
+                      updates.branch = branchId;
+                    }
+                    
+                    setFormData({ ...formData, ...updates });
+                  } else {
+                    setFormData({ ...formData, repCode: selectedRepCodeId });
+                  }
+                }}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+              >
+                <option value="">Select Rep Code</option>
+                {repCodes && repCodes.length > 0 ? (
+                  repCodes.map((repCode) => (
+                    <option key={repCode._id} value={repCode._id}>
+                      {repCode.code}
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled>Loading rep codes...</option>
+                )}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-ars-body mb-2">
                 Branch *
               </label>
               <select
@@ -655,6 +703,30 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
               <select
                 value={formData.adm}
                 onChange={(e) => setFormData({ ...formData, adm: e.target.value })}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+              >
+                <option value="">Select Admin</option>
+                {adminCodes && adminCodes.length > 0 ? (
+                  adminCodes
+                    .filter(ac => ac.isActive)
+                    .map((adminCode) => (
+                      <option key={adminCode._id} value={adminCode.code}>
+                        {adminCode.code} {adminCode.description ? `- ${adminCode.description}` : ''}
+                      </option>
+                    ))
+                ) : (
+                  <option value="" disabled>Loading admin codes...</option>
+                )}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-ars-body mb-2">
+                Assisting Admin (ADM)
+              </label>
+              <select
+                value={formData.assistingAdm}
+                onChange={(e) => setFormData({ ...formData, assistingAdm: e.target.value })}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
               >
                 <option value="">Select Admin</option>
@@ -734,28 +806,6 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                 placeholder="yyyy/mm/dd"
               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-ars-body mb-2">
-                Rep Code
-              </label>
-              <select
-                value={formData.repCode}
-                onChange={(e) => setFormData({ ...formData, repCode: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
-              >
-                <option value="">Select Rep Code</option>
-                {repCodes && repCodes.length > 0 ? (
-                  repCodes.map((repCode) => (
-                    <option key={repCode._id} value={repCode._id}>
-                      {repCode.code}
-                    </option>
-                  ))
-                ) : (
-                  <option value="" disabled>Loading rep codes...</option>
-                )}
-              </select>
             </div>
 
             {/* Machines Selection - Show if customer or cash customer is selected */}

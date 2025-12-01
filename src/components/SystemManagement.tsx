@@ -108,7 +108,7 @@ export function SystemManagement() {
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [editingRepCode, setEditingRepCode] = useState<RepCode | null>(null);
   const [showRepCodeForm, setShowRepCodeForm] = useState(false);
-  const [newRepCode, setNewRepCode] = useState({ code: '', description: '' });
+  const [newRepCode, setNewRepCode] = useState({ code: '', description: '', adminCode: '', branch: '' });
   const [editingAdminCode, setEditingAdminCode] = useState<AdminCode | null>(null);
   const [showAdminCodeForm, setShowAdminCodeForm] = useState(false);
   const [newAdminCode, setNewAdminCode] = useState({ code: '', description: '', userId: '' });
@@ -508,9 +508,11 @@ export function SystemManagement() {
       const response = await createRepCode({
         code: newRepCode.code.trim(),
         description: newRepCode.description.trim() || undefined,
+        adminCode: newRepCode.adminCode?.trim() || undefined,
+        branch: newRepCode.branch?.trim() || undefined,
       });
       setRepCodes([...repCodes, response.repCode]);
-      setNewRepCode({ code: '', description: '' });
+      setNewRepCode({ code: '', description: '', adminCode: '', branch: '' });
       setShowRepCodeForm(false);
       alert('Rep code created successfully');
     } catch (err: any) {
@@ -534,6 +536,8 @@ export function SystemManagement() {
         code: editingRepCode.code,
         description: editingRepCode.description,
         isActive: editingRepCode.isActive,
+        adminCode: editingRepCode.adminCode || undefined,
+        branch: editingRepCode.branch?._id || editingRepCode.branch || undefined,
       });
       setRepCodes(repCodes.map(rc => rc._id === editingRepCode._id ? response.repCode : rc));
       setEditingRepCode(null);
@@ -1810,7 +1814,7 @@ export function SystemManagement() {
                 <button
                   onClick={() => {
                     setEditingRepCode(null);
-                    setNewRepCode({ code: '', description: '' });
+                    setNewRepCode({ code: '', description: '', adminCode: '' });
                     setShowRepCodeForm(true);
                   }}
                   className="px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-xl font-bold text-[14px] hover:shadow-lg transition-all flex items-center gap-2"
@@ -1832,7 +1836,7 @@ export function SystemManagement() {
                     <button
                       onClick={() => {
                         setEditingRepCode(null);
-                        setNewRepCode({ code: '', description: '' });
+                        setNewRepCode({ code: '', description: '', adminCode: '', branch: '' });
                         setShowRepCodeForm(false);
                       }}
                       className="p-1 hover:bg-gray-200 rounded transition-colors"
@@ -1873,6 +1877,67 @@ export function SystemManagement() {
                         placeholder="Optional description"
                       />
                     </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold text-ars-body mb-2">
+                        Linked Admin Code
+                        {editingRepCode?.adminCode && (
+                          <span className="ml-2 text-xs text-orange-600 font-normal">
+                            (To change admin, unlink first then link to new admin)
+                          </span>
+                        )}
+                      </label>
+                      <select
+                        value={editingRepCode?.adminCode || newRepCode.adminCode || ''}
+                        onChange={(e) => {
+                          if (editingRepCode) {
+                            setEditingRepCode({ ...editingRepCode, adminCode: e.target.value });
+                          } else {
+                            setNewRepCode({ ...newRepCode, adminCode: e.target.value });
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      >
+                        <option value="">No admin linked (can be linked later)</option>
+                        {adminCodes.filter(ac => ac.isActive).map((adminCode) => (
+                          <option key={adminCode._id} value={adminCode.code}>
+                            {adminCode.code} {adminCode.description ? `- ${adminCode.description}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Multiple reps can be linked to the same admin. Once linked, rep cannot be changed to another admin without unlinking first.
+                      </p>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold text-ars-body mb-2">
+                        Linked Branch
+                      </label>
+                      <select
+                        value={editingRepCode?.branch?._id || editingRepCode?.branch || newRepCode.branch || ''}
+                        onChange={(e) => {
+                          if (editingRepCode) {
+                            const selectedBranch = branches.find(b => b._id === e.target.value);
+                            setEditingRepCode({ 
+                              ...editingRepCode, 
+                              branch: selectedBranch || e.target.value 
+                            });
+                          } else {
+                            setNewRepCode({ ...newRepCode, branch: e.target.value });
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      >
+                        <option value="">No branch linked (can be linked later)</option>
+                        {branches.filter(b => b.isActive).map((branch) => (
+                          <option key={branch._id} value={branch._id}>
+                            {branch.name}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Link this rep to a specific branch. The branch will auto-populate when creating jobs.
+                      </p>
+                    </div>
                   </div>
                   {editingRepCode && (
                     <div className="mt-4 flex items-center gap-2">
@@ -1900,7 +1965,7 @@ export function SystemManagement() {
                     <button
                       onClick={() => {
                         setEditingRepCode(null);
-                        setNewRepCode({ code: '', description: '' });
+                        setNewRepCode({ code: '', description: '', adminCode: '', branch: '' });
                         setShowRepCodeForm(false);
                       }}
                       className="px-4 py-2.5 border border-gray-300 rounded-xl font-bold text-[14px] hover:bg-gray-50 transition-colors"
@@ -1919,10 +1984,20 @@ export function SystemManagement() {
                     className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200"
                   >
                     <div className="flex-1">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-wrap">
                         <span className="font-semibold text-ars-heading">{repCode.code}</span>
                         {repCode.description && (
                           <span className="text-sm text-ars-body">- {repCode.description}</span>
+                        )}
+                        {repCode.adminCode && (
+                          <span className="px-2 py-1 text-xs font-medium rounded-lg bg-purple-100 text-purple-700">
+                            Admin: {repCode.adminCode}
+                          </span>
+                        )}
+                        {repCode.branch && (
+                          <span className="px-2 py-1 text-xs font-medium rounded-lg bg-blue-100 text-blue-700">
+                            Branch: {typeof repCode.branch === 'object' ? repCode.branch.name : repCode.branch}
+                          </span>
                         )}
                         <span className={`px-2 py-1 text-xs font-medium rounded-lg ${
                           repCode.isActive

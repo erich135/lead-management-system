@@ -233,7 +233,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     if (!job?._id) return;
     setFollowUpSubmitting(true);
     setActiveFollowUpLevel(level);
-    setError(null);
+    setError('');
 
     try {
       const payloadKey = `followUp${level}Date` as const;
@@ -304,7 +304,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     }
 
     setCreatingMachine(true);
-    setError(null);
+    setError('');
     try {
       if (editingMachine) {
         // Update existing machine
@@ -371,7 +371,23 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
       });
       setShowNewMachineForm(false);
     } catch (err: any) {
-      setError(err.message || 'Failed to create machine');
+      console.error('Machine creation error:', err);
+      console.error('Error message:', err.message);
+      const errorMsg = err.message || 'Failed to create machine';
+      
+      // Check if it's a duplicate machine error
+      if (errorMsg.toLowerCase().includes('duplicate') || errorMsg.toLowerCase().includes('already exists')) {
+        const serialNum = newMachine.serialNumber.trim();
+        setError(`❌ Duplicate Machine\n\nA machine with serial number "${serialNum}" already exists in the system.\n\nPlease check the serial number and try again, or select the existing machine from the list above.`);
+      }
+      // Check for validation errors
+      else if (errorMsg.toLowerCase().includes('required') || errorMsg.toLowerCase().includes('invalid')) {
+        setError(`❌ Invalid Machine Data\n\n${errorMsg}\n\nPlease check all machine fields and try again.`);
+      }
+      // Generic error
+      else {
+        setError(`❌ Error Creating Machine\n\n${errorMsg}`);
+      }
     } finally {
       setCreatingMachine(false);
     }
@@ -383,7 +399,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
    */
   async function handleSave() {
     setLoading(true);
-    setError(null);
+    setError('');
     try {
       const payload: any = { ...job };
       if (payload.techBooked && typeof payload.techBooked === 'object') {
@@ -462,7 +478,22 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
       setIsEditing(false);
       onUpdate();
     } catch (err: any) {
-      setError(err.message || 'Failed to update job');
+      // Parse error message for better user feedback
+      const errorMsg = err.message || 'Failed to update job';
+      
+      // Check if it's a duplicate job number error from backend
+      if (errorMsg.includes('duplicate') && errorMsg.includes('jobNumber')) {
+        const jobNum = job.jobNumber?.trim().toUpperCase() || '';
+        setError(`❌ Duplicate Job Number\n\nJob number "${jobNum}" already exists in the system.\n\nPlease enter a different job number.`);
+      } 
+      // Check for other validation errors
+      else if (errorMsg.toLowerCase().includes('required')) {
+        setError(`❌ Missing Required Information\n\n${errorMsg}\n\nPlease fill in all required fields and try again.`);
+      }
+      // Generic error
+      else {
+        setError(`❌ Error Updating Job\n\n${errorMsg}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -473,7 +504,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
    */
   async function handleDelete() {
     setDeleting(true);
-    setError(null);
+    setError('');
     try {
       await deleteJob(job._id);
       setShowDeleteConfirm(false);
@@ -502,8 +533,56 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   }, [isAdmin, isSuperAdmin, canEdit, isEditing]);
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <>
+      {error && (
+        <div className="fixed inset-0 flex items-center justify-center p-4 z-[100] pointer-events-none">
+          <div className="bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-2xl shadow-2xl max-w-md w-full p-6 pointer-events-auto relative">
+            <button
+              onClick={() => setError('')}
+              className="absolute top-4 right-4 text-white hover:bg-white/20 rounded-lg p-1 transition-colors"
+              type="button"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="text-center pr-8 whitespace-pre-line">
+              {error.split('\n').map((line, index) => {
+                if (line.startsWith('•')) {
+                  return (
+                    <div key={index} className="text-sm mb-1">
+                      {line.replace('• ', '')}
+                    </div>
+                  );
+                }
+                if (line.includes('❌') || /^[A-Z\s]+$/.test(line.trim())) {
+                  return (
+                    <h3 key={index} className="text-lg font-semibold mb-3">
+                      {line}
+                    </h3>
+                  );
+                }
+                if (line.trim()) {
+                  return (
+                    <p key={index} className="text-sm mb-2">
+                      {line}
+                    </p>
+                  );
+                }
+                return <div key={index} className="h-2" />;
+              })}
+            </div>
+            <button
+              onClick={() => setError('')}
+              className="w-full mt-6 px-4 py-2.5 bg-white text-[#0969a9] rounded-lg font-medium hover:bg-gray-100 transition-all"
+              type="button"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+        <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white p-6 rounded-t-2xl z-10">
           <div className="flex items-center justify-between">
             <div>
@@ -581,12 +660,6 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
           </div>
         </div>
 
-        {error && (
-          <div className="mx-6 mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-sm text-red-800">{error}</p>
-          </div>
-        )}
-
         {followUpReminder?.followUpLevel && (
           <div className="mx-6 mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
@@ -622,7 +695,10 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       value={job.status?._id || ''}
                       onChange={(e) => {
                         const status = statuses.find(s => s._id === e.target.value);
-                        setJob({ ...job, status: status ? { _id: status._id, name: status.name, sortOrder: status.sortOrder } : undefined });
+                        setJob({
+                          ...job,
+                          status: status ? { _id: status._id, name: status.name, sortOrder: status.sortOrder } : undefined,
+                        });
                       }}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                     >
@@ -1475,6 +1551,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
           </div>
         </div>
       </div>
+    </div>
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
@@ -1532,6 +1609,6 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

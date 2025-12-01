@@ -247,7 +247,9 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
         machineData.cashCustomer = formData.cashCustomer.trim();
       }
       
+      console.log('Creating machine with data:', machineData);
       const response = await createMachine(machineData);
+      console.log('Machine created successfully:', response);
 
       // Add new machine to list and add it to machines array
       setMachines([...machines, response.machine]);
@@ -263,7 +265,23 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
       });
       setShowNewMachineForm(false);
     } catch (err: any) {
-      setError(err.message || 'Failed to create machine');
+      console.error('Machine creation error:', err);
+      console.error('Error message:', err.message);
+      const errorMsg = err.message || 'Failed to create machine';
+      
+      // Check if it's a duplicate machine error
+      if (errorMsg.toLowerCase().includes('duplicate') || errorMsg.toLowerCase().includes('already exists')) {
+        const serialNum = newMachine.serialNumber.trim();
+        setError(`❌ Duplicate Machine\n\nA machine with serial number "${serialNum}" already exists in the system.\n\nPlease check the serial number and try again, or select the existing machine from the list above.`);
+      }
+      // Check for validation errors
+      else if (errorMsg.toLowerCase().includes('required') || errorMsg.toLowerCase().includes('invalid')) {
+        setError(`❌ Invalid Machine Data\n\n${errorMsg}\n\nPlease check all machine fields and try again.`);
+      }
+      // Generic error
+      else {
+        setError(`❌ Error Creating Machine\n\n${errorMsg}`);
+      }
     } finally {
       setCreatingMachine(false);
     }
@@ -416,11 +434,21 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
         onClose();
       }
     } catch (err: any) {
+      // Parse error message for better user feedback
+      const errorMsg = err.message || 'Failed to create job';
+      
       // Check if it's a duplicate job number error from backend
-      if (err.message && err.message.includes('duplicate') && err.message.includes('jobNumber')) {
-        setError(`Job number "${formData.jobNumber?.trim().toUpperCase() || ''}" already exists. Please use a different job number.`);
-      } else {
-        setError(err.message || 'Failed to create job');
+      if (errorMsg.includes('duplicate') && errorMsg.includes('jobNumber')) {
+        const jobNum = formData.jobNumber?.trim().toUpperCase() || '';
+        setError(`❌ Duplicate Job Number\n\nJob number "${jobNum}" already exists in the system.\n\nPlease enter a different job number or leave it blank for auto-generation.`);
+      } 
+      // Check for other validation errors
+      else if (errorMsg.toLowerCase().includes('required')) {
+        setError(`❌ Missing Required Information\n\n${errorMsg}\n\nPlease fill in all required fields and try again.`);
+      }
+      // Generic error
+      else {
+        setError(`❌ Error Creating Job\n\n${errorMsg}`);
       }
     } finally {
       setLoading(false);
@@ -431,22 +459,43 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
     <>
       {error && (
         <div className="fixed inset-0 flex items-center justify-center p-4 z-[100] pointer-events-none">
-          <div className="bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-2xl shadow-2xl max-w-sm w-full p-6 pointer-events-auto relative">
+          <div className="bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-2xl shadow-2xl max-w-md w-full p-6 pointer-events-auto relative">
             <button
               onClick={() => setError('')}
               className="absolute top-4 right-4 text-white hover:bg-white/20 rounded-lg p-1 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
-            <h3 className="text-lg font-semibold text-center mb-4 pr-8">
-              Please make sure the following fields are completed before saving.
-            </h3>
-            <div className="text-center space-y-1">
-              {error.split('\n').filter(line => line.startsWith('•')).map((field, index) => (
-                <div key={index} className="text-sm">
-                  {field.replace('• ', '')}
-                </div>
-              ))}
+            {/* Display error message with proper formatting */}
+            <div className="text-center pr-8 whitespace-pre-line">
+              {error.split('\n').map((line, index) => {
+                // Check if it's a bullet point line
+                if (line.startsWith('•')) {
+                  return (
+                    <div key={index} className="text-sm mb-1">
+                      {line.replace('• ', '')}
+                    </div>
+                  );
+                }
+                // Check if it's a title line (contains emoji or all caps)
+                else if (line.includes('❌') || /^[A-Z\s]+$/.test(line.trim())) {
+                  return (
+                    <h3 key={index} className="text-lg font-semibold mb-3">
+                      {line}
+                    </h3>
+                  );
+                }
+                // Regular text
+                else if (line.trim()) {
+                  return (
+                    <p key={index} className="text-sm mb-2">
+                      {line}
+                    </p>
+                  );
+                }
+                // Empty line for spacing
+                return <div key={index} className="h-2" />;
+              })}
             </div>
             <button
               onClick={() => setError('')}

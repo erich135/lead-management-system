@@ -22,6 +22,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Development Branches
 
+### Branch: `chatbot` - 2025-12-01
+
+#### Added
+- **Rep Code to Branch & Admin Linking**: Implemented linking system for representative codes
+  - Rep codes can now be linked to both admin codes and branches
+  - Multiple rep codes can be linked to the same admin (one-to-many relationship)
+  - Each rep code can link to one branch and one admin code
+  - Added branch field to RepCode model with ObjectId reference
+  - Updated SystemManagement UI with branch dropdown for rep code management
+  - Branch displayed as blue badge alongside admin code (purple badge) in rep code list
+  - Backend validation ensures linked admin codes and branches exist and are active
+
+- **Auto-Population in Job Form**: Streamlined job creation workflow
+  - When selecting a rep code, both branch and admin fields automatically populate
+  - Swapped field positions: Rep Code now appears before Branch field for better UX
+  - Auto-population logic handles nested branch objects and string admin codes
+  - Reduces manual data entry and ensures consistency
+
+#### Changed
+- **Job Form Field Order**: Reordered fields for improved workflow
+  - Rep Code field now positioned before Branch field
+  - Encourages users to select rep first, triggering auto-population
+  - Branch and Admin fields auto-fill based on rep selection
+
 ### Branch: `chatbot` - 2025-11-25
 
 #### Added

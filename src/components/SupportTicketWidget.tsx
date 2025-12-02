@@ -6,7 +6,6 @@ import { submitSupportTicket, getUsers, getMyTickets, getUnreadTicketCount, addT
 // Types
 type Severity = 'low' | 'medium' | 'high' | 'critical';
 type Category = 'bug' | 'feature_request' | 'question' | 'other';
-type TicketStatus = 'open' | 'in-progress' | 'resolved' | 'closed';
 
 // Simplified user for dropdown display
 interface DropdownUser {

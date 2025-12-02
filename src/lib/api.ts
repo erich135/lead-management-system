@@ -1609,6 +1609,198 @@ export async function searchChatMessages(query: string, userId?: string, limit =
   return response.messages;
 }
 
+// ==================== SUPPORT TICKETS ====================
+
+/**
+ * Support ticket submission data.
+ */
+export interface SupportTicketData {
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  category: 'bug' | 'feature' | 'feature_request' | 'question' | 'access' | 'other';
+  subject: string;
+  description: string;
+  reportedBy: string; // User ID of the person who reported the issue
+  context?: {
+    page?: string;
+    browser?: string;
+    jobNumber?: string;
+  };
+}
+
+/**
+ * Support ticket response from API.
+ */
+export interface SupportTicketResponse {
+  ticketId: string;
+  ticketNumber: string;
+  severity: string;
+  category: string;
+  subject: string;
+}
+
+/**
+ * Full support ticket from API.
+ */
+export interface SupportTicketFull {
+  _id: string;
+  ticketNumber: string;
+  subject: string;
+  description: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  category: 'bug' | 'feature' | 'feature_request' | 'question' | 'access' | 'other';
+  status: 'open' | 'in-progress' | 'resolved' | 'closed';
+  reportedBy: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  createdBy: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  responses: Array<{
+    _id: string;
+    message: string;
+    respondedBy: {
+      _id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    };
+    respondedByName: string;
+    isFromSupport: boolean;
+    createdAt: string;
+  }>;
+  unreadByUser: boolean;
+  unreadBySupport?: boolean;
+  context?: {
+    page?: string;
+    browser?: string;
+    jobNumber?: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Submit a support ticket.
+ * Creates a ticket in MongoDB (Super Admin only).
+ * 
+ * @param ticket - Support ticket data
+ * @returns {Promise<SupportTicketResponse>} Created ticket info
+ */
+export async function submitSupportTicket(ticket: SupportTicketData): Promise<SupportTicketResponse> {
+  const response = await apiRequest<{ data: SupportTicketResponse }>('/api/support/ticket', {
+    method: 'POST',
+    body: JSON.stringify(ticket),
+  });
+  return response.data;
+}
+
+/**
+ * Get tickets for the current user.
+ */
+export async function getMyTickets(): Promise<{ tickets: SupportTicketFull[]; count: number }> {
+  const response = await apiRequest<{ tickets: SupportTicketFull[]; count: number }>('/api/support/my-tickets');
+  return response;
+}
+
+/**
+ * Get unread ticket count for notification badge.
+ */
+export async function getUnreadTicketCount(): Promise<number> {
+  const response = await apiRequest<{ unreadCount: number }>('/api/support/unread-count');
+  return response.unreadCount;
+}
+
+/**
+ * Get a single ticket by ID.
+ */
+export async function getTicket(ticketId: string): Promise<SupportTicketFull> {
+  const response = await apiRequest<{ ticket: SupportTicketFull }>(`/api/support/ticket/${ticketId}`);
+  return response.ticket;
+}
+
+/**
+ * Add a response to a ticket.
+ */
+export async function addTicketResponse(ticketId: string, message: string): Promise<void> {
+  await apiRequest(`/api/support/ticket/${ticketId}/response`, {
+    method: 'POST',
+    body: JSON.stringify({ message }),
+  });
+}
+
+/**
+ * Mark a ticket as read.
+ */
+export async function markTicketAsRead(ticketId: string): Promise<void> {
+  await apiRequest(`/api/support/ticket/${ticketId}/read`, {
+    method: 'PATCH',
+  });
+}
+
+/**
+ * Mark all tickets as read for current user.
+ */
+export async function markAllTicketsAsRead(): Promise<void> {
+  await apiRequest('/api/support/mark-all-read', {
+    method: 'PATCH',
+  });
+}
+
+// ============ SUPER ADMIN SUPPORT FUNCTIONS ============
+
+/**
+ * Get all tickets (Super Admin only).
+ */
+export async function getAllTickets(params?: {
+  status?: string;
+  severity?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{ tickets: SupportTicketFull[]; pagination: { page: number; limit: number; total: number; pages: number } }> {
+  const queryParams = new URLSearchParams();
+  if (params?.status) queryParams.append('status', params.status);
+  if (params?.severity) queryParams.append('severity', params.severity);
+  if (params?.page) queryParams.append('page', params.page.toString());
+  if (params?.limit) queryParams.append('limit', params.limit.toString());
+  
+  const query = queryParams.toString();
+  const response = await apiRequest<{ tickets: SupportTicketFull[]; pagination: { page: number; limit: number; total: number; pages: number } }>(`/api/support/all${query ? `?${query}` : ''}`);
+  return response;
+}
+
+/**
+ * Get unread ticket count for support team.
+ */
+export async function getSupportUnreadCount(): Promise<number> {
+  const response = await apiRequest<{ unreadCount: number }>('/api/support/support-unread-count');
+  return response.unreadCount;
+}
+
+/**
+ * Update ticket status (Super Admin only).
+ */
+export async function updateTicketStatus(ticketId: string, status: 'open' | 'in-progress' | 'resolved' | 'closed'): Promise<void> {
+  await apiRequest(`/api/support/ticket/${ticketId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
+/**
+ * Mark ticket as read by support team.
+ */
+export async function markTicketAsReadBySupport(ticketId: string): Promise<void> {
+  await apiRequest(`/api/support/ticket/${ticketId}/support-read`, {
+    method: 'PATCH',
+  });
+}
+
 export default {
   login,
   logout,
@@ -1663,6 +1855,7 @@ export default {
   uploadChatAttachment,
   getChatAttachmentUrl,
   searchChatMessages,
+  submitSupportTicket,
   apiRequest,
 };
 

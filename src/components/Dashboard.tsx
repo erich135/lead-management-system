@@ -47,6 +47,7 @@ import { Reports } from './Reports';
 import { Diary } from './Diary';
 import { Activities } from './Activities';
 import { MobileNavigation } from './MobileNavigation';
+import { SupportTicketButton } from './SupportTicketWidget';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { Tooltip, HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
@@ -698,6 +699,11 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
             
             {/* Right Side Actions */}
             <div className="flex items-center gap-3">
+              {/* Support Ticket Button */}
+              <div className="relative top-0">
+                <SupportTicketButton />
+              </div>
+
               {/* Notifications */}
               <div className="relative">
                 <button

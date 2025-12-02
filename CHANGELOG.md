@@ -5,6 +5,44 @@ All notable changes to the ARS Lead Management System will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.4] - 2025-12-01
+
+### Added
+- **Comprehensive Automated Test Suite**: Full E2E and API testing infrastructure
+  - Playwright E2E tests for all major UI features (auth, dashboard, jobs, reports, chat, admin)
+  - Mocha/Chai API tests for backend endpoints (auth, jobs, users, chat, reference data, machines)
+  - Test configuration with HTML reports, screenshots, and video capture on failures
+  - Overnight test runner scripts (PowerShell and Batch) for scheduled testing
+  - Support for multiple test modes: quick, full, and overnight with retries
+
+### Test Coverage
+- **Authentication Tests**: Login, logout, forgot password, session persistence
+- **Dashboard Tests**: Stats display, navigation, mobile responsiveness
+- **Jobs List Tests**: Search, filtering, sorting, pagination, job details
+- **Job Form Tests**: Creation, customer selection, validation, machine assignment
+- **Reports Tests**: Report generation, date filtering, exports
+- **Chat Tests**: Messaging, emoji picker, user selection, file attachments
+- **Admin Settings Tests**: User management, reference data, permissions
+
+### Technical
+- Added `e2e/` directory with Playwright test structure
+- Added backend test files in `src/tests/`
+- New npm scripts: `test:quick`, `test:full`, `test:overnight`, `test:e2e`, `test:report`
+- Added test dependencies: `@playwright/test`, `mocha`, `chai`
+
+## [1.0.3] - 2025-11-28
+
+### Added
+- Collapsible sections on Reports page (Overdue Jobs, Recent Activities, Jobs, Conversion Time Tracker)
+- Admin users can now view and filter all jobs (not just their own) while defaulting to their own jobs on page load
+
+### Fixed
+- Follow-up reminder buttons and overdue warnings no longer show for jobs in final/completed statuses (Sent to Inv, Invoiced, Job Done, etc.)
+- Admin filter dropdown now correctly displays selected admin code instead of showing "All Admins" when filtered
+- Resolved merge conflicts in ChatWidget, Dashboard, LeadDetails, LeadForm, and LeadsList components while preserving all functionality and applying updated styling standards
+- Job cards now display service description names correctly even when filtering overdue jobs (no more ObjectId strings)
+- Admin filter no longer auto-selects the signed-in admin's code; it defaults to "All Admins" so admins can see the full list before filtering
+
 ## [1.0.2] - 2025-11-26
 
 ### Added

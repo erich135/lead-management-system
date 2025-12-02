@@ -820,14 +820,14 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-8 border border-gray-200 rounded-xl">
+      <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8 border border-gray-200 rounded-xl">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-ars-heading">Reports & Analytics</h2>
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
+          <h2 className="text-xl md:text-2xl font-bold text-ars-heading">Reports & Analytics</h2>
           {activeTab === 'user-performance' && (
             <button
               onClick={exportUserPerformanceReport}
-              className="bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-4 py-2 rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
+              className="w-full md:w-auto bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-4 py-2 rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2"
             >
               <Download className="w-4 h-4" />
               EXPORT REPORT
@@ -837,7 +837,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
             <button
               onClick={exportCustomerReport}
               disabled={!selectedCustomerId}
-              className="bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-4 py-2 rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full md:w-auto bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-4 py-2 rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Download className="w-4 h-4" />
               EXPORT REPORT
@@ -846,7 +846,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
           {activeTab === 'machine' && (
             <button
               onClick={exportMachineReport}
-              className="bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-4 py-2 rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
+              className="w-full md:w-auto bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-4 py-2 rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2"
             >
               <Download className="w-4 h-4" />
               EXPORT REPORT
@@ -855,13 +855,13 @@ export function Reports({ statuses, branches }: ReportsProps) {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-gray-200">
+        <div className="flex flex-col md:flex-row gap-2 mb-6 md:border-b border-gray-200">
           <button
             onClick={() => setActiveTab('user-performance')}
-            className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+            className={`px-4 md:px-6 py-3 font-semibold transition-colors md:border-b-2 rounded-lg md:rounded-none text-sm md:text-base ${
               activeTab === 'user-performance'
-                ? 'border-ars-primary text-ars-primary'
-                : 'border-transparent text-ars-body hover:text-ars-heading'
+                ? 'bg-ars-primary text-white md:bg-transparent md:border-ars-primary md:text-ars-primary'
+                : 'bg-gray-100 text-ars-body md:bg-transparent md:border-transparent md:text-ars-body hover:bg-gray-200 md:hover:bg-transparent md:hover:text-ars-heading'
             }`}
           >
             <UserIcon className="w-4 h-4 inline mr-2" />
@@ -869,10 +869,10 @@ export function Reports({ statuses, branches }: ReportsProps) {
           </button>
           <button
             onClick={() => setActiveTab('customer')}
-            className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+            className={`px-4 md:px-6 py-3 font-semibold transition-colors md:border-b-2 rounded-lg md:rounded-none text-sm md:text-base ${
               activeTab === 'customer'
-                ? 'border-ars-primary text-ars-primary'
-                : 'border-transparent text-ars-body hover:text-ars-heading'
+                ? 'bg-ars-primary text-white md:bg-transparent md:border-ars-primary md:text-ars-primary'
+                : 'bg-gray-100 text-ars-body md:bg-transparent md:border-transparent md:text-ars-body hover:bg-gray-200 md:hover:bg-transparent md:hover:text-ars-heading'
             }`}
           >
             <Building2 className="w-4 h-4 inline mr-2" />
@@ -880,10 +880,10 @@ export function Reports({ statuses, branches }: ReportsProps) {
           </button>
           <button
             onClick={() => setActiveTab('machine')}
-            className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+            className={`px-4 md:px-6 py-3 font-semibold transition-colors md:border-b-2 rounded-lg md:rounded-none text-sm md:text-base ${
               activeTab === 'machine'
-                ? 'border-ars-primary text-ars-primary'
-                : 'border-transparent text-ars-body hover:text-ars-heading'
+                ? 'bg-ars-primary text-white md:bg-transparent md:border-ars-primary md:text-ars-primary'
+                : 'bg-gray-100 text-ars-body md:bg-transparent md:border-transparent md:text-ars-body hover:bg-gray-200 md:hover:bg-transparent md:hover:text-ars-heading'
             }`}
           >
             <Wrench className="w-4 h-4 inline mr-2" />

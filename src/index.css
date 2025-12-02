@@ -4,19 +4,30 @@
 
 /* Mobile app-like styles */
 @layer base {
-  body {
-    font-family: 'Poppins', sans-serif;
+  * {
+    -webkit-tap-highlight-color: transparent;
   }
+  
+  html, body {
+    font-family: 'Poppins', sans-serif;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  body {
+    min-height: 100vh;
+  }
+  
   /* Prevent text selection on mobile for app-like feel */
   @media (max-width: 768px) {
     * {
-      -webkit-tap-highlight-color: transparent;
       -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
     }
     
-    /* Prevent pull-to-refresh on mobile */
-    body {
-      overscroll-behavior-y: contain;
+    input, textarea, select {
+      -webkit-user-select: text;
+      user-select: text;
     }
   }
   

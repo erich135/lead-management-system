@@ -780,9 +780,9 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
           <p className="text-ars-body">Loading jobs...</p>
         </div>
       ) : (
-        <div className="flex gap-6 pt-5">
+        <div className="flex flex-col md:flex-row gap-6 pt-5">
           {/* Left Sidebar - Filters */}
-          <div className="w-64 flex-shrink-0 bg-white rounded-2xl border border-gray-200 p-4 h-fit sticky top-[115px]">
+          <div className="w-full md:w-64 flex-shrink-0 bg-white rounded-2xl border border-gray-200 p-4 md:h-fit md:sticky md:top-[115px]">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold text-ars-heading flex items-center gap-2">
                 <Filter className="w-4 h-4 text-ars-primary" />
@@ -1080,7 +1080,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
             ) : (
               <>
                 {/* Pagination Info */}
-                <div className="mb-4 flex items-center justify-between flex-wrap gap-4">
+                <div className="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div>
                     <p className="text-sm text-ars-body">
                       Showing <span className="font-semibold text-ars-heading">
@@ -1097,21 +1097,21 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between md:justify-end gap-2 w-full md:w-auto">
                     <button
                       onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                       disabled={currentPage === 1}
-                      className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
+                      className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase flex-1 md:flex-none"
                     >
                       Previous
                     </button>
-                    <span className="px-4 py-2 text-sm text-ars-body">
+                    <span className="px-2 md:px-4 py-2 text-sm text-ars-body whitespace-nowrap">
                       Page {currentPage} of {Math.ceil(filteredJobs.length / itemsPerPage) || 1}
                     </span>
                     <button
                       onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredJobs.length / itemsPerPage), prev + 1))}
                       disabled={currentPage >= Math.ceil(filteredJobs.length / itemsPerPage)}
-                      className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
+                      className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase flex-1 md:flex-none"
                     >
                       Next
                     </button>
@@ -1332,18 +1332,18 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
 
                 {/* Pagination Controls Bottom */}
                 {filteredJobs.length > itemsPerPage && (
-                  <div className="mt-6 flex items-center justify-center gap-2">
+                  <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
                     <button
                       onClick={() => setCurrentPage(1)}
                       disabled={currentPage === 1}
-                      className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
+                      className="px-3 md:px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[12px] md:text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
                     >
                       First
                     </button>
                     <button
                       onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                       disabled={currentPage === 1}
-                      className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
+                      className="px-3 md:px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[12px] md:text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
                     >
                       Previous
                     </button>
@@ -1364,7 +1364,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                           <button
                             key={pageNum}
                             onClick={() => setCurrentPage(pageNum)}
-                            className={`px-4 py-2 border rounded-[8px] font-bold text-[14px] transition-colors ${
+                            className={`px-3 md:px-4 py-2 border rounded-[8px] font-bold text-[12px] md:text-[14px] transition-colors ${
                               currentPage === pageNum
                                 ? 'bg-ars-primary border-ars-primary text-white'
                                 : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
@@ -1378,14 +1378,14 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                     <button
                       onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredJobs.length / itemsPerPage), prev + 1))}
                       disabled={currentPage >= Math.ceil(filteredJobs.length / itemsPerPage)}
-                      className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
+                      className="px-3 md:px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[12px] md:text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
                     >
                       Next
                     </button>
                     <button
                       onClick={() => setCurrentPage(Math.ceil(filteredJobs.length / itemsPerPage))}
                       disabled={currentPage >= Math.ceil(filteredJobs.length / itemsPerPage)}
-                      className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
+                      className="px-3 md:px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[12px] md:text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
                     >
                       Last
                     </button>
@@ -1400,7 +1400,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       {/* Floating Action Button */}
       <button
         onClick={onCreateNew}
-        className="fixed bottom-8 right-8 w-14 h-14 bg-ars-primary text-white rounded-full shadow-2xl flex items-center justify-center z-40"
+        className="fixed bottom-[162px] md:bottom-[104px] right-4 md:right-8 w-14 h-14 bg-ars-primary text-white rounded-full shadow-2xl flex items-center justify-center z-20 md:z-40"
       >
         <Plus className="w-6 h-6" />
       </button>

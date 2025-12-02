@@ -7,7 +7,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { getActivities, getUsers, Activity, User } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
-import { Clock, User as UserIcon, Filter, Search, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Clock, User as UserIcon, Filter, Search, RefreshCw, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 
 export function Activities() {
   
@@ -31,6 +31,7 @@ export function Activities() {
   // For super admin: list of users for filtering
   const [users, setUsers] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -94,6 +95,16 @@ export function Activities() {
       loadUsers();
     }
   }, [user?.isSuperAdmin]);
+
+  // Scroll detection for mobile header shadow
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 80);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   /**
    * Handles search with debounce.
@@ -178,9 +189,25 @@ export function Activities() {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-8 border border-gray-200 rounded-xl">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+      {/* Mobile Header - Sticky */}
+      <div className={`md:hidden sticky top-0 bg-white z-10 transition-shadow duration-200 ${isScrolled ? 'shadow-xl' : ''}`}>
+        <div className="px-4 py-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-bold text-ars-heading">Activity Log</h3>
+            <button
+              onClick={loadActivities}
+              disabled={loading}
+              className="p-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-lg hover:shadow-lg transition-all disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8 md:border md:border-gray-200 md:rounded-xl">
+        {/* Desktop Header */}
+        <div className="hidden md:flex items-center justify-between mb-6">
           <h3 className="text-2xl font-bold text-ars-heading flex items-center gap-2">
             Activity Log
           </h3>
@@ -195,8 +222,8 @@ export function Activities() {
         </div>
 
         {/* Filters */}
-        <div className="mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-4">
+        <div className="mb-4 md:mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4 mb-3 md:mb-4">
             {/* Search */}
             <div className="xl:col-span-5">
               <label className="text-[11px] font-medium text-gray-600 mb-1 block">
@@ -327,7 +354,7 @@ export function Activities() {
           {/* Clear Filters Button */}
           <button
             onClick={clearFilters}
-            className="text-sm text-[#0969a9] hover:text-[#0a7bc4] font-medium"
+            className="text-[13px] md:text-sm text-[#0969a9] hover:text-[#0a7bc4] font-medium"
           >
             Clear All Filters
           </button>
@@ -347,21 +374,22 @@ export function Activities() {
         )}
 
         {/* Activities List */}
-        <div className="overflow-auto rounded-xl border border-gray-200">
+        <div className="rounded-xl md:border md:border-gray-200">
           {loading ? (
-            <div className="p-12 text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ars-primary mx-auto mb-4"></div>
-              <p className="text-ars-body">Loading activities...</p>
+            <div className="p-8 md:p-12 text-center">
+              <div className="animate-spin rounded-full h-10 w-10 md:h-12 md:w-12 border-b-2 border-ars-primary mx-auto mb-4"></div>
+              <p className="text-sm md:text-base text-ars-body">Loading activities...</p>
             </div>
           ) : activities.length === 0 ? (
-            <div className="p-12 text-center">
-              <Clock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-lg font-semibold text-ars-heading mb-2">No activities found</p>
+            <div className="p-8 md:p-12 text-center">
+              <Clock className="w-12 h-12 md:w-16 md:h-16 text-gray-400 mx-auto mb-4" />
+              <p className="text-base md:text-lg font-semibold text-ars-heading mb-2">No activities found</p>
               <p className="text-sm text-ars-body">Try adjusting your filters</p>
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
+              {/* Desktop Table */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gradient-to-r from-[#0969a9] to-[#0a7bc4]">
                     <tr>
@@ -443,14 +471,89 @@ export function Activities() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Mobile Cards */}
+              <div className="md:hidden space-y-3">
+                {activities
+                  .filter((activity) => {
+                    if (!searchTerm) return true;
+                    const searchLower = searchTerm.toLowerCase();
+                    return (
+                      activity.description.toLowerCase().includes(searchLower) ||
+                      activity.action.toLowerCase().includes(searchLower) ||
+                      activity.resourceType.toLowerCase().includes(searchLower) ||
+                      (activity.userId?.email?.toLowerCase().includes(searchLower) || false)
+                    );
+                  })
+                  .map((activity) => (
+                    <div
+                      key={activity._id}
+                      className="bg-white rounded-lg border border-gray-200 p-4 space-y-3"
+                    >
+                      {/* Time and Action */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <Calendar className="w-4 h-4" />
+                          {formatDate(activity.createdAt)}
+                        </div>
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getActionColor(
+                            activity.action
+                          )}`}
+                        >
+                          {activity.action}
+                        </span>
+                      </div>
+
+                      {/* User (if super admin) */}
+                      {user?.isSuperAdmin && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <UserIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                          {activity.userId && typeof activity.userId === 'object' && activity.userId.email ? (
+                            <div className="flex flex-col">
+                              <span className="text-ars-body font-medium">
+                                {activity.userId.firstName || ''} {activity.userId.lastName || ''}
+                              </span>
+                              <span className="text-gray-400 text-xs">
+                                {activity.userId.email}
+                              </span>
+                            </div>
+                          ) : activity.userId ? (
+                            <span className="text-gray-400 text-xs">
+                              User ID: {typeof activity.userId === 'string' ? activity.userId.slice(-8) : 'Unknown'}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 italic">System</span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Resource */}
+                      <div className="text-sm">
+                        <span className="font-medium text-ars-heading">{activity.resourceType}</span>
+                        {activity.resourceId && (
+                          <span className="text-gray-400 ml-1 text-xs">
+                            ({activity.resourceId.slice(-8)})
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Description */}
+                      <div className="text-sm text-ars-body">
+                        {activity.description}
+                      </div>
+                    </div>
+                  ))}
+              </div>
             </>
           )}
         </div>
 
         {/* Pagination */}
         {!loading && total > 0 && totalPages > 1 && (
-          <div className="mt-6 flex items-center justify-between flex-wrap gap-4">
-            <div className="text-sm text-ars-body">
+          <div className="mt-4 md:mt-6">
+            {/* Info text */}
+            <div className="text-xs md:text-sm text-ars-body text-center md:text-left mb-3 md:mb-0">
               Showing <span className="font-semibold text-ars-heading">
                 {((page - 1) * limit) + 1}
               </span> to <span className="font-semibold text-ars-heading">
@@ -459,7 +562,9 @@ export function Activities() {
                 {total}
               </span> activities
             </div>
-            <div className="flex items-center gap-2">
+
+            {/* Desktop Pagination */}
+            <div className="hidden md:flex items-center justify-end gap-2 mt-4">
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
@@ -499,6 +604,53 @@ export function Activities() {
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
                 className="px-4 py-2 border border-gray-300 rounded-[8px] font-bold text-[14px] hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                NEXT
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Mobile Pagination */}
+            <div className="md:hidden flex items-center justify-center gap-2 mt-3">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg font-bold text-[13px] hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                PREV
+              </button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
+                  let pageNum: number;
+                  if (totalPages <= 3) {
+                    pageNum = i + 1;
+                  } else if (page <= 2) {
+                    pageNum = i + 1;
+                  } else if (page >= totalPages - 1) {
+                    pageNum = totalPages - 2 + i;
+                  } else {
+                    pageNum = page - 1 + i;
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setPage(pageNum)}
+                      className={`px-3 py-2 rounded-lg font-medium text-sm transition-all min-w-[40px] ${
+                        page === pageNum
+                          ? 'bg-ars-primary text-white'
+                          : 'border border-gray-300 hover:bg-gray-50 text-ars-body'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg font-bold text-[13px] hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 NEXT
                 <ChevronRight className="w-4 h-4" />

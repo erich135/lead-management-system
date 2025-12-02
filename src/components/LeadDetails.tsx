@@ -467,15 +467,15 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   }, [isAdmin, isSuperAdmin, canEdit, isEditing]);
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="sticky top-0 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white p-6 rounded-t-2xl z-10">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 pt-20 pb-24 md:pb-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-full overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white p-6 rounded-t-2xl z-10 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-2xl font-bold mb-1">{job.jobNumber}</h3>
               <p className="text-white/90 text-sm">Job Details</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {canEdit && (
                 <>
                   <button
@@ -488,7 +488,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       }
                     }}
                     disabled={loading}
-                    className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-[14px] uppercase"
+                    className="flex-1 md:flex-none px-4 py-2.5 bg-white/20 hover:bg-white/30 rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-[13px] md:text-[14px] uppercase whitespace-nowrap"
                     type="button"
                   >
                     {isEditing ? (
@@ -510,7 +510,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                         setIsEditing(false);
                         loadJobDetails(); // Reload to reset changes
                       }}
-                      className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-all font-bold text-[14px] uppercase"
+                      className="flex-1 md:flex-none px-4 py-2.5 bg-white/20 hover:bg-white/30 rounded-lg transition-all font-bold text-[13px] md:text-[14px] uppercase whitespace-nowrap"
                       type="button"
                     >
                       CANCEL
@@ -523,11 +523,11 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                         setShowDeleteConfirm(true);
                       }}
                       disabled={loading || deleting}
-                      className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-red-100 hover:text-white font-bold text-[14px] uppercase"
+                      className="flex-1 md:flex-none px-4 py-2.5 bg-red-500/20 hover:bg-red-500/30 rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-red-100 hover:text-white font-bold text-[13px] md:text-[14px] uppercase whitespace-nowrap"
                       type="button"
                     >
                       <Trash2 className="w-4 h-4" />
-                      DELETE JOB
+                      DELETE
                     </button>
                   )}
                 </>
@@ -573,7 +573,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
           </div>
         )}
 
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6 overflow-y-auto flex-1">
           {/* Basic Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">

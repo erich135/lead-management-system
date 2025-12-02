@@ -373,42 +373,46 @@ export function Diary() {
   return (
     <div className="min-h-screen bg-white">
       <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-8 border border-gray-200 rounded-xl">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-2xl font-bold text-ars-heading flex items-center gap-2">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+            <h3 className="text-xl md:text-2xl font-bold text-ars-heading flex items-center gap-2">
               Technician Diary
             </h3>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {/* View Toggle Button */}
               <button
                 onClick={() => setViewMode(viewMode === 'calendar' ? 'table' : 'calendar')}
-                className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
+                className="px-3 md:px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[12px] md:text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 flex-1 md:flex-none justify-center"
                 title={`Switch to ${viewMode === 'calendar' ? 'table' : 'calendar'} view`}
               >
                 {viewMode === 'calendar' ? (
                   <>
                     <Table className="w-4 h-4" />
-                    TABLE VIEW
+                    <span className="hidden sm:inline">TABLE VIEW</span>
+                    <span className="sm:hidden">TABLE</span>
                   </>
                 ) : (
                   <>
                     <Calendar className="w-4 h-4" />
-                    CALENDAR VIEW
+                    <span className="hidden sm:inline">CALENDAR VIEW</span>
+                    <span className="sm:hidden">CALENDAR</span>
                   </>
                 )}
               </button>
               <button
                 onClick={toCSV}
-                className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
+                className="px-3 md:px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[12px] md:text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 flex-1 md:flex-none justify-center"
               >
                 <Download className="w-4 h-4" />
-                EXPORT CSV
+                <span className="hidden sm:inline">EXPORT CSV</span>
+                <span className="sm:hidden">CSV</span>
               </button>
               <button
                 onClick={toPDF}
-                className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
+                className="px-3 md:px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[12px] md:text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 flex-1 md:flex-none justify-center"
               >
                 <Download className="w-4 h-4" />
-                EXPORT PDF
+                <span className="hidden sm:inline">EXPORT PDF</span>
+                <span className="sm:hidden">PDF</span>
               </button>
             </div>
           </div>
@@ -762,16 +766,16 @@ function CalendarView({ jobs, statuses, branches, technicians, onUpdate, selecte
     calendarCells.push(
       <div
         key={i}
-        className={`min-h-[120px] border p-2 ${
+        className={`min-h-[80px] md:min-h-[120px] border p-1 md:p-2 ${
           isCurrentMonth ? 'bg-white' : 'bg-gray-50'
         } ${isToday ? 'border-[#0969a9] border-2 bg-blue-50' : 'border-gray-200'}`}
       >
-        <div className={`text-sm font-semibold mb-1 ${
+        <div className={`text-[10px] md:text-sm font-semibold mb-1 ${
           isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
         } ${isToday ? 'text-[#0969a9]' : ''}`}>
           {isCurrentMonth ? dayNumber : ''}
         </div>
-        <div className="space-y-1 overflow-y-auto max-h-[90px]">
+        <div className="space-y-1 overflow-y-auto max-h-[60px] md:max-h-[90px]">
           {bookings.map((job, idx) => {
             const techName = typeof job.techBooked === 'object' && job.techBooked !== null
               ? (job.techBooked as any).name || 'Unknown Tech'
@@ -799,41 +803,42 @@ function CalendarView({ jobs, statuses, branches, technicians, onUpdate, selecte
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h4 className="text-2xl font-bold text-gray-900">
+    <div className="bg-white rounded-xl border border-gray-200 p-3 md:p-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-6 gap-3">
+        <h4 className="text-lg md:text-2xl font-bold text-gray-900 text-center md:text-left">
           {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
         </h4>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-center gap-2">
           <button
             onClick={previousMonth}
-            className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="px-2 md:px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
           </button>
           <button
             onClick={goToToday}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-bold text-[14px]"
+            className="px-3 md:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-bold text-[12px] md:text-[14px]"
           >
             TODAY
           </button>
           <button
             onClick={nextMonth}
-            className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="px-2 md:px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
           </button>
         </div>
       </div>
       
-      <div className="grid grid-cols-7 gap-0 border-t border-l border-gray-200">
+      <div className="grid grid-cols-7 gap-0 border-t border-l border-gray-200 overflow-x-auto">
         {/* Week day headers */}
         {weekDays.map(day => (
           <div
             key={day}
-            className="bg-gray-100 border-r border-b border-gray-200 px-2 py-3 text-center font-semibold text-sm text-gray-700"
+            className="bg-gray-100 border-r border-b border-gray-200 px-1 md:px-2 py-2 md:py-3 text-center font-semibold text-[10px] md:text-sm text-gray-700"
           >
-            {day}
+            <span className="hidden sm:inline">{day}</span>
+            <span className="sm:hidden">{day.substring(0, 1)}</span>
           </div>
         ))}
         {/* Calendar cells */}

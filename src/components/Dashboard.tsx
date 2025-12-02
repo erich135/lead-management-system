@@ -822,29 +822,23 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
 
       {/* Mobile Top Bar */}
       {isMobile && (
-        <div className={`relative bg-gradient-to-r from-[#0969a9] via-[#0a7bc4] to-[#0c8dd9] sticky top-0 z-40 md:hidden backdrop-blur-md ${isScrolled ? 'shadow-xl' : ''}`}>
+        <div className={`relative bg-white sticky top-0 z-40 md:hidden backdrop-blur-md ${isScrolled ? 'shadow-xl' : ''}`}>
           <div className="absolute inset-0 opacity-10" style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M20 20.5V18H0v-2h20v-2H0v-2h20v-2H0V8h20V6H0V4h20V2H0V0h22v20h2V0h2v20h2V0h2v20h2V0h2v20h2V0h2v22H0v-2h20zM0 20h2v20H0V20zm4 0h2v20H4V20zm4 0h2v20H8V20zm4 0h2v20h-2V20zm4 0h2v20h-2V20zm4 4h20v2H20v-2zm0 4h20v2H20v-2zm0 4h20v2H20v-2zm0 4h20v2H20v-2z'/%3E%3C/g%3E%3C/svg%3E")`,
             backgroundRepeat: 'repeat'
           }}></div>
           <div className="relative flex items-center justify-between h-16 px-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-[8px] flex items-center justify-center shadow-lg p-2">
-                <img src="/Logo.png" alt="ARS Logo" className="w-full h-full object-contain" />
-              </div>
-              <div>
-                <h1 className="text-base font-bold text-white">ARS Management</h1>
-                <p className="text-xs text-white/70">Job System</p>
-              </div>
+              <img src="/Logo.png" alt="ARS Logo" className="h-10 w-auto object-contain" />
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="relative p-2.5 bg-white/10 backdrop-blur-sm hover:bg-white/20 rounded-[8px] transition-all duration-300 border border-white/20"
+                className="relative p-2.5 bg-gray-100 hover:bg-gray-200 rounded-[8px] transition-all duration-300 hover:scale-105"
               >
-                <Bell className="w-5 h-5 text-white" />
+                <Bell className="w-5 h-5 text-[#0969a9]" />
                 {stats && (stats.overdueReminders > 0 || stats.approachingReminders > 0) && (
-                  <span className="absolute -top-1 -right-2 min-w-[20px] h-5 bg-gradient-to-r from-red-500 to-orange-500 rounded-full flex items-center justify-center shadow-lg px-1.5">
+                  <span className="absolute -top-1 -right-2 min-w-[20px] h-5 bg-gradient-to-r from-red-500 to-orange-500 rounded-full flex items-center justify-center shadow-lg animate-pulse px-1.5">
                     <span className="text-xs font-bold text-white">
                       {stats.overdueReminders + stats.approachingReminders}
                     </span>
@@ -858,90 +852,99 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
 
       {/* Mobile Notifications Dropdown */}
       {isMobile && showNotifications && (
-        <div className="fixed top-14 left-0 right-0 bg-white shadow-lg z-30 md:hidden max-h-96 overflow-y-auto">
-          {overdueJobs.length === 0 ? (
-            <div className="px-4 py-8 text-center">
-              <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto mb-2" />
-              <p className="text-sm font-medium text-ars-heading mb-1">
-                All jobs on track!
-              </p>
-              <p className="text-xs text-ars-body">
-                No overdue or approaching jobs
-              </p>
-            </div>
-          ) : (
-            <div className="px-3 py-3">
-              <div className="px-2 py-2 border-b border-gray-200 mb-3">
-                <h3 className="text-sm font-bold text-ars-heading mb-1">
-                  Overdue & Approaching Jobs
-                </h3>
-                <div className="flex items-center gap-3 text-xs">
-                  <span className="text-red-600 font-medium">
-                    {stats?.overdueReminders || 0} overdue
-                  </span>
-                  <span className="text-orange-600 font-medium">
-                    {stats?.approachingReminders || 0} approaching
-                  </span>
-                </div>
+        <>
+          <div 
+            className="fixed inset-0 z-[60]" 
+            onClick={() => setShowNotifications(false)}
+          ></div>
+          <div 
+            className="fixed top-[74px] left-4 right-4 bg-white rounded-[8px] shadow-2xl border border-gray-200 py-4 max-h-96 overflow-y-auto z-[70] backdrop-blur-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 pb-3 border-b border-gray-200 mb-2">
+              <h3 className="text-sm font-bold text-ars-heading mb-1">
+                Job Reminders
+              </h3>
+              <div className="flex items-center gap-3 text-xs">
+                <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full font-medium">
+                  {stats?.overdueReminders || 0} overdue
+                </span>
+                <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-full font-medium">
+                  {stats?.approachingReminders || 0} approaching
+                </span>
               </div>
-              {overdueJobs.slice(0, 10).map((overdue) => (
-                <div
-                  key={overdue.jobId}
-                  className={`px-3 py-3 mb-2 rounded-[8px] border-2 ${getSeverityColor(overdue.severity)}`}
-                  onClick={() => {
-                    if (overdue.job) {
-                      setSelectedLead(overdue.job);
-                      navigateToView('leads');
-                      setShowNotifications(false);
-                    }
-                  }}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 mt-0.5">
-                      {getSeverityIcon(overdue.severity)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-sm font-bold truncate">
-                          {overdue.jobNumber}
-                        </p>
-                        {overdue.isOverdue && (
-                          <span className="text-xs font-bold bg-red-200 text-red-800 px-2 py-0.5 rounded-full flex-shrink-0 ml-2">
-                            {overdue.daysOverdue}d
-                          </span>
-                        )}
+            </div>
+            {overdueJobs.length === 0 ? (
+              <div className="px-4 py-8 text-center">
+                <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                <p className="text-sm font-medium text-ars-heading mb-1">
+                  All jobs on track!
+                </p>
+                <p className="text-xs text-ars-body">
+                  No overdue or approaching jobs
+                </p>
+              </div>
+            ) : (
+              <div className="px-3">
+                {overdueJobs.slice(0, 10).map((overdue) => (
+                  <div
+                    key={overdue.jobId}
+                    className={`px-3 py-3 mb-2 rounded-[8px] border-2 cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${getSeverityColor(overdue.severity)}`}
+                    onClick={() => {
+                      if (overdue.job) {
+                        setSelectedLead(overdue.job);
+                        navigateToView('leads');
+                        setShowNotifications(false);
+                      }
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 mt-0.5">
+                        {getSeverityIcon(overdue.severity)}
                       </div>
-                      <p className="text-xs text-ars-body mb-2 truncate">
-                        {overdue.job?.customer?.name || overdue.job?.cashCustomer || 'No customer'}
-                      </p>
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="text-xs font-medium px-2 py-0.5 bg-white/60 rounded">
-                          {overdue.currentStatus}
-                        </span>
-                        <span className="text-xs text-ars-body">→</span>
-                        <span className="text-xs font-medium px-2 py-0.5 bg-white/60 rounded">
-                          {overdue.expectedNextStatus}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between mt-2">
-                        <p className="text-xs font-medium">
-                          {overdue.isOverdue 
-                            ? `${overdue.daysOverdue} days overdue` 
-                            : `${overdue.daysInStatus}/${overdue.maxDaysAllowed} days`}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-sm font-bold truncate">
+                            {overdue.jobNumber}
+                          </p>
+                          {overdue.isOverdue && (
+                            <span className="text-xs font-bold bg-red-200 text-red-800 px-2 py-0.5 rounded-full flex-shrink-0 ml-2">
+                              {overdue.daysOverdue}d
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-ars-body mb-2 truncate">
+                          {overdue.job?.customer?.name || overdue.job?.cashCustomer || 'No customer'}
                         </p>
-                        {overdue.followUpLevel && (
-                          <span className="text-xs bg-white/80 px-2 py-0.5 rounded">
-                            Follow-up {overdue.followUpLevel}
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="text-xs font-medium px-2 py-0.5 bg-white/60 rounded">
+                            {overdue.currentStatus}
                           </span>
-                        )}
+                          <span className="text-xs text-ars-body">→</span>
+                          <span className="text-xs font-medium px-2 py-0.5 bg-white/60 rounded">
+                            {overdue.expectedNextStatus}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between mt-2">
+                          <p className="text-xs font-medium">
+                            {overdue.isOverdue 
+                              ? `${overdue.daysOverdue} days overdue` 
+                              : `${overdue.daysInStatus}/${overdue.maxDaysAllowed} days`}
+                          </p>
+                          {overdue.followUpLevel && (
+                            <span className="text-xs bg-white/80 px-2 py-0.5 rounded">
+                              Follow-up {overdue.followUpLevel}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       <main className={`max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-8 ${isMobile ? 'pt-4' : ''}`}>
@@ -1050,10 +1053,10 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                   <h3 className="text-[20px] font-semibold text-ars-heading mb-1">Filter by Priority</h3>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 pb-2 -mx-1 px-1 overflow-visible">
+              <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:gap-1.5 pb-2 md:-mx-1 md:px-1">
                 <button
                   onClick={() => setSelectedPriority('all')}
-                  className={`px-3 py-1.5 rounded-[8px] font-medium text-xs whitespace-nowrap transition-all duration-300 ${
+                  className={`px-3 py-2.5 md:py-1.5 rounded-[8px] font-medium text-xs whitespace-nowrap transition-all duration-300 ${
                     selectedPriority === 'all'
                       ? 'bg-ars-secondary text-ars-heading shadow-lg scale-105 hover:brightness-95'
                       : 'bg-white text-ars-body hover:bg-gray-50 border border-gray-200'
@@ -1064,7 +1067,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                 </button>
                 <button
                   onClick={() => setSelectedPriority('critical')}
-                  className={`px-3 py-1.5 rounded-[8px] font-medium text-xs whitespace-nowrap transition-all duration-300 flex items-center gap-1.5 ${
+                  className={`px-3 py-2.5 md:py-1.5 rounded-[8px] font-medium text-xs whitespace-nowrap transition-all duration-300 flex items-center justify-center md:justify-start gap-1.5 ${
                     selectedPriority === 'critical'
                       ? 'bg-ars-secondary text-ars-heading shadow-lg scale-105 hover:brightness-95'
                       : 'bg-white text-ars-body hover:bg-red-50 border border-gray-200'
@@ -1075,7 +1078,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                 </button>
                 <button
                   onClick={() => setSelectedPriority('warning')}
-                  className={`px-3 py-1.5 rounded-[8px] font-medium text-xs whitespace-nowrap transition-all duration-300 flex items-center gap-1.5 ${
+                  className={`px-3 py-2.5 md:py-1.5 rounded-[8px] font-medium text-xs whitespace-nowrap transition-all duration-300 flex items-center justify-center md:justify-start gap-1.5 ${
                     selectedPriority === 'warning'
                       ? 'bg-ars-secondary text-ars-heading shadow-lg scale-105 hover:brightness-95'
                       : 'bg-white text-ars-body hover:bg-orange-50 border border-gray-200'
@@ -1086,7 +1089,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                 </button>
                 <button
                   onClick={() => setSelectedPriority('info')}
-                  className={`px-3 py-1.5 rounded-[8px] font-medium text-xs whitespace-nowrap transition-all duration-300 flex items-center gap-1.5 ${
+                  className={`px-3 py-2.5 md:py-1.5 rounded-[8px] font-medium text-xs whitespace-nowrap transition-all duration-300 flex items-center justify-center md:justify-start gap-1.5 ${
                     selectedPriority === 'info'
                       ? 'bg-ars-secondary text-ars-heading shadow-lg scale-105 hover:brightness-95'
                       : 'bg-white text-ars-body hover:bg-blue-50 border border-gray-200'
@@ -1306,8 +1309,8 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                     )}
                   </div>
 
-                  {/* Table View */}
-                  <div className="bg-white border border-gray-200 overflow-hidden rounded-[8px]">
+                  {/* Table View - Desktop */}
+                  <div className="hidden md:block bg-white border border-gray-200 overflow-hidden rounded-[8px]">
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead>
@@ -1461,9 +1464,6 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                                       navigateToView('leads');
                                     }
                                   }}
-                                  style={{
-                                    animation: `fadeInUp 0.3s ease-out ${index * 0.05}s both`
-                                  }}
                                 >
                                   {/* Job Number */}
                                   <td className="px-2 py-2">
@@ -1574,11 +1574,140 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                       </table>
                     </div>
                   </div>
+
+                  {/* Card View - Mobile */}
+                  <div className="md:hidden space-y-3">
+                    {paginatedJobs.map((overdue, index) => {
+                      const rowColorClass = getStatusColor(overdue.job?.status?.name);
+                      const textColorClass = getStatusTextColor(overdue.job?.status?.name);
+                      const repCode = overdue.job ? getRepCodeFromJob(overdue.job) : null;
+                      
+                      return (
+                        <div
+                          key={overdue.jobId}
+                          onClick={() => {
+                            if (overdue.job) {
+                              setSelectedLead(overdue.job);
+                              navigateToView('leads');
+                            }
+                          }}
+                          className={`${rowColorClass} border-2 rounded-xl p-4 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-lg`}
+                        >
+                          {/* Header: Job Number & Priority Badge */}
+                          <div className="flex items-start justify-between mb-3">
+                            <h3 className="text-lg font-bold text-ars-heading">
+                              {overdue.jobNumber}
+                            </h3>
+                            {overdue.isOverdue ? (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-red-500 text-white">
+                                {overdue.daysOverdue}d overdue
+                              </span>
+                            ) : overdue.isApproaching ? (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-orange-500 text-white">
+                                Approaching
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                On Track
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Status */}
+                          <div className="mb-3">
+                            <span className={`inline-block px-3 py-1 rounded-lg text-xs font-semibold ${textColorClass} bg-white/60 border border-current/20`}>
+                              {overdue.job?.status?.name || '-'}
+                            </span>
+                          </div>
+
+                          {/* Customer */}
+                          <div className="mb-3 flex items-center gap-2 text-sm">
+                            <User className="w-4 h-4 text-gray-400" />
+                            <span className="font-medium text-ars-heading">
+                              {overdue.job?.customer?.name || overdue.job?.cashCustomer || '-'}
+                            </span>
+                          </div>
+
+                          {/* Details Grid */}
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            {/* Start Date */}
+                            {overdue.job?.startDate && (
+                              <div>
+                                <div className="text-xs text-gray-500 mb-1">Start Date</div>
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="w-3 h-3 text-gray-400" />
+                                  <span className="text-gray-700">
+                                    {new Date(overdue.job.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Quoted Date */}
+                            {overdue.job?.dateQuoted && (
+                              <div>
+                                <div className="text-xs text-gray-500 mb-1">Quoted</div>
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="w-3 h-3 text-gray-400" />
+                                  <span className="text-gray-700">
+                                    {new Date(overdue.job.dateQuoted).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* City */}
+                            {overdue.job?.city && (
+                              <div>
+                                <div className="text-xs text-gray-500 mb-1">City</div>
+                                <div className="flex items-center gap-1">
+                                  <Building2 className="w-3 h-3 text-gray-400" />
+                                  <span className="text-gray-700">{overdue.job.city}</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Admin */}
+                            {overdue.job?.adm && (
+                              <div>
+                                <div className="text-xs text-gray-500 mb-1">Admin</div>
+                                <div className="flex items-center gap-1">
+                                  <User className="w-3 h-3 text-gray-400" />
+                                  <span className="text-gray-700">{overdue.job.adm}</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Rep */}
+                            {repCode && (
+                              <div>
+                                <div className="text-xs text-gray-500 mb-1">Rep</div>
+                                <div className="flex items-center gap-1">
+                                  <Tag className="w-3 h-3 text-gray-400" />
+                                  <span className="text-gray-700">{repCode.code}</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Amount */}
+                            {overdue.job?.valueExVat && (
+                              <div>
+                                <div className="text-xs text-gray-500 mb-1">Amount</div>
+                                <span className="font-bold text-ars-heading">
+                                  {formatCurrency(overdue.job.valueExVat)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                   
                   {/* Pagination */}
                   {totalPages > 1 && (
                     <div className="bg-white px-4 py-3 mt-4 -mx-4">
-                      <div className="flex-1 flex justify-between sm:hidden">
+                      <div className="flex-1 flex justify-between items-center sm:hidden">
                         <button
                           onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                           disabled={currentPage === 1}
@@ -1587,9 +1716,15 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                           Previous
                         </button>
                         <button
+                          onClick={() => navigateToView('leads')}
+                          className="bg-[#f7c12b] text-[#383838] px-4 py-2 rounded-[8px] font-bold text-[12px] shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02] hover:brightness-95 whitespace-nowrap"
+                        >
+                          VIEW ALL
+                        </button>
+                        <button
                           onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                           disabled={currentPage === totalPages}
-                          className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 font-bold text-[14px] rounded-[8px] text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed uppercase"
+                          className="relative inline-flex items-center px-4 py-2 border border-gray-300 font-bold text-[14px] rounded-[8px] text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed uppercase"
                         >
                           Next
                         </button>
@@ -1761,7 +1896,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
       {/* Scroll to Top Button */}
       <button
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-        className="fixed bottom-8 left-8 w-14 h-14 bg-[#0969a9] text-white rounded-full shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-110 flex items-center justify-center z-40 group"
+        className="fixed bottom-24 left-4 md:bottom-8 md:left-8 w-14 h-14 bg-[#0969a9] text-white rounded-full shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-110 flex items-center justify-center z-20 md:z-40 group"
         title="Scroll to top"
       >
         <svg

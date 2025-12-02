@@ -269,7 +269,7 @@ export function ChatWidget() {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-24 right-8 bg-[#0969a9] text-white p-4 rounded-full hover:bg-[#0969a9]/90 transition-all z-30"
+        className="fixed bottom-24 right-4 md:bottom-8 md:right-8 bg-[#0969a9] text-white p-4 rounded-full hover:bg-[#0969a9]/90 transition-all z-30"
         title="Open Chat"
         aria-label="Open Chat"
       >
@@ -298,7 +298,7 @@ export function ChatWidget() {
       />
       
       {/* Chat Widget */}
-      <div className={`fixed bottom-24 right-8 bg-white rounded-lg z-30 flex flex-col ${isMinimized ? 'h-14' : 'h-[600px]'} w-96 transition-all`}>
+      <div className={`fixed bottom-24 right-4 md:bottom-8 md:right-8 bg-white rounded-lg z-30 flex flex-col ${isMinimized ? 'h-14 w-14' : 'h-[600px] max-h-[calc(100vh-120px)] w-[calc(100vw-32px)]'} md:w-96 transition-all shadow-2xl`}>
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b bg-[#0969a9] text-white rounded-t-lg">
         <div className="flex items-center space-x-2">

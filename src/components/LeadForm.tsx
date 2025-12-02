@@ -453,9 +453,9 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
         </div>
       )}
 
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="sticky top-0 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white px-6 py-4 flex justify-between items-center rounded-t-2xl">
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 pt-20 pb-24 md:pb-4 z-50">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-full overflow-hidden flex flex-col">
+          <div className="sticky top-0 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white px-6 py-4 flex justify-between items-center rounded-t-2xl z-10 flex-shrink-0">
             <h2 className="text-xl font-bold">Create New Job</h2>
             <button
               onClick={onClose}
@@ -465,7 +465,7 @@ export function LeadForm({ statuses, branches, customers: initialCustomers, onCl
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-5">{/* Removed inline error display */}
+          <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto flex-1">{/* Removed inline error display */}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {isSuperAdmin && (

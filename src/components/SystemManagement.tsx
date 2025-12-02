@@ -125,6 +125,7 @@ export function SystemManagement() {
   const [isAdminCodesExpanded, setIsAdminCodesExpanded] = useState(false);
   const [isTechniciansExpanded, setIsTechniciansExpanded] = useState(false);
   const [isDescriptionsExpanded, setIsDescriptionsExpanded] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   
   // Invite user state
   const [showInviteForm, setShowInviteForm] = useState(false);
@@ -150,6 +151,16 @@ export function SystemManagement() {
       loadReferenceData();
     }
   }, [currentPage, searchTerm, activeTab, showInviteForm]);
+
+  // Scroll detection for mobile header shadow
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 80);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   /**
    * Loads import history/statistics.
@@ -841,55 +852,109 @@ export function SystemManagement() {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-8 border border-gray-200 rounded-xl">
-        <div className="flex justify-between items-center mb-6">
-      <h3 className="text-2xl font-bold text-ars-heading flex items-center gap-2">
+      {/* Mobile Header - Sticky */}
+      <div className={`md:hidden sticky top-0 bg-white z-10 transition-shadow duration-200 ${isScrolled ? 'shadow-xl' : ''}`}>
+        <div className="px-4 py-4">
+          <h3 className="text-xl font-bold text-ars-heading">System Management</h3>
+        </div>
+      </div>
+
+      <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8 md:border md:border-gray-200 md:rounded-xl">
+        {/* Desktop Header */}
+        <div className="hidden md:flex justify-between items-center mb-6">
+          <h3 className="text-2xl font-bold text-ars-heading flex items-center gap-2">
             System Management
           </h3>
         </div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
-          <div className="flex border-b border-gray-200">
+        <div className="mb-4 md:mb-6">
+          {/* Mobile Tabs - Stacked */}
+          <div className="md:hidden flex flex-col gap-2">
             <button
               onClick={() => setActiveTab('users')}
-              className={`flex-1 px-6 py-4 font-semibold transition-all ${
+              className={`px-4 py-3 font-semibold transition-all rounded-lg text-sm ${
                 activeTab === 'users'
-                  ? 'text-ars-primary border-b-2 border-ars-primary bg-blue-50'
-                  : 'text-ars-body hover:text-ars-heading hover:bg-gray-50'
+                  ? 'bg-ars-primary text-white'
+                  : 'bg-gray-100 text-ars-body hover:bg-gray-200'
               }`}
             >
               <div className="flex items-center justify-center gap-2">
-                <Users className="w-5 h-5" />
+                <Users className="w-4 h-4" />
                 User Management
               </div>
             </button>
             <button
               onClick={() => setActiveTab('imports')}
-              className={`flex-1 px-6 py-4 font-semibold transition-all ${
+              className={`px-4 py-3 font-semibold transition-all rounded-lg text-sm ${
                 activeTab === 'imports'
-                  ? 'text-ars-primary border-b-2 border-ars-primary bg-blue-50'
-                  : 'text-ars-body hover:text-ars-heading hover:bg-gray-50'
+                  ? 'bg-ars-primary text-white'
+                  : 'bg-gray-100 text-ars-body hover:bg-gray-200'
               }`}
             >
               <div className="flex items-center justify-center gap-2">
-                <Upload className="w-5 h-5" />
+                <Upload className="w-4 h-4" />
                 Imports
               </div>
             </button>
             <button
               onClick={() => setActiveTab('reference')}
-              className={`flex-1 px-6 py-4 font-semibold transition-all ${
+              className={`px-4 py-3 font-semibold transition-all rounded-lg text-sm ${
                 activeTab === 'reference'
-                  ? 'text-ars-primary border-b-2 border-ars-primary bg-blue-50'
-                  : 'text-ars-body hover:text-ars-heading hover:bg-gray-50'
+                  ? 'bg-ars-primary text-white'
+                  : 'bg-gray-100 text-ars-body hover:bg-gray-200'
               }`}
             >
               <div className="flex items-center justify-center gap-2">
-                <Key className="w-5 h-5" />
+                <Key className="w-4 h-4" />
                 Reference Data
               </div>
             </button>
+          </div>
+
+          {/* Desktop Tabs - Horizontal */}
+          <div className="hidden md:block bg-white rounded-xl border border-gray-200 shadow-sm">
+            <div className="flex border-b border-gray-200">
+              <button
+                onClick={() => setActiveTab('users')}
+                className={`flex-1 px-6 py-4 font-semibold transition-all ${
+                  activeTab === 'users'
+                    ? 'text-ars-primary border-b-2 border-ars-primary bg-blue-50'
+                    : 'text-ars-body hover:text-ars-heading hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <Users className="w-5 h-5" />
+                  User Management
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('imports')}
+                className={`flex-1 px-6 py-4 font-semibold transition-all ${
+                  activeTab === 'imports'
+                    ? 'text-ars-primary border-b-2 border-ars-primary bg-blue-50'
+                    : 'text-ars-body hover:text-ars-heading hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <Upload className="w-5 h-5" />
+                  Imports
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('reference')}
+                className={`flex-1 px-6 py-4 font-semibold transition-all ${
+                  activeTab === 'reference'
+                    ? 'text-ars-primary border-b-2 border-ars-primary bg-blue-50'
+                    : 'text-ars-body hover:text-ars-heading hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <Key className="w-5 h-5" />
+                  Reference Data
+                </div>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -905,11 +970,11 @@ export function SystemManagement() {
 
         {/* Users Tab */}
         {activeTab === 'users' && (
-          <div className="flex gap-6">
+          <div className="flex flex-col md:flex-row gap-4 md:gap-6">
             {/* Left Side - User List */}
-            <div className="flex-1 bg-white rounded-xl border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-ars-heading">Users</h3>
+            <div className="flex-1 bg-white rounded-lg md:rounded-xl border border-gray-200 p-4 md:p-6">
+              <div className="flex items-center justify-between mb-4 md:mb-6">
+                <h3 className="text-lg md:text-xl font-bold text-ars-heading">Users</h3>
                 <button
                   onClick={() => {
                     setShowInviteForm(true);
@@ -926,15 +991,16 @@ export function SystemManagement() {
                       technician: { name: '', email: '', phone: '' },
                     });
                   }}
-                  className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
+                  className="px-3 md:px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-lg md:rounded-[8px] font-bold text-[13px] md:text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  INVITE USER
+                  <span className="hidden sm:inline">INVITE USER</span>
+                  <span className="sm:hidden">INVITE</span>
                 </button>
               </div>
 
               {/* Search */}
-              <div className="relative mb-6">
+              <div className="relative mb-4 md:mb-6">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
@@ -949,29 +1015,29 @@ export function SystemManagement() {
               </div>
 
               {/* User List */}
-              <div className="space-y-3">
+              <div className="space-y-2 md:space-y-3">
                 {users.map((user) => (
                   <div
                     key={user._id}
                     onClick={() => handleViewUser(user._id)}
-                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                    className={`p-3 md:p-4 rounded-lg md:rounded-xl border-2 cursor-pointer transition-all ${
                       selectedUser?._id === user._id
                         ? 'border-ars-primary bg-blue-50'
                         : 'border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2 flex-wrap">
-                          <p className="font-semibold text-ars-heading">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 md:gap-3 mb-2 flex-wrap">
+                          <p className="font-semibold text-sm md:text-base text-ars-heading">
                             {user.firstName} {user.lastName}
                           </p>
                           {user.isSuperAdmin && (
-                            <span className="px-2 py-1 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] text-xs font-bold rounded-lg">
+                            <span className="px-2 py-0.5 md:py-1 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] text-[10px] md:text-xs font-bold rounded-lg">
                               Super Admin
                             </span>
                           )}
-                          <span className={`px-2 py-1 text-xs font-medium rounded-lg ${
+                          <span className={`px-2 py-0.5 md:py-1 text-[10px] md:text-xs font-medium rounded-lg ${
                             user.isActive
                               ? 'bg-green-100 text-green-700'
                               : 'bg-red-100 text-red-700'
@@ -985,7 +1051,7 @@ export function SystemManagement() {
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-ars-body mb-1">{user.email}</p>
+                        <p className="text-xs md:text-sm text-ars-body mb-1 truncate">{user.email}</p>
                         <div className="flex items-center gap-2">
                           <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-lg">
                             {user.role.name}
@@ -995,13 +1061,13 @@ export function SystemManagement() {
                           </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleToggleUserStatus(user);
                           }}
-                          className={`p-2 rounded-lg transition-colors ${
+                          className={`p-1.5 md:p-2 rounded-lg transition-colors ${
                             user.isActive
                               ? 'text-green-600 hover:bg-green-50'
                               : 'text-red-600 hover:bg-red-50'
@@ -1009,9 +1075,9 @@ export function SystemManagement() {
                           title={user.isActive ? 'Deactivate user' : 'Activate user'}
                         >
                           {user.isActive ? (
-                            <UserCheck className="w-5 h-5" />
+                            <UserCheck className="w-4 h-4 md:w-5 md:h-5" />
                           ) : (
-                            <UserX className="w-5 h-5" />
+                            <UserX className="w-4 h-4 md:w-5 md:h-5" />
                           )}
                         </button>
                         <button
@@ -1019,10 +1085,10 @@ export function SystemManagement() {
                             e.stopPropagation();
                             handleViewUser(user._id);
                           }}
-                          className="p-2 text-ars-primary hover:bg-blue-50 rounded-lg transition-colors"
+                          className="p-1.5 md:p-2 text-ars-primary hover:bg-blue-50 rounded-lg transition-colors"
                           title="View/Edit user"
                         >
-                          <Edit2 className="w-5 h-5" />
+                          <Edit2 className="w-4 h-4 md:w-5 md:h-5" />
                         </button>
                       </div>
                     </div>
@@ -1056,7 +1122,7 @@ export function SystemManagement() {
 
             {/* Right Side - User Details */}
             {selectedUser && (
-              <div className="w-96 bg-white rounded-xl border border-gray-200 p-6 h-fit sticky top-6">
+              <div className="md:w-96 bg-white rounded-lg md:rounded-xl border border-gray-200 p-4 md:p-6 h-fit md:sticky md:top-6">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-bold text-ars-heading">User Details</h3>
                   <button
@@ -1270,7 +1336,7 @@ export function SystemManagement() {
             )}
 
             {/* Import Sections */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               {/* Import Jobs */}
               <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -2529,9 +2595,9 @@ export function SystemManagement() {
 
       {/* Invite User Modal */}
       {showInviteForm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white p-6 rounded-t-2xl z-10">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 pt-20 pb-24 md:pb-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-full overflow-y-auto">
+            <div className="sticky top-0 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white p-4 md:p-6 rounded-t-2xl z-10">
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold">Invite New User</h2>
                 <button

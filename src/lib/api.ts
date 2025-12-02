@@ -332,6 +332,7 @@ export interface Job {
   } | string;
   valueExVat?: number;
   adm?: string;
+  assistingAdm?: string;
   repCode?: {
     _id: string;
     code: string;
@@ -541,6 +542,11 @@ export interface RepCode {
   _id: string;
   code: string;
   description?: string;
+  adminCode?: string; // Linked admin code (e.g., "AS", "ER")
+  branch?: {
+    _id: string;
+    name: string;
+  };
   isActive: boolean;
   dbStatus?: string;
   createdAt?: string;

@@ -5,6 +5,61 @@ All notable changes to the ARS Lead Management System will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] - 2025-12-02
+
+### Added
+- **Contextual Help System (Phase 1)**: Comprehensive tooltip and help icon system
+  - New reusable `Tooltip` component with 4 position options (top, bottom, left, right)
+  - New `HelpIcon` component (ⓘ) for inline contextual help with hover/click modes
+  - Centralized `helpContent.ts` configuration for all help text
+  - CSS animations for smooth tooltip fade-in effects
+
+- **Help Icons Integration**: Added help icons throughout the application
+  - **Dashboard**: Tooltips on all stat cards (Total Jobs, Active, Needs Attention, Total Value)
+  - **Dashboard**: HelpIcon on "Filter by Priority" section explaining overdue/approaching/info filters
+  - **Reports - Conversion Tracker**: HelpIcon on section title with overview
+  - **Reports - Conversion Tracker**: HelpIcon on each metric card (Start→Quoted, Quoted→Sent, Sent→PO, PO→Invoiced, Total)
+  - **LeadsList**: HelpIcon on Filters section header
+  - **LeadsList**: HelpIcon on "Show Jobs" priority filter explaining each option
+  - **LeadForm**: HelpIcon on Customer Type field (registered vs cash customers)
+  - **LeadForm**: HelpIcon on Initial Status field
+  - **LeadForm**: HelpIcon on Branch field
+  - **LeadForm**: HelpIcon on Value (ex VAT) field
+  - **LeadForm**: HelpIcon on Start Date and Date Quoted fields
+  - **LeadDetails**: HelpIcon on follow-up levels 1-6 section
+  - **LeadDetails**: HelpIcon on status-based follow-up reminders
+
+- **Rep Code and Branch Filters**: Added filtering by Rep Code and Branch to User Performance Reports
+  - Overdue Jobs section now has Rep Code and Branch filter dropdowns
+  - All Jobs section now has Rep Code and Branch filter dropdowns
+  - Conversion Time Tracker now has Rep Code and Branch filter dropdowns
+  - Filter dropdowns populated from actual job data
+
+- **Conversion Time Tracker Enhancements**
+  - Added `dateSentToClient` field tracking to backend Job model
+  - New conversion stage: "Sent → PO" showing client decision time
+  - Created and executed backfill script for existing jobs (60 jobs updated)
+  - "Complete Workflow Only" toggle for accurate segment totals
+  - Visual timeline now shows 5 stages instead of 4
+
+### Fixed
+- **Dashboard.tsx TypeScript Errors**: Resolved compilation issues
+  - Added missing `techBooked` field to Job interface in api.ts
+  - Fixed sort function returning undefined (added `return 0` fallback)
+  - Cleaned up unused imports (Ticket, ArrowRight, Sparkles, Wrench, Edit2, Eye)
+  - Prefixed unused variables/functions with underscore
+
+- **Conversion Tracker Filter Issue**: Fixed dropdown showing empty when filters applied
+  - Created separate `allConversionJobs` state for dropdown population
+  - Dropdowns now always show all available options regardless of current filter
+
+### Technical
+- New files: `src/components/ui/Tooltip.tsx`, `src/components/ui/HelpIcon.tsx`, `src/components/ui/index.ts`
+- New file: `src/config/helpContent.ts` - centralized help text configuration
+- Updated: `src/index.css` - added tooltip animation keyframes
+- Backend: Added `dateSentToClient` field with index to Job model
+- Backend: Auto-sets `dateSentToClient` when job status changes to "Sent to Client"
+
 ## [1.0.4] - 2025-12-01
 
 ### Added

@@ -33,17 +33,11 @@ import {
   Calendar,
   Clock,
   CheckCircle2,
-  Ticket,
-  ArrowRight,
-  Sparkles,
   Zap,
   Shield,
   User,
   Building2,
   Tag,
-  Wrench,
-  Edit2,
-  Eye,
 } from 'lucide-react';
 import { LeadsList } from './LeadsList';
 import { LeadForm } from './LeadForm';
@@ -54,6 +48,8 @@ import { Diary } from './Diary';
 import { Activities } from './Activities';
 import { MobileNavigation } from './MobileNavigation';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { Tooltip, HelpIcon } from './ui';
+import { helpContent } from '../config/helpContent';
 
 type View = 'dashboard' | 'leads' | 'reports' | 'admin' | 'diary' | 'activities';
 
@@ -105,7 +101,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [repCodes, setRepCodes] = useState<RepCode[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
-  const [adminCodes, setAdminCodes] = useState<AdminCode[]>([]);
+  const [_adminCodes, setAdminCodes] = useState<AdminCode[]>([]);
   const [selectedPriority, setSelectedPriority] = useState<'all' | 'critical' | 'warning' | 'info'>('all');
   const [leadsListRefreshKey, setLeadsListRefreshKey] = useState(0);
   
@@ -292,8 +288,9 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
 
   /**
    * Gets the technician name from a job's techBooked field (which can be a string ID or an object)
+   * @deprecated Currently unused but kept for potential future use
    */
-  function getTechnicianNameFromJob(job: Job): string | null {
+  function _getTechnicianNameFromJob(job: Job): string | null {
     if (!job.techBooked) return null;
     
     // If techBooked is already an object with name, use it
@@ -537,6 +534,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
         }
       }
+      return 0;
     });
 
     return filteredJobs;
@@ -556,7 +554,8 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
   }, [filters, selectedPriority]);
 
   // Helper functions for multi-select filters
-  function toggleFilterItem(filterType: 'status' | 'admin' | 'rep', value: string) {
+  // @ts-ignore - kept for potential future multi-select UI
+  function _toggleFilterItem(filterType: 'status' | 'admin' | 'rep', value: string) {
     setFilters(prev => {
       const currentArray = prev[filterType] as string[];
       const newArray = currentArray.includes(value)
@@ -1011,57 +1010,65 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
 
                 {/* Quick Stats Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('leads')}>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-white/80 text-xs font-medium">Total Jobs</p>
-                      <FileText className="w-4 h-4  text-[#ffffff]" />
+                  <Tooltip content={helpContent.dashboard.stats.totalJobs} position="bottom">
+                    <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('leads')}>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-white/80 text-xs font-medium">Total Jobs</p>
+                        <FileText className="w-4 h-4  text-[#ffffff]" />
+                      </div>
+                      <p className="text-2xl font-bold">{stats.totalJobs}</p>
                     </div>
-                    <p className="text-2xl font-bold">{stats.totalJobs}</p>
-                  </div>
+                  </Tooltip>
 
-                  <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('leads')}>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-white/80 text-xs font-medium">Active</p>
-                      <TrendingUp className="w-4 h-4 text-[#ffffff]" />
+                  <Tooltip content={helpContent.dashboard.stats.activeJobs} position="bottom">
+                    <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('leads')}>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-white/80 text-xs font-medium">Active</p>
+                        <TrendingUp className="w-4 h-4 text-[#ffffff]" />
+                      </div>
+                      <p className="text-2xl font-bold">{stats.activeJobs}</p>
                     </div>
-                    <p className="text-2xl font-bold">{stats.activeJobs}</p>
-                  </div>
+                  </Tooltip>
 
-                  <div 
-                    className={`backdrop-blur-md rounded-xl p-4 border transition-all duration-300 hover:scale-105 cursor-pointer ${
-                      stats.overdueReminders > 0
-                        ? 'bg-red-500/30 border-red-400/50 hover:bg-red-500/40'
-                        : stats.approachingReminders > 0
-                        ? 'bg-orange-500/30 border-orange-400/50 hover:bg-orange-500/40'
-                        : 'bg-white/10 border-white/20 hover:bg-white/15'
-                    }`}
-                    onClick={() => {
-                      setShowNotifications(true);
-                      if (isMobile) {
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }
-                    }}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-white/80 text-xs font-medium">Needs Attention</p>
-                      <AlertCircle className={`w-4 h-4  text-[#ffffff] ${
-                        stats.overdueReminders > 0 ? 'text-red-200' : stats.approachingReminders > 0 ? 'text-orange-200' : 'text-white/60'
-                      }`} />
+                  <Tooltip content={helpContent.dashboard.stats.needsAttention} position="bottom">
+                    <div 
+                      className={`backdrop-blur-md rounded-xl p-4 border transition-all duration-300 hover:scale-105 cursor-pointer ${
+                        stats.overdueReminders > 0
+                          ? 'bg-red-500/30 border-red-400/50 hover:bg-red-500/40'
+                          : stats.approachingReminders > 0
+                          ? 'bg-orange-500/30 border-orange-400/50 hover:bg-orange-500/40'
+                          : 'bg-white/10 border-white/20 hover:bg-white/15'
+                      }`}
+                      onClick={() => {
+                        setShowNotifications(true);
+                        if (isMobile) {
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }
+                      }}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-white/80 text-xs font-medium">Needs Attention</p>
+                        <AlertCircle className={`w-4 h-4  text-[#ffffff] ${
+                          stats.overdueReminders > 0 ? 'text-red-200' : stats.approachingReminders > 0 ? 'text-orange-200' : 'text-white/60'
+                        }`} />
+                      </div>
+                      <p className="text-2xl font-bold">{stats.overdueReminders + stats.approachingReminders}</p>
+                      {stats.overdueReminders > 0 && (
+                        <p className="text-xs text-red-200 mt-1">{stats.overdueReminders} overdue</p>
+                      )}
                     </div>
-                    <p className="text-2xl font-bold">{stats.overdueReminders + stats.approachingReminders}</p>
-                    {stats.overdueReminders > 0 && (
-                      <p className="text-xs text-red-200 mt-1">{stats.overdueReminders} overdue</p>
-                    )}
-                  </div>
+                  </Tooltip>
 
                   {(isSuperAdmin || user?.role?.name?.toLowerCase() === 'manager') && (
-                    <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('reports')}>
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-white/80 text-xs font-medium">Total Value</p>
-                        <Banknote className="w-4 h-4 text-[#ffffff]" />
+                    <Tooltip content={helpContent.dashboard.stats.totalValue} position="bottom">
+                      <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 hover:scale-105 cursor-pointer" onClick={() => navigateToView('reports')}>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-white/80 text-xs font-medium">Total Value</p>
+                          <Banknote className="w-4 h-4 text-[#ffffff]" />
+                        </div>
+                        <p className="text-2xl font-bold">R{stats.totalValue.toLocaleString()}</p>
                       </div>
-                      <p className="text-2xl font-bold">R{stats.totalValue.toLocaleString()}</p>
-                    </div>
+                    </Tooltip>
                   )}
                 </div>
               </div>
@@ -1070,8 +1077,13 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
             {/* Priority Filter Tabs */}
             <div className="space-y-2 mt-[60px] pt-[30px]">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="flex items-center gap-2">
                   <h3 className="text-[20px] font-semibold text-ars-heading mb-1">Filter by Priority</h3>
+                  <HelpIcon 
+                    title={helpContent.dashboard.overdueJobs.title}
+                    content={helpContent.dashboard.overdueJobs.description}
+                    position="right"
+                  />
                 </div>
               </div>
               <div className="flex items-center gap-1.5 pb-2 -mx-1 px-1 overflow-visible">

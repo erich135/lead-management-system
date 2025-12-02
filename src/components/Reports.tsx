@@ -40,12 +40,16 @@ import {
   FileText,
   Clock,
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
   XCircle,
   Eye,
-  Edit2
+  Edit2,
+  Send
 } from 'lucide-react';
 import { LeadDetails } from './LeadDetails';
+import { HelpIcon } from './ui';
+import { helpContent } from '../config/helpContent';
 
 interface ReportsProps {
   statuses: any[];
@@ -56,7 +60,9 @@ type ReportTab = 'user-performance' | 'customer' | 'machine';
 
 type UserRole = 'admin' | 'rep' | 'technician';
 
-type DateRangePreset = 'today' | 'this-month' | 'last-month' | 'custom';
+type DateRangePreset = 'today' | 'this-month' | 'last-month' | 'all-time' | 'custom';
+
+type UserPerformanceSection = 'overdue' | 'jobs' | 'activities' | 'conversion';
 
 export function Reports({ statuses, branches }: ReportsProps) {
   const { user: currentUser } = useAuth();
@@ -70,6 +76,9 @@ export function Reports({ statuses, branches }: ReportsProps) {
   const [selectedTechnician, setSelectedTechnician] = useState<string>('');
   const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>('this-month');
   const [customDateFrom, setCustomDateFrom] = useState<string>('');
+  
+  // Section selector for User Performance
+  const [activeSection, setActiveSection] = useState<UserPerformanceSection>('overdue');
   const [customDateTo, setCustomDateTo] = useState<string>('');
   
   // Customer Report State
@@ -83,19 +92,26 @@ export function Reports({ statuses, branches }: ReportsProps) {
   // Overdue Jobs Filters
   const [overdueStatusFilter, setOverdueStatusFilter] = useState<string>('');
   const [overdueAdminFilter, setOverdueAdminFilter] = useState<string>('');
+  const [overdueRepFilter, setOverdueRepFilter] = useState<string>('');
+  const [overdueBranchFilter, setOverdueBranchFilter] = useState<string>('');
   const [overdueStatusChangedFrom, setOverdueStatusChangedFrom] = useState<string>('');
   const [overdueStatusChangedTo, setOverdueStatusChangedTo] = useState<string>('');
   
   // All Jobs Filters
   const [jobsStatusFilter, setJobsStatusFilter] = useState<string>('');
   const [jobsAdminFilter, setJobsAdminFilter] = useState<string>('');
+  const [jobsRepFilter, setJobsRepFilter] = useState<string>('');
+  const [jobsBranchFilter, setJobsBranchFilter] = useState<string>('');
   const [jobsStatusChangedFrom, setJobsStatusChangedFrom] = useState<string>('');
   const [jobsStatusChangedTo, setJobsStatusChangedTo] = useState<string>('');
   
   // Conversion Time Tracker State
   const [conversionAdminFilter, setConversionAdminFilter] = useState<string>('');
+  const [conversionRepFilter, setConversionRepFilter] = useState<string>('');
+  const [conversionBranchFilter, setConversionBranchFilter] = useState<string>('');
   const [conversionDateFrom, setConversionDateFrom] = useState<string>('');
   const [conversionDateTo, setConversionDateTo] = useState<string>('');
+  const [conversionCompleteOnly, setConversionCompleteOnly] = useState<boolean>(false); // Only show jobs with complete workflow
   
   // Data State
   const [users, setUsers] = useState<User[]>([]);
@@ -112,6 +128,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
   const [allMachines, setAllMachines] = useState<Machine[]>([]);
   const [machineJobs, setMachineJobs] = useState<Job[]>([]);
   const [conversionJobs, setConversionJobs] = useState<Job[]>([]);
+  const [allConversionJobs, setAllConversionJobs] = useState<Job[]>([]); // Unfiltered for dropdown population
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -140,7 +157,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
     if (activeTab === 'customer' && selectedCustomerId) {
       loadCustomerData();
     }
-  }, [activeTab, selectedCustomerId]);
+  }, [activeTab, selectedCustomerId, dateRangePreset, customDateFrom, customDateTo]);
 
   /**
    * Loads machine data when machine tab is active or filters change.
@@ -252,6 +269,11 @@ export function Reports({ statuses, branches }: ReportsProps) {
       case 'last-month':
         startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
         endDate = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
+        break;
+      case 'all-time':
+        // Return empty dates to indicate all-time (no date filter)
+        startDate = '';
+        endDate = '';
         break;
       case 'custom':
         startDate = customDateFrom;
@@ -376,7 +398,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
       setLoading(true);
       setError(null);
 
-      // Build job filters
+      // Build job filters - only use date filters for API call
       const jobFilters: any = {
         allTime: 'true',
         limit: 10000, // Get all jobs
@@ -390,16 +412,38 @@ export function Reports({ statuses, branches }: ReportsProps) {
         jobFilters.endDate = conversionDateTo;
       }
 
-      // Load jobs (admin filtering will happen in calculateConversionMetrics)
+      // Load jobs
       const jobsResponse = await getJobs(jobFilters);
-      let jobs = jobsResponse.jobs || [];
+      const allJobs = jobsResponse.jobs || [];
+      
+      // Store all jobs for dropdown population (before filtering)
+      setAllConversionJobs(allJobs);
+      
+      // Apply frontend filters
+      let filteredJobs = [...allJobs];
       
       // Filter by admin on frontend if specified
       if (conversionAdminFilter) {
-        jobs = jobs.filter(job => job.adm === conversionAdminFilter);
+        filteredJobs = filteredJobs.filter(job => job.adm === conversionAdminFilter);
       }
       
-      setConversionJobs(jobs);
+      // Filter by rep code if specified
+      if (conversionRepFilter) {
+        filteredJobs = filteredJobs.filter(job => {
+          const repCode = typeof job.repCode === 'object' ? (job.repCode as any)?.code : null;
+          return repCode === conversionRepFilter;
+        });
+      }
+      
+      // Filter by branch if specified
+      if (conversionBranchFilter) {
+        filteredJobs = filteredJobs.filter(job => {
+          const branch = typeof job.branch === 'object' ? job.branch?.name : null;
+          return branch === conversionBranchFilter;
+        });
+      }
+      
+      setConversionJobs(filteredJobs);
 
     } catch (err: any) {
       console.error('Error loading conversion data:', err);
@@ -420,14 +464,22 @@ export function Reports({ statuses, branches }: ReportsProps) {
       if (!selectedCustomerId) return;
 
       const { startDate, endDate } = getDateRange();
+      const isAllTime = dateRangePreset === 'all-time';
 
-      // Load customer jobs
-      const jobsResponse = await getJobs({
+      // Load customer jobs - only pass dates if not all-time
+      const jobParams: any = {
         customer: selectedCustomerId,
-        allTime: 'true',
-        startDate,
-        endDate,
-      });
+        limit: 1000, // Get all jobs for this customer
+      };
+      
+      if (isAllTime) {
+        jobParams.allTime = 'true';
+      } else if (startDate && endDate) {
+        jobParams.startDate = startDate;
+        jobParams.endDate = endDate;
+      }
+      
+      const jobsResponse = await getJobs(jobParams);
       setCustomerJobs(jobsResponse.jobs || []);
 
       // Load customer machines
@@ -743,6 +795,22 @@ export function Reports({ statuses, branches }: ReportsProps) {
       });
     }
     
+    // Filter by rep code
+    if (overdueRepFilter) {
+      filtered = filtered.filter(oj => {
+        const repCode = typeof oj.job?.repCode === 'object' ? (oj.job.repCode as any)?.code : '';
+        return repCode.toLowerCase().includes(overdueRepFilter.toLowerCase());
+      });
+    }
+    
+    // Filter by branch
+    if (overdueBranchFilter) {
+      filtered = filtered.filter(oj => {
+        const branch = typeof oj.job?.branch === 'object' ? oj.job.branch?.name : '';
+        return branch?.toLowerCase().includes(overdueBranchFilter.toLowerCase());
+      });
+    }
+    
     // Filter by status changed date range
     if (overdueStatusChangedFrom) {
       filtered = filtered.filter(oj => {
@@ -764,7 +832,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
   }
 
   /**
-   * Filters all jobs by status, admin, and date range.
+   * Filters all jobs by status, admin, rep, branch, and date range.
    */
   function getFilteredJobs(): Job[] {
     let filtered = userJobs;
@@ -782,6 +850,22 @@ export function Reports({ statuses, branches }: ReportsProps) {
       filtered = filtered.filter(job => {
         const jobAdmin = job.adm || '';
         return jobAdmin.toLowerCase().includes(jobsAdminFilter.toLowerCase());
+      });
+    }
+    
+    // Filter by rep code
+    if (jobsRepFilter) {
+      filtered = filtered.filter(job => {
+        const repCode = typeof job.repCode === 'object' ? (job.repCode as any)?.code : '';
+        return repCode.toLowerCase().includes(jobsRepFilter.toLowerCase());
+      });
+    }
+    
+    // Filter by branch
+    if (jobsBranchFilter) {
+      filtered = filtered.filter(job => {
+        const branch = typeof job.branch === 'object' ? job.branch?.name : '';
+        return branch?.toLowerCase().includes(jobsBranchFilter.toLowerCase());
       });
     }
     
@@ -830,6 +914,30 @@ export function Reports({ statuses, branches }: ReportsProps) {
   }
 
   /**
+   * Gets unique rep codes from overdue jobs.
+   */
+  function getUniqueOverdueReps(): string[] {
+    const repSet = new Set<string>();
+    userOverdueJobs.forEach(oj => {
+      const repCode = typeof oj.job?.repCode === 'object' ? (oj.job.repCode as any)?.code : null;
+      if (repCode) repSet.add(repCode);
+    });
+    return Array.from(repSet).sort();
+  }
+
+  /**
+   * Gets unique branches from overdue jobs.
+   */
+  function getUniqueOverdueBranches(): string[] {
+    const branchSet = new Set<string>();
+    userOverdueJobs.forEach(oj => {
+      const branch = typeof oj.job?.branch === 'object' ? oj.job.branch?.name : null;
+      if (branch) branchSet.add(branch);
+    });
+    return Array.from(branchSet).sort();
+  }
+
+  /**
    * Gets unique statuses from all jobs.
    */
   function getUniqueJobStatuses(): string[] {
@@ -854,11 +962,91 @@ export function Reports({ statuses, branches }: ReportsProps) {
   }
 
   /**
+   * Gets unique rep codes from all jobs.
+   */
+  function getUniqueJobReps(): string[] {
+    const repSet = new Set<string>();
+    userJobs.forEach(job => {
+      const repCode = typeof job.repCode === 'object' ? (job.repCode as any)?.code : null;
+      if (repCode) repSet.add(repCode);
+    });
+    return Array.from(repSet).sort();
+  }
+
+  /**
+   * Gets unique branches from all jobs.
+   */
+  function getUniqueJobBranches(): string[] {
+    const branchSet = new Set<string>();
+    userJobs.forEach(job => {
+      const branch = typeof job.branch === 'object' ? job.branch?.name : null;
+      if (branch) branchSet.add(branch);
+    });
+    return Array.from(branchSet).sort();
+  }
+
+  /**
+   * Gets unique admin codes from all conversion jobs (unfiltered).
+   */
+  function getUniqueConversionAdmins(): string[] {
+    const adminSet = new Set<string>();
+    allConversionJobs.forEach(job => {
+      const admin = job.adm;
+      if (admin) adminSet.add(admin);
+    });
+    return Array.from(adminSet).sort();
+  }
+
+  /**
+   * Gets unique rep codes from all conversion jobs (unfiltered).
+   */
+  function getUniqueConversionReps(): string[] {
+    const repSet = new Set<string>();
+    allConversionJobs.forEach(job => {
+      const repCode = typeof job.repCode === 'object' ? (job.repCode as any)?.code : null;
+      if (repCode) repSet.add(repCode);
+    });
+    return Array.from(repSet).sort();
+  }
+
+  /**
+   * Gets unique branches from all conversion jobs (unfiltered).
+   */
+  function getUniqueConversionBranches(): string[] {
+    const branchSet = new Set<string>();
+    allConversionJobs.forEach(job => {
+      const branch = typeof job.branch === 'object' ? job.branch?.name : null;
+      if (branch) branchSet.add(branch);
+    });
+    return Array.from(branchSet).sort();
+  }
+
+  /**
    * Calculates conversion time metrics.
+   * When conversionCompleteOnly is true, only uses jobs with ALL date fields present.
    */
   function calculateConversionMetrics() {
-    // Use conversionJobs instead of filtering userJobs
-    const filteredJobs = conversionJobs;
+    let filteredJobs = conversionJobs;
+    
+    // If "complete workflow only" is enabled, filter to jobs with all dates
+    if (conversionCompleteOnly) {
+      filteredJobs = filteredJobs.filter(job => 
+        job.startDate && 
+        job.dateQuoted && 
+        job.dateSentToClient && 
+        job.poDate && 
+        job.invoiceDate
+      );
+    }
+    
+    // Calculate metrics for complete workflow jobs (for consistent totals)
+    const completeWorkflowJobs = filteredJobs.filter(job => 
+      job.startDate && 
+      job.dateQuoted && 
+      job.dateSentToClient && 
+      job.poDate && 
+      job.invoiceDate
+    );
     
     // Calculate average days between status transitions
     const metrics = {
@@ -872,30 +1060,49 @@ export function Reports({ statuses, branches }: ReportsProps) {
       startToInvoiced: [] as number[],
     };
     
+    // Complete workflow metrics (where numbers will add up)
+    const completeMetrics = {
+      startToQuoted: [] as number[],
+      quotedToSentToClient: [] as number[],
+      sentToClientToAwaitingPO: [] as number[],
+      inProgressToJobDone: [] as number[],
+      startToInvoiced: [] as number[],
+    };
+    
     filteredJobs.forEach(job => {
       if (!job.startDate) return;
       
       const startDate = new Date(job.startDate).getTime();
       const quotedDate = job.dateQuoted ? new Date(job.dateQuoted).getTime() : null;
+      const sentToClientDate = job.dateSentToClient ? new Date(job.dateSentToClient).getTime() : null;
       const poDate = job.poDate ? new Date(job.poDate).getTime() : null;
       const invoiceDate = job.invoiceDate ? new Date(job.invoiceDate).getTime() : null;
       
-      // Start to Quoted
+      // Start to Quoted (only count positive values - negative means data error)
       if (quotedDate) {
         const days = (quotedDate - startDate) / (1000 * 60 * 60 * 24);
         if (days >= 0) metrics.startToQuoted.push(days);
       }
       
-      // For other transitions, we'd need status change history
-      // For now, using available date fields
+      // Quoted to Sent to Client
+      if (quotedDate && sentToClientDate) {
+        const days = (sentToClientDate - quotedDate) / (1000 * 60 * 60 * 24);
+        if (days >= 0) metrics.quotedToSentToClient.push(days);
+      }
       
-      // Awaiting PO (using PO date as proxy)
-      if (quotedDate && poDate) {
+      // Sent to Client to Awaiting PO (client decision time - the sticky point!)
+      if (sentToClientDate && poDate) {
+        const days = (poDate - sentToClientDate) / (1000 * 60 * 60 * 24);
+        if (days >= 0) metrics.sentToClientToAwaitingPO.push(days);
+      }
+      
+      // Awaiting PO to In Progress (using PO date - if no sentToClient, fall back to quoted)
+      if (!sentToClientDate && quotedDate && poDate) {
         const days = (poDate - quotedDate) / (1000 * 60 * 60 * 24);
         if (days >= 0) metrics.awaitingPOToInProgress.push(days);
       }
       
-      // Job Done to Invoiced (using invoice date)
+      // PO to Invoiced (job execution time)
       if (poDate && invoiceDate) {
         const days = (invoiceDate - poDate) / (1000 * 60 * 60 * 24);
         if (days >= 0) metrics.inProgressToJobDone.push(days);
@@ -905,6 +1112,29 @@ export function Reports({ statuses, branches }: ReportsProps) {
       if (invoiceDate) {
         const days = (invoiceDate - startDate) / (1000 * 60 * 60 * 24);
         if (days >= 0) metrics.startToInvoiced.push(days);
+      }
+    });
+    
+    // Calculate complete workflow metrics separately (these will add up correctly)
+    completeWorkflowJobs.forEach(job => {
+      const startDate = new Date(job.startDate!).getTime();
+      const quotedDate = new Date(job.dateQuoted!).getTime();
+      const sentToClientDate = new Date(job.dateSentToClient!).getTime();
+      const poDate = new Date(job.poDate!).getTime();
+      const invoiceDate = new Date(job.invoiceDate!).getTime();
+      
+      // Only include if all segments are positive (valid data)
+      const d1 = (quotedDate - startDate) / (1000 * 60 * 60 * 24);
+      const d2 = (sentToClientDate - quotedDate) / (1000 * 60 * 60 * 24);
+      const d3 = (poDate - sentToClientDate) / (1000 * 60 * 60 * 24);
+      const d4 = (invoiceDate - poDate) / (1000 * 60 * 60 * 24);
+      
+      if (d1 >= 0 && d2 >= 0 && d3 >= 0 && d4 >= 0) {
+        completeMetrics.startToQuoted.push(d1);
+        completeMetrics.quotedToSentToClient.push(d2);
+        completeMetrics.sentToClientToAwaitingPO.push(d3);
+        completeMetrics.inProgressToJobDone.push(d4);
+        completeMetrics.startToInvoiced.push(d1 + d2 + d3 + d4);
       }
     });
     
@@ -933,6 +1163,15 @@ export function Reports({ statuses, branches }: ReportsProps) {
         jobDoneToRSRNeeded: metrics.jobDoneToRSRNeeded.length,
         rsrNeededToInvoiced: metrics.rsrNeededToInvoiced.length,
         startToInvoiced: metrics.startToInvoiced.length,
+      },
+      // Complete workflow metrics (these add up correctly)
+      complete: {
+        avgStartToQuoted: calculateAverage(completeMetrics.startToQuoted),
+        avgQuotedToSentToClient: calculateAverage(completeMetrics.quotedToSentToClient),
+        avgSentToClientToAwaitingPO: calculateAverage(completeMetrics.sentToClientToAwaitingPO),
+        avgInProgressToJobDone: calculateAverage(completeMetrics.inProgressToJobDone),
+        avgTotal: calculateAverage(completeMetrics.startToInvoiced),
+        jobCount: completeMetrics.startToInvoiced.length,
       }
     };
   }
@@ -1057,7 +1296,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
   }
 
   /**
-   * Calculates customer statistics.
+   * Calculates comprehensive customer statistics.
    */
   function calculateCustomerStats() {
     const totalJobs = customerJobs.length;
@@ -1078,6 +1317,58 @@ export function Reports({ statuses, branches }: ReportsProps) {
         .filter(Boolean)
     );
 
+    // Jobs by status breakdown
+    const jobsByStatus: Record<string, { count: number; value: number }> = {};
+    customerJobs.forEach(job => {
+      const statusName = job.status?.name || 'No Status';
+      if (!jobsByStatus[statusName]) {
+        jobsByStatus[statusName] = { count: 0, value: 0 };
+      }
+      jobsByStatus[statusName].count++;
+      jobsByStatus[statusName].value += job.valueExVat || 0;
+    });
+
+    // Financial breakdown
+    const quotedValue = customerJobs
+      .filter(j => j.dateQuoted && !j.invoiceDate)
+      .reduce((sum, j) => sum + (j.valueExVat || 0), 0);
+    const invoicedValue = customerJobs
+      .filter(j => j.invoiceDate)
+      .reduce((sum, j) => sum + (j.valueExVat || 0), 0);
+    const pendingValue = customerJobs
+      .filter(j => !j.dateQuoted && !j.invoiceDate)
+      .reduce((sum, j) => sum + (j.valueExVat || 0), 0);
+    const avgJobValue = totalJobs > 0 ? totalValue / totalJobs : 0;
+
+    // Jobs over time (by month)
+    const jobsByMonth: Record<string, { count: number; value: number }> = {};
+    customerJobs.forEach(job => {
+      const date = job.startDate ? new Date(job.startDate) : new Date(job.createdAt);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (!jobsByMonth[monthKey]) {
+        jobsByMonth[monthKey] = { count: 0, value: 0 };
+      }
+      jobsByMonth[monthKey].count++;
+      jobsByMonth[monthKey].value += job.valueExVat || 0;
+    });
+
+    // Team details with names
+    const adminDetails = Array.from(admins).map(adm => ({
+      code: adm as string,
+      jobCount: customerJobs.filter(j => j.adm === adm).length,
+      totalValue: customerJobs.filter(j => j.adm === adm).reduce((sum, j) => sum + (j.valueExVat || 0), 0),
+    }));
+    const repDetails = Array.from(repCodes).map(code => ({
+      code: code as string,
+      jobCount: customerJobs.filter(j => typeof j.repCode === 'object' && (j.repCode as any)?.code === code).length,
+      totalValue: customerJobs.filter(j => typeof j.repCode === 'object' && (j.repCode as any)?.code === code).reduce((sum, j) => sum + (j.valueExVat || 0), 0),
+    }));
+    const techDetails = Array.from(technicians).map(name => ({
+      name: name as string,
+      jobCount: customerJobs.filter(j => typeof j.techBooked === 'object' && (j.techBooked as any)?.name === name).length,
+      totalValue: customerJobs.filter(j => typeof j.techBooked === 'object' && (j.techBooked as any)?.name === name).reduce((sum, j) => sum + (j.valueExVat || 0), 0),
+    }));
+
     return {
       totalJobs,
       totalValue,
@@ -1086,6 +1377,16 @@ export function Reports({ statuses, branches }: ReportsProps) {
       uniqueAdmins: admins.size,
       uniqueRepCodes: repCodes.size,
       uniqueTechnicians: technicians.size,
+      // New comprehensive stats
+      jobsByStatus,
+      quotedValue,
+      invoicedValue,
+      pendingValue,
+      avgJobValue,
+      jobsByMonth,
+      adminDetails,
+      repDetails,
+      techDetails,
     };
   }
 
@@ -1275,7 +1576,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
                 {/* Date Range Preset */}
                 <div>
-                  <label className="block text-sm font-semibold text-ars-heading mb-2 flex items-center gap-2">
+                  <label className="text-sm font-semibold text-ars-heading mb-2 flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
                     Date Range
                   </label>
@@ -1287,6 +1588,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     <option value="today">Today</option>
                     <option value="this-month">This Month</option>
                     <option value="last-month">Last Month</option>
+                    <option value="all-time">All Time</option>
                     <option value="custom">Custom Range</option>
                   </select>
                 </div>
@@ -1352,8 +1654,59 @@ export function Reports({ statuses, branches }: ReportsProps) {
               </div>
             </div>
 
+            {/* Section Selector */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-md p-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-semibold text-ars-heading mr-2">View Section:</span>
+                <button
+                  onClick={() => setActiveSection('overdue')}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 ${
+                    activeSection === 'overdue'
+                      ? 'bg-red-500 text-white shadow-md'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <AlertCircle className="w-4 h-4" />
+                  Overdue Jobs ({userOverdueJobs.length})
+                </button>
+                <button
+                  onClick={() => setActiveSection('jobs')}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 ${
+                    activeSection === 'jobs'
+                      ? 'bg-blue-500 text-white shadow-md'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <FileText className="w-4 h-4" />
+                  All Jobs ({userJobs.length})
+                </button>
+                <button
+                  onClick={() => setActiveSection('activities')}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 ${
+                    activeSection === 'activities'
+                      ? 'bg-purple-500 text-white shadow-md'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <Clock className="w-4 h-4" />
+                  Activities ({userActivities.length})
+                </button>
+                <button
+                  onClick={() => setActiveSection('conversion')}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 ${
+                    activeSection === 'conversion'
+                      ? 'bg-green-500 text-white shadow-md'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  Conversion Tracker
+                </button>
+              </div>
+            </div>
+
             {/* Overdue Jobs */}
-            {userOverdueJobs.length > 0 && (
+            {activeSection === 'overdue' && userOverdueJobs.length > 0 && (
               <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
                 <h3 className="text-lg font-bold text-ars-heading mb-4">Overdue Jobs</h3>
                 
@@ -1363,7 +1716,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     <Filter className="w-4 h-4" />
                     Filter Overdue Jobs
                   </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
                       <select
@@ -1391,6 +1744,32 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       </select>
                     </div>
                     <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Rep Code</label>
+                      <select
+                        value={overdueRepFilter}
+                        onChange={(e) => setOverdueRepFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        <option value="">All Reps</option>
+                        {getUniqueOverdueReps().map(rep => (
+                          <option key={rep} value={rep}>{rep}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Branch</label>
+                      <select
+                        value={overdueBranchFilter}
+                        onChange={(e) => setOverdueBranchFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        <option value="">All Branches</option>
+                        {getUniqueOverdueBranches().map(branch => (
+                          <option key={branch} value={branch}>{branch}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Status Changed From</label>
                       <input
                         type="date"
@@ -1409,8 +1788,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       />
                     </div>
                   </div>
-                  {(overdueStatusFilter || overdueAdminFilter || overdueStatusChangedFrom || overdueStatusChangedTo) && (
-                    <div className="mt-3 flex items-center gap-2">
+                  {(overdueStatusFilter || overdueAdminFilter || overdueRepFilter || overdueBranchFilter || overdueStatusChangedFrom || overdueStatusChangedTo) && (
+                    <div className="mt-3 flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-gray-600">Active filters:</span>
                       {overdueStatusFilter && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
@@ -1420,6 +1799,16 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       {overdueAdminFilter && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
                           Admin: {overdueAdminFilter}
+                        </span>
+                      )}
+                      {overdueRepFilter && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">
+                          Rep: {overdueRepFilter}
+                        </span>
+                      )}
+                      {overdueBranchFilter && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs">
+                          Branch: {overdueBranchFilter}
                         </span>
                       )}
                       {overdueStatusChangedFrom && (
@@ -1436,6 +1825,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
                         onClick={() => {
                           setOverdueStatusFilter('');
                           setOverdueAdminFilter('');
+                          setOverdueRepFilter('');
+                          setOverdueBranchFilter('');
                           setOverdueStatusChangedFrom('');
                           setOverdueStatusChangedTo('');
                         }}
@@ -1488,12 +1879,21 @@ export function Reports({ statuses, branches }: ReportsProps) {
               </div>
             )}
 
+            {/* Empty state for overdue when no jobs */}
+            {activeSection === 'overdue' && userOverdueJobs.length === 0 && (
+              <div className="bg-white rounded-xl border border-gray-200 shadow-md p-8 text-center">
+                <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                <h3 className="text-lg font-bold text-ars-heading mb-2">No Overdue Jobs!</h3>
+                <p className="text-sm text-ars-body">All jobs are on track. Great work!</p>
+              </div>
+            )}
+
             {/* Recent Activities */}
-            {userActivities.length > 0 && (
+            {activeSection === 'activities' && userActivities.length > 0 && (
               <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
                 <h3 className="text-lg font-bold text-ars-heading mb-4">Recent Activities</h3>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {userActivities.slice(0, 50).map(activity => (
+                <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                  {userActivities.slice(0, 100).map(activity => (
                     <div key={activity._id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
                       <div className="flex-shrink-0 mt-1">
                         {activity.action === 'create' && <CheckCircle2 className="w-4 h-4 text-green-500" />}
@@ -1516,8 +1916,17 @@ export function Reports({ statuses, branches }: ReportsProps) {
               </div>
             )}
 
+            {/* Empty state for activities */}
+            {activeSection === 'activities' && userActivities.length === 0 && (
+              <div className="bg-white rounded-xl border border-gray-200 shadow-md p-8 text-center">
+                <Clock className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                <h3 className="text-lg font-bold text-ars-heading mb-2">No Activities Found</h3>
+                <p className="text-sm text-ars-body">No recent activities for this user in the selected period.</p>
+              </div>
+            )}
+
             {/* Jobs List */}
-            {userJobs.length > 0 && (
+            {activeSection === 'jobs' && userJobs.length > 0 && (
               <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
                 <h3 className="text-lg font-bold text-ars-heading mb-4">Jobs ({userJobs.length})</h3>
                 
@@ -1527,7 +1936,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     <Filter className="w-4 h-4" />
                     Filter Jobs
                   </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
                       <select
@@ -1555,6 +1964,32 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       </select>
                     </div>
                     <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Rep Code</label>
+                      <select
+                        value={jobsRepFilter}
+                        onChange={(e) => setJobsRepFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        <option value="">All Reps</option>
+                        {getUniqueJobReps().map(rep => (
+                          <option key={rep} value={rep}>{rep}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Branch</label>
+                      <select
+                        value={jobsBranchFilter}
+                        onChange={(e) => setJobsBranchFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        <option value="">All Branches</option>
+                        {getUniqueJobBranches().map(branch => (
+                          <option key={branch} value={branch}>{branch}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Status Changed From</label>
                       <input
                         type="date"
@@ -1573,8 +2008,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       />
                     </div>
                   </div>
-                  {(jobsStatusFilter || jobsAdminFilter || jobsStatusChangedFrom || jobsStatusChangedTo) && (
-                    <div className="mt-3 flex items-center gap-2">
+                  {(jobsStatusFilter || jobsAdminFilter || jobsRepFilter || jobsBranchFilter || jobsStatusChangedFrom || jobsStatusChangedTo) && (
+                    <div className="mt-3 flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-gray-600">Active filters:</span>
                       {jobsStatusFilter && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
@@ -1584,6 +2019,16 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       {jobsAdminFilter && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
                           Admin: {jobsAdminFilter}
+                        </span>
+                      )}
+                      {jobsRepFilter && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">
+                          Rep: {jobsRepFilter}
+                        </span>
+                      )}
+                      {jobsBranchFilter && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs">
+                          Branch: {jobsBranchFilter}
                         </span>
                       )}
                       {jobsStatusChangedFrom && (
@@ -1600,6 +2045,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
                         onClick={() => {
                           setJobsStatusFilter('');
                           setJobsAdminFilter('');
+                          setJobsRepFilter('');
+                          setJobsBranchFilter('');
                           setJobsStatusChangedFrom('');
                           setJobsStatusChangedTo('');
                         }}
@@ -1611,7 +2058,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                   )}
                 </div>
                 
-                <div className="space-y-3 max-h-96 overflow-y-auto">
+                <div className="space-y-3 max-h-[600px] overflow-y-auto">
                   {getFilteredJobs().length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
                       <p className="text-sm">No jobs match the selected filters.</p>
@@ -1684,10 +2131,26 @@ export function Reports({ statuses, branches }: ReportsProps) {
               </div>
             )}
 
+            {/* Empty state for jobs */}
+            {activeSection === 'jobs' && userJobs.length === 0 && (
+              <div className="bg-white rounded-xl border border-gray-200 shadow-md p-8 text-center">
+                <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                <h3 className="text-lg font-bold text-ars-heading mb-2">No Jobs Found</h3>
+                <p className="text-sm text-ars-body">No jobs for this user in the selected period.</p>
+              </div>
+            )}
+
             {/* Conversion Time Tracker */}
-            {userJobs.length > 0 && (
+            {activeSection === 'conversion' && (
               <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-                <h3 className="text-lg font-bold text-ars-heading mb-4">Conversion Time Tracker</h3>
+                <div className="flex items-center gap-2 mb-4">
+                  <h3 className="text-lg font-bold text-ars-heading">Conversion Time Tracker</h3>
+                  <HelpIcon 
+                    title={helpContent.reports.conversionTracker.title}
+                    content={helpContent.reports.conversionTracker.description}
+                    position="right"
+                  />
+                </div>
                 
                 {/* Conversion Tracker Filters */}
                 <div className="mb-4 p-4 bg-gray-50 rounded-lg">
@@ -1695,7 +2158,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     <Filter className="w-4 h-4" />
                     Filter Analysis
                   </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Admin</label>
                       <select
@@ -1704,8 +2167,34 @@ export function Reports({ statuses, branches }: ReportsProps) {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                       >
                         <option value="">All Admins</option>
-                        {getUniqueJobAdmins().map(admin => (
+                        {getUniqueConversionAdmins().map(admin => (
                           <option key={admin} value={admin}>{admin}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Rep Code</label>
+                      <select
+                        value={conversionRepFilter}
+                        onChange={(e) => setConversionRepFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        <option value="">All Reps</option>
+                        {getUniqueConversionReps().map(rep => (
+                          <option key={rep} value={rep}>{rep}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Branch</label>
+                      <select
+                        value={conversionBranchFilter}
+                        onChange={(e) => setConversionBranchFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        <option value="">All Branches</option>
+                        {getUniqueConversionBranches().map(branch => (
+                          <option key={branch} value={branch}>{branch}</option>
                         ))}
                       </select>
                     </div>
@@ -1728,12 +2217,22 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       />
                     </div>
                   </div>
-                  {(conversionAdminFilter || conversionDateFrom || conversionDateTo) && (
-                    <div className="mt-3 flex items-center gap-2">
+                  {(conversionAdminFilter || conversionRepFilter || conversionBranchFilter || conversionDateFrom || conversionDateTo) && (
+                    <div className="mt-3 flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-gray-600">Active filters:</span>
                       {conversionAdminFilter && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
                           Admin: {conversionAdminFilter}
+                        </span>
+                      )}
+                      {conversionRepFilter && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">
+                          Rep: {conversionRepFilter}
+                        </span>
+                      )}
+                      {conversionBranchFilter && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs">
+                          Branch: {conversionBranchFilter}
                         </span>
                       )}
                       {conversionDateFrom && (
@@ -1749,6 +2248,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       <button
                         onClick={() => {
                           setConversionAdminFilter('');
+                          setConversionRepFilter('');
+                          setConversionBranchFilter('');
                           setConversionDateFrom('');
                           setConversionDateTo('');
                           loadConversionData();
@@ -1759,26 +2260,56 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       </button>
                     </div>
                   )}
-                  <div className="mt-3">
+                  
+                  {/* Complete Workflow Toggle */}
+                  <div className="mt-3 flex items-center justify-between flex-wrap gap-3">
                     <button
                       onClick={loadConversionData}
                       className="px-4 py-2 bg-ars-primary text-white rounded-lg hover:bg-ars-primary/90 transition-colors text-sm font-medium"
                     >
                       Load Data
                     </button>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={conversionCompleteOnly}
+                        onChange={(e) => setConversionCompleteOnly(e.target.checked)}
+                        className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary"
+                      />
+                      <span className="text-sm text-gray-700">Complete workflow only</span>
+                      <span className="text-xs text-gray-500">(numbers will add up)</span>
+                    </label>
                   </div>
                 </div>
 
                 {/* Conversion Metrics */}
                 {(() => {
                   const metrics = calculateConversionMetrics();
+                  const segmentsTotal = metrics.avgStartToQuoted + metrics.avgQuotedToSentToClient + 
+                    metrics.avgSentToClientToAwaitingPO + metrics.avgInProgressToJobDone;
+                  const showMismatchNote = !conversionCompleteOnly && 
+                    Math.abs(segmentsTotal - metrics.avgStartToInvoiced) > 1 && 
+                    metrics.avgStartToInvoiced > 0;
+                  
                   return (
                     <>
                       <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-semibold text-blue-900">
-                            Analyzing {metrics.jobCount} jobs
-                          </p>
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div>
+                            <p className="text-sm font-semibold text-blue-900">
+                              Analyzing {metrics.jobCount} jobs
+                              {conversionCompleteOnly && metrics.complete.jobCount > 0 && (
+                                <span className="font-normal text-blue-700 ml-1">
+                                  ({metrics.complete.jobCount} with complete workflow)
+                                </span>
+                              )}
+                            </p>
+                            {!conversionCompleteOnly && metrics.complete.jobCount > 0 && (
+                              <p className="text-xs text-blue-600 mt-1">
+                                💡 {metrics.complete.jobCount} jobs have complete workflow data - enable "Complete workflow only" for consistent totals
+                              </p>
+                            )}
+                          </div>
                           {conversionAdminFilter && (
                             <p className="text-xs text-blue-700">Admin: {conversionAdminFilter}</p>
                           )}
@@ -1788,14 +2319,28 @@ export function Reports({ statuses, branches }: ReportsProps) {
                             Period: {conversionDateFrom || 'Start'} to {conversionDateTo || 'End'}
                           </p>
                         )}
+                        {showMismatchNote && (
+                          <p className="text-xs text-amber-700 mt-2 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" />
+                            Note: Segment averages ({segmentsTotal.toFixed(1)}d) ≠ Total ({metrics.avgStartToInvoiced.toFixed(1)}d) because each is calculated from different job sets
+                          </p>
+                        )}
                       </div>
 
                       {/* Metrics Grid */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                         {/* Start to Quoted */}
                         <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
                           <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs font-semibold text-blue-900">Start → Quoted</p>
+                            <div className="flex items-center gap-1">
+                              <p className="text-xs font-semibold text-blue-900">Start → Quoted</p>
+                              <HelpIcon 
+                                title={helpContent.reports.conversionTracker.metrics.startToQuoted.title}
+                                content={helpContent.reports.conversionTracker.metrics.startToQuoted.description}
+                                size="sm"
+                                position="top"
+                              />
+                            </div>
                             <Clock className="w-4 h-4 text-blue-600" />
                           </div>
                           <p className="text-2xl font-bold text-blue-900">
@@ -1805,36 +2350,81 @@ export function Reports({ statuses, branches }: ReportsProps) {
                           <p className="text-xs text-blue-600 mt-1">({metrics.counts.startToQuoted} jobs)</p>
                         </div>
 
-                        {/* Awaiting PO to In Progress */}
-                        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 border border-orange-200">
+                        {/* Quoted to Sent to Client */}
+                        <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg p-4 border border-indigo-200">
                           <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs font-semibold text-orange-900">Awaiting PO → In Progress</p>
-                            <Clock className="w-4 h-4 text-orange-600" />
+                            <div className="flex items-center gap-1">
+                              <p className="text-xs font-semibold text-indigo-900">Quoted → Sent</p>
+                              <HelpIcon 
+                                title={helpContent.reports.conversionTracker.metrics.quotedToSent.title}
+                                content={helpContent.reports.conversionTracker.metrics.quotedToSent.description}
+                                size="sm"
+                                position="top"
+                              />
+                            </div>
+                            <Send className="w-4 h-4 text-indigo-600" />
                           </div>
-                          <p className="text-2xl font-bold text-orange-900">
-                            {metrics.avgAwaitingPOToInProgress > 0 ? metrics.avgAwaitingPOToInProgress.toFixed(1) : '0'}
+                          <p className="text-2xl font-bold text-indigo-900">
+                            {metrics.avgQuotedToSentToClient > 0 ? metrics.avgQuotedToSentToClient.toFixed(1) : '0'}
                           </p>
-                          <p className="text-xs text-orange-700 mt-1">days average</p>
-                          <p className="text-xs text-orange-600 mt-1">({metrics.counts.awaitingPOToInProgress} jobs)</p>
+                          <p className="text-xs text-indigo-700 mt-1">days average</p>
+                          <p className="text-xs text-indigo-600 mt-1">({metrics.counts.quotedToSentToClient} jobs)</p>
                         </div>
 
-                        {/* In Progress to Job Done */}
+                        {/* Sent to Client to PO Received - THE STICKY POINT! */}
+                        <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg p-4 border-2 border-amber-400">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-1">
+                              <p className="text-xs font-semibold text-amber-900">Sent → PO ⚠️</p>
+                              <HelpIcon 
+                                title={helpContent.reports.conversionTracker.metrics.sentToPO.title}
+                                content={helpContent.reports.conversionTracker.metrics.sentToPO.description}
+                                size="sm"
+                                position="top"
+                              />
+                            </div>
+                            <AlertTriangle className="w-4 h-4 text-amber-600" />
+                          </div>
+                          <p className="text-2xl font-bold text-amber-900">
+                            {metrics.avgSentToClientToAwaitingPO > 0 ? metrics.avgSentToClientToAwaitingPO.toFixed(1) : '0'}
+                          </p>
+                          <p className="text-xs text-amber-700 mt-1">days (client decision)</p>
+                          <p className="text-xs text-amber-600 mt-1">({metrics.counts.sentToClientToAwaitingPO} jobs)</p>
+                        </div>
+
+                        {/* PO to Invoiced */}
                         <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
                           <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs font-semibold text-purple-900">In Progress → Job Done</p>
+                            <div className="flex items-center gap-1">
+                              <p className="text-xs font-semibold text-purple-900">PO → Invoiced</p>
+                              <HelpIcon 
+                                title={helpContent.reports.conversionTracker.metrics.poToInvoiced.title}
+                                content={helpContent.reports.conversionTracker.metrics.poToInvoiced.description}
+                                size="sm"
+                                position="top"
+                              />
+                            </div>
                             <Clock className="w-4 h-4 text-purple-600" />
                           </div>
                           <p className="text-2xl font-bold text-purple-900">
                             {metrics.avgInProgressToJobDone > 0 ? metrics.avgInProgressToJobDone.toFixed(1) : '0'}
                           </p>
-                          <p className="text-xs text-purple-700 mt-1">days average</p>
+                          <p className="text-xs text-purple-700 mt-1">days (execution)</p>
                           <p className="text-xs text-purple-600 mt-1">({metrics.counts.inProgressToJobDone} jobs)</p>
                         </div>
 
                         {/* Start to Invoiced (Total) */}
-                        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border-2 border-green-300">
+                        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border-2 border-green-300 col-span-1 md:col-span-2">
                           <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs font-semibold text-green-900">Start → Invoiced</p>
+                            <div className="flex items-center gap-1">
+                              <p className="text-xs font-semibold text-green-900">Start → Invoiced</p>
+                              <HelpIcon 
+                                title={helpContent.reports.conversionTracker.metrics.totalTime.title}
+                                content={helpContent.reports.conversionTracker.metrics.totalTime.description}
+                                size="sm"
+                                position="top"
+                              />
+                            </div>
                             <CheckCircle2 className="w-4 h-4 text-green-600" />
                           </div>
                           <p className="text-2xl font-bold text-green-900">
@@ -1850,48 +2440,51 @@ export function Reports({ statuses, branches }: ReportsProps) {
                         <h4 className="text-sm font-semibold text-ars-heading mb-4">Average Workflow Timeline</h4>
                         <div className="flex items-center gap-2 overflow-x-auto pb-2">
                           <div className="flex-shrink-0 text-center">
-                            <div className="w-24 bg-blue-500 text-white text-xs font-medium px-2 py-1 rounded">
-                              Start Date
+                            <div className="w-20 bg-blue-500 text-white text-xs font-medium px-2 py-1 rounded">
+                              Start
                             </div>
                           </div>
-                          <div className="flex-shrink-0 flex items-center gap-2">
+                          <div className="flex-shrink-0 flex items-center gap-1">
                             <div className="text-xs font-bold text-blue-600">
                               {metrics.avgStartToQuoted > 0 ? `${metrics.avgStartToQuoted.toFixed(0)}d` : '0d'}
                             </div>
-                            <div className="h-0.5 w-16 bg-blue-400"></div>
+                            <div className="h-0.5 w-10 bg-blue-400"></div>
                           </div>
                           <div className="flex-shrink-0 text-center">
-                            <div className="w-24 bg-blue-500 text-white text-xs font-medium px-2 py-1 rounded">
+                            <div className="w-20 bg-blue-500 text-white text-xs font-medium px-2 py-1 rounded">
                               Quoted
                             </div>
                           </div>
-                          <div className="flex-shrink-0 flex items-center gap-2">
-                            <div className="text-xs font-bold text-orange-600">
-                              {metrics.avgAwaitingPOToInProgress > 0 ? `${metrics.avgAwaitingPOToInProgress.toFixed(0)}d` : '0d'}
+                          <div className="flex-shrink-0 flex items-center gap-1">
+                            <div className="text-xs font-bold text-indigo-600">
+                              {metrics.avgQuotedToSentToClient > 0 ? `${metrics.avgQuotedToSentToClient.toFixed(0)}d` : '0d'}
                             </div>
-                            <div className="h-0.5 w-16 bg-orange-400"></div>
+                            <div className="h-0.5 w-10 bg-indigo-400"></div>
                           </div>
                           <div className="flex-shrink-0 text-center">
-                            <div className="w-28 bg-orange-500 text-white text-xs font-medium px-2 py-1 rounded">
-                              In Progress
+                            <div className="w-20 bg-indigo-500 text-white text-xs font-medium px-2 py-1 rounded">
+                              Sent
                             </div>
                           </div>
-                          <div className="flex-shrink-0 flex items-center gap-2">
+                          <div className="flex-shrink-0 flex items-center gap-1">
+                            <div className="text-xs font-bold text-amber-600">
+                              {metrics.avgSentToClientToAwaitingPO > 0 ? `${metrics.avgSentToClientToAwaitingPO.toFixed(0)}d` : '0d'}
+                            </div>
+                            <div className="h-0.5 w-10 bg-amber-400"></div>
+                          </div>
+                          <div className="flex-shrink-0 text-center">
+                            <div className="w-24 bg-amber-500 text-white text-xs font-medium px-2 py-1 rounded">
+                              PO Recv'd ⚠️
+                            </div>
+                          </div>
+                          <div className="flex-shrink-0 flex items-center gap-1">
                             <div className="text-xs font-bold text-purple-600">
                               {metrics.avgInProgressToJobDone > 0 ? `${metrics.avgInProgressToJobDone.toFixed(0)}d` : '0d'}
                             </div>
-                            <div className="h-0.5 w-16 bg-purple-400"></div>
+                            <div className="h-0.5 w-10 bg-purple-400"></div>
                           </div>
                           <div className="flex-shrink-0 text-center">
-                            <div className="w-24 bg-purple-500 text-white text-xs font-medium px-2 py-1 rounded">
-                              Job Done
-                            </div>
-                          </div>
-                          <div className="flex-shrink-0 flex items-center gap-2">
-                            <div className="h-0.5 w-16 bg-green-400"></div>
-                          </div>
-                          <div className="flex-shrink-0 text-center">
-                            <div className="w-24 bg-green-600 text-white text-xs font-medium px-2 py-1 rounded">
+                            <div className="w-20 bg-green-600 text-white text-xs font-medium px-2 py-1 rounded">
                               Invoiced
                             </div>
                           </div>
@@ -1900,6 +2493,12 @@ export function Reports({ statuses, branches }: ReportsProps) {
                           <p className="text-sm font-semibold text-gray-700">
                             Total Average: <span className="text-green-600">{metrics.avgStartToInvoiced > 0 ? metrics.avgStartToInvoiced.toFixed(1) : '0'} days</span>
                           </p>
+                          {metrics.counts.sentToClientToAwaitingPO > 0 && metrics.avgSentToClientToAwaitingPO > 7 && (
+                            <p className="text-xs text-amber-600 mt-1 flex items-center justify-center gap-1">
+                              <AlertTriangle className="w-3 h-3" />
+                              Client decision time is averaging {metrics.avgSentToClientToAwaitingPO.toFixed(1)} days - consider follow-up improvements
+                            </p>
+                          )}
                         </div>
                       </div>
                     </>
@@ -1936,7 +2535,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-ars-heading mb-2 flex items-center gap-2">
+                  <label className="text-sm font-semibold text-ars-heading mb-2 flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
                     Date Range
                   </label>
@@ -1948,6 +2547,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     <option value="today">Today</option>
                     <option value="this-month">This Month</option>
                     <option value="last-month">Last Month</option>
+                    <option value="all-time">All Time</option>
                     <option value="custom">Custom Range</option>
                   </select>
                 </div>
@@ -1978,7 +2578,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
             {selectedCustomerId && (
               <>
-                {/* Statistics Cards */}
+                {/* Summary Statistics Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
                     <div className="flex items-center justify-between mb-3">
@@ -2006,51 +2606,251 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
                   <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
                     <div className="flex items-center justify-between mb-3">
-                      <p className="text-sm font-medium text-ars-body">Activities</p>
+                      <p className="text-sm font-medium text-ars-body">Avg Job Value</p>
                       <TrendingUp className="w-5 h-5 text-purple-500" />
                     </div>
-                    <p className="text-3xl font-bold text-ars-heading">{customerStats.totalActivities.toLocaleString()}</p>
+                    <p className="text-3xl font-bold text-ars-heading">R{Math.round(customerStats.avgJobValue).toLocaleString()}</p>
                   </div>
                 </div>
 
-                {/* Who Worked on This Customer */}
+                {/* Financial Overview */}
                 <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-                  <h3 className="text-lg font-bold text-ars-heading mb-4">Who Worked on This Customer</h3>
+                  <h3 className="text-lg font-bold text-ars-heading mb-4 flex items-center gap-2">
+                    <Banknote className="w-5 h-5" />
+                    Financial Overview
+                  </h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-4 bg-blue-50 rounded-lg">
-                      <p className="text-sm font-medium text-ars-body mb-2">Admins</p>
-                      <p className="text-2xl font-bold text-ars-heading">{customerStats.uniqueAdmins}</p>
+                    <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                      <p className="text-sm font-medium text-green-800 mb-1">Invoiced</p>
+                      <p className="text-2xl font-bold text-green-900">R{customerStats.invoicedValue.toLocaleString()}</p>
+                      <p className="text-xs text-green-700 mt-1">
+                        {customerJobs.filter(j => j.invoiceDate).length} jobs invoiced
+                      </p>
                     </div>
-                    <div className="p-4 bg-green-50 rounded-lg">
-                      <p className="text-sm font-medium text-ars-body mb-2">Rep Codes</p>
-                      <p className="text-2xl font-bold text-ars-heading">{customerStats.uniqueRepCodes}</p>
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <p className="text-sm font-medium text-blue-800 mb-1">Quoted (Pending)</p>
+                      <p className="text-2xl font-bold text-blue-900">R{customerStats.quotedValue.toLocaleString()}</p>
+                      <p className="text-xs text-blue-700 mt-1">
+                        {customerJobs.filter(j => j.dateQuoted && !j.invoiceDate).length} jobs quoted
+                      </p>
                     </div>
-                    <div className="p-4 bg-purple-50 rounded-lg">
-                      <p className="text-sm font-medium text-ars-body mb-2">Technicians</p>
-                      <p className="text-2xl font-bold text-ars-heading">{customerStats.uniqueTechnicians}</p>
+                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-sm font-medium text-gray-800 mb-1">In Progress</p>
+                      <p className="text-2xl font-bold text-gray-900">R{customerStats.pendingValue.toLocaleString()}</p>
+                      <p className="text-xs text-gray-700 mt-1">
+                        {customerJobs.filter(j => !j.dateQuoted && !j.invoiceDate).length} jobs in progress
+                      </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Machines */}
-                {customerMachines.length > 0 && (
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-                    <h3 className="text-lg font-bold text-ars-heading mb-4">Machines ({customerMachines.length})</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {customerMachines.map(machine => (
-                        <div key={machine._id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                          <p className="font-semibold text-ars-heading">{machine.make} {machine.model}</p>
-                          <p className="text-sm text-ars-body mt-1">Serial: {machine.serialNumber}</p>
-                          <div className="mt-2 space-y-1">
-                            <p className="text-xs text-ars-body">
-                              Hours: <span className="font-semibold">{machine.machineHours.toLocaleString()}</span>
-                            </p>
-                            <p className="text-xs text-ars-body">
-                              Next Service: <span className="font-semibold">{machine.nextServiceHours.toLocaleString()}</span>
-                            </p>
-                          </div>
+                {/* Jobs by Status */}
+                <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+                  <h3 className="text-lg font-bold text-ars-heading mb-4 flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    Jobs by Status
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {Object.entries(customerStats.jobsByStatus)
+                      .sort((a, b) => b[1].count - a[1].count)
+                      .map(([status, data]) => (
+                        <div key={status} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <p className="text-xs font-medium text-ars-body truncate">{status}</p>
+                          <p className="text-lg font-bold text-ars-heading">{data.count}</p>
+                          <p className="text-xs text-ars-body">R{data.value.toLocaleString()}</p>
                         </div>
                       ))}
+                  </div>
+                </div>
+
+                {/* Revenue Over Time */}
+                {Object.keys(customerStats.jobsByMonth).length > 0 && (
+                  <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+                    <h3 className="text-lg font-bold text-ars-heading mb-4 flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5" />
+                      Revenue Over Time
+                    </h3>
+                    <div className="overflow-x-auto">
+                      <div className="flex gap-2 min-w-max pb-2">
+                        {Object.entries(customerStats.jobsByMonth)
+                          .sort((a, b) => a[0].localeCompare(b[0]))
+                          .map(([month, data]) => {
+                            const [year, monthNum] = month.split('-');
+                            const monthName = new Date(parseInt(year), parseInt(monthNum) - 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                            const maxValue = Math.max(...Object.values(customerStats.jobsByMonth).map(d => d.value));
+                            const barHeight = maxValue > 0 ? (data.value / maxValue) * 100 : 0;
+                            return (
+                              <div key={month} className="flex flex-col items-center w-16">
+                                <div className="w-full h-24 flex flex-col justify-end bg-gray-100 rounded">
+                                  <div
+                                    className="w-full bg-ars-primary rounded transition-all"
+                                    style={{ height: `${barHeight}%` }}
+                                  />
+                                </div>
+                                <p className="text-xs font-medium text-ars-body mt-1">{monthName}</p>
+                                <p className="text-xs text-ars-body">{data.count} jobs</p>
+                                <p className="text-xs text-green-600 font-medium">R{(data.value / 1000).toFixed(0)}k</p>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Team Involvement */}
+                <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+                  <h3 className="text-lg font-bold text-ars-heading mb-4 flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    Team Involvement
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Admins */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-ars-heading mb-3 flex items-center gap-2">
+                        <UserIcon className="w-4 h-4" />
+                        Admins ({customerStats.uniqueAdmins})
+                      </h4>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {customerStats.adminDetails.length > 0 ? (
+                          customerStats.adminDetails
+                            .sort((a, b) => b.totalValue - a.totalValue)
+                            .map((admin) => (
+                              <div key={admin.code} className="p-2 bg-blue-50 rounded-lg">
+                                <p className="font-medium text-sm text-blue-900">{admin.code}</p>
+                                <p className="text-xs text-blue-700">{admin.jobCount} jobs • R{admin.totalValue.toLocaleString()}</p>
+                              </div>
+                            ))
+                        ) : (
+                          <p className="text-sm text-ars-body">No admins assigned</p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Rep Codes */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-ars-heading mb-3 flex items-center gap-2">
+                        <UserIcon className="w-4 h-4" />
+                        Rep Codes ({customerStats.uniqueRepCodes})
+                      </h4>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {customerStats.repDetails.length > 0 ? (
+                          customerStats.repDetails
+                            .sort((a, b) => b.totalValue - a.totalValue)
+                            .map((rep) => (
+                              <div key={rep.code} className="p-2 bg-green-50 rounded-lg">
+                                <p className="font-medium text-sm text-green-900">{rep.code}</p>
+                                <p className="text-xs text-green-700">{rep.jobCount} jobs • R{rep.totalValue.toLocaleString()}</p>
+                              </div>
+                            ))
+                        ) : (
+                          <p className="text-sm text-ars-body">No reps assigned</p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Technicians */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-ars-heading mb-3 flex items-center gap-2">
+                        <Wrench className="w-4 h-4" />
+                        Technicians ({customerStats.uniqueTechnicians})
+                      </h4>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {customerStats.techDetails.length > 0 ? (
+                          customerStats.techDetails
+                            .sort((a, b) => b.totalValue - a.totalValue)
+                            .map((tech) => (
+                              <div key={tech.name} className="p-2 bg-purple-50 rounded-lg">
+                                <p className="font-medium text-sm text-purple-900">{tech.name}</p>
+                                <p className="text-xs text-purple-700">{tech.jobCount} jobs • R{tech.totalValue.toLocaleString()}</p>
+                              </div>
+                            ))
+                        ) : (
+                          <p className="text-sm text-ars-body">No technicians assigned</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Machines with Service History */}
+                {customerMachines.length > 0 && (
+                  <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+                    <h3 className="text-lg font-bold text-ars-heading mb-4 flex items-center gap-2">
+                      <Wrench className="w-5 h-5" />
+                      Machines & Service History ({customerMachines.length})
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {customerMachines.map(machine => {
+                        // Find jobs that include this machine
+                        const machineJobsList = customerJobs.filter(job => {
+                          if (!job.machines) return false;
+                          return job.machines.some(m => {
+                            const machineId = typeof m === 'string' ? m : m._id;
+                            return machineId === machine._id;
+                          });
+                        });
+                        const machineValue = machineJobsList.reduce((sum, j) => sum + (j.valueExVat || 0), 0);
+                        const servicesDue = machine.nextServiceHours > 0 && machine.machineHours >= machine.nextServiceHours * 0.9;
+
+                        return (
+                          <div key={machine._id} className={`p-4 rounded-lg border ${servicesDue ? 'bg-orange-50 border-orange-200' : 'bg-gray-50 border-gray-200'}`}>
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <p className="font-semibold text-ars-heading">{machine.make} {machine.model}</p>
+                                <p className="text-sm text-ars-body">Serial: {machine.serialNumber}</p>
+                              </div>
+                              {servicesDue && (
+                                <span className="px-2 py-1 bg-orange-100 text-orange-700 text-xs font-medium rounded">
+                                  Service Due
+                                </span>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
+                              <div>
+                                <p className="text-xs text-ars-body">Current Hours</p>
+                                <p className="font-semibold text-ars-heading">{machine.machineHours.toLocaleString()}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-ars-body">Next Service</p>
+                                <p className={`font-semibold ${servicesDue ? 'text-orange-600' : 'text-ars-heading'}`}>
+                                  {machine.nextServiceHours.toLocaleString()}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-ars-body">Jobs Done</p>
+                                <p className="font-semibold text-ars-heading">{machineJobsList.length}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-ars-body">Total Value</p>
+                                <p className="font-semibold text-green-600">R{machineValue.toLocaleString()}</p>
+                              </div>
+                            </div>
+                            {machineJobsList.length > 0 && (
+                              <div className="mt-3 pt-3 border-t border-gray-200">
+                                <p className="text-xs font-medium text-ars-body mb-2">Recent Jobs:</p>
+                                <div className="space-y-1">
+                                  {machineJobsList.slice(0, 3).map(job => (
+                                    <div key={job._id} className="flex justify-between text-xs">
+                                      <span className="text-ars-heading">{job.jobNumber}</span>
+                                      <span className={`px-1.5 py-0.5 rounded ${
+                                        job.status?.name === 'Job Done' ? 'bg-green-100 text-green-700' :
+                                        job.status?.name === 'Invoiced' ? 'bg-blue-100 text-blue-700' :
+                                        'bg-gray-100 text-gray-700'
+                                      }`}>
+                                        {job.status?.name || 'No Status'}
+                                      </span>
+                                    </div>
+                                  ))}
+                                  {machineJobsList.length > 3 && (
+                                    <p className="text-xs text-ars-primary">+{machineJobsList.length - 3} more jobs</p>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -2058,101 +2858,118 @@ export function Reports({ statuses, branches }: ReportsProps) {
                 {/* Jobs List */}
                 {customerJobs.length > 0 && (
                   <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-                    <h3 className="text-lg font-bold text-ars-heading mb-4">Jobs ({customerJobs.length})</h3>
-                    <div className="space-y-2 max-h-96 overflow-y-auto">
-                      {customerJobs.map(job => (
-                        <div key={job._id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <p className="font-semibold text-ars-heading">{job.jobNumber}</p>
-                                <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
-                                  job.status?.name === 'Job Done' ? 'bg-green-100 text-green-700' :
-                                  job.status?.name === 'In Progress' ? 'bg-blue-100 text-blue-700' :
-                                  'bg-gray-100 text-gray-700'
-                                }`}>
-                                  {job.status?.name || 'No Status'}
-                                </span>
+                    <h3 className="text-lg font-bold text-ars-heading mb-4 flex items-center gap-2">
+                      <FileText className="w-5 h-5" />
+                      All Jobs ({customerJobs.length})
+                    </h3>
+                    <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                      {customerJobs
+                        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                        .map(job => (
+                          <div key={job._id} className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-ars-primary transition-colors">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <p className="font-semibold text-ars-heading">{job.jobNumber}</p>
+                                  <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
+                                    job.status?.name === 'Job Done' ? 'bg-green-100 text-green-700' :
+                                    job.status?.name === 'Invoiced' ? 'bg-blue-100 text-blue-700' :
+                                    job.status?.name === 'In Progress' ? 'bg-purple-100 text-purple-700' :
+                                    job.status?.name === 'Sent to Client' ? 'bg-amber-100 text-amber-700' :
+                                    'bg-gray-100 text-gray-700'
+                                  }`}>
+                                    {job.status?.name || 'No Status'}
+                                  </span>
+                                </div>
+                                {typeof job.description === 'object' && job.description && (
+                                  <p className="text-sm text-ars-body">{(job.description as any).name}</p>
+                                )}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-ars-body mt-2">
+                                  {job.startDate && (
+                                    <div><span className="font-medium">Start:</span> {formatDate(job.startDate)}</div>
+                                  )}
+                                  {job.dateQuoted && (
+                                    <div><span className="font-medium">Quoted:</span> {formatDate(job.dateQuoted)}</div>
+                                  )}
+                                  {job.poDate && (
+                                    <div><span className="font-medium">PO:</span> {formatDate(job.poDate)}</div>
+                                  )}
+                                  {job.invoiceDate && (
+                                    <div><span className="font-medium">Invoiced:</span> {formatDate(job.invoiceDate)}</div>
+                                  )}
+                                </div>
+                                <p className="text-xs text-ars-body mt-2">
+                                  Admin: <span className="font-medium">{job.adm || 'N/A'}</span> | 
+                                  Rep: <span className="font-medium">{typeof job.repCode === 'object' ? (job.repCode as any)?.code || 'N/A' : 'N/A'}</span> | 
+                                  Tech: <span className="font-medium">{typeof job.techBooked === 'object' ? (job.techBooked as any)?.name || 'N/A' : 'N/A'}</span>
+                                </p>
                               </div>
-                              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-ars-body mt-2">
-                                {job.startDate && (
-                                  <div><span className="font-medium">Start:</span> {formatDate(job.startDate)}</div>
-                                )}
-                                {job.dateQuoted && (
-                                  <div><span className="font-medium">Quoted:</span> {formatDate(job.dateQuoted)}</div>
-                                )}
-                                {job.poDate && (
-                                  <div><span className="font-medium">PO Date:</span> {formatDate(job.poDate)}</div>
-                                )}
-                                {job.invoiceDate && (
-                                  <div><span className="font-medium">Invoice Date:</span> {formatDate(job.invoiceDate)}</div>
-                                )}
-                                {job.poNumber && (
-                                  <div><span className="font-medium">PO #:</span> {job.poNumber}</div>
-                                )}
-                                {job.invNumber && (
-                                  <div><span className="font-medium">Invoice #:</span> {job.invNumber}</div>
-                                )}
-                                {job.rsrNumber && (
-                                  <div><span className="font-medium">RSR #:</span> {job.rsrNumber}</div>
-                                )}
-                                {job.branch && (
-                                  <div><span className="font-medium">Branch:</span> {typeof job.branch === 'object' ? job.branch.name : ''}</div>
-                                )}
+                              <div className="text-right ml-4">
+                                <p className="text-lg font-bold text-green-600">
+                                  R{(job.valueExVat || 0).toLocaleString()}
+                                </p>
+                                <div className="flex gap-1 mt-2">
+                                  <button
+                                    onClick={() => setSelectedJob(job)}
+                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                    title="View Job"
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </button>
+                                </div>
                               </div>
-                              <p className="text-xs text-ars-body mt-2">
-                                Admin: {job.adm || 'N/A'} | 
-                                Rep: {typeof job.repCode === 'object' ? (job.repCode as any)?.code || 'N/A' : 'N/A'} | 
-                                Tech: {typeof job.techBooked === 'object' ? (job.techBooked as any)?.name || 'N/A' : 'N/A'}
-                              </p>
-                            </div>
-                            <div className="text-right ml-4">
-                              <p className="text-sm font-semibold text-ars-heading">
-                                R{(job.valueExVat || 0).toLocaleString()}
-                              </p>
                             </div>
                           </div>
-                          {job.feedback && (
-                            <div className="mt-2 pt-2 border-t border-gray-200">
-                              <p className="text-xs text-ars-body">
-                                <span className="font-medium">Feedback:</span> {job.feedback}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                        ))}
                     </div>
                   </div>
                 )}
 
-                {/* Activities */}
+                {/* Activity Timeline */}
                 {customerActivities.length > 0 && (
                   <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-                    <h3 className="text-lg font-bold text-ars-heading mb-4">Activity History</h3>
+                    <h3 className="text-lg font-bold text-ars-heading mb-4 flex items-center gap-2">
+                      <Clock className="w-5 h-5" />
+                      Activity Timeline ({customerActivities.length})
+                    </h3>
                     <div className="space-y-2 max-h-96 overflow-y-auto">
-                      {customerActivities.map(activity => (
-                        <div key={activity._id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                          <div className="flex-shrink-0 mt-1">
-                            {activity.action === 'create' && <CheckCircle2 className="w-4 h-4 text-green-500" />}
-                            {activity.action === 'update' && <Edit2 className="w-4 h-4 text-blue-500" />}
-                            {activity.action === 'delete' && <XCircle className="w-4 h-4 text-red-500" />}
-                            {activity.action === 'view' && <Eye className="w-4 h-4 text-gray-500" />}
-                            {!['create', 'update', 'delete', 'view'].includes(activity.action) && (
-                              <FileText className="w-4 h-4 text-gray-500" />
-                            )}
+                      {customerActivities
+                        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                        .map(activity => (
+                          <div key={activity._id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                            <div className="flex-shrink-0 mt-1">
+                              {activity.action === 'create' && <CheckCircle2 className="w-4 h-4 text-green-500" />}
+                              {activity.action === 'update' && <Edit2 className="w-4 h-4 text-blue-500" />}
+                              {activity.action === 'delete' && <XCircle className="w-4 h-4 text-red-500" />}
+                              {activity.action === 'view' && <Eye className="w-4 h-4 text-gray-500" />}
+                              {!['create', 'update', 'delete', 'view'].includes(activity.action) && (
+                                <FileText className="w-4 h-4 text-gray-500" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-ars-heading">{activity.description}</p>
+                              <p className="text-xs text-ars-body mt-1">
+                                {activity.createdAt ? new Date(activity.createdAt).toLocaleString() : ''} | 
+                                By: {typeof activity.userId === 'object' && activity.userId !== null
+                                  ? `${(activity.userId as any).firstName || ''} ${(activity.userId as any).lastName || ''}`.trim()
+                                  : 'System'}
+                              </p>
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-ars-heading">{activity.description}</p>
-                            <p className="text-xs text-ars-body mt-1">
-                              {activity.createdAt ? new Date(activity.createdAt).toLocaleString() : ''} | 
-                              By: {typeof activity.userId === 'object' && activity.userId !== null
-                                ? `${(activity.userId as any).firstName || ''} ${(activity.userId as any).lastName || ''}`.trim()
-                                : 'System'}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
+                        ))}
                     </div>
+                  </div>
+                )}
+
+                {/* No Data State */}
+                {customerJobs.length === 0 && customerMachines.length === 0 && (
+                  <div className="bg-white rounded-xl border border-gray-200 shadow-md p-12 text-center">
+                    <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-ars-heading mb-2">No Data Found</h3>
+                    <p className="text-ars-body">
+                      No jobs or machines found for this customer in the selected date range.
+                      Try expanding the date range or selecting "Custom Range" with a wider period.
+                    </p>
                   </div>
                 )}
               </>

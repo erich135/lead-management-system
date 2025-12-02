@@ -3,6 +3,8 @@ import { getJobs, updateJob, getCustomers, getTechnicians, getOverdueJobs, getRe
 import { Search, Filter, Plus, AlertCircle, Calendar, Edit2, Eye, Clock, CheckCircle2, X, Zap, FileText, User, Building2, DollarSign, Wrench, Sparkles, ArrowRight, Tag, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
 import { LeadDetails } from './LeadDetails';
 import { useAuth } from '../contexts/AuthContext';
+import { HelpIcon } from './ui';
+import { helpContent } from '../config/helpContent';
 
 interface LeadsListProps {
   onLeadClick: (lead: Job) => void;
@@ -791,12 +793,22 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
               <h3 className="text-base font-bold text-ars-heading flex items-center gap-2">
                 <Filter className="w-4 h-4 text-ars-primary" />
                 Filters
+                <HelpIcon 
+                  content={helpContent.filters.overview || "Use filters to narrow down the jobs list. Combine multiple filters for more specific results."}
+                  size="sm"
+                />
               </h3>
             </div>
 
             {/* Priority Checkboxes */}
             <div className="mb-4">
-              <label className="block text-xs font-semibold text-ars-heading mb-2">Show Jobs</label>
+              <label className="text-xs font-semibold text-ars-heading mb-2 flex items-center gap-1">
+                Show Jobs
+                <HelpIcon 
+                  content="Filter jobs by their urgency: Overdue (past deadline), Approaching (nearing deadline), Open (on track), or All Jobs (no filter)."
+                  size="sm"
+                />
+              </label>
               <div className="space-y-1.5">
                 <label className="flex items-center gap-2 cursor-pointer group">
                   <input

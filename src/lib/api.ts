@@ -340,6 +340,10 @@ export interface Job {
   };
   machines?: (Machine | string)[];
   registerDate?: string | Date;
+  techBooked?: string | {
+    _id: string;
+    name: string;
+  };
   bookings?: Array<{
     technicianId: string;
     technicianName?: string;
@@ -367,6 +371,7 @@ export interface Job {
   reminderFollowUp1Date?: string | Date;
   reminderFollowUp2Date?: string | Date;
   reminderFollowUp3Date?: string | Date;
+  dateSentToClient?: string | Date;
   poDate?: string | Date;
   poNumber?: string;
   oilSampleNumber?: string;

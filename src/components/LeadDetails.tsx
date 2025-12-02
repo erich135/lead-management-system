@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getJob, updateJob, getMachinesByCustomer, createMachine, getTechnicians, getRepCodes, getCustomers, getActivities, getServiceDescriptions, deleteJob, type Job, type Status, type Branch, type Machine, type Technician, type RepCode, type Customer, type Activity, type ServiceDescription, type OverdueJob } from '../lib/api';
 import { X, Edit, Save, Clock, User, Trash2 } from 'lucide-react';
+import { HelpIcon } from './ui';
+import { helpContent } from '../config/helpContent';
 
 interface LeadDetailsProps {
   lead: Job;
@@ -797,8 +799,12 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
               {/* Follow-up levels 1-6 */}
               {followUpReminder.followUpLevel >= 1 && followUpReminder.followUpLevel <= 6 && (
                 <>
-                  <p className="text-sm font-semibold text-amber-900">
+                  <p className="text-sm font-semibold text-amber-900 flex items-center gap-1">
                     Follow-up {followUpReminder.followUpLevel} {followUpReminder.isOverdue ? 'is overdue' : 'is due soon'}.
+                    <HelpIcon 
+                      content={helpContent.followUps.overview}
+                      size="sm"
+                    />
                   </p>
                   <p className="text-sm text-amber-800 mt-1">
                     Expected next status: {followUpReminder.expectedNextStatus}. Days in current stage: {followUpReminder.daysInStatus}.
@@ -890,8 +896,12 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
             followUpReminder.isOverdue ? 'bg-orange-50 border-orange-200' : 'bg-amber-50 border-amber-200'
           }`}>
             <div>
-              <p className={`text-sm font-semibold ${followUpReminder.isOverdue ? 'text-orange-900' : 'text-amber-900'}`}>
+              <p className={`text-sm font-semibold flex items-center gap-1 ${followUpReminder.isOverdue ? 'text-orange-900' : 'text-amber-900'}`}>
                 📞 Follow-up required for "{followUpReminder.currentStatus}"
+                <HelpIcon 
+                  content={helpContent.followUps.statusFollowUp}
+                  size="sm"
+                />
                 {followUpReminder.statusFollowUpCount && followUpReminder.statusFollowUpCount > 0 && (
                   <span className="ml-2 text-xs bg-orange-200 text-orange-800 px-2 py-0.5 rounded-full">
                     Follow-up #{followUpReminder.statusFollowUpCount + 1}

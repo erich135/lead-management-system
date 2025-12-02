@@ -1,5 +1,58 @@
 # Lead Management & Scheduling System - Setup Guide
 
+---
+
+## 🚀 Quick Start for New Developers
+
+### Required Environment Files
+
+**1. Backend (`ars-app-backend/.env`):**
+```env
+PORT=5000
+NODE_ENV=development
+MONGO_URI=<GET FROM TEAM LEAD>
+JWT_SECRET=<GET FROM TEAM LEAD - MUST MATCH>
+JWT_EXPIRES_IN=7d
+BCRYPT_SALT_ROUNDS=10
+FRONTEND_URL=http://localhost:5173
+```
+
+**2. Frontend (`lead-management-system/.env`):**
+```env
+VITE_API_BASE_URL=http://localhost:5000
+```
+
+> ⚠️ **CRITICAL**: The `MONGO_URI` and `JWT_SECRET` MUST be obtained from your team lead. These must match the shared/production database!
+
+### Quick Start Commands
+
+**Terminal 1 - Backend:**
+```bash
+cd ars-app-backend
+npm install
+npm run dev
+# Should show: "Server running on port 5000" and "MongoDB connected"
+```
+
+**Terminal 2 - Frontend:**
+```bash
+cd lead-management-system
+npm install
+npm run dev
+# Should show: "Local: http://localhost:5173/"
+```
+
+### Troubleshooting Login Issues
+
+| Issue | Solution |
+|-------|----------|
+| "Invalid credentials" | Check `MONGO_URI` points to correct database |
+| Can't connect to backend | Ensure backend running on port 5000 |
+| CORS errors in console | Check `VITE_API_BASE_URL=http://localhost:5000` |
+| MongoDB connection failed | Verify your IP is whitelisted in MongoDB Atlas |
+
+---
+
 ## Overview
 
 This is a comprehensive lead management and scheduling system built with React, TypeScript, Supabase, and Tailwind CSS. The system provides:

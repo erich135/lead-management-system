@@ -356,6 +356,14 @@ export interface Job {
   followUp2Date?: string | Date;
   followUp3Date?: string | Date;
   followUp4Date?: string | Date;
+  followUp5Date?: string | Date;
+  followUp6Date?: string | Date;
+  quoteRefreshCount?: number;
+  lastQuoteRefreshDate?: string | Date;
+  // Status-based follow-up tracking
+  statusFollowUpCount?: number;
+  statusFollowUpDate?: string | Date;
+  statusFollowUpNotes?: string;
   reminderFollowUp1Date?: string | Date;
   reminderFollowUp2Date?: string | Date;
   reminderFollowUp3Date?: string | Date;
@@ -397,9 +405,12 @@ export interface OverdueJob {
   currentStatusNumber: number;
   expectedNextStatus: string;
   maxDaysAllowed: number;
-  reminderType: "status_overdue" | "followup_overdue" | "approaching_due";
-  followUpLevel?: number;
+  reminderType: "status_overdue" | "followup_overdue" | "approaching_due" | "status_followup";
+  followUpLevel?: number; // 1-6 for follow-ups, 7 for refresh/cancel, 8 for cancel only
   severity: "critical" | "warning" | "info";
+  quoteRefreshCount?: number; // Number of times quote has been refreshed (0-3)
+  statusFollowUpCount?: number; // Number of status follow-ups done
+  requiresNotes?: boolean; // Whether follow-up requires notes/reason
   job: Job | null;
 }
 

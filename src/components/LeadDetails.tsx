@@ -82,6 +82,9 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   const [followUpReminder, setFollowUpReminder] = useState<OverdueJob | null>(null);
   const [followUpSubmitting, setFollowUpSubmitting] = useState(false);
   const [activeFollowUpLevel, setActiveFollowUpLevel] = useState<number | null>(null);
+  // Status-based follow-up with notes
+  const [showStatusFollowUpModal, setShowStatusFollowUpModal] = useState(false);
+  const [statusFollowUpNotes, setStatusFollowUpNotes] = useState('');
 
   useEffect(() => {
     loadJobDetails();
@@ -227,7 +230,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   /**
    * Handles marking a follow-up level as completed and refreshes the job details.
    *
-   * @param level - Follow-up stage to complete (1, 2, or 3)
+   * @param level - Follow-up stage to complete (1-6)
    */
   async function handleFollowUpCompletion(level: number) {
     if (!job?._id) return;
@@ -248,6 +251,130 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     } finally {
       setFollowUpSubmitting(false);
       setActiveFollowUpLevel(null);
+    }
+  }
+
+  /**
+   * Handles refreshing a quote - resets the follow-up cycle back to step 1
+   * while incrementing the refresh count. Can only be done 3 times max.
+   */
+  async function handleQuoteRefresh() {
+    if (!job?._id) return;
+    setFollowUpSubmitting(true);
+    setActiveFollowUpLevel(7); // Using 7 for refresh action
+    setError('');
+
+    try {
+      const currentRefreshCount = job.quoteRefreshCount || 0;
+      await updateJob(job._id, {
+        // Reset all follow-up dates to restart the cycle
+        followUp1Date: undefined,
+        followUp2Date: undefined,
+        followUp3Date: undefined,
+        followUp4Date: undefined,
+        followUp5Date: undefined,
+        followUp6Date: undefined,
+        // Increment refresh count and set last refresh date
+        quoteRefreshCount: currentRefreshCount + 1,
+        lastQuoteRefreshDate: new Date().toISOString(),
+      } as Partial<Job>);
+      await loadJobDetails();
+      onUpdate();
+    } catch (err: any) {
+      console.error('Error refreshing quote:', err);
+      setError(err.message || 'Failed to refresh quote.');
+    } finally {
+      setFollowUpSubmitting(false);
+      setActiveFollowUpLevel(null);
+    }
+  }
+
+  /**
+   * Handles cancelling a quotation - changes status to "Cancelled" or appropriate status
+   * and notifies Super Admin about the cancellation.
+   */
+  async function handleCancelQuotation() {
+    if (!job?._id) return;
+    
+    // Confirm cancellation
+    if (!window.confirm('Are you sure you want to cancel this quotation? This will notify the Super Admin.')) {
+      return;
+    }
+    
+    setFollowUpSubmitting(true);
+    setActiveFollowUpLevel(8); // Using 8 for cancel action
+    setError('');
+
+    try {
+      // Find the "Cancelled" status or equivalent
+      const cancelledStatus = statuses.find(s => 
+        s.name.toLowerCase() === 'cancelled' || 
+        s.name.toLowerCase() === 'quotation cancelled'
+      );
+      
+      const updateData: Partial<Job> = {};
+      
+      if (cancelledStatus) {
+        updateData.status = {
+          _id: cancelledStatus._id,
+          name: cancelledStatus.name,
+          sortOrder: cancelledStatus.sortOrder,
+        };
+      }
+      
+      // Note: The backend should handle notifying Super Admin
+      // We'll pass a flag or the activity will be logged
+      await updateJob(job._id, {
+        ...updateData,
+        // Add internal notes about cancellation
+        internalNotes: job.internalNotes 
+          ? `${job.internalNotes}\n\n[${new Date().toLocaleString()}] Quotation cancelled after ${job.quoteRefreshCount || 0} quote refreshes.`
+          : `[${new Date().toLocaleString()}] Quotation cancelled after ${job.quoteRefreshCount || 0} quote refreshes.`,
+      } as Partial<Job>);
+      
+      await loadJobDetails();
+      onUpdate();
+    } catch (err: any) {
+      console.error('Error cancelling quotation:', err);
+      setError(err.message || 'Failed to cancel quotation.');
+    } finally {
+      setFollowUpSubmitting(false);
+      setActiveFollowUpLevel(null);
+    }
+  }
+
+  /**
+   * Handles status-based follow-ups (Await PO, Register, Parts In Stock, etc.)
+   * Requires notes explaining the follow-up conversation/reason.
+   */
+  async function handleStatusFollowUp() {
+    if (!job?._id || !statusFollowUpNotes.trim()) {
+      setError('Please enter notes describing the follow-up.');
+      return;
+    }
+    
+    setFollowUpSubmitting(true);
+    setError('');
+
+    try {
+      const currentCount = job.statusFollowUpCount || 0;
+      await updateJob(job._id, {
+        statusFollowUpCount: currentCount + 1,
+        statusFollowUpDate: new Date().toISOString(),
+        statusFollowUpNotes: statusFollowUpNotes.trim(),
+      } as Partial<Job>);
+      
+      // Reset modal state
+      setShowStatusFollowUpModal(false);
+      setStatusFollowUpNotes('');
+      
+      await loadJobDetails();
+      onUpdate();
+    } catch (err: any) {
+      console.error('Error completing status follow-up:', err);
+      setError(err.message || 'Failed to complete follow-up.');
+    } finally {
+      setFollowUpSubmitting(false);
     }
   }
 
@@ -661,23 +788,181 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
         </div>
 
         {followUpReminder?.followUpLevel && (
-          <div className="mx-6 mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className={`mx-6 mt-4 p-4 border rounded-lg flex flex-col md:flex-row md:items-center md:justify-between gap-4 ${
+            followUpReminder.followUpLevel >= 7 
+              ? 'bg-red-50 border-red-200' 
+              : 'bg-amber-50 border-amber-200'
+          }`}>
             <div>
-              <p className="text-sm font-semibold text-amber-900">
-                Follow-up {followUpReminder.followUpLevel} {followUpReminder.isOverdue ? 'is overdue' : 'is due soon'}.
+              {/* Follow-up levels 1-6 */}
+              {followUpReminder.followUpLevel >= 1 && followUpReminder.followUpLevel <= 6 && (
+                <>
+                  <p className="text-sm font-semibold text-amber-900">
+                    Follow-up {followUpReminder.followUpLevel} {followUpReminder.isOverdue ? 'is overdue' : 'is due soon'}.
+                  </p>
+                  <p className="text-sm text-amber-800 mt-1">
+                    Expected next status: {followUpReminder.expectedNextStatus}. Days in current stage: {followUpReminder.daysInStatus}.
+                  </p>
+                </>
+              )}
+              
+              {/* Level 7: Refresh or Cancel option */}
+              {followUpReminder.followUpLevel === 7 && (
+                <>
+                  <p className="text-sm font-semibold text-red-900">
+                    ⚠️ All follow-ups completed. {followUpReminder.isOverdue ? 'Action required!' : 'Action needed soon.'}
+                  </p>
+                  <p className="text-sm text-red-800 mt-1">
+                    Quote refresh {(followUpReminder.quoteRefreshCount || 0) + 1} of 3. 
+                    {' '}You can refresh the quote to restart follow-ups or cancel the quotation.
+                  </p>
+                </>
+              )}
+              
+              {/* Level 8: Cancel only (after 3 refreshes) */}
+              {followUpReminder.followUpLevel === 8 && (
+                <>
+                  <p className="text-sm font-semibold text-red-900">
+                    🚨 Maximum quote refreshes reached ({followUpReminder.quoteRefreshCount || 3}/3).
+                  </p>
+                  <p className="text-sm text-red-800 mt-1">
+                    The quotation must now be cancelled. This will notify the Super Admin.
+                  </p>
+                </>
+              )}
+            </div>
+            
+            <div className="flex flex-wrap gap-2">
+              {/* Follow-up buttons for levels 1-6 */}
+              {followUpReminder.followUpLevel >= 1 && followUpReminder.followUpLevel <= 6 && (
+                <button
+                  type="button"
+                  onClick={() => handleFollowUpCompletion(followUpReminder.followUpLevel!)}
+                  disabled={followUpSubmitting}
+                  className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {followUpSubmitting && activeFollowUpLevel === followUpReminder.followUpLevel 
+                    ? 'Saving…' 
+                    : `Follow Up ${followUpReminder.followUpLevel}`}
+                </button>
+              )}
+              
+              {/* Level 7: Show both Refresh and Cancel buttons */}
+              {followUpReminder.followUpLevel === 7 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleQuoteRefresh}
+                    disabled={followUpSubmitting}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {followUpSubmitting && activeFollowUpLevel === 7 ? 'Refreshing…' : '🔄 Refresh Quote'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelQuotation}
+                    disabled={followUpSubmitting}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {followUpSubmitting && activeFollowUpLevel === 8 ? 'Cancelling…' : '❌ Cancel Quotation'}
+                  </button>
+                </>
+              )}
+              
+              {/* Level 8: Only Cancel button */}
+              {followUpReminder.followUpLevel === 8 && (
+                <button
+                  type="button"
+                  onClick={handleCancelQuotation}
+                  disabled={followUpSubmitting}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {followUpSubmitting && activeFollowUpLevel === 8 ? 'Cancelling…' : '❌ Cancel Quotation'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Status-based follow-up reminder (Await PO, Register, Parts In Stock, etc.) */}
+        {followUpReminder?.reminderType === 'status_followup' && (
+          <div className={`mx-6 mt-4 p-4 border rounded-lg flex flex-col md:flex-row md:items-center md:justify-between gap-4 ${
+            followUpReminder.isOverdue ? 'bg-orange-50 border-orange-200' : 'bg-amber-50 border-amber-200'
+          }`}>
+            <div>
+              <p className={`text-sm font-semibold ${followUpReminder.isOverdue ? 'text-orange-900' : 'text-amber-900'}`}>
+                📞 Follow-up required for "{followUpReminder.currentStatus}"
+                {followUpReminder.statusFollowUpCount && followUpReminder.statusFollowUpCount > 0 && (
+                  <span className="ml-2 text-xs bg-orange-200 text-orange-800 px-2 py-0.5 rounded-full">
+                    Follow-up #{followUpReminder.statusFollowUpCount + 1}
+                  </span>
+                )}
               </p>
-              <p className="text-sm text-amber-800 mt-1">
-                Expected next status: {followUpReminder.expectedNextStatus}. Days in current stage: {followUpReminder.daysInStatus}.
+              <p className={`text-sm mt-1 ${followUpReminder.isOverdue ? 'text-orange-800' : 'text-amber-800'}`}>
+                {followUpReminder.isOverdue 
+                  ? `Overdue by ${followUpReminder.daysOverdue} day(s). ` 
+                  : `Due soon. `}
+                Days since last action: {followUpReminder.daysInStatus}. 
+                Interval: every {followUpReminder.maxDaysAllowed} days.
               </p>
             </div>
+            
             <button
               type="button"
-              onClick={() => handleFollowUpCompletion(followUpReminder.followUpLevel!)}
+              onClick={() => setShowStatusFollowUpModal(true)}
               disabled={followUpSubmitting}
-              className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                followUpReminder.isOverdue 
+                  ? 'bg-orange-600 hover:bg-orange-700' 
+                  : 'bg-amber-600 hover:bg-amber-700'
+              }`}
             >
-              {followUpSubmitting && activeFollowUpLevel === followUpReminder.followUpLevel ? 'Saving…' : `Follow Up ${followUpReminder.followUpLevel}`}
+              📝 Record Follow-up
             </button>
+          </div>
+        )}
+
+        {/* Status Follow-up Modal */}
+        {showStatusFollowUpModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+              <h3 className="text-lg font-bold text-slate-900 mb-4">
+                Record Follow-up for "{followUpReminder?.currentStatus}"
+              </h3>
+              <p className="text-sm text-slate-600 mb-4">
+                This is follow-up #{(job.statusFollowUpCount || 0) + 1}. 
+                Please enter notes about your conversation or action taken.
+              </p>
+              
+              <textarea
+                value={statusFollowUpNotes}
+                onChange={(e) => setStatusFollowUpNotes(e.target.value)}
+                placeholder="e.g., Called customer, they will send PO by end of week..."
+                className="w-full h-32 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px] resize-none"
+                autoFocus
+              />
+              
+              <div className="flex justify-end gap-3 mt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowStatusFollowUpModal(false);
+                    setStatusFollowUpNotes('');
+                  }}
+                  className="px-4 py-2 text-slate-600 hover:text-slate-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleStatusFollowUp}
+                  disabled={followUpSubmitting || !statusFollowUpNotes.trim()}
+                  className="px-4 py-2 bg-ars-primary text-white rounded-lg hover:bg-ars-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {followUpSubmitting ? 'Saving…' : 'Save Follow-up'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

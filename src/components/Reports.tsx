@@ -45,7 +45,8 @@ import {
   XCircle,
   Eye,
   Edit2,
-  Send
+  Send,
+  X
 } from 'lucide-react';
 import { LeadDetails } from './LeadDetails';
 import { HelpIcon } from './ui';
@@ -63,6 +64,14 @@ type UserRole = 'admin' | 'rep' | 'technician';
 type DateRangePreset = 'today' | 'this-month' | 'last-month' | 'all-time' | 'custom';
 
 type UserPerformanceSection = 'overdue' | 'jobs' | 'activities' | 'conversion';
+
+type StatsPanelType = 
+  | 'user-total-jobs' 
+  | 'user-overdue-jobs' 
+  | 'customer-invoiced' 
+  | 'customer-quoted' 
+  | 'customer-in-progress' 
+  | null;
 
 export function Reports({ statuses, branches }: ReportsProps) {
   const { user: currentUser } = useAuth();
@@ -133,6 +142,9 @@ export function Reports({ statuses, branches }: ReportsProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  
+  // Stats panel slide-out state
+  const [statsPanelType, setStatsPanelType] = useState<StatsPanelType>(null);
 
   /**
    * Loads initial reference data.
@@ -1621,12 +1633,20 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
             {/* Statistics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+              <div 
+                onClick={() => userStats.totalJobs > 0 && setStatsPanelType('user-total-jobs')}
+                className={`bg-white rounded-xl border border-gray-200 shadow-md p-6 transition-all duration-200 ${
+                  userStats.totalJobs > 0 ? 'cursor-pointer hover:shadow-lg hover:border-ars-primary hover:scale-[1.02]' : ''
+                }`}
+              >
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm font-medium text-ars-body">Total Jobs</p>
                   <FileText className="w-5 h-5 text-ars-primary" />
                 </div>
                 <p className="text-3xl font-bold text-ars-heading">{userStats.totalJobs.toLocaleString()}</p>
+                {userStats.totalJobs > 0 && (
+                  <p className="text-xs text-ars-primary mt-2">Click to view list →</p>
+                )}
               </div>
 
               <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
@@ -1645,12 +1665,20 @@ export function Reports({ statuses, branches }: ReportsProps) {
                 <p className="text-3xl font-bold text-ars-heading">{userStats.totalActivities.toLocaleString()}</p>
               </div>
 
-              <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
+              <div 
+                onClick={() => userStats.overdueCount > 0 && setStatsPanelType('user-overdue-jobs')}
+                className={`bg-white rounded-xl border border-gray-200 shadow-md p-6 transition-all duration-200 ${
+                  userStats.overdueCount > 0 ? 'cursor-pointer hover:shadow-lg hover:border-red-400 hover:scale-[1.02]' : ''
+                }`}
+              >
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm font-medium text-ars-body">Overdue Jobs</p>
                   <AlertCircle className="w-5 h-5 text-red-500" />
                 </div>
                 <p className="text-3xl font-bold text-ars-heading">{userStats.overdueCount.toLocaleString()}</p>
+                {userStats.overdueCount > 0 && (
+                  <p className="text-xs text-red-500 mt-2">Click to view list →</p>
+                )}
               </div>
             </div>
 
@@ -2620,26 +2648,56 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     Financial Overview
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                    <div 
+                      onClick={() => customerJobs.filter(j => j.invoiceDate).length > 0 && setStatsPanelType('customer-invoiced')}
+                      className={`p-4 bg-green-50 rounded-lg border border-green-200 transition-all duration-200 ${
+                        customerJobs.filter(j => j.invoiceDate).length > 0 
+                          ? 'cursor-pointer hover:shadow-md hover:border-green-400 hover:scale-[1.02]' 
+                          : ''
+                      }`}
+                    >
                       <p className="text-sm font-medium text-green-800 mb-1">Invoiced</p>
                       <p className="text-2xl font-bold text-green-900">R{customerStats.invoicedValue.toLocaleString()}</p>
                       <p className="text-xs text-green-700 mt-1">
                         {customerJobs.filter(j => j.invoiceDate).length} jobs invoiced
                       </p>
+                      {customerJobs.filter(j => j.invoiceDate).length > 0 && (
+                        <p className="text-xs text-green-600 mt-2 font-medium">Click to view →</p>
+                      )}
                     </div>
-                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <div 
+                      onClick={() => customerJobs.filter(j => j.dateQuoted && !j.invoiceDate).length > 0 && setStatsPanelType('customer-quoted')}
+                      className={`p-4 bg-blue-50 rounded-lg border border-blue-200 transition-all duration-200 ${
+                        customerJobs.filter(j => j.dateQuoted && !j.invoiceDate).length > 0 
+                          ? 'cursor-pointer hover:shadow-md hover:border-blue-400 hover:scale-[1.02]' 
+                          : ''
+                      }`}
+                    >
                       <p className="text-sm font-medium text-blue-800 mb-1">Quoted (Pending)</p>
                       <p className="text-2xl font-bold text-blue-900">R{customerStats.quotedValue.toLocaleString()}</p>
                       <p className="text-xs text-blue-700 mt-1">
                         {customerJobs.filter(j => j.dateQuoted && !j.invoiceDate).length} jobs quoted
                       </p>
+                      {customerJobs.filter(j => j.dateQuoted && !j.invoiceDate).length > 0 && (
+                        <p className="text-xs text-blue-600 mt-2 font-medium">Click to view →</p>
+                      )}
                     </div>
-                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div 
+                      onClick={() => customerJobs.filter(j => !j.dateQuoted && !j.invoiceDate).length > 0 && setStatsPanelType('customer-in-progress')}
+                      className={`p-4 bg-gray-50 rounded-lg border border-gray-200 transition-all duration-200 ${
+                        customerJobs.filter(j => !j.dateQuoted && !j.invoiceDate).length > 0 
+                          ? 'cursor-pointer hover:shadow-md hover:border-gray-400 hover:scale-[1.02]' 
+                          : ''
+                      }`}
+                    >
                       <p className="text-sm font-medium text-gray-800 mb-1">In Progress</p>
                       <p className="text-2xl font-bold text-gray-900">R{customerStats.pendingValue.toLocaleString()}</p>
                       <p className="text-xs text-gray-700 mt-1">
                         {customerJobs.filter(j => !j.dateQuoted && !j.invoiceDate).length} jobs in progress
                       </p>
+                      {customerJobs.filter(j => !j.dateQuoted && !j.invoiceDate).length > 0 && (
+                        <p className="text-xs text-gray-600 mt-2 font-medium">Click to view →</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -3240,6 +3298,210 @@ export function Reports({ statuses, branches }: ReportsProps) {
             setSelectedJob(null);
           }}
         />
+      )}
+
+      {/* Stats Panel Slide-out */}
+      {statsPanelType && (
+        <div className="fixed inset-0 z-50 overflow-hidden">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black bg-opacity-50 transition-opacity"
+            onClick={() => setStatsPanelType(null)}
+          />
+          
+          {/* Slide-out Panel */}
+          <div className="absolute inset-y-0 right-0 max-w-2xl w-full bg-white shadow-2xl flex flex-col animate-slide-in-right">
+            {/* Panel Header */}
+            <div className={`p-4 border-b flex items-center justify-between ${
+              statsPanelType === 'user-overdue-jobs' ? 'bg-red-50 border-red-200' :
+              statsPanelType === 'customer-invoiced' ? 'bg-green-50 border-green-200' :
+              statsPanelType === 'customer-quoted' ? 'bg-blue-50 border-blue-200' :
+              statsPanelType === 'customer-in-progress' ? 'bg-gray-50 border-gray-200' :
+              'bg-ars-primary/10 border-ars-primary/20'
+            }`}>
+              <div>
+                <h3 className="text-lg font-bold text-ars-heading">
+                  {statsPanelType === 'user-total-jobs' && 'All Jobs'}
+                  {statsPanelType === 'user-overdue-jobs' && 'Overdue Jobs'}
+                  {statsPanelType === 'customer-invoiced' && 'Invoiced Jobs'}
+                  {statsPanelType === 'customer-quoted' && 'Quoted Jobs (Pending)'}
+                  {statsPanelType === 'customer-in-progress' && 'Jobs In Progress'}
+                </h3>
+                <p className="text-sm text-ars-body">
+                  {statsPanelType === 'user-total-jobs' && `${userJobs.length} jobs`}
+                  {statsPanelType === 'user-overdue-jobs' && `${userOverdueJobs.length} overdue jobs`}
+                  {statsPanelType === 'customer-invoiced' && `${customerJobs.filter(j => j.invoiceDate).length} jobs`}
+                  {statsPanelType === 'customer-quoted' && `${customerJobs.filter(j => j.dateQuoted && !j.invoiceDate).length} jobs`}
+                  {statsPanelType === 'customer-in-progress' && `${customerJobs.filter(j => !j.dateQuoted && !j.invoiceDate).length} jobs`}
+                </p>
+              </div>
+              <button
+                onClick={() => setStatsPanelType(null)}
+                className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Panel Content */}
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="space-y-3">
+                {/* User Performance - Total Jobs */}
+                {statsPanelType === 'user-total-jobs' && userJobs.map(job => (
+                  <div 
+                    key={job._id}
+                    onClick={() => {
+                      setSelectedJob(job);
+                    }}
+                    className="p-4 bg-white border border-gray-200 rounded-lg hover:shadow-md hover:border-ars-primary cursor-pointer transition-all"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="font-bold text-ars-heading">{job.jobNumber}</span>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        typeof job.status === 'object' && job.status?.name 
+                          ? 'bg-blue-100 text-blue-800' 
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {typeof job.status === 'object' ? job.status?.name : job.status || 'No Status'}
+                      </span>
+                    </div>
+                    <p className="text-sm text-ars-body mb-1">
+                      {typeof job.customer === 'object' ? job.customer?.companyName : 'Unknown Customer'}
+                    </p>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-ars-body">{formatDate(job.dateOfJob)}</span>
+                      <span className="font-semibold text-green-600">R{(job.quoteValue || 0).toLocaleString()}</span>
+                    </div>
+                  </div>
+                ))}
+
+                {/* User Performance - Overdue Jobs */}
+                {statsPanelType === 'user-overdue-jobs' && userOverdueJobs.map(overdueJob => (
+                  <div 
+                    key={overdueJob.jobId}
+                    onClick={() => {
+                      // Use the nested job object if available, otherwise construct minimal job data
+                      if (overdueJob.job) {
+                        setSelectedJob(overdueJob.job);
+                      }
+                    }}
+                    className={`p-4 bg-white border border-red-200 rounded-lg transition-all ${
+                      overdueJob.job ? 'hover:shadow-md hover:border-red-400 cursor-pointer' : 'opacity-75'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="font-bold text-ars-heading">{overdueJob.jobNumber}</span>
+                      <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
+                        {overdueJob.daysOverdue || overdueJob.daysInStatus} days overdue
+                      </span>
+                    </div>
+                    <p className="text-sm text-ars-body mb-1">
+                      {overdueJob.job?.customer && typeof overdueJob.job.customer === 'object' 
+                        ? overdueJob.job.customer?.companyName 
+                        : 'Unknown Customer'}
+                    </p>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-ars-body">{overdueJob.job?.dateOfJob ? formatDate(overdueJob.job.dateOfJob) : '-'}</span>
+                      <span className="font-semibold text-green-600">R{(overdueJob.job?.quoteValue || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="mt-2 text-xs text-gray-500">
+                      Status: {overdueJob.currentStatus || 'Unknown'}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Customer Report - Invoiced */}
+                {statsPanelType === 'customer-invoiced' && customerJobs.filter(j => j.invoiceDate).map(job => (
+                  <div 
+                    key={job._id}
+                    onClick={() => setSelectedJob(job)}
+                    className="p-4 bg-white border border-green-200 rounded-lg hover:shadow-md hover:border-green-400 cursor-pointer transition-all"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="font-bold text-ars-heading">{job.jobNumber}</span>
+                      <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                        Invoiced
+                      </span>
+                    </div>
+                    <p className="text-sm text-ars-body mb-1">
+                      Invoice Date: {formatDate(job.invoiceDate)}
+                    </p>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-ars-body">Job Date: {formatDate(job.dateOfJob)}</span>
+                      <span className="font-semibold text-green-600">R{(job.quoteValue || 0).toLocaleString()}</span>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Customer Report - Quoted (Pending) */}
+                {statsPanelType === 'customer-quoted' && customerJobs.filter(j => j.dateQuoted && !j.invoiceDate).map(job => (
+                  <div 
+                    key={job._id}
+                    onClick={() => setSelectedJob(job)}
+                    className="p-4 bg-white border border-blue-200 rounded-lg hover:shadow-md hover:border-blue-400 cursor-pointer transition-all"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="font-bold text-ars-heading">{job.jobNumber}</span>
+                      <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                        Quoted - Pending
+                      </span>
+                    </div>
+                    <p className="text-sm text-ars-body mb-1">
+                      Quoted: {formatDate(job.dateQuoted)}
+                    </p>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-ars-body">Job Date: {formatDate(job.dateOfJob)}</span>
+                      <span className="font-semibold text-blue-600">R{(job.quoteValue || 0).toLocaleString()}</span>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Customer Report - In Progress */}
+                {statsPanelType === 'customer-in-progress' && customerJobs.filter(j => !j.dateQuoted && !j.invoiceDate).map(job => (
+                  <div 
+                    key={job._id}
+                    onClick={() => setSelectedJob(job)}
+                    className="p-4 bg-white border border-gray-200 rounded-lg hover:shadow-md hover:border-gray-400 cursor-pointer transition-all"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="font-bold text-ars-heading">{job.jobNumber}</span>
+                      <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">
+                        In Progress
+                      </span>
+                    </div>
+                    <p className="text-sm text-ars-body mb-1">
+                      Status: {typeof job.status === 'object' ? job.status?.name : job.status || 'Unknown'}
+                    </p>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-ars-body">Job Date: {formatDate(job.dateOfJob)}</span>
+                      <span className="font-semibold text-gray-600">R{(job.quoteValue || 0).toLocaleString()}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Panel Footer with Total */}
+            <div className="p-4 border-t bg-gray-50">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-ars-body">Total Value:</span>
+                <span className="text-lg font-bold text-green-600">
+                  R{(
+                    statsPanelType === 'user-total-jobs' 
+                      ? userJobs.reduce((sum, j) => sum + (j.quoteValue || 0), 0)
+                    : statsPanelType === 'user-overdue-jobs'
+                      ? userOverdueJobs.reduce((sum, oj) => sum + (oj.job?.quoteValue || 0), 0)
+                    : statsPanelType === 'customer-invoiced'
+                      ? customerJobs.filter(j => j.invoiceDate).reduce((sum, j) => sum + (j.quoteValue || 0), 0)
+                    : statsPanelType === 'customer-quoted'
+                      ? customerJobs.filter(j => j.dateQuoted && !j.invoiceDate).reduce((sum, j) => sum + (j.quoteValue || 0), 0)
+                    : customerJobs.filter(j => !j.dateQuoted && !j.invoiceDate).reduce((sum, j) => sum + (j.quoteValue || 0), 0)
+                  ).toLocaleString()}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

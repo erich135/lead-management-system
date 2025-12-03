@@ -34,6 +34,9 @@ import {
   updateServiceDescription,
   deleteServiceDescription,
   getBranches,
+  createBranch,
+  updateBranch,
+  deleteBranch,
   getStatuses,
   createStatus,
   updateStatus,
@@ -71,7 +74,8 @@ import {
   ChevronDown,
   ChevronUp,
   Tag,
-  History
+  History,
+  Building2
 } from 'lucide-react';
 import { ChangelogViewer } from './ChangelogViewer';
 
@@ -101,6 +105,10 @@ export function SystemManagement() {
   
   // Branches state
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
+  const [showBranchForm, setShowBranchForm] = useState(false);
+  const [newBranch, setNewBranch] = useState({ name: '', code: '', jobNumberCode: '', address: '', isDefault: false });
+  const [isBranchesExpanded, setIsBranchesExpanded] = useState(false);
   
   // Reference data state
   const [repCodes, setRepCodes] = useState<RepCode[]>([]);
@@ -717,6 +725,74 @@ export function SystemManagement() {
       window.location.reload();
     } catch (err: any) {
       setError(err.message || 'Failed to delete status');
+    }
+  }
+
+  /**
+   * Handles creating a new branch.
+   */
+  async function handleCreateBranch() {
+    if (!newBranch.name.trim()) {
+      setError('Branch name is required');
+      return;
+    }
+
+    try {
+      setError(null);
+      const response = await createBranch({
+        name: newBranch.name.trim(),
+        code: newBranch.code.trim() || undefined,
+        jobNumberCode: newBranch.jobNumberCode.trim() || undefined,
+        address: newBranch.address.trim() || undefined,
+        isDefault: newBranch.isDefault,
+      });
+      setBranches([...branches, response.branch].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewBranch({ name: '', code: '', jobNumberCode: '', address: '', isDefault: false });
+      setShowBranchForm(false);
+      alert('Branch created successfully');
+    } catch (err: any) {
+      setError(err.message || 'Failed to create branch');
+    }
+  }
+
+  /**
+   * Handles updating a branch.
+   */
+  async function handleUpdateBranch() {
+    if (!editingBranch) return;
+
+    try {
+      setError(null);
+      const response = await updateBranch(editingBranch._id, {
+        name: editingBranch.name,
+        code: editingBranch.code,
+        jobNumberCode: editingBranch.jobNumberCode,
+        address: editingBranch.address,
+        isDefault: editingBranch.isDefault,
+      });
+      setBranches(branches.map(b => b._id === editingBranch._id ? response.branch : b).sort((a, b) => a.name.localeCompare(b.name)));
+      setEditingBranch(null);
+      setShowBranchForm(false);
+      alert('Branch updated successfully');
+    } catch (err: any) {
+      setError(err.message || 'Failed to update branch');
+    }
+  }
+
+  /**
+   * Handles deleting a branch.
+   */
+  async function handleDeleteBranch(id: string) {
+    if (!confirm('Are you sure you want to delete this branch?')) {
+      return;
+    }
+
+    try {
+      await deleteBranch(id);
+      setBranches(branches.filter(b => b._id !== id));
+      alert('Branch deleted successfully');
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete branch');
     }
   }
 
@@ -1903,6 +1979,217 @@ export function SystemManagement() {
                 ))}
                 {statuses.length === 0 && (
                   <p className="text-center text-ars-body py-8">No statuses found. Click "Add Status" to create one.</p>
+                )}
+              </div>
+                </>
+              )}
+            </div>
+
+            {/* Branches Section */}
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <button
+                onClick={() => setIsBranchesExpanded(!isBranchesExpanded)}
+                className="w-full flex items-center gap-2 text-xl font-bold text-ars-heading hover:text-ars-primary transition-colors"
+              >
+                {isBranchesExpanded ? <ChevronUp className="w-6 h-6 text-ars-primary" /> : <ChevronDown className="w-6 h-6 text-ars-primary" />}
+                <Building2 className="w-6 h-6 text-ars-primary" />
+                Branches
+              </button>
+
+              {isBranchesExpanded && (
+                <>
+              <div className="mt-5 mb-4">
+                <button
+                  onClick={() => {
+                    setEditingBranch(null);
+                    setNewBranch({ name: '', code: '', jobNumberCode: '', address: '', isDefault: false });
+                    setShowBranchForm(true);
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  ADD BRANCH
+                </button>
+              </div>
+
+              {/* Add/Edit Branch Form */}
+              {(editingBranch || showBranchForm) && (
+                <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-semibold text-ars-heading">
+                      {editingBranch ? 'Edit Branch' : 'New Branch'}
+                    </h4>
+                    <button
+                      onClick={() => {
+                        setEditingBranch(null);
+                        setNewBranch({ name: '', code: '', jobNumberCode: '', address: '', isDefault: false });
+                        setShowBranchForm(false);
+                      }}
+                      className="p-1 hover:bg-gray-200 rounded transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">Branch Name *</label>
+                      <input
+                        type="text"
+                        value={editingBranch?.name || newBranch.name}
+                        onChange={(e) => {
+                          if (editingBranch) {
+                            setEditingBranch({ ...editingBranch, name: e.target.value });
+                          } else {
+                            setNewBranch({ ...newBranch, name: e.target.value });
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                        placeholder="e.g., Johannesburg"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">Code</label>
+                      <input
+                        type="text"
+                        value={editingBranch?.code || newBranch.code}
+                        onChange={(e) => {
+                          if (editingBranch) {
+                            setEditingBranch({ ...editingBranch, code: e.target.value });
+                          } else {
+                            setNewBranch({ ...newBranch, code: e.target.value });
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                        placeholder="e.g., JHB"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">Job Number Code</label>
+                      <input
+                        type="text"
+                        value={editingBranch?.jobNumberCode || newBranch.jobNumberCode}
+                        onChange={(e) => {
+                          if (editingBranch) {
+                            setEditingBranch({ ...editingBranch, jobNumberCode: e.target.value });
+                          } else {
+                            setNewBranch({ ...newBranch, jobNumberCode: e.target.value });
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                        placeholder="e.g., J"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">Address</label>
+                      <input
+                        type="text"
+                        value={editingBranch?.address || newBranch.address}
+                        onChange={(e) => {
+                          if (editingBranch) {
+                            setEditingBranch({ ...editingBranch, address: e.target.value });
+                          } else {
+                            setNewBranch({ ...newBranch, address: e.target.value });
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                        placeholder="Branch address"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="isDefaultBranch"
+                      checked={editingBranch?.isDefault || newBranch.isDefault}
+                      onChange={(e) => {
+                        if (editingBranch) {
+                          setEditingBranch({ ...editingBranch, isDefault: e.target.checked });
+                        } else {
+                          setNewBranch({ ...newBranch, isDefault: e.target.checked });
+                        }
+                      }}
+                      className="w-4 h-4 text-ars-primary border-gray-300 rounded focus:ring-ars-primary"
+                    />
+                    <label htmlFor="isDefaultBranch" className="text-sm font-semibold text-ars-body">
+                      Default Branch
+                    </label>
+                  </div>
+                  <div className="flex gap-3 mt-4">
+                    <button
+                      onClick={editingBranch ? handleUpdateBranch : handleCreateBranch}
+                      disabled={loading}
+                      className="px-4 py-2.5 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <Save className="w-4 h-4" />
+                      {editingBranch ? 'UPDATE' : 'CREATE'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingBranch(null);
+                        setNewBranch({ name: '', code: '', jobNumberCode: '', address: '', isDefault: false });
+                        setShowBranchForm(false);
+                      }}
+                      className="px-4 py-2.5 border border-gray-300 rounded-[8px] font-bold text-[14px] hover:bg-gray-50 transition-colors"
+                    >
+                      CANCEL
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Branches List */}
+              <div className="space-y-2">
+                {branches.map((branch) => (
+                  <div
+                    key={branch._id}
+                    className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <span className="font-semibold text-ars-heading">{branch.name}</span>
+                        {branch.code && (
+                          <span className="px-2 py-1 text-xs font-medium rounded-lg bg-blue-100 text-blue-700">
+                            {branch.code}
+                          </span>
+                        )}
+                        {branch.jobNumberCode && (
+                          <span className="px-2 py-1 text-xs font-medium rounded-lg bg-purple-100 text-purple-700">
+                            Job Code: {branch.jobNumberCode}
+                          </span>
+                        )}
+                        {branch.isDefault && (
+                          <span className="px-2 py-1 text-xs font-medium rounded-lg bg-green-100 text-green-700">
+                            Default
+                          </span>
+                        )}
+                      </div>
+                      {branch.address && (
+                        <p className="text-sm text-ars-body mt-1">{branch.address}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingBranch(branch);
+                          setShowBranchForm(false);
+                        }}
+                        className="p-2 text-ars-primary hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Edit branch"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteBranch(branch._id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete branch"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {branches.length === 0 && (
+                  <p className="text-center text-ars-body py-8">No branches found. Click "Add Branch" to create one.</p>
                 )}
               </div>
                 </>

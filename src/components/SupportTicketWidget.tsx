@@ -141,6 +141,7 @@ const MyTicketsModal: React.FC<MyTicketsModalProps> = ({ isOpen, onClose, ticket
   const [selectedTicket, setSelectedTicket] = useState<SupportTicketFull | null>(null);
   const [newResponse, setNewResponse] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
 
   useEffect(() => {
     if (isOpen && tickets.length > 0) {
@@ -165,6 +166,28 @@ const MyTicketsModal: React.FC<MyTicketsModalProps> = ({ isOpen, onClose, ticket
       console.error('Failed to submit response:', error);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleCloseTicket = async () => {
+    if (!selectedTicket) return;
+    
+    if (!confirm('Are you sure you want to close this ticket? This action will be recorded.')) {
+      return;
+    }
+    
+    setIsClosing(true);
+    try {
+      await updateTicketStatus(selectedTicket._id, 'closed');
+      onRefresh();
+      // Refresh selected ticket
+      const result = await getMyTickets();
+      const refreshed = result.tickets?.find((t: SupportTicketFull) => t._id === selectedTicket._id);
+      if (refreshed) setSelectedTicket(refreshed);
+    } catch (error) {
+      console.error('Failed to close ticket:', error);
+    } finally {
+      setIsClosing(false);
     }
   };
 
@@ -313,7 +336,7 @@ const MyTicketsModal: React.FC<MyTicketsModalProps> = ({ isOpen, onClose, ticket
               {/* Response Input */}
               {selectedTicket.status !== 'closed' && (
                 <div className="p-4 border-t bg-gray-50">
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 mb-2">
                     <input
                       type="text"
                       value={newResponse}
@@ -330,6 +353,14 @@ const MyTicketsModal: React.FC<MyTicketsModalProps> = ({ isOpen, onClose, ticket
                       <Send className="w-4 h-4" />
                     </button>
                   </div>
+                  <button
+                    onClick={handleCloseTicket}
+                    disabled={isClosing}
+                    className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    {isClosing ? 'Closing...' : 'Close Ticket'}
+                  </button>
                 </div>
               )}
             </>
@@ -587,7 +618,8 @@ const AdminTicketDashboard: React.FC<AdminTicketDashboardProps> = ({ isOpen, onC
   const [newResponse, setNewResponse] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [isClosing, setIsClosing] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('open'); // Default to open tickets
 
   useEffect(() => {
     if (isOpen) {
@@ -655,6 +687,25 @@ const AdminTicketDashboard: React.FC<AdminTicketDashboardProps> = ({ isOpen, onC
       setSelectedTicket({ ...selectedTicket, status: newStatus as any });
     } catch (error) {
       console.error('Failed to update status:', error);
+    }
+  };
+
+  const handleCloseTicket = async () => {
+    if (!selectedTicket) return;
+    
+    if (!confirm('Are you sure you want to close this ticket? This action will be recorded.')) {
+      return;
+    }
+    
+    setIsClosing(true);
+    try {
+      await updateTicketStatus(selectedTicket._id, 'closed');
+      loadTickets();
+      setSelectedTicket({ ...selectedTicket, status: 'closed' });
+    } catch (error) {
+      console.error('Failed to close ticket:', error);
+    } finally {
+      setIsClosing(false);
     }
   };
 
@@ -862,7 +913,7 @@ const AdminTicketDashboard: React.FC<AdminTicketDashboardProps> = ({ isOpen, onC
                 {/* Response Input */}
                 {selectedTicket.status !== 'closed' && (
                   <div className="p-4 border-t bg-gray-50">
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 mb-2">
                       <input
                         type="text"
                         value={newResponse}
@@ -879,6 +930,14 @@ const AdminTicketDashboard: React.FC<AdminTicketDashboardProps> = ({ isOpen, onC
                         <Send className="w-4 h-4" />
                       </button>
                     </div>
+                    <button
+                      onClick={handleCloseTicket}
+                      disabled={isClosing}
+                      className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      {isClosing ? 'Closing...' : 'Close Ticket'}
+                    </button>
                   </div>
                 )}
               </>

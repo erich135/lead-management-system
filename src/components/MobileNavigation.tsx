@@ -1,9 +1,9 @@
-import { LayoutDashboard, FileText, BarChart3, Calendar, Users, Menu, X, Bell, LogOut, Clock } from 'lucide-react';
+import { LayoutDashboard, FileText, BarChart3, Calendar, Users, Menu, X, Bell, LogOut, Clock, Cog } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
-type View = 'dashboard' | 'leads' | 'reports' | 'admin' | 'diary' | 'activities';
+type View = 'dashboard' | 'leads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines';
 
 interface MobileNavigationProps {
   currentView: View;
@@ -34,6 +34,7 @@ export function MobileNavigation({
     if (path === '/diary') return 'diary';
     if (path === '/admin') return 'admin';
     if (path === '/activities') return 'activities';
+    if (path === '/machines') return 'machines';
     return 'dashboard';
   };
 
@@ -141,6 +142,22 @@ export function MobileNavigation({
                   <Clock className="w-5 h-5" />
                   <span className="font-medium">Activities</span>
                 </Link>
+
+                {/* Machines (if super admin) */}
+                {user?.isSuperAdmin ? (
+                  <Link
+                    to="/machines"
+                    onClick={() => setShowMenu(false)}
+                    className={`w-full flex items-center gap-4 p-4 rounded-[8px] transition-all ${
+                      activeView === 'machines'
+                        ? 'bg-ars-secondary/20 text-ars-heading'
+                        : 'bg-gray-50 text-ars-heading hover:bg-gray-100'
+                    }`}
+                  >
+                    <Cog className="w-5 h-5" />
+                    <span className="font-medium">Machines</span>
+                  </Link>
+                ) : null}
 
                 {/* System Admin (if super admin) */}
                 {user?.isSuperAdmin ? (

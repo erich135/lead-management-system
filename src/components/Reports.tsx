@@ -3,7 +3,7 @@
  * Split into User Performance Reports and Customer Reports sections.
  * Supports role-based filtering and export functionality.
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   getJobs, 
   getActivities, 
@@ -14,6 +14,8 @@ import {
   getRepCodes,
   getTechnicians,
   getMachines,
+  getMachineRSRUrl,
+  getAuthToken,
   Job, 
   Activity,
   User,
@@ -22,6 +24,7 @@ import {
   RepCode,
   Technician,
   Machine,
+  MachineRSR,
   OverdueJob
 } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -99,6 +102,17 @@ export function Reports({ statuses, branches }: ReportsProps) {
   const [machineMakeFilter, setMachineMakeFilter] = useState<string>('');
   const [machineModelFilter, setMachineModelFilter] = useState<string>('');
   const [machineSerialFilter, setMachineSerialFilter] = useState<string>('');
+  const [machineCustomerFilter, setMachineCustomerFilter] = useState<string>('');
+  const [machineCustomerSearch, setMachineCustomerSearch] = useState<string>('');
+  const [machineCustomerResults, setMachineCustomerResults] = useState<Customer[]>([]);
+  const [showMachineCustomerDropdown, setShowMachineCustomerDropdown] = useState(false);
+  const [selectedMachineCustomer, setSelectedMachineCustomer] = useState<Customer | null>(null);
+  const machineCustomerDropdownRef = useRef<HTMLDivElement>(null);
+  
+  // RSR Preview State for Reports
+  const [reportRSRPreview, setReportRSRPreview] = useState<{ machineId: string; rsr: MachineRSR } | null>(null);
+  const [showReportRSRPreview, setShowReportRSRPreview] = useState(false);
+  const [expandedMachineRSRs, setExpandedMachineRSRs] = useState<Set<string>>(new Set());
   
   // Overdue Jobs Filters
   const [overdueStatusFilter, setOverdueStatusFilter] = useState<string>('');
@@ -142,8 +156,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
   const [customerJobs, setCustomerJobs] = useState<Job[]>([]);
   const [customerMachines, setCustomerMachines] = useState<Machine[]>([]);
   const [customerActivities, setCustomerActivities] = useState<Activity[]>([]);
-  const [allMachines, setAllMachines] = useState<Machine[]>([]);
-  const [machineJobs, setMachineJobs] = useState<Job[]>([]);
+  const [allMachinesRaw, setAllMachinesRaw] = useState<Machine[]>([]);
+  const [allMachineJobsRaw, setAllMachineJobsRaw] = useState<Job[]>([]);
   const [conversionJobs, setConversionJobs] = useState<Job[]>([]);
   const [allConversionJobs, setAllConversionJobs] = useState<Job[]>([]); // Unfiltered for dropdown population
   
@@ -180,13 +194,48 @@ export function Reports({ statuses, branches }: ReportsProps) {
   }, [activeTab, selectedCustomerId, dateRangePreset, customDateFrom, customDateTo]);
 
   /**
-   * Loads machine data when machine tab is active or filters change.
+   * Loads machine data when machine tab is active.
+   * Filters are applied client-side via useMemo.
    */
   useEffect(() => {
     if (activeTab === 'machine') {
       loadMachineData();
     }
-  }, [activeTab, machineMakeFilter, machineModelFilter, machineSerialFilter]);
+  }, [activeTab]);
+
+  /**
+   * Search for customers in machine filter.
+   */
+  useEffect(() => {
+    const searchCustomers = async () => {
+      if (machineCustomerSearch.length < 2) {
+        setMachineCustomerResults([]);
+        return;
+      }
+      try {
+        const response = await getCustomers({ search: machineCustomerSearch, limit: 10 });
+        setMachineCustomerResults(response.customers || []);
+      } catch (error) {
+        console.error('Error searching customers:', error);
+        setMachineCustomerResults([]);
+      }
+    };
+    const debounce = setTimeout(searchCustomers, 300);
+    return () => clearTimeout(debounce);
+  }, [machineCustomerSearch]);
+
+  /**
+   * Close machine customer dropdown when clicking outside.
+   */
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (machineCustomerDropdownRef.current && !machineCustomerDropdownRef.current.contains(event.target as Node)) {
+        setShowMachineCustomerDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   /**
    * Loads conversion data initially with all jobs.
@@ -723,7 +772,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
     
     allMachines.forEach(machine => {
       // Get jobs that have this machine
-      const jobsForMachine = machineJobs.filter(job => {
+      const jobsForMachine = filteredMachineJobs.filter(job => {
         if (!Array.isArray(job.machines) || job.machines.length === 0) return false;
         return job.machines.some(machineRef => {
           const machineId = typeof machineRef === 'object' && machineRef !== null
@@ -1274,38 +1323,9 @@ export function Reports({ statuses, branches }: ReportsProps) {
         machinesList = machinesList.filter(m => userJobMachineIds.has(m._id));
       }
 
-      // Apply filters
-      if (machineMakeFilter) {
-        machinesList = machinesList.filter(m => 
-          m.make?.toLowerCase().includes(machineMakeFilter.toLowerCase())
-        );
-      }
-      if (machineModelFilter) {
-        machinesList = machinesList.filter(m => 
-          m.model?.toLowerCase().includes(machineModelFilter.toLowerCase())
-        );
-      }
-      if (machineSerialFilter) {
-        machinesList = machinesList.filter(m => 
-          m.serialNumber?.toLowerCase().includes(machineSerialFilter.toLowerCase())
-        );
-      }
-
-      setAllMachines(machinesList);
-
-      // Get all jobs that have these machines
-      const machineIds = new Set(machinesList.map(m => m._id));
-      const jobsWithMachines = allJobsList.filter(job => {
-        if (!Array.isArray(job.machines) || job.machines.length === 0) return false;
-        return job.machines.some(machineRef => {
-          const machineId = typeof machineRef === 'object' && machineRef !== null
-            ? (machineRef as any)._id
-            : machineRef;
-          return machineIds.has(String(machineId));
-        });
-      });
-
-      setMachineJobs(jobsWithMachines);
+      // Store raw data - filters will be applied via useMemo
+      setAllMachinesRaw(machinesList);
+      setAllMachineJobsRaw(allJobsList);
 
     } catch (err: any) {
       console.error('Error loading machine data:', err);
@@ -1314,6 +1334,56 @@ export function Reports({ statuses, branches }: ReportsProps) {
       setLoading(false);
     }
   }
+
+  /**
+   * Client-side filtered machines using useMemo.
+   * Filters are applied without API reload.
+   */
+  const allMachines = useMemo(() => {
+    let filtered = [...allMachinesRaw];
+    
+    if (machineMakeFilter) {
+      filtered = filtered.filter(m => 
+        m.make?.toLowerCase().includes(machineMakeFilter.toLowerCase())
+      );
+    }
+    if (machineModelFilter) {
+      filtered = filtered.filter(m => 
+        m.model?.toLowerCase().includes(machineModelFilter.toLowerCase())
+      );
+    }
+    if (machineSerialFilter) {
+      filtered = filtered.filter(m => 
+        m.serialNumber?.toLowerCase().includes(machineSerialFilter.toLowerCase())
+      );
+    }
+    if (selectedMachineCustomer) {
+      filtered = filtered.filter(m => {
+        const customerId = typeof m.customer === 'object' && m.customer !== null
+          ? (m.customer as any)._id
+          : null;
+        return customerId === selectedMachineCustomer._id;
+      });
+    }
+    
+    return filtered;
+  }, [allMachinesRaw, machineMakeFilter, machineModelFilter, machineSerialFilter, selectedMachineCustomer]);
+
+  /**
+   * Client-side filtered machine jobs using useMemo.
+   */
+  const filteredMachineJobs = useMemo(() => {
+    const machineIds = new Set(allMachines.map(m => m._id));
+    return allMachineJobsRaw.filter(job => {
+      if (!Array.isArray(job.machines) || job.machines.length === 0) return false;
+      return job.machines.some(machineRef => {
+        const machineId = typeof machineRef === 'object' && machineRef !== null
+          ? (machineRef as any)._id
+          : machineRef;
+        return machineIds.has(String(machineId));
+      });
+    });
+  }, [allMachines, allMachineJobsRaw]);
 
   /**
    * Calculates comprehensive customer statistics.
@@ -3090,7 +3160,65 @@ export function Reports({ statuses, branches }: ReportsProps) {
               <h3 className="text-lg font-bold text-ars-heading mb-4">
                 Machine Filters
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="relative" ref={machineCustomerDropdownRef}>
+                  <label className="block text-[11px] font-medium text-gray-600 mb-1">Customer</label>
+                  {selectedMachineCustomer ? (
+                    <div className="flex items-center justify-between w-full pl-2 pr-2 py-1.5 text-[13px] border border-blue-300 rounded-[8px] bg-blue-50">
+                      <span className="text-blue-700 font-medium truncate">{selectedMachineCustomer.name}</span>
+                      <button
+                        onClick={() => {
+                          setSelectedMachineCustomer(null);
+                          setMachineCustomerSearch('');
+                        }}
+                        className="ml-2 text-blue-500 hover:text-blue-700"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="relative">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Search customer..."
+                          value={machineCustomerSearch}
+                          onChange={(e) => {
+                            setMachineCustomerSearch(e.target.value);
+                            setShowMachineCustomerDropdown(true);
+                          }}
+                          onFocus={() => setShowMachineCustomerDropdown(true)}
+                          className="w-full pl-8 pr-2 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                        />
+                      </div>
+                      {showMachineCustomerDropdown && machineCustomerSearch.length >= 2 && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-auto">
+                          {machineCustomerResults.length > 0 ? (
+                            machineCustomerResults.map((customer) => (
+                              <button
+                                key={customer._id}
+                                onClick={() => {
+                                  setSelectedMachineCustomer(customer);
+                                  setMachineCustomerSearch('');
+                                  setShowMachineCustomerDropdown(false);
+                                }}
+                                className="w-full px-3 py-2 text-left hover:bg-blue-50 flex items-center gap-2 border-b border-gray-100 last:border-0 text-[13px]"
+                              >
+                                <Building2 className="w-4 h-4 text-gray-400" />
+                                <span className="truncate">{customer.name}</span>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-3 py-2 text-gray-500 text-[13px] text-center">
+                              No customers found
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
                 <div>
                   <label className="block text-[11px] font-medium text-gray-600 mb-1">Make</label>
                   <input
@@ -3151,7 +3279,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       <p className="text-sm font-medium text-ars-body truncate">Total Jobs</p>
                       <FileText className="w-5 h-5 text-[#f7c12b] flex-shrink-0" />
                     </div>
-                    <p className="text-3xl font-bold text-ars-heading truncate">{machineJobs.length.toLocaleString()}</p>
+                    <p className="text-3xl font-bold text-ars-heading truncate">{filteredMachineJobs.length.toLocaleString()}</p>
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <div className="flex items-center justify-between mb-3 gap-2">
@@ -3159,7 +3287,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       <Banknote className="w-5 h-5 text-[#f7c12b] flex-shrink-0" />
                     </div>
                     <p className="text-3xl font-bold text-ars-heading truncate">
-                      R{machineJobs.reduce((sum, job) => sum + (job.valueExVat || 0), 0).toLocaleString()}
+                      R{filteredMachineJobs.reduce((sum, job) => sum + (job.valueExVat || 0), 0).toLocaleString()}
                     </p>
                   </div>
                 </div>
@@ -3170,7 +3298,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                   <div className="space-y-6">
                     {allMachines.map((machine) => {
                       // Get jobs for this machine
-                      const jobsForMachine = machineJobs.filter(job => {
+                      const jobsForMachine = filteredMachineJobs.filter(job => {
                         if (!Array.isArray(job.machines) || job.machines.length === 0) return false;
                         return job.machines.some(machineRef => {
                           const machineId = typeof machineRef === 'object' && machineRef !== null
@@ -3206,16 +3334,100 @@ export function Reports({ statuses, branches }: ReportsProps) {
                                 <div className="text-sm text-ars-body mb-1">
                                   <span className="font-medium">Hours:</span> {machine.machineHours?.toLocaleString() || '0'}
                                 </div>
-                                <div className="text-sm text-orange-600">
+                                <div className="text-sm text-orange-600 mb-1">
                                   <span className="font-medium">Next Service:</span> {machine.nextServiceHours?.toLocaleString() || '0'}
                                 </div>
+                                {(machine.rsrDocuments?.length || 0) > 0 && (
+                                  <button
+                                    onClick={() => {
+                                      const newExpanded = new Set(expandedMachineRSRs);
+                                      if (newExpanded.has(machine._id)) {
+                                        newExpanded.delete(machine._id);
+                                      } else {
+                                        newExpanded.add(machine._id);
+                                      }
+                                      setExpandedMachineRSRs(newExpanded);
+                                    }}
+                                    className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                  >
+                                    <FileText className="w-4 h-4" />
+                                    <span className="font-medium">RSR Docs:</span> {machine.rsrDocuments?.length || 0}
+                                    {expandedMachineRSRs.has(machine._id) ? (
+                                      <ChevronUp className="w-4 h-4" />
+                                    ) : (
+                                      <ChevronDown className="w-4 h-4" />
+                                    )}
+                                  </button>
+                                )}
                               </div>
                             </div>
+                            
+                            {/* RSR Documents Expandable Section */}
+                            {expandedMachineRSRs.has(machine._id) && machine.rsrDocuments && machine.rsrDocuments.length > 0 && (
+                              <div className="mt-3 pt-3 border-t border-gray-200">
+                                <h5 className="text-sm font-semibold text-ars-heading mb-2 flex items-center gap-2">
+                                  <FileText className="w-4 h-4 text-blue-600" />
+                                  RSR Documents
+                                </h5>
+                                <div className="space-y-2">
+                                  {machine.rsrDocuments.map((rsr: MachineRSR) => (
+                                    <div key={rsr._id} className="flex items-center justify-between bg-blue-50 rounded-lg p-3 border border-blue-100">
+                                      <div className="flex items-center gap-3">
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                                          rsr.mimeType?.includes('pdf') ? 'bg-red-100' : 'bg-green-100'
+                                        }`}>
+                                          {rsr.mimeType?.includes('pdf') ? (
+                                            <FileText className="w-4 h-4 text-red-600" />
+                                          ) : (
+                                            <Eye className="w-4 h-4 text-green-600" />
+                                          )}
+                                        </div>
+                                        <div>
+                                          <p className="text-sm font-medium text-ars-heading">{rsr.title || rsr.fileName}</p>
+                                          <p className="text-xs text-ars-body">
+                                            {rsr.fileName} • {formatDate(rsr.uploadedAt)} • {((rsr.fileSize || 0) / 1024).toFixed(1)} KB
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          onClick={() => {
+                                            setReportRSRPreview({ machineId: machine._id, rsr });
+                                            setShowReportRSRPreview(true);
+                                          }}
+                                          className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                                          title="View"
+                                        >
+                                          <Eye className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            const token = getAuthToken();
+                                            const url = getMachineRSRUrl(machine._id, rsr._id);
+                                            const link = document.createElement('a');
+                                            link.href = `${url}?token=${token}`;
+                                            link.download = rsr.fileName;
+                                            link.target = '_blank';
+                                            document.body.appendChild(link);
+                                            link.click();
+                                            document.body.removeChild(link);
+                                          }}
+                                          className="p-2 text-green-600 hover:bg-green-100 rounded-lg transition-colors"
+                                          title="Download"
+                                        >
+                                          <Download className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
 
                           {/* Jobs for this Machine */}
                           {jobsForMachine.length > 0 ? (
-                            <div>
+                            <div className="mt-4 pt-4 border-t border-gray-200">
                               <h5 className="text-sm font-semibold text-ars-heading mb-3">
                                 Jobs ({jobsForMachine.length})
                               </h5>
@@ -3545,6 +3757,76 @@ export function Reports({ statuses, branches }: ReportsProps) {
                   ).toLocaleString()}
                 </span>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RSR Preview Modal for Reports */}
+      {showReportRSRPreview && reportRSRPreview && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <div>
+                <h3 className="text-lg font-bold text-ars-heading">{reportRSRPreview.rsr.title || reportRSRPreview.rsr.fileName}</h3>
+                <p className="text-sm text-ars-body">
+                  {reportRSRPreview.rsr.fileName} • {formatDate(reportRSRPreview.rsr.uploadedAt)}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const token = getAuthToken();
+                    const url = getMachineRSRUrl(reportRSRPreview.machineId, reportRSRPreview.rsr._id);
+                    const link = document.createElement('a');
+                    link.href = `${url}?token=${token}`;
+                    link.download = reportRSRPreview.rsr.fileName;
+                    link.target = '_blank';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Download
+                </button>
+                <button
+                  onClick={() => {
+                    setShowReportRSRPreview(false);
+                    setReportRSRPreview(null);
+                  }}
+                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            
+            {/* Preview Content */}
+            <div className="flex-1 overflow-auto p-4 bg-gray-100">
+              {reportRSRPreview.rsr.mimeType?.includes('pdf') ? (
+                <iframe
+                  src={`${getMachineRSRUrl(reportRSRPreview.machineId, reportRSRPreview.rsr._id)}?token=${getAuthToken()}`}
+                  className="w-full h-full min-h-[60vh] rounded-lg border border-gray-200"
+                  title={reportRSRPreview.rsr.fileName}
+                />
+              ) : reportRSRPreview.rsr.mimeType?.includes('image') ? (
+                <div className="flex items-center justify-center h-full">
+                  <img
+                    src={`${getMachineRSRUrl(reportRSRPreview.machineId, reportRSRPreview.rsr._id)}?token=${getAuthToken()}`}
+                    alt={reportRSRPreview.rsr.fileName}
+                    className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-lg"
+                  />
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-gray-500 py-12">
+                  <FileText className="w-16 h-16 mb-4" />
+                  <p className="text-lg font-medium">Preview not available</p>
+                  <p className="text-sm">Click Download to view this file</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

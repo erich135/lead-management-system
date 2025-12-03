@@ -471,7 +471,7 @@ export function ChatWidget() {
       />
       
       {/* Chat Widget */}
-      <div className={`fixed bottom-24 right-8 bg-white rounded-lg z-30 flex flex-col ${isMinimized ? 'h-14' : 'h-[600px]'} w-96 transition-all`}>
+      <div className={`fixed bottom-24 right-8 bg-white rounded-lg z-50 flex flex-col shadow-2xl ${isMinimized ? 'h-14' : 'h-[600px]'} w-96 transition-all`}>
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b bg-[#0969a9] text-white rounded-t-lg">
         <div className="flex items-center space-x-2">

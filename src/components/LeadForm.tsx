@@ -1,6 +1,6 @@
 import { useState, FormEvent, useEffect, useRef } from 'react';
 import { createJob, getJobs, getStatuses, getBranches, getCustomers, createCustomer, getTechnicians, getServiceDescriptions, getRepCodes, getAdminCodes, getMachinesByCustomer, createMachine, type Status, type Branch, type Customer, type Technician, type ServiceDescription, type RepCode, type AdminCode, type Machine, type Job } from '../lib/api';
-import { X, Search, Plus, Wrench } from 'lucide-react';
+import { X, Plus, Wrench } from 'lucide-react';
 import { HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
 
@@ -35,15 +35,10 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
     machineType: '',
   });
   const [creatingMachine, setCreatingMachine] = useState(false);
-  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
-  const [searchedCustomers, setSearchedCustomers] = useState<Customer[]>([]);
-  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
   const [selectedCustomerName, setSelectedCustomerName] = useState('');
   const machinesSectionRef = useRef<HTMLDivElement>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const customerDropdownRef = useRef<HTMLDivElement>(null);
-  const isSelectingCustomerRef = useRef(false); // Flag to prevent search when selecting
-  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
 
   const [formData, setFormData] = useState<{
     jobNumber: string,
@@ -101,25 +96,28 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
 
 
 
-  // Load technicians, service descriptions, rep codes, and admin codes on mount
+  // Load technicians, service descriptions, rep codes, admin codes, and all customers on mount
   useEffect(() => {
     async function loadReferenceData() {
       try {
-        const [techsData, descsData, repCodesData, adminCodesData] = await Promise.all([
+        const [techsData, descsData, repCodesData, adminCodesData, customersData] = await Promise.all([
           getTechnicians().catch(err => { console.error('getTechnicians failed:', err); return { technicians: [] }; }),
           getServiceDescriptions().catch(err => { console.error('getServiceDescriptions failed:', err); return { descriptions: [] }; }),
           getRepCodes().catch(err => { console.error('getRepCodes failed:', err); return { repCodes: [] }; }),
           getAdminCodes().catch(err => { console.error('getAdminCodes failed:', err); return { adminCodes: [] }; }),
+          getCustomers({ limit: 10000 }).catch(err => { console.error('getCustomers failed:', err); return { customers: [] }; }),
         ]);
         setTechnicians(techsData.technicians || []);
         setServiceDescriptions(descsData.descriptions || []);
         setRepCodes(repCodesData.repCodes || []);
         setAdminCodes(adminCodesData.adminCodes || []);
+        setAllCustomers(customersData.customers || []);
         console.log('Reference data loaded:', { 
           technicians: techsData.technicians?.length, 
           descriptions: descsData.descriptions?.length,
           repCodes: repCodesData.repCodes?.length,
-          adminCodes: adminCodesData.adminCodes?.length 
+          adminCodes: adminCodesData.adminCodes?.length,
+          customers: customersData.customers?.length
         });
         console.log('Admin codes data:', adminCodesData);
       } catch (err) {
@@ -147,73 +145,6 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
     const today = new Date();
     return today.toISOString().split('T')[0];
   };
-
-  // Search customers when search term changes (with debounce)
-  useEffect(() => {
-    // Don't search if we're in the process of selecting a customer
-    if (isSelectingCustomerRef.current) {
-      isSelectingCustomerRef.current = false; // Reset flag
-      return;
-    }
-
-    if (!customerSearchTerm || customerSearchTerm.length < 2) {
-      setSearchedCustomers([]);
-      setShowCustomerDropdown(false);
-      return;
-    }
-
-    const timeoutId = setTimeout(async () => {
-      try {
-        const data = await getCustomers({ search: customerSearchTerm, limit: 5 });
-        setSearchedCustomers(data.customers || []);
-        setShowCustomerDropdown(true);
-      } catch (err) {
-        console.error('Error searching customers:', err);
-        setSearchedCustomers([]);
-      }
-    }, 300); // 300ms debounce
-
-    return () => clearTimeout(timeoutId);
-  }, [customerSearchTerm]);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (customerDropdownRef.current && !customerDropdownRef.current.contains(event.target as Node)) {
-        setShowCustomerDropdown(false);
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  async function handleCustomerSelect(customer: Customer) {
-    isSelectingCustomerRef.current = true; // Set flag to prevent search
-    setFormData({ ...formData, customer: customer._id, machines: [] }); // Reset machines when customer changes
-    setSelectedCustomer(customer);
-    setSelectedCustomerName(customer.name);
-    setCustomerSearchTerm(customer.name);
-    setShowCustomerDropdown(false);
-    setSearchedCustomers([]); // Clear search results since we've selected
-    setShowNewMachineForm(false); // Reset new machine form
-    
-    // Load machines for this customer
-    try {
-      const machinesData = await getMachinesByCustomer(customer._id);
-      setMachines(machinesData.machines || []);
-    } catch (err) {
-      console.error('Error loading machines:', err);
-      setMachines([]);
-    }
-    
-    // Scroll to machines section after a short delay to ensure it's rendered
-    setTimeout(() => {
-      if (machinesSectionRef.current) {
-        machinesSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-    }, 100);
-  }
 
   // Load machines when cash customer changes
   useEffect(() => {
@@ -574,87 +505,50 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
             </div>
 
             {customerSelection === 'customer' && (
-              <div className="relative" ref={customerDropdownRef}>
+              <div>
                 <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                   Customer *
                 </label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    type="text"
-                    value={customerSearchTerm}
-                    onChange={(e) => {
-                      const newValue = e.target.value;
-                      setCustomerSearchTerm(newValue);
-                      // If user is typing and it's different from selected customer, clear selection
-                      if (selectedCustomer && newValue !== selectedCustomer.name) {
-                        setFormData({ ...formData, customer: '' });
-                        setSelectedCustomer(null);
-                        setSelectedCustomerName('');
+                <select
+                  value={formData.customer}
+                  onChange={async (e) => {
+                    const customerId = e.target.value;
+                    const customer = allCustomers.find(c => c._id === customerId);
+                    if (customer) {
+                      setFormData({ ...formData, customer: customerId, machines: [] });
+                      setSelectedCustomer(customer);
+                      setSelectedCustomerName(customer.name);
+                      // Load machines for this customer
+                      try {
+                        const machinesData = await getMachinesByCustomer(customerId);
+                        setMachines(machinesData.machines || []);
+                      } catch (err) {
+                        console.error('Error loading machines:', err);
+                        setMachines([]);
                       }
-                      if (!newValue) {
-                        setFormData({ ...formData, customer: '' });
-                        setSelectedCustomer(null);
-                        setSelectedCustomerName('');
-                      }
-                    }}
-                    onFocus={() => {
-                      if (searchedCustomers.length > 0) {
-                        setShowCustomerDropdown(true);
-                      }
-                    }}
-                    placeholder="Search for customer (min 2 characters)..."
-                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
-                  />
-                  {showCustomerDropdown && searchedCustomers.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-[8px] shadow-lg max-h-60 overflow-y-auto">
-                      {searchedCustomers.map((customer) => (
-                        <button
-                          key={customer._id}
-                          type="button"
-                          onClick={() => handleCustomerSelect(customer)}
-                          className="w-full px-4 py-2.5 text-left hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-b-0"
-                        >
-                          <span className="text-sm font-medium text-ars-heading">{customer.name}</span>
-                        </button>
-                      ))}
-                      {searchedCustomers.length === 5 && (
-                        <div className="px-4 py-2 text-xs text-ars-body bg-gray-50 border-t border-gray-200">
-                          Showing top 5 results. Type more to refine search.
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {customerSearchTerm.length >= 2 && searchedCustomers.length === 0 && showCustomerDropdown && !selectedCustomer && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-[8px] shadow-lg p-4">
-                      <p className="text-sm text-ars-body mb-3">No customers found matching "{customerSearchTerm}"</p>
-                      {true ? (
-                        <button
-                          type="button"
-                          onClick={handleCreateCustomer}
-                          disabled={isCreatingCustomer}
-                          className="w-full px-4 py-2 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-lg font-bold text-[14px] hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                        >
-                          {isCreatingCustomer ? (
-                            <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                              CREATING...
-                            </>
-                          ) : (
-                            <>
-                              <Plus className="w-4 h-4" />
-                              CREATE "{customerSearchTerm.toUpperCase()}"
-                            </>
-                          )}
-                        </button>
-                      ) : (
-                        <p className="text-xs text-ars-body text-center py-2">
-                          Customer not found. Only super admins can create new customers.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
+                      // Scroll to machines section
+                      setTimeout(() => {
+                        if (machinesSectionRef.current) {
+                          machinesSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
+                      }, 100);
+                    } else {
+                      setFormData({ ...formData, customer: '', machines: [] });
+                      setSelectedCustomer(null);
+                      setSelectedCustomerName('');
+                      setMachines([]);
+                    }
+                  }}
+                  style={{ fontSize: '15px' }}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                >
+                  <option value="">Select Customer</option>
+                  {allCustomers.map((customer) => (
+                    <option key={customer._id} value={customer._id}>
+                      {customer.name}
+                    </option>
+                  ))}
+                </select>
                 {selectedCustomerName && (
                   <p className="mt-1 text-xs text-ars-body">
                     Selected: <span className="font-medium text-ars-heading">{selectedCustomerName}</span>

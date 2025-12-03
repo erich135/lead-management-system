@@ -585,6 +585,22 @@ export interface AdminCode {
   updatedAt?: string;
 }
 
+export interface MachineRSR {
+  _id: string;
+  title?: string;
+  fileName: string;
+  fileUrl: string;
+  fileSize: number;
+  mimeType: string;
+  description?: string;
+  uploadedBy: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+  } | string;
+  uploadedAt: string;
+}
+
 export interface Machine {
   _id: string;
   make: string;
@@ -599,6 +615,7 @@ export interface Machine {
   nextServiceHours: number;
   isActive: boolean;
   dbStatus?: string;
+  rsrDocuments?: MachineRSR[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -682,6 +699,50 @@ export async function createCustomer(name: string): Promise<{ customer: Customer
  */
 export async function getBranches(): Promise<{ branches: Branch[] }> {
   return apiRequest('/api/reference/branches');
+}
+
+/**
+ * Creates a new branch.
+ */
+export async function createBranch(branchData: {
+  name: string;
+  code?: string;
+  jobNumberCode?: string;
+  address?: string;
+  isDefault?: boolean;
+}): Promise<{ branch: Branch }> {
+  return apiRequest('/api/reference/branches', {
+    method: 'POST',
+    body: JSON.stringify(branchData),
+  });
+}
+
+/**
+ * Updates a branch.
+ */
+export async function updateBranch(
+  id: string,
+  branchData: {
+    name?: string;
+    code?: string;
+    jobNumberCode?: string;
+    address?: string;
+    isDefault?: boolean;
+  }
+): Promise<{ branch: Branch }> {
+  return apiRequest(`/api/reference/branches/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(branchData),
+  });
+}
+
+/**
+ * Deletes a branch.
+ */
+export async function deleteBranch(id: string): Promise<{ message: string }> {
+  return apiRequest(`/api/reference/branches/${id}`, {
+    method: 'DELETE',
+  });
 }
 
 /**
@@ -1789,6 +1850,66 @@ export async function deleteRSRDocument(documentId: string): Promise<void> {
   });
 }
 
+// ============================================================================
+// Machine RSR Document Functions
+// ============================================================================
+
+/**
+ * Upload RSR document to a machine.
+ */
+export async function uploadMachineRSR(
+  machineId: string,
+  file: File,
+  title: string,
+  description?: string
+): Promise<MachineRSR> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('title', title);
+  if (description) formData.append('description', description);
+
+  const token = getAuthToken();
+  const response = await fetch(`${API_BASE_URL}/api/machines/${machineId}/rsr`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || 'Failed to upload RSR document');
+  }
+
+  const data = await response.json();
+  return data.data.rsrDocument;
+}
+
+/**
+ * Get RSR documents for a machine.
+ */
+export async function getMachineRSRs(machineId: string): Promise<MachineRSR[]> {
+  const response = await apiRequest<{ rsrDocuments: MachineRSR[] }>(
+    `/api/machines/${machineId}/rsr`
+  );
+  return response.rsrDocuments || [];
+}
+
+/**
+ * Get machine RSR document download URL.
+ */
+export function getMachineRSRUrl(machineId: string, rsrId: string): string {
+  return `${API_BASE_URL}/api/machines/${machineId}/rsr/${rsrId}`;
+}
+
+/**
+ * Delete RSR document from a machine (super admin only).
+ */
+export async function deleteMachineRSR(machineId: string, rsrId: string): Promise<void> {
+  await apiRequest(`/api/machines/${machineId}/rsr/${rsrId}`, {
+    method: 'DELETE',
+  });
+}
+
 /**
  * Create a note for a job.
  */
@@ -1989,6 +2110,9 @@ export default {
   deleteStatus,
   getCustomers,
   getBranches,
+  createBranch,
+  updateBranch,
+  deleteBranch,
   getServiceDescriptions,
   createServiceDescription,
   updateServiceDescription,
@@ -2029,6 +2153,10 @@ export default {
   getRSRDocuments,
   getRSRDocumentUrl,
   deleteRSRDocument,
+  uploadMachineRSR,
+  getMachineRSRs,
+  getMachineRSRUrl,
+  deleteMachineRSR,
   createJobNote,
   getJobNotes,
   uploadJobNoteAttachment,

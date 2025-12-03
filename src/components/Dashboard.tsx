@@ -38,6 +38,7 @@ import {
   User,
   Building2,
   Tag,
+  Cog,
 } from 'lucide-react';
 import { LeadsList } from './LeadsList';
 import { LeadForm } from './LeadForm';
@@ -46,13 +47,14 @@ import { SystemManagement } from './SystemManagement';
 import { Reports } from './Reports';
 import { Diary } from './Diary';
 import { Activities } from './Activities';
+import { Machines } from './Machines';
 import { MobileNavigation } from './MobileNavigation';
 import { SupportTicketButton } from './SupportTicketWidget';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { Tooltip, HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
 
-type View = 'dashboard' | 'leads' | 'reports' | 'admin' | 'diary' | 'activities';
+type View = 'dashboard' | 'leads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines';
 
 interface DashboardProps {
   view?: View;
@@ -71,6 +73,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
     if (path === '/diary') return 'diary';
     if (path === '/admin') return 'admin';
     if (path === '/activities') return 'activities';
+    if (path === '/machines') return 'machines';
     return 'dashboard';
   };
   
@@ -86,6 +89,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
       diary: '/diary',
       admin: '/admin',
       activities: '/activities',
+      machines: '/machines',
     };
     navigate(routes[newView]);
   };
@@ -681,6 +685,19 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                   <Clock className={`w-4 h-4 transition-transform ${view === 'activities' ? 'scale-110' : ''}`} />
                   <span>Activities</span>
                 </Link>
+                {isSuperAdmin && (
+                  <Link
+                    to="/machines"
+                    className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
+                      view === 'machines'
+                        ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
+                        : 'text-[#383838] hover:text-[#f7c12b]'
+                    }`}
+                  >
+                    <Cog className={`w-4 h-4 transition-transform ${view === 'machines' ? 'scale-110' : ''}`} />
+                    <span>Machines</span>
+                  </Link>
+                )}
                 {isSuperAdmin && (
                   <Link
                     to="/admin"
@@ -1784,6 +1801,10 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
 
         {view === 'diary' && (
           <Diary />
+        )}
+
+        {view === 'machines' && isSuperAdmin && (
+          <Machines />
         )}
 
         {view === 'admin' && isSuperAdmin && (

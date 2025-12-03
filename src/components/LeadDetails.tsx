@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getJob, updateJob, getMachinesByCustomer, createMachine, updateMachine, getTechnicians, getRepCodes, getCustomers, getActivities, getServiceDescriptions, deleteJob, uploadRSRDocument, getRSRDocuments, getRSRDocumentUrl, deleteRSRDocument, createJobNote, getJobNotes, uploadJobNoteAttachment, getJobNoteAttachmentUrl, deleteJobNote, type Job, type Status, type Branch, type Machine, type Technician, type RepCode, type Customer, type Activity, type ServiceDescription, type OverdueJob, type JobRSRDocument, type JobNote, type JobNoteAttachment } from '../lib/api';
-import { X, Edit, Save, Clock, User, Trash2, FileText, Paperclip, Upload, Download, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Edit, Save, Clock, User, Trash2, FileText, Paperclip, Upload, Download, Plus, ChevronDown, ChevronUp, Eye, Image } from 'lucide-react';
 import { HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
 
@@ -92,6 +92,8 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   const [rsrFile, setRsrFile] = useState<File | null>(null);
   const [uploadingRSR, setUploadingRSR] = useState(false);
   const [rsrDragActive, setRsrDragActive] = useState(false);
+  const [previewRSR, setPreviewRSR] = useState<JobRSRDocument | null>(null);
+  const [showRSRPreview, setShowRSRPreview] = useState(false);
   const [notes, setNotes] = useState<JobNote[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(false);
   const [notesMinimized, setNotesMinimized] = useState(false);
@@ -272,8 +274,9 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
       return;
     }
 
-    if (rsrFile.type !== 'application/pdf') {
-      setError('Only PDF files are allowed for RSR documents');
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+    if (!allowedTypes.includes(rsrFile.type)) {
+      setError('Only PDF, JPEG, and PNG files are allowed for RSR documents');
       return;
     }
 
@@ -2025,10 +2028,11 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                         
                         const file = e.dataTransfer.files?.[0];
                         if (file) {
-                          if (file.type === 'application/pdf') {
+                          const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+                          if (allowedTypes.includes(file.type)) {
                             setRsrFile(file);
                           } else {
-                            setError('Only PDF files are allowed for RSR documents');
+                            setError('Only PDF, JPEG, and PNG files are allowed for RSR documents');
                           }
                         }
                       }}
@@ -2040,14 +2044,15 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                             <span>Click to upload</span>
                             <input
                               type="file"
-                              accept=".pdf"
+                              accept=".pdf,application/pdf,image/jpeg,image/jpg,image/png,.jpg,.jpeg,.png"
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
                                 if (file) {
-                                  if (file.type === 'application/pdf') {
+                                  const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+                                  if (allowedTypes.includes(file.type)) {
                                     setRsrFile(file);
                                   } else {
-                                    setError('Only PDF files are allowed for RSR documents');
+                                    setError('Only PDF, JPEG, and PNG files are allowed for RSR documents');
                                   }
                                 }
                               }}
@@ -2061,7 +2066,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                             Selected: {rsrFile.name}
                           </p>
                         )}
-                        <p className="text-xs text-gray-500 mt-2">PDF files only</p>
+                        <p className="text-xs text-gray-500 mt-2">PDF, JPEG, PNG files</p>
                       </div>
                     </div>
                   </div>
@@ -2136,6 +2141,17 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            setPreviewRSR(doc);
+                            setShowRSRPreview(true);
+                          }}
+                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                          title="View"
+                          type="button"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
                         <a
                           href={getRSRDocumentUrl(doc._id)}
                           download={doc.originalName}
@@ -2559,6 +2575,55 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RSR Document Preview Modal */}
+      {showRSRPreview && previewRSR && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-800">{previewRSR.title}</h3>
+                <p className="text-sm text-slate-500">{previewRSR.originalName}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={getRSRDocumentUrl(previewRSR._id)}
+                  download={previewRSR.originalName}
+                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  title="Download"
+                >
+                  <Download className="w-5 h-5" />
+                </a>
+                <button
+                  onClick={() => {
+                    setShowRSRPreview(false);
+                    setPreviewRSR(null);
+                  }}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
+                  type="button"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto p-4 bg-slate-100">
+              {previewRSR.mimeType?.startsWith('image/') ? (
+                <img
+                  src={getRSRDocumentUrl(previewRSR._id)}
+                  alt={previewRSR.title}
+                  className="max-w-full h-auto mx-auto rounded-lg shadow-lg"
+                />
+              ) : (
+                <iframe
+                  src={getRSRDocumentUrl(previewRSR._id)}
+                  className="w-full h-full min-h-[70vh] rounded-lg bg-white"
+                  title={previewRSR.title}
+                />
+              )}
             </div>
           </div>
         </div>

@@ -101,6 +101,11 @@ function AppContent() {
             <Dashboard view="diary" />
           </ProtectedRoute>
         } />
+        <Route path="/machines" element={
+          <ProtectedRoute>
+            <Dashboard view="machines" />
+          </ProtectedRoute>
+        } />
         <Route path="/admin" element={
           <ProtectedRoute>
             <Dashboard view="admin" />

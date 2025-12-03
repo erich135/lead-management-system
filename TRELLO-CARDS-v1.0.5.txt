@@ -1,0 +1,379 @@
+TRELLO CARDS FOR VERSION 1.0.5 - December 2, 2025
+==================================================
+
+================================================================================
+CARD 1: Contextual Help System - Tooltip Component
+================================================================================
+
+Title: Add Tooltip Component for Contextual Help
+
+Description:
+Created a reusable Tooltip component that displays helpful text when users hover over UI elements.
+
+Features:
+- 4 position options: top, bottom, left, right
+- Smooth fade-in animation
+- Customizable max width
+- Accessible (keyboard and screen reader friendly)
+- Works with any child element
+
+Files Added:
+- src/components/ui/Tooltip.tsx
+- src/components/ui/index.ts (barrel export)
+- Updated src/index.css (animation keyframes)
+
+Testing:
+[ ] Hover over Dashboard stat cards - tooltip should appear below
+[ ] Verify tooltip disappears when mouse leaves
+[ ] Test on mobile (touch to show)
+
+
+================================================================================
+CARD 2: Contextual Help System - HelpIcon Component
+================================================================================
+
+Title: Add HelpIcon (i) Component for Field Explanations
+
+Description:
+Created a HelpIcon component that displays a small info icon (i) next to labels and titles. When hovered or clicked, it shows explanatory text.
+
+Features:
+- Small, medium, large size options
+- Inline mode (tooltip) or modal mode (popup)
+- Position-aware tooltips
+- Consistent styling across app
+
+Files Added:
+- src/components/ui/HelpIcon.tsx
+
+Testing:
+[ ] Find any (i) icon in the app
+[ ] Hover to see explanation tooltip
+[ ] Verify text is helpful and accurate
+
+
+================================================================================
+CARD 3: Centralized Help Content Configuration
+================================================================================
+
+Title: Create Centralized Help Content Configuration
+
+Description:
+Created a single configuration file containing all help text for the application. This makes it easy to update help content without changing component code.
+
+Content Sections:
+- Dashboard metrics explanations
+- Job/Lead field descriptions
+- Status definitions (all 13 statuses)
+- Follow-up system explanation
+- Report section descriptions
+- Filter explanations
+- System management help
+- Diary and Activities help
+
+Files Added:
+- src/config/helpContent.ts
+
+Testing:
+[ ] Review help text for accuracy
+[ ] Verify all statuses have descriptions
+[ ] Check that field explanations match actual functionality
+
+
+================================================================================
+CARD 4: Dashboard Help Integration
+================================================================================
+
+Title: Add Help Tooltips to Dashboard
+
+Description:
+Integrated help system into the Dashboard component.
+
+Locations:
+- Total Jobs card - Tooltip explaining what's counted
+- Active Jobs card - Tooltip explaining active vs inactive
+- Needs Attention card - Tooltip explaining overdue/approaching
+- Total Value card - Tooltip explaining value calculation
+- Filter by Priority section - HelpIcon explaining Critical/Warning/Info filters
+
+Files Modified:
+- src/components/Dashboard.tsx
+
+Testing:
+[ ] Login and view Dashboard
+[ ] Hover over each stat card - tooltip should appear
+[ ] Click (i) next to "Filter by Priority" - explanation should show
+[ ] Verify explanations are accurate
+
+
+================================================================================
+CARD 5: Reports - Conversion Tracker Help Integration
+================================================================================
+
+Title: Add Help Icons to Conversion Time Tracker
+
+Description:
+Added contextual help to the Conversion Time Tracker in Reports.
+
+Locations:
+- Section title - HelpIcon explaining what conversion tracking measures
+- Start -> Quoted card - Explains quoting speed metric
+- Quoted -> Sent card - Explains internal processing time
+- Sent -> PO card - Explains client decision time (highlighted as key metric)
+- PO -> Invoiced card - Explains execution efficiency
+- Start -> Invoiced card - Explains total conversion cycle
+
+Files Modified:
+- src/components/Reports.tsx
+
+Testing:
+[ ] Go to Reports > User Performance > Conversion Time Tracker
+[ ] Click (i) next to section title
+[ ] Hover over each metric card's (i) icon
+[ ] Verify the "Sent -> PO" explanation mentions it's client decision time
+
+
+================================================================================
+CARD 6: LeadsList Help Integration
+================================================================================
+
+Title: Add Help Icons to Jobs List Filters
+
+Description:
+Added contextual help to the LeadsList (Jobs List) component.
+
+Locations:
+- Filters section header - HelpIcon explaining how to use filters
+- "Show Jobs" filter - HelpIcon explaining Overdue/Approaching/Open/All options
+
+Files Modified:
+- src/components/LeadsList.tsx
+
+Testing:
+[ ] Go to Jobs List
+[ ] Look for (i) next to "Filters" heading
+[ ] Look for (i) next to "Show Jobs" label
+[ ] Verify explanations help understand filter options
+
+
+================================================================================
+CARD 7: LeadForm Help Integration
+================================================================================
+
+Title: Add Help Icons to Create Job Form
+
+Description:
+Added contextual help to key fields in the Create New Job form.
+
+Fields with Help Icons:
+- Customer Type - Explains registered vs cash customers
+- Initial Status - Explains workflow status selection
+- Branch - Explains branch assignment
+- Value (ex VAT) - Explains what value to enter
+- Start Date - Explains when job was created
+- Date Quoted - Explains importance for follow-up tracking
+
+Files Modified:
+- src/components/LeadForm.tsx
+
+Testing:
+[ ] Click "New Job" button
+[ ] Look for (i) icons next to field labels
+[ ] Hover over each to see explanation
+[ ] Verify help text matches field purpose
+
+
+================================================================================
+CARD 8: LeadDetails Help Integration
+================================================================================
+
+Title: Add Help Icons to Job Details Modal
+
+Description:
+Added contextual help to the Job Details modal, specifically for follow-up sections.
+
+Locations:
+- Follow-up levels 1-6 banner - HelpIcon explaining follow-up system
+- Status-based follow-up reminder - HelpIcon explaining status follow-ups
+
+Files Modified:
+- src/components/LeadDetails.tsx
+
+Testing:
+[ ] Open any job in "Sent to Client" status with pending follow-ups
+[ ] Look for (i) icon in the follow-up reminder banner
+[ ] Open a job in "Await PO" or "Register" status
+[ ] Look for (i) icon in status follow-up reminder
+[ ] Verify explanations help users understand the follow-up system
+
+
+================================================================================
+CARD 9: Rep Code & Branch Filters for User Performance Reports
+================================================================================
+
+Title: Add Rep Code and Branch Filters to User Performance Reports
+
+Description:
+Added additional filter dropdowns to all sections of User Performance Reports.
+
+Sections Updated:
+- Overdue Jobs - Added Rep Code and Branch filters
+- All Jobs - Added Rep Code and Branch filters
+- Conversion Time Tracker - Added Rep Code and Branch filters
+
+Functionality:
+- Filter dropdowns populated from actual job data
+- Filters work in combination with existing Admin filter
+- Clear all button resets all filters
+
+Files Modified:
+- src/components/Reports.tsx
+
+Testing:
+[ ] Go to Reports > User Performance
+[ ] Check Overdue Jobs section has Rep Code and Branch dropdowns
+[ ] Check All Jobs section has Rep Code and Branch dropdowns
+[ ] Check Conversion Tracker has Rep Code and Branch dropdowns
+[ ] Test filtering by different rep codes
+[ ] Test filtering by different branches
+[ ] Test combining filters (Admin + Rep + Branch)
+
+
+================================================================================
+CARD 10: Conversion Tracker - "Sent to Client" Date Tracking
+================================================================================
+
+Title: Add "Sent to Client" Date Tracking for Accurate Conversion Metrics
+
+Description:
+Added a new dateSentToClient field to track when jobs are sent to clients, enabling accurate measurement of client decision time.
+
+Backend Changes:
+- Added dateSentToClient field to Job model with index
+- Auto-populates when job status changes to "Sent to Client"
+- Created backfill script for existing jobs (60 jobs updated)
+
+Frontend Changes:
+- Added dateSentToClient to Job interface in api.ts
+- Conversion Tracker now shows 5 stages instead of 4:
+  1. Start -> Quoted
+  2. Quoted -> Sent to Client
+  3. Sent to Client -> PO (client decision time)
+  4. PO -> Invoiced
+  5. Total (Start -> Invoiced)
+
+Files Modified:
+- Backend: src/models/job.model.ts
+- Backend: src/controllers/job.controller.ts
+- Frontend: src/lib/api.ts
+- Frontend: src/components/Reports.tsx
+
+Files Added:
+- Backend: src/scripts/backfill-sent-to-client.ts
+- Backend: src/scripts/verify-conversion-calc.ts
+
+Testing:
+[ ] Go to Reports > Conversion Time Tracker
+[ ] Verify 5 metric cards are displayed (not 4)
+[ ] Check "Sent -> PO" card shows client decision time
+[ ] Create a new job and change status to "Sent to Client"
+[ ] Verify job now has dateSentToClient populated
+
+
+================================================================================
+CARD 11: Conversion Tracker - "Complete Workflow Only" Toggle
+================================================================================
+
+Title: Add "Complete Workflow Only" Toggle to Conversion Tracker
+
+Description:
+Added a toggle to filter conversion metrics to only show jobs that have completed the entire workflow. This ensures segment times add up to the total.
+
+Problem Solved:
+Previously, segment averages didn't add up to total because each segment was calculated from different job sets (some jobs have dateQuoted but not poDate, etc.)
+
+Solution:
+- "Complete Workflow Only" checkbox
+- When enabled, only includes jobs with ALL dates present
+- Segment totals now mathematically add up to the total time
+- Shows count of jobs with complete workflow data
+
+Files Modified:
+- src/components/Reports.tsx
+
+Testing:
+[ ] Go to Reports > Conversion Time Tracker
+[ ] Note the segment averages and total
+[ ] Enable "Complete workflow only" checkbox
+[ ] Verify segment times now add up to total
+[ ] Note the job count changes (fewer jobs with complete data)
+
+
+================================================================================
+CARD 12: Dashboard TypeScript Error Fixes
+================================================================================
+
+Title: Fix Dashboard TypeScript Compilation Errors
+
+Description:
+Fixed TypeScript errors that were causing build warnings in the Dashboard component.
+
+Issues Fixed:
+- Added missing techBooked field to Job interface in api.ts
+- Fixed sort function that could return undefined (added return 0 fallback)
+- Cleaned up unused imports (Ticket, ArrowRight, Sparkles, Wrench, Edit2, Eye)
+- Prefixed unused variables/functions with underscore to satisfy linter
+
+Files Modified:
+- src/lib/api.ts
+- src/components/Dashboard.tsx
+
+Testing:
+[ ] Run npm run build - should complete without TypeScript errors
+[ ] Dashboard should load without console errors
+[ ] All Dashboard functionality should work as before
+
+
+================================================================================
+CARD 13: Fix Conversion Tracker Filter Dropdown Population
+================================================================================
+
+Title: Fix Empty Filter Dropdowns in Conversion Tracker
+
+Description:
+Fixed an issue where filter dropdowns (Admin, Rep, Branch) would show empty when filters were applied.
+
+Problem:
+Dropdowns were populated from filtered job list, so applying a filter would remove options from other dropdowns.
+
+Solution:
+- Created separate allConversionJobs state for dropdown population
+- Dropdowns now always show all available options
+- Filtering only affects the displayed metrics, not dropdown options
+
+Files Modified:
+- src/components/Reports.tsx
+
+Testing:
+[ ] Go to Reports > Conversion Time Tracker
+[ ] Select an Admin filter
+[ ] Check that Rep Code dropdown still shows all options
+[ ] Check that Branch dropdown still shows all options
+[ ] Clear filters and verify all dropdowns still populated
+
+
+================================================================================
+SUMMARY
+================================================================================
+
+Total Cards: 13
+
+Categories:
+- Help System (Cards 1-8): 8 cards
+- Filters Enhancement (Card 9): 1 card
+- Conversion Tracking (Cards 10-11): 2 cards
+- Bug Fixes (Cards 12-13): 2 cards
+
+Version: 1.0.5
+Date: December 2, 2025
+Branch: chatbot

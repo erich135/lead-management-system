@@ -340,6 +340,10 @@ export interface Job {
   };
   machines?: (Machine | string)[];
   registerDate?: string | Date;
+  techBooked?: string | {
+    _id: string;
+    name: string;
+  };
   bookings?: Array<{
     technicianId: string;
     technicianName?: string;
@@ -356,9 +360,18 @@ export interface Job {
   followUp2Date?: string | Date;
   followUp3Date?: string | Date;
   followUp4Date?: string | Date;
+  followUp5Date?: string | Date;
+  followUp6Date?: string | Date;
+  quoteRefreshCount?: number;
+  lastQuoteRefreshDate?: string | Date;
+  // Status-based follow-up tracking
+  statusFollowUpCount?: number;
+  statusFollowUpDate?: string | Date;
+  statusFollowUpNotes?: string;
   reminderFollowUp1Date?: string | Date;
   reminderFollowUp2Date?: string | Date;
   reminderFollowUp3Date?: string | Date;
+  dateSentToClient?: string | Date;
   poDate?: string | Date;
   poNumber?: string;
   oilSampleNumber?: string;
@@ -397,9 +410,12 @@ export interface OverdueJob {
   currentStatusNumber: number;
   expectedNextStatus: string;
   maxDaysAllowed: number;
-  reminderType: "status_overdue" | "followup_overdue" | "approaching_due";
-  followUpLevel?: number;
+  reminderType: "status_overdue" | "followup_overdue" | "approaching_due" | "status_followup";
+  followUpLevel?: number; // 1-6 for follow-ups, 7 for refresh/cancel, 8 for cancel only
   severity: "critical" | "warning" | "info";
+  quoteRefreshCount?: number; // Number of times quote has been refreshed (0-3)
+  statusFollowUpCount?: number; // Number of status follow-ups done
+  requiresNotes?: boolean; // Whether follow-up requires notes/reason
   job: Job | null;
 }
 
@@ -1640,6 +1656,82 @@ export interface JobNote {
   updatedAt: string;
 }
 
+// ==================== SUPPORT TICKETS ====================
+
+/**
+ * Support ticket submission data.
+ */
+export interface SupportTicketData {
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  category: 'bug' | 'feature' | 'feature_request' | 'question' | 'access' | 'other';
+  subject: string;
+  description: string;
+  reportedBy: string; // User ID of the person who reported the issue
+  context?: {
+    page?: string;
+    browser?: string;
+    jobNumber?: string;
+  };
+}
+
+/**
+ * Support ticket response from API.
+ */
+export interface SupportTicketResponse {
+  ticketId: string;
+  ticketNumber: string;
+  severity: string;
+  category: string;
+  subject: string;
+}
+
+/**
+ * Full support ticket from API.
+ */
+export interface SupportTicketFull {
+  _id: string;
+  ticketNumber: string;
+  subject: string;
+  description: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  category: 'bug' | 'feature' | 'feature_request' | 'question' | 'access' | 'other';
+  status: 'open' | 'in-progress' | 'resolved' | 'closed';
+  reportedBy: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  createdBy: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  responses: Array<{
+    _id: string;
+    message: string;
+    respondedBy: {
+      _id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    };
+    respondedByName: string;
+    isFromSupport: boolean;
+    createdAt: string;
+  }>;
+  unreadByUser: boolean;
+  unreadBySupport?: boolean;
+  context?: {
+    page?: string;
+    browser?: string;
+    jobNumber?: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
 /**
  * Upload RSR document for a job.
  */
@@ -1763,6 +1855,122 @@ export async function deleteJobNote(noteId: string): Promise<void> {
   });
 }
 
+/**
+ * Submit a support ticket.
+ * Creates a ticket in MongoDB (Super Admin only).
+ * 
+ * @param ticket - Support ticket data
+ * @returns {Promise<SupportTicketResponse>} Created ticket info
+ */
+export async function submitSupportTicket(ticket: SupportTicketData): Promise<SupportTicketResponse> {
+  const response = await apiRequest<{ data: SupportTicketResponse }>('/api/support/ticket', {
+    method: 'POST',
+    body: JSON.stringify(ticket),
+  });
+  return response.data;
+}
+
+/**
+ * Get tickets for the current user.
+ */
+export async function getMyTickets(): Promise<{ tickets: SupportTicketFull[]; count: number }> {
+  const response = await apiRequest<{ tickets: SupportTicketFull[]; count: number }>('/api/support/my-tickets');
+  return response;
+}
+
+/**
+ * Get unread ticket count for notification badge.
+ */
+export async function getUnreadTicketCount(): Promise<number> {
+  const response = await apiRequest<{ unreadCount: number }>('/api/support/unread-count');
+  return response.unreadCount;
+}
+
+/**
+ * Get a single ticket by ID.
+ */
+export async function getTicket(ticketId: string): Promise<SupportTicketFull> {
+  const response = await apiRequest<{ ticket: SupportTicketFull }>(`/api/support/ticket/${ticketId}`);
+  return response.ticket;
+}
+
+/**
+ * Add a response to a ticket.
+ */
+export async function addTicketResponse(ticketId: string, message: string): Promise<void> {
+  await apiRequest(`/api/support/ticket/${ticketId}/response`, {
+    method: 'POST',
+    body: JSON.stringify({ message }),
+  });
+}
+
+/**
+ * Mark a ticket as read.
+ */
+export async function markTicketAsRead(ticketId: string): Promise<void> {
+  await apiRequest(`/api/support/ticket/${ticketId}/read`, {
+    method: 'PATCH',
+  });
+}
+
+/**
+ * Mark all tickets as read for current user.
+ */
+export async function markAllTicketsAsRead(): Promise<void> {
+  await apiRequest('/api/support/mark-all-read', {
+    method: 'PATCH',
+  });
+}
+
+// ============ SUPER ADMIN SUPPORT FUNCTIONS ============
+
+/**
+ * Get all tickets (Super Admin only).
+ */
+export async function getAllTickets(params?: {
+  status?: string;
+  severity?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{ tickets: SupportTicketFull[]; pagination: { page: number; limit: number; total: number; pages: number } }> {
+  const queryParams = new URLSearchParams();
+  if (params?.status) queryParams.append('status', params.status);
+  if (params?.severity) queryParams.append('severity', params.severity);
+  if (params?.page) queryParams.append('page', params.page.toString());
+  if (params?.limit) queryParams.append('limit', params.limit.toString());
+  
+  const query = queryParams.toString();
+  const response = await apiRequest<{ tickets: SupportTicketFull[]; pagination: { page: number; limit: number; total: number; pages: number } }>(`/api/support/all${query ? `?${query}` : ''}`);
+  return response;
+}
+
+/**
+ * Get unread ticket count for support team.
+ */
+export async function getSupportUnreadCount(): Promise<number> {
+  const response = await apiRequest<{ unreadCount: number }>('/api/support/support-unread-count');
+  return response.unreadCount;
+}
+
+/**
+ * Update ticket status (Super Admin only).
+ */
+export async function updateTicketStatus(ticketId: string, status: 'open' | 'in-progress' | 'resolved' | 'closed'): Promise<void> {
+  await apiRequest(`/api/support/ticket/${ticketId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
+/**
+ * Mark ticket as read by support team.
+ */
+export async function markTicketAsReadBySupport(ticketId: string): Promise<void> {
+  await apiRequest(`/api/support/ticket/${ticketId}/support-read`, {
+    method: 'PATCH',
+  });
+}
+
 export default {
   login,
   logout,
@@ -1826,6 +2034,17 @@ export default {
   uploadJobNoteAttachment,
   getJobNoteAttachmentUrl,
   deleteJobNote,
+  submitSupportTicket,
+  getMyTickets,
+  getUnreadTicketCount,
+  getTicket,
+  addTicketResponse,
+  markTicketAsRead,
+  markAllTicketsAsRead,
+  getAllTickets,
+  getSupportUnreadCount,
+  updateTicketStatus,
+  markTicketAsReadBySupport,
   apiRequest,
 };
 

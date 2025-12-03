@@ -1,6 +1,8 @@
 import { useState, FormEvent, useEffect, useRef } from 'react';
 import { createJob, getJobs, getStatuses, getBranches, getCustomers, createCustomer, getTechnicians, getServiceDescriptions, getRepCodes, getAdminCodes, getMachinesByCustomer, createMachine, type Status, type Branch, type Customer, type Technician, type ServiceDescription, type RepCode, type AdminCode, type Machine, type Job } from '../lib/api';
 import { X, Search, Plus, Wrench } from 'lucide-react';
+import { HelpIcon } from './ui';
+import { helpContent } from '../config/helpContent';
 
 interface LeadFormProps {
   statuses: Status[];
@@ -554,7 +556,13 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
             )}
 
             <div>
-              <label className="block text-[14px] font-semibold text-slate-900 mb-2">Customer Type</label>
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2 flex items-center gap-1">
+                Customer Type
+                <HelpIcon 
+                  content={helpContent.jobs.customer + ' ' + helpContent.jobs.cashCustomer}
+                  size="sm"
+                />
+              </label>
               <select
                 value={customerSelection}
                 onChange={(e) => setCustomerSelection(e.target.value as 'customer' | 'cash')}
@@ -716,8 +724,12 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
             </div>
 
             <div>
-              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2 flex items-center gap-1">
                 Branch *
+                <HelpIcon 
+                  content={helpContent.filters.branch}
+                  size="sm"
+                />
               </label>
               <select
                 value={formData.branch}
@@ -738,8 +750,12 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
             </div>
 
             <div>
-              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2 flex items-center gap-1">
                 Initial Status *
+                <HelpIcon 
+                  content={helpContent.jobs.status}
+                  size="sm"
+                />
               </label>
               <select
                 value={formData.status}
@@ -831,8 +847,12 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
             </div>
 
             <div>
-              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2 flex items-center gap-1">
                 Value (ex VAT)
+                <HelpIcon 
+                  content={helpContent.jobs.valueExVat}
+                  size="sm"
+                />
               </label>
               <input
                 type="number"
@@ -845,8 +865,12 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
             </div>
 
             <div>
-              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2 flex items-center gap-1">
                 Start Date
+                <HelpIcon 
+                  content={helpContent.jobs.startDate}
+                  size="sm"
+                />
               </label>
               <input
                 type="date"
@@ -858,8 +882,12 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
             </div>
 
             <div>
-              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2 flex items-center gap-1">
                 Date Quoted
+                <HelpIcon 
+                  content={helpContent.jobs.dateQuoted}
+                  size="sm"
+                />
               </label>
               <input
                 type="date"

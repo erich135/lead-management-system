@@ -820,7 +820,13 @@ function CalendarView({ jobs, statuses, branches, technicians, onUpdate, selecte
   // Get bookings for a specific date
   // Get bookings for a specific date (multiple bookings per job)
   const getBookingsForDate = (date: Date): Array<{ job: Job, techId: string, techName: string }> => {
-    const dateStr = date.toISOString().split('T')[0];
+    // Use local date formatting to avoid timezone issues with toISOString()
+    // toISOString() converts to UTC which can shift the date by a day
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    
     const bookings: Array<{ job: Job, techId: string, techName: string }> = [];
     jobs.forEach(job => {
       if (Array.isArray(job.bookings)) {

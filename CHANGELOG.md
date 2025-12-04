@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.0.7] - 2025-12-04
+
+### Added
+- **Conversion Time Tracker - Registered Step**
+  - Added new "Registered" step to conversion workflow (PO → Registered → Invoiced)
+  - Uses existing `registerDate` field for tracking registration timing
+  - Visual timeline now shows 6 stages: Start → Quoted → Sent → PO Rec'd → Registered → Invoiced
+  - Metrics calculated for PO → Registered and Registered → Invoiced segments
+- **Status History Tracking (Backend)**
+  - Added `statusHistory` array to Job model for tracking all status changes
+  - Records status ID, status name, timestamp, and user who made the change
+  - Automatically populates on job creation and status updates
+- **Support Ticket System Improvements**
+  - Fixed unread badge counter not appearing for new support tickets
+  - New tickets now properly show notification badge in sidebar
+  - Changed `unreadBySupport` default to `true` for new tickets
+  - Added support routes to backend API
+
+### Fixed
+- Rep Code dropdown not populating in Reports overdue jobs (added `.populate("repCode")` to getOverdueJobs)
+- TypeScript errors in Reports.tsx for incorrect property names (`quoteValue` → `valueExVat`, `companyName` → `name`, `dateOfJob` → `startDate`)
+- Role type mismatch in Reports.tsx (`role.id` → `role._id` mapping for non-super admin users)
+
 ## [1.0.6] - 2025-12-03
 
 ### Added

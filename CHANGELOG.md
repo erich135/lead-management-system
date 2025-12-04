@@ -3,20 +3,17 @@
 ## [1.0.6] - 2025-12-03
 
 ### Added
-- **Machine Management System**
-  - New Machines tab in Reports page with full machine listing
-  - Machine cards displaying model, serial number, customer, and document count
-  - Searchable customer dropdown filter for machines
-  - Machine RSR document upload with drag-and-drop support
-  - Expandable RSR section per machine with view/download buttons
-  - Preview modal for PDF and image RSR documents
-  - Backend API for machine RSR uploads using GridFS storage
-- **Branches Management in System Management**
-  - Full CRUD (add, edit, delete) for branches in Reference Data tab
-  - Branch fields: name, code, job number code, address, default flag
-- **Improved Customer Selection**
-  - LeadForm now uses a proper dropdown for customer selection
-  - Reports Machine tab has a searchable customer dropdown filter
+- New Machines tab in Reports page with full machine listing
+- Machine cards displaying model, serial number, customer, and document count
+- Searchable customer dropdown filter for machines
+- Machine RSR document upload with drag-and-drop support
+- Expandable RSR section per machine with view/download buttons
+- Preview modal for PDF and image RSR documents
+- Backend API for machine RSR uploads using GridFS storage
+- Full CRUD (add, edit, delete) for branches in Reference Data tab
+- Branch fields: name, code, job number code, address, default flag
+- LeadForm now uses a proper dropdown for customer selection
+- Reports Machine tab has a searchable customer dropdown filter
 
 ### Fixed
 - RSR upload not working (fixed API response parsing in getMachineRSRs)

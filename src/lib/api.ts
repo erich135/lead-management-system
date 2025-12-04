@@ -374,6 +374,7 @@ export interface Job {
   dateSentToClient?: string | Date;
   poDate?: string | Date;
   poNumber?: string;
+  dateBooked?: string | Date;
   oilSampleNumber?: string;
   storePack?: string;
   invoiceDate?: string | Date;
@@ -385,6 +386,12 @@ export interface Job {
   startDate?: string | Date;
   dateQuoted?: string | Date;
   statusChangedAt?: string;
+  statusHistory?: Array<{
+    status: string;
+    statusName: string;
+    changedAt: string | Date;
+    changedBy?: string;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -563,6 +570,12 @@ export interface RepCode {
     _id: string;
     name: string;
   };
+  user?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email?: string;
+  };
   isActive: boolean;
   dbStatus?: string;
   createdAt?: string;
@@ -623,6 +636,12 @@ export interface Machine {
 export interface Technician {
   _id: string;
   name: string;
+  user?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email?: string;
+  };
   isActive?: boolean;
 }
 

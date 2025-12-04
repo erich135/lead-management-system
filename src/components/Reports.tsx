@@ -262,7 +262,12 @@ export function Reports({ statuses, branches }: ReportsProps) {
           email: currentUser?.email || '',
           firstName: currentUser?.firstName || '',
           lastName: currentUser?.lastName || '',
-          role: currentUser?.role || { _id: '', name: '', isActive: true },
+          role: {
+            _id: currentUser?.role?.id || '',
+            name: currentUser?.role?.name || '',
+            description: currentUser?.role?.description,
+            isActive: currentUser?.role?.isActive ?? true,
+          },
           permissions: currentUser?.permissions || [],
           isActive: true,
           createdAt: '',
@@ -1104,6 +1109,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
         job.dateQuoted && 
         job.dateSentToClient && 
         job.poDate && 
+        job.registerDate &&
         job.invoiceDate
       );
     }
@@ -1114,6 +1120,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
       job.dateQuoted && 
       job.dateSentToClient && 
       job.poDate && 
+      job.registerDate &&
       job.invoiceDate
     );
     
@@ -1123,6 +1130,9 @@ export function Reports({ statuses, branches }: ReportsProps) {
       quotedToSentToClient: [] as number[],
       sentToClientToAwaitingPO: [] as number[],
       awaitingPOToInProgress: [] as number[],
+      poToRegistered: [] as number[],
+      registeredToInvoiced: [] as number[],
+      poToInvoiced: [] as number[],  // Direct PO to Invoiced (always calculated)
       inProgressToJobDone: [] as number[],
       jobDoneToRSRNeeded: [] as number[],
       rsrNeededToInvoiced: [] as number[],
@@ -1134,6 +1144,9 @@ export function Reports({ statuses, branches }: ReportsProps) {
       startToQuoted: [] as number[],
       quotedToSentToClient: [] as number[],
       sentToClientToAwaitingPO: [] as number[],
+      poToRegistered: [] as number[],
+      registeredToInvoiced: [] as number[],
+      poToInvoiced: [] as number[],
       inProgressToJobDone: [] as number[],
       startToInvoiced: [] as number[],
     };
@@ -1145,6 +1158,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
       const quotedDate = job.dateQuoted ? new Date(job.dateQuoted).getTime() : null;
       const sentToClientDate = job.dateSentToClient ? new Date(job.dateSentToClient).getTime() : null;
       const poDate = job.poDate ? new Date(job.poDate).getTime() : null;
+      const registerDate = job.registerDate ? new Date(job.registerDate).getTime() : null;
       const invoiceDate = job.invoiceDate ? new Date(job.invoiceDate).getTime() : null;
       
       // Start to Quoted (only count positive values - negative means data error)
@@ -1171,10 +1185,22 @@ export function Reports({ statuses, branches }: ReportsProps) {
         if (days >= 0) metrics.awaitingPOToInProgress.push(days);
       }
       
-      // PO to Invoiced (job execution time)
+      // PO to Registered (preparation time)
+      if (poDate && registerDate) {
+        const days = (registerDate - poDate) / (1000 * 60 * 60 * 24);
+        if (days >= 0) metrics.poToRegistered.push(days);
+      }
+      
+      // Registered to Invoiced (execution time)
+      if (registerDate && invoiceDate) {
+        const days = (invoiceDate - registerDate) / (1000 * 60 * 60 * 24);
+        if (days >= 0) metrics.registeredToInvoiced.push(days);
+      }
+      
+      // PO to Invoiced (ALWAYS calculate this - it's the complete segment for jobs without registerDate)
       if (poDate && invoiceDate) {
         const days = (invoiceDate - poDate) / (1000 * 60 * 60 * 24);
-        if (days >= 0) metrics.inProgressToJobDone.push(days);
+        if (days >= 0) metrics.poToInvoiced.push(days);
       }
       
       // Start to Invoiced (total conversion time)
@@ -1190,20 +1216,23 @@ export function Reports({ statuses, branches }: ReportsProps) {
       const quotedDate = new Date(job.dateQuoted!).getTime();
       const sentToClientDate = new Date(job.dateSentToClient!).getTime();
       const poDate = new Date(job.poDate!).getTime();
+      const registerDate = new Date(job.registerDate!).getTime();
       const invoiceDate = new Date(job.invoiceDate!).getTime();
       
       // Only include if all segments are positive (valid data)
       const d1 = (quotedDate - startDate) / (1000 * 60 * 60 * 24);
       const d2 = (sentToClientDate - quotedDate) / (1000 * 60 * 60 * 24);
       const d3 = (poDate - sentToClientDate) / (1000 * 60 * 60 * 24);
-      const d4 = (invoiceDate - poDate) / (1000 * 60 * 60 * 24);
+      const d4 = (registerDate - poDate) / (1000 * 60 * 60 * 24);
+      const d5 = (invoiceDate - registerDate) / (1000 * 60 * 60 * 24);
       
-      if (d1 >= 0 && d2 >= 0 && d3 >= 0 && d4 >= 0) {
+      if (d1 >= 0 && d2 >= 0 && d3 >= 0 && d4 >= 0 && d5 >= 0) {
         completeMetrics.startToQuoted.push(d1);
         completeMetrics.quotedToSentToClient.push(d2);
         completeMetrics.sentToClientToAwaitingPO.push(d3);
-        completeMetrics.inProgressToJobDone.push(d4);
-        completeMetrics.startToInvoiced.push(d1 + d2 + d3 + d4);
+        completeMetrics.poToRegistered.push(d4);
+        completeMetrics.registeredToInvoiced.push(d5);
+        completeMetrics.startToInvoiced.push(d1 + d2 + d3 + d4 + d5);
       }
     });
     
@@ -1218,6 +1247,9 @@ export function Reports({ statuses, branches }: ReportsProps) {
       avgQuotedToSentToClient: calculateAverage(metrics.quotedToSentToClient),
       avgSentToClientToAwaitingPO: calculateAverage(metrics.sentToClientToAwaitingPO),
       avgAwaitingPOToInProgress: calculateAverage(metrics.awaitingPOToInProgress),
+      avgPoToRegistered: calculateAverage(metrics.poToRegistered),
+      avgRegisteredToInvoiced: calculateAverage(metrics.registeredToInvoiced),
+      avgPoToInvoiced: calculateAverage(metrics.poToInvoiced),
       avgInProgressToJobDone: calculateAverage(metrics.inProgressToJobDone),
       avgJobDoneToRSRNeeded: calculateAverage(metrics.jobDoneToRSRNeeded),
       avgRSRNeededToInvoiced: calculateAverage(metrics.rsrNeededToInvoiced),
@@ -1228,6 +1260,9 @@ export function Reports({ statuses, branches }: ReportsProps) {
         quotedToSentToClient: metrics.quotedToSentToClient.length,
         sentToClientToAwaitingPO: metrics.sentToClientToAwaitingPO.length,
         awaitingPOToInProgress: metrics.awaitingPOToInProgress.length,
+        poToRegistered: metrics.poToRegistered.length,
+        registeredToInvoiced: metrics.registeredToInvoiced.length,
+        poToInvoiced: metrics.poToInvoiced.length,
         inProgressToJobDone: metrics.inProgressToJobDone.length,
         jobDoneToRSRNeeded: metrics.jobDoneToRSRNeeded.length,
         rsrNeededToInvoiced: metrics.rsrNeededToInvoiced.length,
@@ -1238,6 +1273,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
         avgStartToQuoted: calculateAverage(completeMetrics.startToQuoted),
         avgQuotedToSentToClient: calculateAverage(completeMetrics.quotedToSentToClient),
         avgSentToClientToAwaitingPO: calculateAverage(completeMetrics.sentToClientToAwaitingPO),
+        avgPoToRegistered: calculateAverage(completeMetrics.poToRegistered),
+        avgRegisteredToInvoiced: calculateAverage(completeMetrics.registeredToInvoiced),
         avgInProgressToJobDone: calculateAverage(completeMetrics.inProgressToJobDone),
         avgTotal: calculateAverage(completeMetrics.startToInvoiced),
         jobCount: completeMetrics.startToInvoiced.length,
@@ -2420,8 +2457,13 @@ export function Reports({ statuses, branches }: ReportsProps) {
                 {/* Conversion Metrics */}
                 {(() => {
                   const metrics = calculateConversionMetrics();
+                  // Use Registered breakdown if available, otherwise use combined PO → Invoiced
+                  const hasRegisteredData = metrics.counts.poToRegistered > 0;
+                  const poToInvoiceSegment = hasRegisteredData 
+                    ? (metrics.avgPoToRegistered + metrics.avgRegisteredToInvoiced)
+                    : metrics.avgPoToInvoiced;
                   const segmentsTotal = metrics.avgStartToQuoted + metrics.avgQuotedToSentToClient + 
-                    metrics.avgSentToClientToAwaitingPO + metrics.avgInProgressToJobDone;
+                    metrics.avgSentToClientToAwaitingPO + poToInvoiceSegment;
                   const showMismatchNote = !conversionCompleteOnly && 
                     Math.abs(segmentsTotal - metrics.avgStartToInvoiced) > 1 && 
                     metrics.avgStartToInvoiced > 0;
@@ -2463,7 +2505,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       </div>
 
                       {/* Metrics Grid */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-4">
                         {/* Start to Quoted */}
                         <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
                           <div className="flex items-center justify-between mb-2">
@@ -2527,26 +2569,76 @@ export function Reports({ statuses, branches }: ReportsProps) {
                           <p className="text-xs text-amber-600 mt-1">({metrics.counts.sentToClientToAwaitingPO} jobs)</p>
                         </div>
 
-                        {/* PO to Invoiced */}
-                        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-1">
-                              <p className="text-xs font-semibold text-purple-900">PO → Invoiced</p>
-                              <HelpIcon 
-                                title={helpContent.reports.conversionTracker.metrics.poToInvoiced.title}
-                                content={helpContent.reports.conversionTracker.metrics.poToInvoiced.description}
-                                size="sm"
-                                position="top"
-                              />
+                        {/* PO to Invoiced section - conditionally show breakdown or combined */}
+                        {metrics.counts.poToRegistered > 0 ? (
+                          <>
+                            {/* PO to Registered - only shown when we have data */}
+                            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-1">
+                                  <p className="text-xs font-semibold text-purple-900">PO → Registered</p>
+                                  <HelpIcon 
+                                    title="PO to Registered Time"
+                                    content="Time from Purchase Order received to job being registered."
+                                    size="sm"
+                                    position="top"
+                                  />
+                                </div>
+                                <Clock className="w-4 h-4 text-purple-600" />
+                              </div>
+                              <p className="text-2xl font-bold text-purple-900">
+                                {metrics.avgPoToRegistered > 0 ? metrics.avgPoToRegistered.toFixed(1) : '0'}
+                              </p>
+                              <p className="text-xs text-purple-700 mt-1">days (registration)</p>
+                              <p className="text-xs text-purple-600 mt-1">({metrics.counts.poToRegistered} jobs)</p>
                             </div>
-                            <Clock className="w-4 h-4 text-purple-600" />
+
+                            {/* Registered to Invoiced - only shown when we have data */}
+                            <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-lg p-4 border border-pink-200">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-1">
+                                  <p className="text-xs font-semibold text-pink-900">Registered → Invoiced</p>
+                                  <HelpIcon 
+                                    title="Registered to Invoiced Time"
+                                    content="Time from job being registered to invoice being sent. This is the execution phase."
+                                    size="sm"
+                                    position="top"
+                                  />
+                                </div>
+                                <Clock className="w-4 h-4 text-pink-600" />
+                              </div>
+                              <p className="text-2xl font-bold text-pink-900">
+                                {metrics.avgRegisteredToInvoiced > 0 ? metrics.avgRegisteredToInvoiced.toFixed(1) : '0'}
+                              </p>
+                              <p className="text-xs text-pink-700 mt-1">days (execution)</p>
+                              <p className="text-xs text-pink-600 mt-1">({metrics.counts.registeredToInvoiced} jobs)</p>
+                            </div>
+                          </>
+                        ) : (
+                          /* PO to Invoiced - shown when no Registered data exists */
+                          <div className="bg-gradient-to-br from-purple-50 via-pink-50 to-pink-100 rounded-lg p-4 border border-purple-200 col-span-1 md:col-span-2">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-1">
+                                <p className="text-xs font-semibold text-purple-900">PO → Invoiced</p>
+                                <HelpIcon 
+                                  title="PO to Invoiced Time"
+                                  content="Time from Purchase Order received to invoice being sent. This will split into 'PO → Registered' and 'Registered → Invoiced' when registerDate is populated on jobs."
+                                  size="sm"
+                                  position="top"
+                                />
+                              </div>
+                              <Clock className="w-4 h-4 text-purple-600" />
+                            </div>
+                            <p className="text-2xl font-bold text-purple-900">
+                              {metrics.avgPoToInvoiced > 0 ? metrics.avgPoToInvoiced.toFixed(1) : '0'}
+                            </p>
+                            <p className="text-xs text-purple-700 mt-1">days (PO to completion)</p>
+                            <p className="text-xs text-purple-600 mt-1">({metrics.counts.poToInvoiced} jobs)</p>
+                            <p className="text-xs text-gray-500 mt-2 italic">
+                              💡 Will show Registered breakdown when jobs have registerDate
+                            </p>
                           </div>
-                          <p className="text-2xl font-bold text-purple-900">
-                            {metrics.avgInProgressToJobDone > 0 ? metrics.avgInProgressToJobDone.toFixed(1) : '0'}
-                          </p>
-                          <p className="text-xs text-purple-700 mt-1">days (execution)</p>
-                          <p className="text-xs text-purple-600 mt-1">({metrics.counts.inProgressToJobDone} jobs)</p>
-                        </div>
+                        )}
 
                         {/* Start to Invoiced (Total) */}
                         <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border-2 border-green-300 col-span-1 md:col-span-2">
@@ -2612,12 +2704,35 @@ export function Reports({ statuses, branches }: ReportsProps) {
                               PO Recv'd ⚠️
                             </div>
                           </div>
-                          <div className="flex-shrink-0 flex items-center gap-1">
-                            <div className="text-xs font-bold text-purple-600">
-                              {metrics.avgInProgressToJobDone > 0 ? `${metrics.avgInProgressToJobDone.toFixed(0)}d` : '0d'}
+                          {/* Conditionally show Parts Ready breakdown or combined PO → Invoiced */}
+                          {hasRegisteredData ? (
+                            <>
+                              <div className="flex-shrink-0 flex items-center gap-1">
+                                <div className="text-xs font-bold text-purple-600">
+                                  {metrics.avgPoToRegistered > 0 ? `${metrics.avgPoToRegistered.toFixed(0)}d` : '0d'}
+                                </div>
+                                <div className="h-0.5 w-10 bg-purple-400"></div>
+                              </div>
+                              <div className="flex-shrink-0 text-center">
+                                <div className="w-24 bg-purple-500 text-white text-xs font-medium px-2 py-1 rounded">
+                                  Registered
+                                </div>
+                              </div>
+                              <div className="flex-shrink-0 flex items-center gap-1">
+                                <div className="text-xs font-bold text-pink-600">
+                                  {metrics.avgRegisteredToInvoiced > 0 ? `${metrics.avgRegisteredToInvoiced.toFixed(0)}d` : '0d'}
+                                </div>
+                                <div className="h-0.5 w-10 bg-pink-400"></div>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex-shrink-0 flex items-center gap-1">
+                              <div className="text-xs font-bold text-purple-600">
+                                {metrics.avgPoToInvoiced > 0 ? `${metrics.avgPoToInvoiced.toFixed(0)}d` : '0d'}
+                              </div>
+                              <div className="h-0.5 w-10 bg-purple-400"></div>
                             </div>
-                            <div className="h-0.5 w-10 bg-purple-400"></div>
-                          </div>
+                          )}
                           <div className="flex-shrink-0 text-center">
                             <div className="w-20 bg-green-600 text-white text-xs font-medium px-2 py-1 rounded">
                               Invoiced
@@ -3624,11 +3739,11 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       </span>
                     </div>
                     <p className="text-sm text-ars-body mb-1">
-                      {typeof job.customer === 'object' ? job.customer?.companyName : 'Unknown Customer'}
+                      {typeof job.customer === 'object' ? job.customer?.name : 'Unknown Customer'}
                     </p>
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-ars-body">{formatDate(job.dateOfJob)}</span>
-                      <span className="font-semibold text-green-600">R{(job.quoteValue || 0).toLocaleString()}</span>
+                      <span className="text-ars-body">{formatDate(job.startDate)}</span>
+                      <span className="font-semibold text-green-600">R{(job.valueExVat || 0).toLocaleString()}</span>
                     </div>
                   </div>
                 ))}
@@ -3655,12 +3770,12 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     </div>
                     <p className="text-sm text-ars-body mb-1">
                       {overdueJob.job?.customer && typeof overdueJob.job.customer === 'object' 
-                        ? overdueJob.job.customer?.companyName 
+                        ? overdueJob.job.customer?.name 
                         : 'Unknown Customer'}
                     </p>
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-ars-body">{overdueJob.job?.dateOfJob ? formatDate(overdueJob.job.dateOfJob) : '-'}</span>
-                      <span className="font-semibold text-green-600">R{(overdueJob.job?.quoteValue || 0).toLocaleString()}</span>
+                      <span className="text-ars-body">{overdueJob.job?.startDate ? formatDate(overdueJob.job.startDate) : '-'}</span>
+                      <span className="font-semibold text-green-600">R{(overdueJob.job?.valueExVat || 0).toLocaleString()}</span>
                     </div>
                     <div className="mt-2 text-xs text-gray-500">
                       Status: {overdueJob.currentStatus || 'Unknown'}
@@ -3685,8 +3800,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       Invoice Date: {formatDate(job.invoiceDate)}
                     </p>
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-ars-body">Job Date: {formatDate(job.dateOfJob)}</span>
-                      <span className="font-semibold text-green-600">R{(job.quoteValue || 0).toLocaleString()}</span>
+                      <span className="text-ars-body">Job Date: {formatDate(job.startDate)}</span>
+                      <span className="font-semibold text-green-600">R{(job.valueExVat || 0).toLocaleString()}</span>
                     </div>
                   </div>
                 ))}
@@ -3708,8 +3823,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       Quoted: {formatDate(job.dateQuoted)}
                     </p>
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-ars-body">Job Date: {formatDate(job.dateOfJob)}</span>
-                      <span className="font-semibold text-blue-600">R{(job.quoteValue || 0).toLocaleString()}</span>
+                      <span className="text-ars-body">Job Date: {formatDate(job.startDate)}</span>
+                      <span className="font-semibold text-blue-600">R{(job.valueExVat || 0).toLocaleString()}</span>
                     </div>
                   </div>
                 ))}
@@ -3731,8 +3846,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       Status: {typeof job.status === 'object' ? job.status?.name : job.status || 'Unknown'}
                     </p>
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-ars-body">Job Date: {formatDate(job.dateOfJob)}</span>
-                      <span className="font-semibold text-gray-600">R{(job.quoteValue || 0).toLocaleString()}</span>
+                      <span className="text-ars-body">Job Date: {formatDate(job.startDate)}</span>
+                      <span className="font-semibold text-gray-600">R{(job.valueExVat || 0).toLocaleString()}</span>
                     </div>
                   </div>
                 ))}
@@ -3746,14 +3861,14 @@ export function Reports({ statuses, branches }: ReportsProps) {
                 <span className="text-lg font-bold text-green-600">
                   R{(
                     statsPanelType === 'user-total-jobs' 
-                      ? userJobs.reduce((sum, j) => sum + (j.quoteValue || 0), 0)
+                      ? userJobs.reduce((sum, j) => sum + (j.valueExVat || 0), 0)
                     : statsPanelType === 'user-overdue-jobs'
-                      ? userOverdueJobs.reduce((sum, oj) => sum + (oj.job?.quoteValue || 0), 0)
+                      ? userOverdueJobs.reduce((sum, oj) => sum + (oj.job?.valueExVat || 0), 0)
                     : statsPanelType === 'customer-invoiced'
-                      ? customerJobs.filter(j => j.invoiceDate).reduce((sum, j) => sum + (j.quoteValue || 0), 0)
+                      ? customerJobs.filter(j => j.invoiceDate).reduce((sum, j) => sum + (j.valueExVat || 0), 0)
                     : statsPanelType === 'customer-quoted'
-                      ? customerJobs.filter(j => j.dateQuoted && !j.invoiceDate).reduce((sum, j) => sum + (j.quoteValue || 0), 0)
-                    : customerJobs.filter(j => !j.dateQuoted && !j.invoiceDate).reduce((sum, j) => sum + (j.quoteValue || 0), 0)
+                      ? customerJobs.filter(j => j.dateQuoted && !j.invoiceDate).reduce((sum, j) => sum + (j.valueExVat || 0), 0)
+                    : customerJobs.filter(j => !j.dateQuoted && !j.invoiceDate).reduce((sum, j) => sum + (j.valueExVat || 0), 0)
                   ).toLocaleString()}
                 </span>
               </div>

@@ -374,6 +374,7 @@ export interface Job {
   dateSentToClient?: string | Date;
   poDate?: string | Date;
   poNumber?: string;
+  dateBooked?: string | Date;
   oilSampleNumber?: string;
   storePack?: string;
   invoiceDate?: string | Date;
@@ -385,6 +386,12 @@ export interface Job {
   startDate?: string | Date;
   dateQuoted?: string | Date;
   statusChangedAt?: string;
+  statusHistory?: Array<{
+    status: string;
+    statusName: string;
+    changedAt: string | Date;
+    changedBy?: string;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -433,12 +440,16 @@ export async function getOverdueJobs(params?: {
   branch?: string;
   severity?: "critical" | "warning" | "info";
   includeApproaching?: boolean;
+  includeHidden?: boolean;
 }): Promise<{ jobs: OverdueJob[]; count: number; overdueCount: number; approachingCount: number }> {
   const queryParams = new URLSearchParams();
   if (params?.branch) queryParams.append('branch', params.branch);
   if (params?.severity) queryParams.append('severity', params.severity);
   if (params?.includeApproaching !== undefined) {
     queryParams.append('includeApproaching', params.includeApproaching.toString());
+  }
+  if (params?.includeHidden !== undefined) {
+    queryParams.append('includeHidden', params.includeHidden.toString());
   }
   
   const query = queryParams.toString();
@@ -563,6 +574,12 @@ export interface RepCode {
     _id: string;
     name: string;
   };
+  user?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email?: string;
+  };
   isActive: boolean;
   dbStatus?: string;
   createdAt?: string;
@@ -623,6 +640,12 @@ export interface Machine {
 export interface Technician {
   _id: string;
   name: string;
+  user?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email?: string;
+  };
   isActive?: boolean;
 }
 

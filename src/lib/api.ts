@@ -440,12 +440,16 @@ export async function getOverdueJobs(params?: {
   branch?: string;
   severity?: "critical" | "warning" | "info";
   includeApproaching?: boolean;
+  includeHidden?: boolean;
 }): Promise<{ jobs: OverdueJob[]; count: number; overdueCount: number; approachingCount: number }> {
   const queryParams = new URLSearchParams();
   if (params?.branch) queryParams.append('branch', params.branch);
   if (params?.severity) queryParams.append('severity', params.severity);
   if (params?.includeApproaching !== undefined) {
     queryParams.append('includeApproaching', params.includeApproaching.toString());
+  }
+  if (params?.includeHidden !== undefined) {
+    queryParams.append('includeHidden', params.includeHidden.toString());
   }
   
   const query = queryParams.toString();

@@ -117,6 +117,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
     customer: '',
     admin: [] as string[],
     rep: [] as string[],
+    description: [] as string[],
     startDateFrom: '',
     startDateTo: ''
   });
@@ -464,6 +465,13 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
         return filters.rep.some(rep => repCodeStr.includes(rep.toLowerCase()));
       });
     }
+    if (filters.description.length > 0) {
+      filteredJobs = filteredJobs.filter(job => {
+        const description = typeof job.job?.description === 'object' ? job.job.description?.name : (job.job?.description || '');
+        const descStr = (description || '').toLowerCase();
+        return filters.description.some(desc => descStr.includes(desc.toLowerCase()));
+      });
+    }
     if (filters.startDateFrom) {
       filteredJobs = filteredJobs.filter(job => {
         const startDate = job.job?.startDate ? new Date(job.job.startDate) : null;
@@ -577,6 +585,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
       customer: '',
       admin: [],
       rep: [],
+      description: [],
       startDateFrom: '',
       startDateTo: ''
     });
@@ -606,6 +615,15 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
       if (repCode?.code) repSet.add(repCode.code);
     });
     return Array.from(repSet).sort();
+  }
+
+  function getUniqueDescriptions(): string[] {
+    const descSet = new Set<string>();
+    overdueJobs.forEach(job => {
+      const description = typeof job.job?.description === 'object' ? job.job.description?.name : (job.job?.description || null);
+      if (description) descSet.add(description);
+    });
+    return Array.from(descSet).sort();
   }
 
   return (
@@ -1187,7 +1205,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                   {/* Filters */}
                   <div className="bg-white rounded-[8px] border border-gray-200 p-3 mb-4">
                     <h3 className="text-xs font-semibold text-ars-heading mb-2">Filters</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-7 gap-2">
+                    <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-2">
                       <div>
                         <label className="block text-[11px] font-medium text-gray-600 mb-1">Job Number</label>
                         <input
@@ -1328,6 +1346,45 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                       </div>
                       
                       <div>
+                        <label className="block text-[11px] font-medium text-gray-600 mb-1">Service Description</label>
+                        <select
+                          className="w-full pl-2 pr-10 py-1.5 border border-gray-300 rounded-[8px] text-[13px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white appearance-none"
+                          style={{
+                            backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27currentColor%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')",
+                            backgroundPosition: 'right 0.75rem center',
+                            backgroundRepeat: 'no-repeat',
+                            backgroundSize: '1rem 1rem'
+                          }}
+                          value=""
+                          onChange={(e) => {
+                            if (e.target.value && !filters.description.includes(e.target.value)) {
+                              setFilters({...filters, description: [...filters.description, e.target.value]});
+                            }
+                          }}
+                        >
+                          <option value="">Select description...</option>
+                          {getUniqueDescriptions().filter(desc => !filters.description.includes(desc)).map(desc => (
+                            <option key={desc} value={desc}>{desc}</option>
+                          ))}
+                        </select>
+                        {filters.description.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {filters.description.map(desc => (
+                              <span key={desc} className="inline-flex items-center gap-1 px-2 py-1 bg-teal-100 text-teal-800 rounded-[8px] text-xs">
+                                {desc}
+                                <button
+                                  onClick={() => setFilters({...filters, description: filters.description.filter(d => d !== desc)})}
+                                  className="text-teal-600 hover:text-teal-800 ml-1"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div>
                         <label className="block text-[11px] font-medium text-gray-600 mb-1">Start Date From</label>
                         <input
                           type="date"
@@ -1363,6 +1420,11 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                         {filters.rep.length > 0 && (
                           <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">
                             Rep ({filters.rep.length})
+                          </span>
+                        )}
+                        {filters.description.length > 0 && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-teal-100 text-teal-800 rounded text-xs">
+                            Description ({filters.description.length})
                           </span>
                         )}
                         {filters.jobNumber && (

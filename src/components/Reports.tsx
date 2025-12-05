@@ -16,6 +16,7 @@ import {
   getMachines,
   getMachineRSRUrl,
   getAuthToken,
+  getServiceDescriptions,
   Job, 
   Activity,
   User,
@@ -25,7 +26,8 @@ import {
   Technician,
   Machine,
   MachineRSR,
-  OverdueJob
+  OverdueJob,
+  ServiceDescription
 } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { formatDate, formatDateTime } from '../utils/dateFormat';
@@ -88,7 +90,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
   const [selectedAdminCode, setSelectedAdminCode] = useState<string>('');
   const [selectedRepCode, setSelectedRepCode] = useState<string>('');
   const [selectedTechnician, setSelectedTechnician] = useState<string>('');
-  const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>('this-month');
+  const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>('all-time');
   const [customDateFrom, setCustomDateFrom] = useState<string>('');
   
   // Section selector for User Performance
@@ -119,24 +121,30 @@ export function Reports({ statuses, branches }: ReportsProps) {
   const [overdueAdminFilter, setOverdueAdminFilter] = useState<string>('');
   const [overdueRepFilter, setOverdueRepFilter] = useState<string>('');
   const [overdueBranchFilter, setOverdueBranchFilter] = useState<string>('');
+  const [overdueDescriptionFilter, setOverdueDescriptionFilter] = useState<string>('');
   const [overdueStatusChangedFrom, setOverdueStatusChangedFrom] = useState<string>('');
   const [overdueStatusChangedTo, setOverdueStatusChangedTo] = useState<string>('');
+  const [showHiddenOverdue, setShowHiddenOverdue] = useState<boolean>(false);
   
   // All Jobs Filters
   const [jobsStatusFilter, setJobsStatusFilter] = useState<string>('');
   const [jobsAdminFilter, setJobsAdminFilter] = useState<string>('');
   const [jobsRepFilter, setJobsRepFilter] = useState<string>('');
   const [jobsBranchFilter, setJobsBranchFilter] = useState<string>('');
+  const [jobsDescriptionFilter, setJobsDescriptionFilter] = useState<string>('');
   const [jobsStatusChangedFrom, setJobsStatusChangedFrom] = useState<string>('');
   const [jobsStatusChangedTo, setJobsStatusChangedTo] = useState<string>('');
+  const [showHiddenJobs, setShowHiddenJobs] = useState<boolean>(false);
   
   // Conversion Time Tracker State
   const [conversionAdminFilter, setConversionAdminFilter] = useState<string>('');
   const [conversionRepFilter, setConversionRepFilter] = useState<string>('');
   const [conversionBranchFilter, setConversionBranchFilter] = useState<string>('');
+  const [conversionDescriptionFilter, setConversionDescriptionFilter] = useState<string>('');
   const [conversionDateFrom, setConversionDateFrom] = useState<string>('');
   const [conversionDateTo, setConversionDateTo] = useState<string>('');
   const [conversionCompleteOnly, setConversionCompleteOnly] = useState<boolean>(false); // Only show jobs with complete workflow
+  const [showHiddenConversion, setShowHiddenConversion] = useState<boolean>(false);
   
   // Section collapse/expand state
   const [isOverdueJobsExpanded, setIsOverdueJobsExpanded] = useState<boolean>(true);
@@ -150,6 +158,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
   const [repCodes, setRepCodes] = useState<RepCode[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [serviceDescriptions, setServiceDescriptions] = useState<ServiceDescription[]>([]);
   const [userJobs, setUserJobs] = useState<Job[]>([]);
   const [userActivities, setUserActivities] = useState<Activity[]>([]);
   const [userOverdueJobs, setUserOverdueJobs] = useState<OverdueJob[]>([]);
@@ -182,7 +191,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
     if (activeTab === 'user-performance') {
       loadUserPerformanceData();
     }
-  }, [activeTab, selectedRole, selectedUserId, selectedAdminCode, selectedRepCode, selectedTechnician, dateRangePreset, customDateFrom, customDateTo]);
+  }, [activeTab, selectedRole, selectedUserId, selectedAdminCode, selectedRepCode, selectedTechnician, dateRangePreset, customDateFrom, customDateTo, showHiddenOverdue, showHiddenJobs]);
 
   /**
    * Loads customer data when customer is selected.
@@ -242,7 +251,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
    */
   useEffect(() => {
     loadConversionData();
-  }, []);
+  }, [showHiddenConversion]);
 
   /**
    * Loads reference data (users, codes, technicians, customers).
@@ -290,6 +299,10 @@ export function Reports({ statuses, branches }: ReportsProps) {
       // Load customers
       const customersResponse = await getCustomers({ limit: 1000 });
       setCustomers(customersResponse.customers || []);
+
+      // Load service descriptions
+      const descriptionsResponse = await getServiceDescriptions();
+      setServiceDescriptions(descriptionsResponse.descriptions || []);
 
       // Auto-select current user's code/technician if not super admin
       if (!currentUser?.isSuperAdmin) {
@@ -367,17 +380,22 @@ export function Reports({ statuses, branches }: ReportsProps) {
       setError(null);
 
       const { startDate, endDate } = getDateRange();
-      if (!startDate || !endDate) {
-        return;
-      }
-
       // Build job filters based on role
       const jobFilters: any = {
-        allTime: 'true',
-        startDate,
-        endDate,
         limit: 10000, // Get all jobs, not just 50
+        includeHidden: showHiddenJobs ? true : undefined,
       };
+      
+      // Only add date filters if not "all-time"
+      if (dateRangePreset === 'all-time') {
+        jobFilters.allTime = 'true';
+      } else if (startDate && endDate) {
+        jobFilters.startDate = startDate;
+        jobFilters.endDate = endDate;
+      } else {
+        // No valid date range, skip loading
+        return;
+      }
 
       // Build activity filters
       const activityFilters: any = {
@@ -431,7 +449,10 @@ export function Reports({ statuses, branches }: ReportsProps) {
       }
 
       // Load overdue jobs
-      const overdueResponse = await getOverdueJobs({ includeApproaching: true });
+      const overdueResponse = await getOverdueJobs({ 
+        includeApproaching: true,
+        includeHidden: showHiddenOverdue ? true : undefined
+      });
       // Filter overdue jobs by selected role
       let filteredOverdue = overdueResponse.jobs || [];
       if (selectedRole === 'admin' && selectedAdminCode) {
@@ -476,6 +497,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
       const jobFilters: any = {
         allTime: 'true',
         limit: 10000, // Get all jobs
+        includeHidden: showHiddenConversion ? true : undefined,
       };
 
       // Add date filters if specified
@@ -514,6 +536,14 @@ export function Reports({ statuses, branches }: ReportsProps) {
         filteredJobs = filteredJobs.filter(job => {
           const branch = typeof job.branch === 'object' ? job.branch?.name : null;
           return branch === conversionBranchFilter;
+        });
+      }
+      
+      // Filter by service description if specified
+      if (conversionDescriptionFilter) {
+        filteredJobs = filteredJobs.filter(job => {
+          const description = typeof job.description === 'object' ? job.description?.name : (job.description || null);
+          return description === conversionDescriptionFilter;
         });
       }
       
@@ -885,6 +915,14 @@ export function Reports({ statuses, branches }: ReportsProps) {
       });
     }
     
+    // Filter by service description
+    if (overdueDescriptionFilter) {
+      filtered = filtered.filter(oj => {
+        const description = typeof oj.job?.description === 'object' ? oj.job.description?.name : (oj.job?.description || '');
+        return description?.toLowerCase().includes(overdueDescriptionFilter.toLowerCase());
+      });
+    }
+    
     // Filter by status changed date range
     if (overdueStatusChangedFrom) {
       filtered = filtered.filter(oj => {
@@ -940,6 +978,14 @@ export function Reports({ statuses, branches }: ReportsProps) {
       filtered = filtered.filter(job => {
         const branch = typeof job.branch === 'object' ? job.branch?.name : '';
         return branch?.toLowerCase().includes(jobsBranchFilter.toLowerCase());
+      });
+    }
+    
+    // Filter by service description
+    if (jobsDescriptionFilter) {
+      filtered = filtered.filter(job => {
+        const description = typeof job.description === 'object' ? job.description?.name : (job.description || '');
+        return description?.toLowerCase().includes(jobsDescriptionFilter.toLowerCase());
       });
     }
     
@@ -1012,6 +1058,18 @@ export function Reports({ statuses, branches }: ReportsProps) {
   }
 
   /**
+   * Gets unique service descriptions from overdue jobs.
+   */
+  function getUniqueOverdueDescriptions(): string[] {
+    const descSet = new Set<string>();
+    userOverdueJobs.forEach(oj => {
+      const description = typeof oj.job?.description === 'object' ? oj.job.description?.name : (oj.job?.description || null);
+      if (description) descSet.add(description);
+    });
+    return Array.from(descSet).sort();
+  }
+
+  /**
    * Gets unique statuses from all jobs.
    */
   function getUniqueJobStatuses(): string[] {
@@ -1060,6 +1118,18 @@ export function Reports({ statuses, branches }: ReportsProps) {
   }
 
   /**
+   * Gets unique service descriptions from all jobs.
+   */
+  function getUniqueJobDescriptions(): string[] {
+    const descSet = new Set<string>();
+    userJobs.forEach(job => {
+      const description = typeof job.description === 'object' ? job.description?.name : (job.description || null);
+      if (description) descSet.add(description);
+    });
+    return Array.from(descSet).sort();
+  }
+
+  /**
    * Gets unique admin codes from all conversion jobs (unfiltered).
    */
   function getUniqueConversionAdmins(): string[] {
@@ -1093,6 +1163,18 @@ export function Reports({ statuses, branches }: ReportsProps) {
       if (branch) branchSet.add(branch);
     });
     return Array.from(branchSet).sort();
+  }
+
+  /**
+   * Gets unique service descriptions from all conversion jobs (unfiltered).
+   */
+  function getUniqueConversionDescriptions(): string[] {
+    const descSet = new Set<string>();
+    allConversionJobs.forEach(job => {
+      const description = typeof job.description === 'object' ? job.description?.name : (job.description || null);
+      if (description) descSet.add(description);
+    });
+    return Array.from(descSet).sort();
   }
 
   /**
@@ -1888,7 +1970,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     <Filter className="w-4 h-4" />
                     Filter Overdue Jobs
                   </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
                       <select
@@ -1942,6 +2024,19 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       </select>
                     </div>
                     <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Service Description</label>
+                      <select
+                        value={overdueDescriptionFilter}
+                        onChange={(e) => setOverdueDescriptionFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        <option value="">All Descriptions</option>
+                        {getUniqueOverdueDescriptions().map(desc => (
+                          <option key={desc} value={desc}>{desc}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Status Changed From</label>
                       <input
                         type="date"
@@ -1960,9 +2055,30 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       />
                     </div>
                   </div>
-                  {(overdueStatusFilter || overdueAdminFilter || overdueRepFilter || overdueBranchFilter || overdueStatusChangedFrom || overdueStatusChangedTo) && (
+                  {/* Show Hidden Toggle */}
+                  <div className="mt-3 flex items-center gap-2">
+                    <label className="flex items-center gap-2 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={showHiddenOverdue}
+                        onChange={(e) => setShowHiddenOverdue(e.target.checked)}
+                        className="w-4 h-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                      />
+                      <div className="flex items-center gap-1.5">
+                        <Eye className="w-4 h-4 text-orange-600" />
+                        <span className="text-sm text-gray-700 group-hover:text-gray-900 transition-colors">Show Hidden Jobs</span>
+                      </div>
+                    </label>
+                  </div>
+                  {(overdueStatusFilter || overdueAdminFilter || overdueRepFilter || overdueBranchFilter || overdueDescriptionFilter || overdueStatusChangedFrom || overdueStatusChangedTo || showHiddenOverdue) && (
                     <div className="mt-3 flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-gray-600">Active filters:</span>
+                      {showHiddenOverdue && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs">
+                          <Eye className="w-3 h-3" />
+                          Hidden Jobs
+                        </span>
+                      )}
                       {overdueStatusFilter && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
                           Status: {overdueStatusFilter}
@@ -1983,6 +2099,11 @@ export function Reports({ statuses, branches }: ReportsProps) {
                           Branch: {overdueBranchFilter}
                         </span>
                       )}
+                      {overdueDescriptionFilter && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-teal-100 text-teal-800 rounded text-xs">
+                          Description: {overdueDescriptionFilter}
+                        </span>
+                      )}
                       {overdueStatusChangedFrom && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">
                           From: {formatDate(overdueStatusChangedFrom)}
@@ -1999,8 +2120,10 @@ export function Reports({ statuses, branches }: ReportsProps) {
                           setOverdueAdminFilter('');
                           setOverdueRepFilter('');
                           setOverdueBranchFilter('');
+                          setOverdueDescriptionFilter('');
                           setOverdueStatusChangedFrom('');
                           setOverdueStatusChangedTo('');
+                          setShowHiddenOverdue(false);
                         }}
                         className="text-xs text-ars-primary hover:text-ars-primary/80 underline"
                       >
@@ -2108,7 +2231,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     <Filter className="w-4 h-4" />
                     Filter Jobs
                   </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
                       <select
@@ -2162,6 +2285,19 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       </select>
                     </div>
                     <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Service Description</label>
+                      <select
+                        value={jobsDescriptionFilter}
+                        onChange={(e) => setJobsDescriptionFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        <option value="">All Descriptions</option>
+                        {getUniqueJobDescriptions().map(desc => (
+                          <option key={desc} value={desc}>{desc}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Status Changed From</label>
                       <input
                         type="date"
@@ -2180,9 +2316,30 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       />
                     </div>
                   </div>
-                  {(jobsStatusFilter || jobsAdminFilter || jobsRepFilter || jobsBranchFilter || jobsStatusChangedFrom || jobsStatusChangedTo) && (
+                  {/* Show Hidden Toggle */}
+                  <div className="mt-3 flex items-center gap-2">
+                    <label className="flex items-center gap-2 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={showHiddenJobs}
+                        onChange={(e) => setShowHiddenJobs(e.target.checked)}
+                        className="w-4 h-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                      />
+                      <div className="flex items-center gap-1.5">
+                        <Eye className="w-4 h-4 text-orange-600" />
+                        <span className="text-sm text-gray-700 group-hover:text-gray-900 transition-colors">Show Hidden Jobs</span>
+                      </div>
+                    </label>
+                  </div>
+                  {(jobsStatusFilter || jobsAdminFilter || jobsRepFilter || jobsBranchFilter || jobsDescriptionFilter || jobsStatusChangedFrom || jobsStatusChangedTo || showHiddenJobs) && (
                     <div className="mt-3 flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-gray-600">Active filters:</span>
+                      {showHiddenJobs && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs">
+                          <Eye className="w-3 h-3" />
+                          Hidden Jobs
+                        </span>
+                      )}
                       {jobsStatusFilter && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
                           Status: {jobsStatusFilter}
@@ -2203,6 +2360,11 @@ export function Reports({ statuses, branches }: ReportsProps) {
                           Branch: {jobsBranchFilter}
                         </span>
                       )}
+                      {jobsDescriptionFilter && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-teal-100 text-teal-800 rounded text-xs">
+                          Description: {jobsDescriptionFilter}
+                        </span>
+                      )}
                       {jobsStatusChangedFrom && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">
                           From: {formatDate(jobsStatusChangedFrom)}
@@ -2219,8 +2381,10 @@ export function Reports({ statuses, branches }: ReportsProps) {
                           setJobsAdminFilter('');
                           setJobsRepFilter('');
                           setJobsBranchFilter('');
+                          setJobsDescriptionFilter('');
                           setJobsStatusChangedFrom('');
                           setJobsStatusChangedTo('');
+                          setShowHiddenJobs(false);
                         }}
                         className="text-xs text-ars-primary hover:text-ars-primary/80 underline"
                       >
@@ -2330,7 +2494,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     <Filter className="w-4 h-4" />
                     Filter Analysis
                   </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Admin</label>
                       <select
@@ -2371,6 +2535,19 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       </select>
                     </div>
                     <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Service Description</label>
+                      <select
+                        value={conversionDescriptionFilter}
+                        onChange={(e) => setConversionDescriptionFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        <option value="">All Descriptions</option>
+                        {getUniqueConversionDescriptions().map(desc => (
+                          <option key={desc} value={desc}>{desc}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Date From</label>
                       <input
                         type="date"
@@ -2389,9 +2566,30 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       />
                     </div>
                   </div>
-                  {(conversionAdminFilter || conversionRepFilter || conversionBranchFilter || conversionDateFrom || conversionDateTo) && (
+                  {/* Show Hidden Toggle */}
+                  <div className="mt-3 flex items-center gap-2">
+                    <label className="flex items-center gap-2 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={showHiddenConversion}
+                        onChange={(e) => setShowHiddenConversion(e.target.checked)}
+                        className="w-4 h-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                      />
+                      <div className="flex items-center gap-1.5">
+                        <Eye className="w-4 h-4 text-orange-600" />
+                        <span className="text-sm text-gray-700 group-hover:text-gray-900 transition-colors">Show Hidden Jobs</span>
+                      </div>
+                    </label>
+                  </div>
+                  {(conversionAdminFilter || conversionRepFilter || conversionBranchFilter || conversionDescriptionFilter || conversionDateFrom || conversionDateTo || showHiddenConversion) && (
                     <div className="mt-3 flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-gray-600">Active filters:</span>
+                      {showHiddenConversion && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs">
+                          <Eye className="w-3 h-3" />
+                          Hidden Jobs
+                        </span>
+                      )}
                       {conversionAdminFilter && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
                           Admin: {conversionAdminFilter}
@@ -2405,6 +2603,11 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       {conversionBranchFilter && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs">
                           Branch: {conversionBranchFilter}
+                        </span>
+                      )}
+                      {conversionDescriptionFilter && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-teal-100 text-teal-800 rounded text-xs">
+                          Description: {conversionDescriptionFilter}
                         </span>
                       )}
                       {conversionDateFrom && (
@@ -2422,8 +2625,10 @@ export function Reports({ statuses, branches }: ReportsProps) {
                           setConversionAdminFilter('');
                           setConversionRepFilter('');
                           setConversionBranchFilter('');
+                          setConversionDescriptionFilter('');
                           setConversionDateFrom('');
                           setConversionDateTo('');
+                          setShowHiddenConversion(false);
                           loadConversionData();
                         }}
                         className="text-xs text-ars-primary hover:text-ars-primary/80 underline"

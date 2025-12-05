@@ -1,5 +1,36 @@
 # Changelog
 
+## [1.0.8] - 2025-12-05
+
+### Added
+- **Service Description Filter in Reports**
+  - Added Service Description dropdown filter to Overdue Jobs section
+  - Added Service Description dropdown filter to All Jobs section
+  - Added Service Description dropdown filter to Conversion Tracker section
+  - Teal-colored badges for active Service Description filters
+  - Unique descriptions populated from actual job data in each section
+
+- **Show Hidden Jobs Filter in Reports**
+  - Added "Show Hidden Jobs" toggle to Overdue Jobs section
+  - Added "Show Hidden Jobs" toggle to All Jobs section
+  - Added "Show Hidden Jobs" toggle to Conversion Tracker section
+  - Orange Eye icon and badge styling for hidden jobs filter
+  - Backend support for `includeHidden` parameter in getOverdueJobs API
+  - Allows viewing cancelled/hidden status jobs in reports
+
+### Fixed
+- **Reports Date Range Issue**
+  - Fixed "All Jobs (0)" showing no data due to incorrect `allTime` parameter handling
+  - Date filters now properly applied based on selected date range preset
+  - Removed hardcoded `allTime: 'true'` that was bypassing date filters
+
+- **Backend techBooked Populate Error**
+  - Removed invalid `.populate("techBooked")` from overdue jobs query that caused 500 errors
+  - techBooked field is a string, not a reference, so populate was failing
+
+### Changed
+- Default Date Range preset changed from "This Month" to "All Time" in Reports
+
 ## [1.0.7] - 2025-12-04
 
 ### Added

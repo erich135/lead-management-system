@@ -3,22 +3,19 @@
 ## [1.0.9] - 2025-12-08
 
 ### Added
-- **Job Source Feature**
-  - New Job Source field to differentiate between "Normal" jobs and "Web Enquiries"
-  - Job Source dropdown in LeadForm (required field for new jobs)
-  - Job Source display in LeadDetails with super_admin-only edit capability
-  - Job Source filter in LeadsList component
-  - Job Source filter in Reports (Overdue Jobs, All Jobs, Conversion Tracker sections)
-  - Job Source management in SystemManagement for super admins
-  - Backend JobSource model with CRUD operations
-  - Migration script to backfill existing jobs based on activity history
-
-- **Multi-Select Status Filter in Reports**
-  - Status filter now supports multiple selections with checkboxes
-  - Available in both Overdue Jobs and All Jobs sections
-  - Click-outside to close dropdown behavior
-  - Shows "X selected" count when multiple statuses are chosen
-  - Active filter tags display all selected statuses
+- New Job Source field to differentiate between "Normal" jobs and "Web Enquiries"
+- Job Source dropdown in LeadForm (required field for new jobs)
+- Job Source display in LeadDetails with super_admin-only edit capability
+- Job Source filter in LeadsList component
+- Job Source filter in Reports (Overdue Jobs, All Jobs, Conversion Tracker sections)
+- Job Source management in SystemManagement for super admins
+- Backend JobSource model with CRUD operations
+- Migration script to backfill existing jobs based on activity history
+- Status filter now supports multiple selections with checkboxes in Reports
+- Multi-select status filter available in both Overdue Jobs and All Jobs sections
+- Click-outside to close dropdown behavior for status filter
+- Shows "X selected" count when multiple statuses are chosen
+- Active filter tags display all selected statuses
 
 ### Changed
 - Job Source is locked after initial save (only super_admin can modify)
@@ -26,30 +23,24 @@
 ## [1.0.8] - 2025-12-05
 
 ### Added
-- **Service Description Filter in Reports**
-  - Added Service Description dropdown filter to Overdue Jobs section
-  - Added Service Description dropdown filter to All Jobs section
-  - Added Service Description dropdown filter to Conversion Tracker section
-  - Teal-colored badges for active Service Description filters
-  - Unique descriptions populated from actual job data in each section
-
-- **Show Hidden Jobs Filter in Reports**
-  - Added "Show Hidden Jobs" toggle to Overdue Jobs section
-  - Added "Show Hidden Jobs" toggle to All Jobs section
-  - Added "Show Hidden Jobs" toggle to Conversion Tracker section
-  - Orange Eye icon and badge styling for hidden jobs filter
-  - Backend support for `includeHidden` parameter in getOverdueJobs API
-  - Allows viewing cancelled/hidden status jobs in reports
+- Service Description dropdown filter added to Overdue Jobs section
+- Service Description dropdown filter added to All Jobs section
+- Service Description dropdown filter added to Conversion Tracker section
+- Teal-colored badges for active Service Description filters
+- Unique descriptions populated from actual job data in each section
+- "Show Hidden Jobs" toggle added to Overdue Jobs section
+- "Show Hidden Jobs" toggle added to All Jobs section
+- "Show Hidden Jobs" toggle added to Conversion Tracker section
+- Orange Eye icon and badge styling for hidden jobs filter
+- Backend support for `includeHidden` parameter in getOverdueJobs API
+- Allows viewing cancelled/hidden status jobs in reports
 
 ### Fixed
-- **Reports Date Range Issue**
-  - Fixed "All Jobs (0)" showing no data due to incorrect `allTime` parameter handling
-  - Date filters now properly applied based on selected date range preset
-  - Removed hardcoded `allTime: 'true'` that was bypassing date filters
-
-- **Backend techBooked Populate Error**
-  - Removed invalid `.populate("techBooked")` from overdue jobs query that caused 500 errors
-  - techBooked field is a string, not a reference, so populate was failing
+- Fixed "All Jobs (0)" showing no data due to incorrect `allTime` parameter handling
+- Date filters now properly applied based on selected date range preset
+- Removed hardcoded `allTime: 'true'` that was bypassing date filters
+- Removed invalid `.populate("techBooked")` from overdue jobs query that caused 500 errors
+- techBooked field is a string, not a reference, so populate was failing
 
 ### Changed
 - Default Date Range preset changed from "This Month" to "All Time" in Reports
@@ -57,20 +48,17 @@
 ## [1.0.7] - 2025-12-04
 
 ### Added
-- **Conversion Time Tracker - Registered Step**
-  - Added new "Registered" step to conversion workflow (PO → Registered → Invoiced)
-  - Uses existing `registerDate` field for tracking registration timing
-  - Visual timeline now shows 6 stages: Start → Quoted → Sent → PO Rec'd → Registered → Invoiced
-  - Metrics calculated for PO → Registered and Registered → Invoiced segments
-- **Status History Tracking (Backend)**
-  - Added `statusHistory` array to Job model for tracking all status changes
-  - Records status ID, status name, timestamp, and user who made the change
-  - Automatically populates on job creation and status updates
-- **Support Ticket System Improvements**
-  - Fixed unread badge counter not appearing for new support tickets
-  - New tickets now properly show notification badge in sidebar
-  - Changed `unreadBySupport` default to `true` for new tickets
-  - Added support routes to backend API
+- Added new "Registered" step to conversion workflow (PO → Registered → Invoiced)
+- Uses existing `registerDate` field for tracking registration timing
+- Visual timeline now shows 6 stages: Start → Quoted → Sent → PO Rec'd → Registered → Invoiced
+- Metrics calculated for PO → Registered and Registered → Invoiced segments
+- Added `statusHistory` array to Job model for tracking all status changes
+- Records status ID, status name, timestamp, and user who made the change
+- Automatically populates on job creation and status updates
+- Fixed unread badge counter not appearing for new support tickets
+- New tickets now properly show notification badge in sidebar
+- Changed `unreadBySupport` default to `true` for new tickets
+- Added support routes to backend API
 
 ### Fixed
 - Rep Code dropdown not populating in Reports overdue jobs (added `.populate("repCode")` to getOverdueJobs)

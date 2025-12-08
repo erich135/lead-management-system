@@ -55,9 +55,14 @@ import {
   ChevronDown,
   ChevronUp,
   Send,
-  X
+  X,
+  FileSpreadsheet,
+  File
 } from 'lucide-react';
 import { LeadDetails } from './LeadDetails';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
 
@@ -158,6 +163,9 @@ export function Reports({ statuses, branches }: ReportsProps) {
   const [isJobsExpanded, setIsJobsExpanded] = useState<boolean>(true);
   const [isConversionTrackerExpanded, setIsConversionTrackerExpanded] = useState<boolean>(true);
   const [isRecentActivitiesExpanded, setIsRecentActivitiesExpanded] = useState<boolean>(true);
+  
+  // Export dropdown state
+  const [showExportDropdown, setShowExportDropdown] = useState<boolean>(false);
   
   // Data State
   const [users, setUsers] = useState<User[]>([]);
@@ -895,6 +903,228 @@ export function Reports({ statuses, branches }: ReportsProps) {
     a.download = `machine-report-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Get section title based on active section
+   */
+  function getSectionTitle(): string {
+    switch (activeSection) {
+      case 'overdue': return 'Overdue Jobs';
+      case 'jobs': return 'All Jobs';
+      case 'activities': return 'Activities';
+      case 'conversion': return 'Conversion Tracker';
+      default: return 'Report';
+    }
+  }
+
+  /**
+   * Get active filters as a string for report header
+   */
+  function getActiveFiltersString(): string {
+    const filters: string[] = [];
+    
+    if (activeSection === 'overdue') {
+      if (overdueStatusFilter.length > 0) filters.push(`Status: ${overdueStatusFilter.join(', ')}`);
+      if (overdueAdminFilter) filters.push(`Admin: ${overdueAdminFilter}`);
+      if (overdueRepFilter) filters.push(`Rep: ${overdueRepFilter}`);
+      if (overdueBranchFilter) filters.push(`Branch: ${overdueBranchFilter}`);
+      if (overdueDescriptionFilter) filters.push(`Description: ${overdueDescriptionFilter}`);
+      if (overdueJobSourceFilter) filters.push(`Source: ${overdueJobSourceFilter}`);
+      if (overdueStatusChangedFrom) filters.push(`From: ${formatDate(overdueStatusChangedFrom)}`);
+      if (overdueStatusChangedTo) filters.push(`To: ${formatDate(overdueStatusChangedTo)}`);
+    } else if (activeSection === 'jobs') {
+      if (jobsStatusFilter.length > 0) filters.push(`Status: ${jobsStatusFilter.join(', ')}`);
+      if (jobsAdminFilter) filters.push(`Admin: ${jobsAdminFilter}`);
+      if (jobsRepFilter) filters.push(`Rep: ${jobsRepFilter}`);
+      if (jobsBranchFilter) filters.push(`Branch: ${jobsBranchFilter}`);
+      if (jobsDescriptionFilter) filters.push(`Description: ${jobsDescriptionFilter}`);
+      if (jobsJobSourceFilter) filters.push(`Source: ${jobsJobSourceFilter}`);
+      if (jobsStatusChangedFrom) filters.push(`From: ${formatDate(jobsStatusChangedFrom)}`);
+      if (jobsStatusChangedTo) filters.push(`To: ${formatDate(jobsStatusChangedTo)}`);
+    } else if (activeSection === 'conversion') {
+      if (conversionAdminFilter) filters.push(`Admin: ${conversionAdminFilter}`);
+      if (conversionRepFilter) filters.push(`Rep: ${conversionRepFilter}`);
+      if (conversionBranchFilter) filters.push(`Branch: ${conversionBranchFilter}`);
+      if (conversionDescriptionFilter) filters.push(`Description: ${conversionDescriptionFilter}`);
+      if (conversionJobSourceFilter) filters.push(`Source: ${conversionJobSourceFilter}`);
+      if (conversionDateFrom) filters.push(`From: ${formatDate(conversionDateFrom)}`);
+      if (conversionDateTo) filters.push(`To: ${formatDate(conversionDateTo)}`);
+    }
+    
+    return filters.length > 0 ? filters.join(' | ') : 'No filters applied';
+  }
+
+  /**
+   * Export current section to Excel format
+   */
+  function exportToExcel() {
+    const { startDate, endDate } = getDateRange();
+    const sectionTitle = getSectionTitle();
+    const filtersString = getActiveFiltersString();
+    let data: any[][] = [];
+    let filename = '';
+
+    if (activeSection === 'overdue') {
+      const filteredData = getFilteredOverdueJobs();
+      const headers = ['Job Number', 'Status', 'Days Overdue', 'Customer', 'Admin', 'Rep Code', 'Branch', 'Current Status', 'Expected Next Status'];
+      const rows = filteredData.map(oj => [
+        oj.jobNumber || '',
+        oj.job?.status?.name || '',
+        oj.daysOverdue || 0,
+        typeof oj.job?.customer === 'object' ? oj.job.customer?.name || '' : (oj.job?.cashCustomer || ''),
+        oj.job?.adm || '',
+        typeof oj.job?.repCode === 'object' ? (oj.job.repCode as any)?.code || '' : '',
+        typeof oj.job?.branch === 'object' ? oj.job.branch?.name || '' : '',
+        oj.currentStatus || '',
+        oj.expectedNextStatus || '',
+      ]);
+      data = [[sectionTitle], [`Filters: ${filtersString}`], [`Date Range: ${startDate} to ${endDate}`], [], headers, ...rows];
+      filename = `Overdue-Jobs-${startDate}-to-${endDate}.xlsx`;
+    } else if (activeSection === 'jobs') {
+      const filteredData = getFilteredJobs();
+      const headers = ['Job Number', 'Status', 'Customer', 'Cash Customer', 'Start Date', 'Date Quoted', 'Value ex VAT', 'Admin', 'Rep Code', 'Branch', 'Description', 'Job Source'];
+      const rows = filteredData.map(job => [
+        job.jobNumber || '',
+        job.status?.name || '',
+        typeof job.customer === 'object' ? job.customer?.name || '' : '',
+        job.cashCustomer || '',
+        job.startDate ? formatDate(job.startDate) : '',
+        job.dateQuoted ? formatDate(job.dateQuoted) : '',
+        job.valueExVat || 0,
+        job.adm || '',
+        typeof job.repCode === 'object' ? (job.repCode as any)?.code || '' : '',
+        typeof job.branch === 'object' ? job.branch?.name || '' : '',
+        typeof job.description === 'object' ? (job.description as any)?.name || '' : '',
+        typeof job.jobSource === 'object' ? (job.jobSource as any)?.name || '' : '',
+      ]);
+      data = [[sectionTitle], [`Filters: ${filtersString}`], [`Date Range: ${startDate} to ${endDate}`], [], headers, ...rows];
+      filename = `All-Jobs-${startDate}-to-${endDate}.xlsx`;
+    } else if (activeSection === 'activities') {
+      const headers = ['Date', 'Time', 'Action', 'Resource Type', 'Description', 'IP Address'];
+      const rows = userActivities.map(act => [
+        act.createdAt ? formatDate(act.createdAt) : '',
+        act.createdAt ? new Date(act.createdAt).toLocaleTimeString() : '',
+        act.action || '',
+        act.resourceType || '',
+        act.description || '',
+        act.ipAddress || '',
+      ]);
+      data = [[sectionTitle], [`Date Range: ${startDate} to ${endDate}`], [], headers, ...rows];
+      filename = `Activities-${startDate}-to-${endDate}.xlsx`;
+    } else if (activeSection === 'conversion') {
+      // Use conversionJobs directly (already filtered by the useEffect)
+      const headers = ['Job Number', 'Customer', 'Admin', 'Rep Code', 'Branch', 'Start Date', 'Date Quoted', 'Sent to Client', 'PO Date', 'Register Date', 'Invoice Date'];
+      const rows = conversionJobs.map(job => [
+        job.jobNumber || '',
+        typeof job.customer === 'object' ? job.customer?.name || '' : (job.cashCustomer || ''),
+        job.adm || '',
+        typeof job.repCode === 'object' ? (job.repCode as any)?.code || '' : '',
+        typeof job.branch === 'object' ? job.branch?.name || '' : '',
+        job.startDate ? formatDate(job.startDate) : '',
+        job.dateQuoted ? formatDate(job.dateQuoted) : '',
+        job.dateSentToClient ? formatDate(job.dateSentToClient) : '',
+        job.poDate ? formatDate(job.poDate) : '',
+        job.registerDate ? formatDate(job.registerDate) : '',
+        job.invoiceDate ? formatDate(job.invoiceDate) : '',
+      ]);
+      data = [[sectionTitle], [`Filters: ${filtersString}`], [], headers, ...rows];
+      filename = `Conversion-Tracker-${new Date().toISOString().split('T')[0]}.xlsx`;
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sectionTitle.substring(0, 31)); // Excel sheet name limit is 31 chars
+    XLSX.writeFile(wb, filename);
+    setShowExportDropdown(false);
+  }
+
+  /**
+   * Export current section to PDF format
+   */
+  function exportToPDF() {
+    const { startDate, endDate } = getDateRange();
+    const sectionTitle = getSectionTitle();
+    const filtersString = getActiveFiltersString();
+    const doc = new jsPDF({ orientation: 'landscape' });
+    
+    // Add title
+    doc.setFontSize(18);
+    doc.text(sectionTitle, 14, 20);
+    
+    // Add filters and date range
+    doc.setFontSize(10);
+    doc.text(`Filters: ${filtersString}`, 14, 28);
+    doc.text(`Date Range: ${startDate} to ${endDate}`, 14, 34);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 40);
+
+    let headers: string[] = [];
+    let rows: any[][] = [];
+
+    if (activeSection === 'overdue') {
+      const filteredData = getFilteredOverdueJobs();
+      headers = ['Job #', 'Status', 'Days', 'Customer', 'Admin', 'Rep', 'Branch'];
+      rows = filteredData.map(oj => [
+        oj.jobNumber || '',
+        oj.job?.status?.name || '',
+        oj.daysOverdue || 0,
+        typeof oj.job?.customer === 'object' ? (oj.job.customer?.name || '').substring(0, 25) : (oj.job?.cashCustomer || '').substring(0, 25),
+        oj.job?.adm || '',
+        typeof oj.job?.repCode === 'object' ? (oj.job.repCode as any)?.code || '' : '',
+        typeof oj.job?.branch === 'object' ? oj.job.branch?.name || '' : '',
+      ]);
+    } else if (activeSection === 'jobs') {
+      const filteredData = getFilteredJobs();
+      headers = ['Job #', 'Status', 'Customer', 'Start Date', 'Value', 'Admin', 'Rep', 'Branch'];
+      rows = filteredData.map(job => [
+        job.jobNumber || '',
+        job.status?.name || '',
+        (typeof job.customer === 'object' ? job.customer?.name || '' : (job.cashCustomer || '')).substring(0, 20),
+        job.startDate ? formatDate(job.startDate) : '',
+        job.valueExVat ? `R${job.valueExVat.toLocaleString()}` : '',
+        job.adm || '',
+        typeof job.repCode === 'object' ? (job.repCode as any)?.code || '' : '',
+        typeof job.branch === 'object' ? job.branch?.name || '' : '',
+      ]);
+    } else if (activeSection === 'activities') {
+      headers = ['Date', 'Time', 'Action', 'Resource', 'Description'];
+      rows = userActivities.slice(0, 100).map(act => [
+        act.createdAt ? formatDate(act.createdAt) : '',
+        act.createdAt ? new Date(act.createdAt).toLocaleTimeString() : '',
+        act.action || '',
+        act.resourceType || '',
+        (act.description || '').substring(0, 40),
+      ]);
+    } else if (activeSection === 'conversion') {
+      // Use conversionJobs directly (already filtered by the useEffect)
+      headers = ['Job #', 'Customer', 'Admin', 'Start', 'Quoted', 'PO Date', 'Invoiced'];
+      rows = conversionJobs.map(job => [
+        job.jobNumber || '',
+        (typeof job.customer === 'object' ? job.customer?.name || '' : (job.cashCustomer || '')).substring(0, 20),
+        job.adm || '',
+        job.startDate ? formatDate(job.startDate) : '',
+        job.dateQuoted ? formatDate(job.dateQuoted) : '',
+        job.poDate ? formatDate(job.poDate) : '',
+        job.invoiceDate ? formatDate(job.invoiceDate) : '',
+      ]);
+    }
+
+    autoTable(doc, {
+      head: [headers],
+      body: rows,
+      startY: 46,
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [59, 130, 246], textColor: 255 },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+    });
+
+    // Add footer with count
+    const finalY = (doc as any).lastAutoTable?.finalY || 50;
+    doc.setFontSize(9);
+    doc.text(`Total Records: ${rows.length}`, 14, finalY + 10);
+
+    doc.save(`${sectionTitle.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`);
+    setShowExportDropdown(false);
   }
 
   /**
@@ -1692,13 +1922,40 @@ export function Reports({ statuses, branches }: ReportsProps) {
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-ars-heading">Reports & Analytics</h2>
           {activeTab === 'user-performance' && (
-            <button
-              onClick={exportUserPerformanceReport}
-              className="bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-4 py-2 rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
-            >
-              <Download className="w-4 h-4" />
-              EXPORT REPORT
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowExportDropdown(!showExportDropdown)}
+                className="bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] px-4 py-2 rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                EXPORT REPORT
+                <ChevronDown className="w-4 h-4" />
+              </button>
+              {showExportDropdown && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-[99]" 
+                    onClick={() => setShowExportDropdown(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-[100]">
+                    <button
+                      onClick={exportToExcel}
+                      className="w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-3 rounded-t-lg"
+                    >
+                      <FileSpreadsheet className="w-5 h-5 text-green-600" />
+                      Export to Excel
+                    </button>
+                    <button
+                      onClick={exportToPDF}
+                      className="w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-3 rounded-b-lg border-t border-gray-100"
+                    >
+                      <File className="w-5 h-5 text-red-600" />
+                      Export to PDF
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           )}
           {activeTab === 'customer' && (
             <button

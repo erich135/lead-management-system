@@ -162,7 +162,15 @@ async function apiRequest<T>(
     throw new Error(errorMessage);
   }
 
-  return data.data as T;
+  // If there's a data property, return it; otherwise return the response (for message-only responses)
+  if (data.data !== undefined) {
+    return data.data as T;
+  }
+  
+  // For responses that don't have a data property (e.g., { success: true, message: "..." })
+  // Return the relevant parts of the response
+  const { success, ...rest } = data;
+  return rest as T;
 }
 
 /**

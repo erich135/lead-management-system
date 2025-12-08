@@ -27,6 +27,16 @@
   - Includes filter summary and date range in exported files
   - Professional PDF formatting with auto-table layout
 
+- **User Management Enhancements**
+  - Activate/Deactivate button in User Details panel (preserves user data instead of deleting)
+  - Confirmation dialog before activating/deactivating users
+  - Success message after status change
+
+### Fixed
+- Fixed "Resend Invitation" error: "Cannot read properties of undefined (reading 'message')"
+  - API response handling now correctly processes message-only responses
+- Improved error handling for user status toggle with better network error messages
+
 ### Changed
 - Job Source is locked after initial save (only super_admin can modify)
 

@@ -350,6 +350,11 @@ export function SystemManagement() {
    * Handles toggling user active status.
    */
   async function handleToggleUserStatus(user: User) {
+    const action = user.isActive ? 'deactivate' : 'activate';
+    if (!confirm(`Are you sure you want to ${action} ${user.firstName} ${user.lastName}?`)) {
+      return;
+    }
+    
     try {
       setLoading(true);
       await updateUser(user._id, { isActive: !user.isActive });
@@ -358,9 +363,13 @@ export function SystemManagement() {
         const response = await getUser(user._id);
         setSelectedUser(response.user);
       }
+      alert(`User ${user.isActive ? 'deactivated' : 'activated'} successfully`);
     } catch (err: any) {
       console.error('Error updating user status:', err);
-      alert('Failed to update user status');
+      const errorMessage = err.message === 'Failed to fetch' 
+        ? 'Network error. Please check your connection and try again.'
+        : (err.message || 'Failed to update user status');
+      alert('Failed to update user status: ' + errorMessage);
     } finally {
       setLoading(false);
     }
@@ -1441,13 +1450,42 @@ export function SystemManagement() {
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-ars-body mb-1">Status</label>
-                      <p className={`px-3 py-1.5 rounded-lg inline-block font-medium ${
-                        selectedUser.isActive
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}>
-                        {selectedUser.isActive ? 'Active' : 'Inactive'}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className={`px-3 py-1.5 rounded-lg inline-block font-medium ${
+                          selectedUser.isActive
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {selectedUser.isActive ? 'Active' : 'Inactive'}
+                        </p>
+                        <button
+                          onClick={() => {
+                            const action = selectedUser.isActive ? 'deactivate' : 'activate';
+                            if (confirm(`Are you sure you want to ${action} this user?`)) {
+                              handleToggleUserStatus(selectedUser);
+                            }
+                          }}
+                          disabled={loading}
+                          className={`px-3 py-1.5 rounded-[8px] font-bold text-[13px] transition-all duration-300 hover:scale-105 flex items-center gap-1 disabled:opacity-50 ${
+                            selectedUser.isActive
+                              ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                              : 'bg-green-100 text-green-700 hover:bg-green-200'
+                          }`}
+                          title={selectedUser.isActive ? 'Deactivate user' : 'Activate user'}
+                        >
+                          {selectedUser.isActive ? (
+                            <>
+                              <UserX className="w-4 h-4" />
+                              DEACTIVATE
+                            </>
+                          ) : (
+                            <>
+                              <UserCheck className="w-4 h-4" />
+                              ACTIVATE
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                     {selectedUser.passwordSet === false && (
                       <div>

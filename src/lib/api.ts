@@ -383,6 +383,10 @@ export interface Job {
     _id: string;
     name: string;
   };
+  jobSource?: {
+    _id: string;
+    name: string;
+  } | string;
   startDate?: string | Date;
   dateQuoted?: string | Date;
   statusChangedAt?: string;
@@ -563,6 +567,14 @@ export interface Branch {
 export interface ServiceDescription {
   _id: string;
   name: string;
+}
+
+export interface JobSource {
+  _id: string;
+  name: string;
+  description?: string;
+  isDefault?: boolean;
+  isActive?: boolean;
 }
 
 export interface RepCode {
@@ -803,6 +815,46 @@ export async function updateServiceDescription(id: string, descriptionData: Part
  */
 export async function deleteServiceDescription(id: string): Promise<{ message: string }> {
   return apiRequest(`/api/reference/service-descriptions/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Gets all job sources.
+ */
+export async function getJobSources(): Promise<{ sources: JobSource[] }> {
+  return apiRequest('/api/reference/job-sources');
+}
+
+/**
+ * Creates a new job source.
+ */
+export async function createJobSource(sourceData: {
+  name: string;
+  description?: string;
+  isDefault?: boolean;
+}): Promise<{ source: JobSource }> {
+  return apiRequest('/api/reference/job-sources', {
+    method: 'POST',
+    body: JSON.stringify(sourceData),
+  });
+}
+
+/**
+ * Updates a job source.
+ */
+export async function updateJobSource(id: string, sourceData: Partial<JobSource>): Promise<{ source: JobSource }> {
+  return apiRequest(`/api/reference/job-sources/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(sourceData),
+  });
+}
+
+/**
+ * Deletes a job source.
+ */
+export async function deleteJobSource(id: string): Promise<{ message: string }> {
+  return apiRequest(`/api/reference/job-sources/${id}`, {
     method: 'DELETE',
   });
 }
@@ -2140,6 +2192,10 @@ export default {
   createServiceDescription,
   updateServiceDescription,
   deleteServiceDescription,
+  getJobSources,
+  createJobSource,
+  updateJobSource,
+  deleteJobSource,
   getRepCodes,
   createRepCode,
   updateRepCode,

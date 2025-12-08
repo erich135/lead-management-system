@@ -17,6 +17,7 @@ import {
   getMachineRSRUrl,
   getAuthToken,
   getServiceDescriptions,
+  getJobSources,
   Job, 
   Activity,
   User,
@@ -27,7 +28,8 @@ import {
   Machine,
   MachineRSR,
   OverdueJob,
-  ServiceDescription
+  ServiceDescription,
+  JobSource
 } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { formatDate, formatDateTime } from '../utils/dateFormat';
@@ -117,21 +119,25 @@ export function Reports({ statuses, branches }: ReportsProps) {
   const [expandedMachineRSRs, setExpandedMachineRSRs] = useState<Set<string>>(new Set());
   
   // Overdue Jobs Filters
-  const [overdueStatusFilter, setOverdueStatusFilter] = useState<string>('');
+  const [overdueStatusFilter, setOverdueStatusFilter] = useState<string[]>([]);
+  const [overdueStatusDropdownOpen, setOverdueStatusDropdownOpen] = useState(false);
   const [overdueAdminFilter, setOverdueAdminFilter] = useState<string>('');
   const [overdueRepFilter, setOverdueRepFilter] = useState<string>('');
   const [overdueBranchFilter, setOverdueBranchFilter] = useState<string>('');
   const [overdueDescriptionFilter, setOverdueDescriptionFilter] = useState<string>('');
+  const [overdueJobSourceFilter, setOverdueJobSourceFilter] = useState<string>('');
   const [overdueStatusChangedFrom, setOverdueStatusChangedFrom] = useState<string>('');
   const [overdueStatusChangedTo, setOverdueStatusChangedTo] = useState<string>('');
   const [showHiddenOverdue, setShowHiddenOverdue] = useState<boolean>(false);
   
   // All Jobs Filters
-  const [jobsStatusFilter, setJobsStatusFilter] = useState<string>('');
+  const [jobsStatusFilter, setJobsStatusFilter] = useState<string[]>([]);
+  const [jobsStatusDropdownOpen, setJobsStatusDropdownOpen] = useState(false);
   const [jobsAdminFilter, setJobsAdminFilter] = useState<string>('');
   const [jobsRepFilter, setJobsRepFilter] = useState<string>('');
   const [jobsBranchFilter, setJobsBranchFilter] = useState<string>('');
   const [jobsDescriptionFilter, setJobsDescriptionFilter] = useState<string>('');
+  const [jobsJobSourceFilter, setJobsJobSourceFilter] = useState<string>('');
   const [jobsStatusChangedFrom, setJobsStatusChangedFrom] = useState<string>('');
   const [jobsStatusChangedTo, setJobsStatusChangedTo] = useState<string>('');
   const [showHiddenJobs, setShowHiddenJobs] = useState<boolean>(false);
@@ -141,6 +147,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
   const [conversionRepFilter, setConversionRepFilter] = useState<string>('');
   const [conversionBranchFilter, setConversionBranchFilter] = useState<string>('');
   const [conversionDescriptionFilter, setConversionDescriptionFilter] = useState<string>('');
+  const [conversionJobSourceFilter, setConversionJobSourceFilter] = useState<string>('');
   const [conversionDateFrom, setConversionDateFrom] = useState<string>('');
   const [conversionDateTo, setConversionDateTo] = useState<string>('');
   const [conversionCompleteOnly, setConversionCompleteOnly] = useState<boolean>(false); // Only show jobs with complete workflow
@@ -159,6 +166,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [serviceDescriptions, setServiceDescriptions] = useState<ServiceDescription[]>([]);
+  const [jobSources, setJobSources] = useState<JobSource[]>([]);
   const [userJobs, setUserJobs] = useState<Job[]>([]);
   const [userActivities, setUserActivities] = useState<Activity[]>([]);
   const [userOverdueJobs, setUserOverdueJobs] = useState<OverdueJob[]>([]);
@@ -303,6 +311,10 @@ export function Reports({ statuses, branches }: ReportsProps) {
       // Load service descriptions
       const descriptionsResponse = await getServiceDescriptions();
       setServiceDescriptions(descriptionsResponse.descriptions || []);
+
+      // Load job sources
+      const jobSourcesResponse = await getJobSources();
+      setJobSources(jobSourcesResponse.sources || []);
 
       // Auto-select current user's code/technician if not super admin
       if (!currentUser?.isSuperAdmin) {
@@ -544,6 +556,14 @@ export function Reports({ statuses, branches }: ReportsProps) {
         filteredJobs = filteredJobs.filter(job => {
           const description = typeof job.description === 'object' ? job.description?.name : (job.description || null);
           return description === conversionDescriptionFilter;
+        });
+      }
+      
+      // Filter by job source if specified
+      if (conversionJobSourceFilter) {
+        filteredJobs = filteredJobs.filter(job => {
+          const jobSource = typeof job.jobSource === 'object' ? job.jobSource?.name : (job.jobSource || null);
+          return jobSource === conversionJobSourceFilter;
         });
       }
       
@@ -883,11 +903,11 @@ export function Reports({ statuses, branches }: ReportsProps) {
   function getFilteredOverdueJobs(): OverdueJob[] {
     let filtered = userOverdueJobs;
     
-    // Filter by status
-    if (overdueStatusFilter) {
+    // Filter by status (multiple selection)
+    if (overdueStatusFilter.length > 0) {
       filtered = filtered.filter(oj => {
         const jobStatus = oj.job?.status?.name || oj.currentStatus || '';
-        return jobStatus.toLowerCase().includes(overdueStatusFilter.toLowerCase());
+        return overdueStatusFilter.some(status => jobStatus.toLowerCase() === status.toLowerCase());
       });
     }
     
@@ -923,6 +943,14 @@ export function Reports({ statuses, branches }: ReportsProps) {
       });
     }
     
+    // Filter by job source
+    if (overdueJobSourceFilter) {
+      filtered = filtered.filter(oj => {
+        const jobSource = typeof oj.job?.jobSource === 'object' ? oj.job.jobSource?.name : (oj.job?.jobSource || '');
+        return jobSource?.toLowerCase().includes(overdueJobSourceFilter.toLowerCase());
+      });
+    }
+    
     // Filter by status changed date range
     if (overdueStatusChangedFrom) {
       filtered = filtered.filter(oj => {
@@ -949,11 +977,11 @@ export function Reports({ statuses, branches }: ReportsProps) {
   function getFilteredJobs(): Job[] {
     let filtered = userJobs;
     
-    // Filter by status
-    if (jobsStatusFilter) {
+    // Filter by status (multiple selection)
+    if (jobsStatusFilter.length > 0) {
       filtered = filtered.filter(job => {
         const jobStatus = job.status?.name || '';
-        return jobStatus.toLowerCase().includes(jobsStatusFilter.toLowerCase());
+        return jobsStatusFilter.some(status => jobStatus.toLowerCase() === status.toLowerCase());
       });
     }
     
@@ -986,6 +1014,14 @@ export function Reports({ statuses, branches }: ReportsProps) {
       filtered = filtered.filter(job => {
         const description = typeof job.description === 'object' ? job.description?.name : (job.description || '');
         return description?.toLowerCase().includes(jobsDescriptionFilter.toLowerCase());
+      });
+    }
+    
+    // Filter by job source
+    if (jobsJobSourceFilter) {
+      filtered = filtered.filter(job => {
+        const jobSource = typeof job.jobSource === 'object' ? job.jobSource?.name : (job.jobSource || '');
+        return jobSource?.toLowerCase().includes(jobsJobSourceFilter.toLowerCase());
       });
     }
     
@@ -1070,6 +1106,18 @@ export function Reports({ statuses, branches }: ReportsProps) {
   }
 
   /**
+   * Gets unique job sources from overdue jobs.
+   */
+  function getUniqueOverdueJobSources(): string[] {
+    const sourceSet = new Set<string>();
+    userOverdueJobs.forEach(oj => {
+      const jobSource = typeof oj.job?.jobSource === 'object' ? oj.job.jobSource?.name : (oj.job?.jobSource || null);
+      if (jobSource) sourceSet.add(jobSource);
+    });
+    return Array.from(sourceSet).sort();
+  }
+
+  /**
    * Gets unique statuses from all jobs.
    */
   function getUniqueJobStatuses(): string[] {
@@ -1130,6 +1178,18 @@ export function Reports({ statuses, branches }: ReportsProps) {
   }
 
   /**
+   * Gets unique job sources from all jobs.
+   */
+  function getUniqueJobJobSources(): string[] {
+    const sourceSet = new Set<string>();
+    userJobs.forEach(job => {
+      const jobSource = typeof job.jobSource === 'object' ? job.jobSource?.name : (job.jobSource || null);
+      if (jobSource) sourceSet.add(jobSource);
+    });
+    return Array.from(sourceSet).sort();
+  }
+
+  /**
    * Gets unique admin codes from all conversion jobs (unfiltered).
    */
   function getUniqueConversionAdmins(): string[] {
@@ -1175,6 +1235,18 @@ export function Reports({ statuses, branches }: ReportsProps) {
       if (description) descSet.add(description);
     });
     return Array.from(descSet).sort();
+  }
+
+  /**
+   * Gets unique job sources from all conversion jobs (unfiltered).
+   */
+  function getUniqueConversionJobSources(): string[] {
+    const sourceSet = new Set<string>();
+    allConversionJobs.forEach(job => {
+      const jobSource = typeof job.jobSource === 'object' ? job.jobSource?.name : (job.jobSource || null);
+      if (jobSource) sourceSet.add(jobSource);
+    });
+    return Array.from(sourceSet).sort();
   }
 
   /**
@@ -1965,24 +2037,61 @@ export function Reports({ statuses, branches }: ReportsProps) {
                 <h3 className="text-lg font-bold text-ars-heading mb-4">Overdue Jobs</h3>
                 
                 {/* Overdue Jobs Filters */}
-                <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                <div className="mb-4 p-4 bg-gray-50 rounded-lg overflow-visible">
                   <h4 className="text-sm font-semibold text-ars-heading mb-3 flex items-center gap-2">
                     <Filter className="w-4 h-4" />
                     Filter Overdue Jobs
                   </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-3">
-                    <div>
+                  <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-3 overflow-visible">
+                    <div className="relative">
                       <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
-                      <select
-                        value={overdueStatusFilter}
-                        onChange={(e) => setOverdueStatusFilter(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                      >
-                        <option value="">All Statuses</option>
-                        {getUniqueOverdueStatuses().map(status => (
-                          <option key={status} value={status}>{status}</option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setOverdueStatusDropdownOpen(!overdueStatusDropdownOpen)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-left flex items-center justify-between"
+                        >
+                          <span className={overdueStatusFilter.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
+                            {overdueStatusFilter.length === 0 ? 'All Statuses' : `${overdueStatusFilter.length} selected`}
+                          </span>
+                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        {overdueStatusDropdownOpen && (
+                          <>
+                            <div 
+                              className="fixed inset-0 z-[99]" 
+                              onClick={() => setOverdueStatusDropdownOpen(false)}
+                            />
+                            <div
+                              className="absolute z-[100] mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg"
+                              style={{ maxHeight: '200px', overflowY: 'auto' }}
+                            >
+                              {getUniqueOverdueStatuses().map(status => (
+                                <label
+                                  key={status}
+                                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={overdueStatusFilter.includes(status)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setOverdueStatusFilter([...overdueStatusFilter, status]);
+                                      } else {
+                                        setOverdueStatusFilter(overdueStatusFilter.filter(s => s !== status));
+                                      }
+                                    }}
+                                    className="rounded border-gray-300 text-ars-primary focus:ring-ars-primary"
+                                  />
+                                  {status}
+                                </label>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Admin</label>
@@ -2037,6 +2146,19 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       </select>
                     </div>
                     <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Job Source</label>
+                      <select
+                        value={overdueJobSourceFilter}
+                        onChange={(e) => setOverdueJobSourceFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        <option value="">All Sources</option>
+                        {getUniqueOverdueJobSources().map(source => (
+                          <option key={source} value={source}>{source}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Status Changed From</label>
                       <input
                         type="date"
@@ -2070,7 +2192,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       </div>
                     </label>
                   </div>
-                  {(overdueStatusFilter || overdueAdminFilter || overdueRepFilter || overdueBranchFilter || overdueDescriptionFilter || overdueStatusChangedFrom || overdueStatusChangedTo || showHiddenOverdue) && (
+                  {(overdueStatusFilter.length > 0 || overdueAdminFilter || overdueRepFilter || overdueBranchFilter || overdueDescriptionFilter || overdueJobSourceFilter || overdueStatusChangedFrom || overdueStatusChangedTo || showHiddenOverdue) && (
                     <div className="mt-3 flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-gray-600">Active filters:</span>
                       {showHiddenOverdue && (
@@ -2079,9 +2201,9 @@ export function Reports({ statuses, branches }: ReportsProps) {
                           Hidden Jobs
                         </span>
                       )}
-                      {overdueStatusFilter && (
+                      {overdueStatusFilter.length > 0 && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                          Status: {overdueStatusFilter}
+                          Status: {overdueStatusFilter.join(', ')}
                         </span>
                       )}
                       {overdueAdminFilter && (
@@ -2104,6 +2226,11 @@ export function Reports({ statuses, branches }: ReportsProps) {
                           Description: {overdueDescriptionFilter}
                         </span>
                       )}
+                      {overdueJobSourceFilter && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-cyan-100 text-cyan-800 rounded text-xs">
+                          Source: {overdueJobSourceFilter}
+                        </span>
+                      )}
                       {overdueStatusChangedFrom && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">
                           From: {formatDate(overdueStatusChangedFrom)}
@@ -2116,11 +2243,12 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       )}
                       <button
                         onClick={() => {
-                          setOverdueStatusFilter('');
+                          setOverdueStatusFilter([]);
                           setOverdueAdminFilter('');
                           setOverdueRepFilter('');
                           setOverdueBranchFilter('');
                           setOverdueDescriptionFilter('');
+                          setOverdueJobSourceFilter('');
                           setOverdueStatusChangedFrom('');
                           setOverdueStatusChangedTo('');
                           setShowHiddenOverdue(false);
@@ -2226,24 +2354,61 @@ export function Reports({ statuses, branches }: ReportsProps) {
                 <h3 className="text-lg font-bold text-ars-heading mb-4">Jobs ({userJobs.length})</h3>
                 
                 {/* Jobs Filters */}
-                <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                <div className="mb-4 p-4 bg-gray-50 rounded-lg overflow-visible">
                   <h4 className="text-sm font-semibold text-ars-heading mb-3 flex items-center gap-2">
                     <Filter className="w-4 h-4" />
                     Filter Jobs
                   </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-3">
-                    <div>
+                  <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-3 overflow-visible">
+                    <div className="relative">
                       <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
-                      <select
-                        value={jobsStatusFilter}
-                        onChange={(e) => setJobsStatusFilter(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                      >
-                        <option value="">All Statuses</option>
-                        {getUniqueJobStatuses().map(status => (
-                          <option key={status} value={status}>{status}</option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setJobsStatusDropdownOpen(!jobsStatusDropdownOpen)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-left flex items-center justify-between"
+                        >
+                          <span className={jobsStatusFilter.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
+                            {jobsStatusFilter.length === 0 ? 'All Statuses' : `${jobsStatusFilter.length} selected`}
+                          </span>
+                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        {jobsStatusDropdownOpen && (
+                          <>
+                            <div 
+                              className="fixed inset-0 z-[99]" 
+                              onClick={() => setJobsStatusDropdownOpen(false)}
+                            />
+                            <div
+                              className="absolute z-[100] mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg"
+                              style={{ maxHeight: '200px', overflowY: 'auto' }}
+                            >
+                              {getUniqueJobStatuses().map(status => (
+                                <label
+                                  key={status}
+                                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={jobsStatusFilter.includes(status)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setJobsStatusFilter([...jobsStatusFilter, status]);
+                                      } else {
+                                        setJobsStatusFilter(jobsStatusFilter.filter(s => s !== status));
+                                      }
+                                    }}
+                                    className="rounded border-gray-300 text-ars-primary focus:ring-ars-primary"
+                                  />
+                                  {status}
+                                </label>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Admin</label>
@@ -2298,6 +2463,19 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       </select>
                     </div>
                     <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Job Source</label>
+                      <select
+                        value={jobsJobSourceFilter}
+                        onChange={(e) => setJobsJobSourceFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        <option value="">All Sources</option>
+                        {getUniqueJobJobSources().map(source => (
+                          <option key={source} value={source}>{source}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Status Changed From</label>
                       <input
                         type="date"
@@ -2331,7 +2509,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       </div>
                     </label>
                   </div>
-                  {(jobsStatusFilter || jobsAdminFilter || jobsRepFilter || jobsBranchFilter || jobsDescriptionFilter || jobsStatusChangedFrom || jobsStatusChangedTo || showHiddenJobs) && (
+                  {(jobsStatusFilter.length > 0 || jobsAdminFilter || jobsRepFilter || jobsBranchFilter || jobsDescriptionFilter || jobsJobSourceFilter || jobsStatusChangedFrom || jobsStatusChangedTo || showHiddenJobs) && (
                     <div className="mt-3 flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-gray-600">Active filters:</span>
                       {showHiddenJobs && (
@@ -2340,9 +2518,9 @@ export function Reports({ statuses, branches }: ReportsProps) {
                           Hidden Jobs
                         </span>
                       )}
-                      {jobsStatusFilter && (
+                      {jobsStatusFilter.length > 0 && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                          Status: {jobsStatusFilter}
+                          Status: {jobsStatusFilter.join(', ')}
                         </span>
                       )}
                       {jobsAdminFilter && (
@@ -2365,6 +2543,11 @@ export function Reports({ statuses, branches }: ReportsProps) {
                           Description: {jobsDescriptionFilter}
                         </span>
                       )}
+                      {jobsJobSourceFilter && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-cyan-100 text-cyan-800 rounded text-xs">
+                          Source: {jobsJobSourceFilter}
+                        </span>
+                      )}
                       {jobsStatusChangedFrom && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">
                           From: {formatDate(jobsStatusChangedFrom)}
@@ -2377,11 +2560,12 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       )}
                       <button
                         onClick={() => {
-                          setJobsStatusFilter('');
+                          setJobsStatusFilter([]);
                           setJobsAdminFilter('');
                           setJobsRepFilter('');
                           setJobsBranchFilter('');
                           setJobsDescriptionFilter('');
+                          setJobsJobSourceFilter('');
                           setJobsStatusChangedFrom('');
                           setJobsStatusChangedTo('');
                           setShowHiddenJobs(false);
@@ -2458,7 +2642,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     </div>
                   ))
                   )}
-                  {getFilteredJobs().length > 0 && (jobsStatusFilter || jobsAdminFilter || jobsStatusChangedFrom || jobsStatusChangedTo) && (
+                  {getFilteredJobs().length > 0 && (jobsStatusFilter.length > 0 || jobsAdminFilter || jobsStatusChangedFrom || jobsStatusChangedTo) && (
                     <p className="text-xs text-center text-gray-500 mt-4 pt-4 border-t">
                       Showing {getFilteredJobs().length} of {userJobs.length} jobs
                     </p>
@@ -2548,6 +2732,19 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       </select>
                     </div>
                     <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Job Source</label>
+                      <select
+                        value={conversionJobSourceFilter}
+                        onChange={(e) => setConversionJobSourceFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        <option value="">All Sources</option>
+                        {getUniqueConversionJobSources().map(source => (
+                          <option key={source} value={source}>{source}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Date From</label>
                       <input
                         type="date"
@@ -2581,7 +2778,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       </div>
                     </label>
                   </div>
-                  {(conversionAdminFilter || conversionRepFilter || conversionBranchFilter || conversionDescriptionFilter || conversionDateFrom || conversionDateTo || showHiddenConversion) && (
+                  {(conversionAdminFilter || conversionRepFilter || conversionBranchFilter || conversionDescriptionFilter || conversionJobSourceFilter || conversionDateFrom || conversionDateTo || showHiddenConversion) && (
                     <div className="mt-3 flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-gray-600">Active filters:</span>
                       {showHiddenConversion && (
@@ -2610,6 +2807,11 @@ export function Reports({ statuses, branches }: ReportsProps) {
                           Description: {conversionDescriptionFilter}
                         </span>
                       )}
+                      {conversionJobSourceFilter && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-cyan-100 text-cyan-800 rounded text-xs">
+                          Source: {conversionJobSourceFilter}
+                        </span>
+                      )}
                       {conversionDateFrom && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">
                           From: {formatDate(conversionDateFrom)}
@@ -2626,6 +2828,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                           setConversionRepFilter('');
                           setConversionBranchFilter('');
                           setConversionDescriptionFilter('');
+                          setConversionJobSourceFilter('');
                           setConversionDateFrom('');
                           setConversionDateTo('');
                           setShowHiddenConversion(false);

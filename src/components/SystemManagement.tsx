@@ -33,6 +33,10 @@ import {
   createServiceDescription,
   updateServiceDescription,
   deleteServiceDescription,
+  getJobSources,
+  createJobSource,
+  updateJobSource,
+  deleteJobSource,
   getBranches,
   createBranch,
   updateBranch,
@@ -49,6 +53,7 @@ import {
   AdminCode,
   Technician,
   ServiceDescription,
+  JobSource,
   Branch,
   Status
 } from '../lib/api';
@@ -128,6 +133,11 @@ export function SystemManagement() {
   const [editingDescription, setEditingDescription] = useState<ServiceDescription | null>(null);
   const [showDescriptionForm, setShowDescriptionForm] = useState(false);
   const [newDescription, setNewDescription] = useState({ name: '', description: '' });
+  const [jobSources, setJobSources] = useState<JobSource[]>([]);
+  const [editingJobSource, setEditingJobSource] = useState<JobSource | null>(null);
+  const [showJobSourceForm, setShowJobSourceForm] = useState(false);
+  const [newJobSource, setNewJobSource] = useState({ name: '', description: '', isDefault: false });
+  const [isJobSourcesExpanded, setIsJobSourcesExpanded] = useState(false);
   const [editingStatus, setEditingStatus] = useState<Status | null>(null);
   const [showStatusForm, setShowStatusForm] = useState(false);
   const [newStatus, setNewStatus] = useState({ name: '', description: '' });
@@ -206,6 +216,10 @@ export function SystemManagement() {
       // Load service descriptions
       const descriptionsResponse = await getServiceDescriptions();
       setDescriptions(descriptionsResponse.descriptions || []);
+
+      // Load job sources
+      const jobSourcesResponse = await getJobSources();
+      setJobSources(jobSourcesResponse.sources || []);
 
       // Load statuses
       const statusesResponse = await getStatuses();
@@ -926,6 +940,89 @@ export function SystemManagement() {
       setDescriptions(descriptions.filter(d => d._id !== id));
     } catch (err: any) {
       setError(err.message || 'Failed to delete service description');
+    }
+  }
+
+  /**
+   * Handles creating a new job source.
+   */
+  async function handleCreateJobSource() {
+    if (!newJobSource.name.trim()) {
+      setError('Job source name is required');
+      return;
+    }
+
+    try {
+      setError(null);
+      const response = await createJobSource({
+        name: newJobSource.name.trim(),
+        description: newJobSource.description.trim() || undefined,
+        isDefault: newJobSource.isDefault,
+      });
+      // If we just created a default, update other sources to not be default
+      let updatedSources = [...jobSources];
+      if (newJobSource.isDefault) {
+        updatedSources = updatedSources.map(s => ({ ...s, isDefault: false }));
+      }
+      setJobSources([...updatedSources, response.source].sort((a, b) => {
+        // Sort by default first, then by name
+        if (a.isDefault && !b.isDefault) return -1;
+        if (!a.isDefault && b.isDefault) return 1;
+        return a.name.localeCompare(b.name);
+      }));
+      setNewJobSource({ name: '', description: '', isDefault: false });
+      setShowJobSourceForm(false);
+    } catch (err: any) {
+      setError(err.message || 'Failed to create job source');
+    }
+  }
+
+  /**
+   * Handles updating a job source.
+   */
+  async function handleUpdateJobSource() {
+    if (!editingJobSource) return;
+
+    try {
+      setError(null);
+      const response = await updateJobSource(editingJobSource._id, {
+        name: editingJobSource.name,
+        description: editingJobSource.description,
+        isDefault: editingJobSource.isDefault,
+        isActive: editingJobSource.isActive,
+      });
+      // If we just set this as default, update other sources
+      let updatedSources = jobSources.map(s => s._id === editingJobSource._id ? response.source : s);
+      if (response.source.isDefault) {
+        updatedSources = updatedSources.map(s => 
+          s._id === response.source._id ? s : { ...s, isDefault: false }
+        );
+      }
+      setJobSources(updatedSources.sort((a, b) => {
+        if (a.isDefault && !b.isDefault) return -1;
+        if (!a.isDefault && b.isDefault) return 1;
+        return a.name.localeCompare(b.name);
+      }));
+      setEditingJobSource(null);
+      setShowJobSourceForm(false);
+    } catch (err: any) {
+      setError(err.message || 'Failed to update job source');
+    }
+  }
+
+  /**
+   * Handles deleting a job source.
+   */
+  async function handleDeleteJobSource(id: string) {
+    if (!confirm('Are you sure you want to delete this job source?')) {
+      return;
+    }
+
+    try {
+      await deleteJobSource(id);
+      setJobSources(jobSources.filter(s => s._id !== id));
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete job source');
     }
   }
 
@@ -2985,6 +3082,191 @@ export function SystemManagement() {
                 ))}
                 {descriptions.length === 0 && (
                   <p className="text-center text-ars-body py-8">No service descriptions found. Click "Add Description" to create one.</p>
+                )}
+              </div>
+                </>
+              )}
+            </div>
+
+            {/* Job Sources Section */}
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <button
+                onClick={() => setIsJobSourcesExpanded(!isJobSourcesExpanded)}
+                className="w-full flex items-center gap-2 text-xl font-bold text-ars-heading hover:text-ars-primary transition-colors"
+              >
+                {isJobSourcesExpanded ? <ChevronUp className="w-6 h-6 text-ars-primary" /> : <ChevronDown className="w-6 h-6 text-ars-primary" />}
+                <Tag className="w-6 h-6 text-ars-primary" />
+                Job Sources
+              </button>
+              {isJobSourcesExpanded && (
+                <>
+              <p className="mt-5 text-sm text-ars-body mb-4">
+                Manage job sources to track how jobs are acquired (e.g., Normal, Web Enquiry).
+              </p>
+
+              <div className="mb-4">
+                <button
+                  onClick={() => {
+                    setEditingJobSource(null);
+                    setNewJobSource({ name: '', description: '', isDefault: false });
+                    setShowJobSourceForm(!showJobSourceForm);
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  ADD JOB SOURCE
+                </button>
+              </div>
+
+              {/* Job Source Form */}
+              {(showJobSourceForm || editingJobSource) && (
+                <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <h4 className="text-lg font-semibold text-ars-heading mb-4">
+                    {editingJobSource ? 'Edit Job Source' : 'Create New Job Source'}
+                  </h4>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">
+                        Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={editingJobSource ? editingJobSource.name : newJobSource.name}
+                        onChange={(e) => {
+                          if (editingJobSource) {
+                            setEditingJobSource({ ...editingJobSource, name: e.target.value });
+                          } else {
+                            setNewJobSource({ ...newJobSource, name: e.target.value });
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                        placeholder="e.g., Normal, Web Enquiry, Phone"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">Description</label>
+                      <textarea
+                        value={editingJobSource ? editingJobSource.description || '' : newJobSource.description}
+                        onChange={(e) => {
+                          if (editingJobSource) {
+                            setEditingJobSource({ ...editingJobSource, description: e.target.value });
+                          } else {
+                            setNewJobSource({ ...newJobSource, description: e.target.value });
+                          }
+                        }}
+                        rows={3}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                        placeholder="Optional description of this job source"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="jobsource-default"
+                        checked={editingJobSource ? editingJobSource.isDefault || false : newJobSource.isDefault}
+                        onChange={(e) => {
+                          if (editingJobSource) {
+                            setEditingJobSource({ ...editingJobSource, isDefault: e.target.checked });
+                          } else {
+                            setNewJobSource({ ...newJobSource, isDefault: e.target.checked });
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary"
+                      />
+                      <label htmlFor="jobsource-default" className="text-sm text-ars-body cursor-pointer">
+                        Set as default for new jobs
+                      </label>
+                    </div>
+                  </div>
+                  {editingJobSource && (
+                    <div className="mt-4 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="jobsource-active"
+                        checked={editingJobSource.isActive}
+                        onChange={(e) => setEditingJobSource({ ...editingJobSource, isActive: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary"
+                      />
+                      <label htmlFor="jobsource-active" className="text-sm text-ars-body cursor-pointer">
+                        Active
+                      </label>
+                    </div>
+                  )}
+                  <div className="flex gap-3 mt-4">
+                    <button
+                      onClick={editingJobSource ? handleUpdateJobSource : handleCreateJobSource}
+                      disabled={loading}
+                      className="px-4 py-2.5 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <Save className="w-4 h-4" />
+                      {editingJobSource ? 'UPDATE' : 'CREATE'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingJobSource(null);
+                        setNewJobSource({ name: '', description: '', isDefault: false });
+                        setShowJobSourceForm(false);
+                      }}
+                      className="px-4 py-2.5 border border-gray-300 rounded-[8px] font-bold text-[14px] hover:bg-gray-50 transition-colors"
+                    >
+                      CANCEL
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Job Sources List */}
+              <div className="space-y-2">
+                {jobSources.map((source) => (
+                  <div
+                    key={source._id}
+                    className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <span className="font-semibold text-ars-heading">{source.name}</span>
+                        {source.description && (
+                          <span className="text-sm text-ars-body">- {source.description}</span>
+                        )}
+                        {source.isDefault && (
+                          <span className="px-2 py-1 text-xs font-medium rounded-lg bg-blue-100 text-blue-700">
+                            Default
+                          </span>
+                        )}
+                        <span className={`px-2 py-1 text-xs font-medium rounded-lg ${
+                          source.isActive
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {source.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingJobSource(source);
+                          setShowJobSourceForm(false);
+                        }}
+                        className="p-2 text-ars-primary hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Edit job source"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      {!source.isDefault && (
+                        <button
+                          onClick={() => handleDeleteJobSource(source._id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete job source"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {jobSources.length === 0 && (
+                  <p className="text-center text-ars-body py-8">No job sources found. Click "Add Job Source" to create one.</p>
                 )}
               </div>
                 </>

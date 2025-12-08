@@ -1,5 +1,5 @@
 import { useState, FormEvent, useEffect, useRef } from 'react';
-import { createJob, getJobs, getStatuses, getBranches, getCustomers, createCustomer, getTechnicians, getServiceDescriptions, getRepCodes, getAdminCodes, getMachinesByCustomer, createMachine, type Status, type Branch, type Customer, type Technician, type ServiceDescription, type RepCode, type AdminCode, type Machine, type Job } from '../lib/api';
+import { createJob, getJobs, getStatuses, getBranches, getCustomers, createCustomer, getTechnicians, getServiceDescriptions, getJobSources, getRepCodes, getAdminCodes, getMachinesByCustomer, createMachine, type Status, type Branch, type Customer, type Technician, type ServiceDescription, type JobSource, type RepCode, type AdminCode, type Machine, type Job } from '../lib/api';
 import { X, Plus, Wrench } from 'lucide-react';
 import { HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
@@ -22,6 +22,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
   const [error, setError] = useState('');
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [serviceDescriptions, setServiceDescriptions] = useState<ServiceDescription[]>([]);
+  const [jobSources, setJobSources] = useState<JobSource[]>([]);
   const [repCodes, setRepCodes] = useState<RepCode[]>([]);
   const [adminCodes, setAdminCodes] = useState<AdminCode[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
@@ -47,6 +48,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
     branch: string,
     status: string,
     description: string,
+    jobSource: string,
     valueExVat: string,
     adm: string,
     assistingAdm: string,
@@ -73,6 +75,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
       branch: '',
       status: '',
       description: '',
+      jobSource: '',
       valueExVat: '',
       adm: '',
       assistingAdm: '',
@@ -100,21 +103,24 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
   useEffect(() => {
     async function loadReferenceData() {
       try {
-        const [techsData, descsData, repCodesData, adminCodesData, customersData] = await Promise.all([
+        const [techsData, descsData, jobSourcesData, repCodesData, adminCodesData, customersData] = await Promise.all([
           getTechnicians().catch(err => { console.error('getTechnicians failed:', err); return { technicians: [] }; }),
           getServiceDescriptions().catch(err => { console.error('getServiceDescriptions failed:', err); return { descriptions: [] }; }),
+          getJobSources().catch(err => { console.error('getJobSources failed:', err); return { sources: [] }; }),
           getRepCodes().catch(err => { console.error('getRepCodes failed:', err); return { repCodes: [] }; }),
           getAdminCodes().catch(err => { console.error('getAdminCodes failed:', err); return { adminCodes: [] }; }),
           getCustomers({ limit: 10000 }).catch(err => { console.error('getCustomers failed:', err); return { customers: [] }; }),
         ]);
         setTechnicians(techsData.technicians || []);
         setServiceDescriptions(descsData.descriptions || []);
+        setJobSources(jobSourcesData.sources || []);
         setRepCodes(repCodesData.repCodes || []);
         setAdminCodes(adminCodesData.adminCodes || []);
         setAllCustomers(customersData.customers || []);
         console.log('Reference data loaded:', { 
           technicians: techsData.technicians?.length, 
           descriptions: descsData.descriptions?.length,
+          jobSources: jobSourcesData.sources?.length,
           repCodes: repCodesData.repCodes?.length,
           adminCodes: adminCodesData.adminCodes?.length,
           customers: customersData.customers?.length
@@ -139,6 +145,18 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statuses]);
+
+  // Set default job source when job sources are loaded (only once)
+  useEffect(() => {
+    if (jobSources && jobSources.length > 0 && !formData.jobSource) {
+      // Find the default job source, or use the first one
+      const defaultJobSource = jobSources.find(s => s.isDefault) || jobSources[0];
+      if (defaultJobSource) {
+        setFormData(prev => ({ ...prev, jobSource: defaultJobSource._id }));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobSources]);
 
   // Get today's date in YYYY-MM-DD format for default dates
   const getTodayDate = () => {
@@ -312,6 +330,10 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
         missingFields.push('Service Description');
       }
 
+      if (!formData.jobSource) {
+        missingFields.push('Job Source');
+      }
+
       // If there are missing fields, show error with list
       if (missingFields.length > 0) {
         const fieldsList = missingFields.map(field => `• ${field}`).join('\n');
@@ -349,6 +371,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
         invoiceDate: formData.invoiceDate || undefined,
         invNumber: formData.invNumber || undefined,
         description: formData.description || undefined,
+        jobSource: formData.jobSource || undefined,
         startDate: formData.startDate || undefined,
         dateQuoted: formData.dateQuoted || undefined,
       };
@@ -736,6 +759,28 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
                   ))
                 ) : (
                   <option value="" disabled>Loading descriptions...</option>
+                )}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
+                Job Source
+              </label>
+              <select
+                value={formData.jobSource}
+                onChange={(e) => setFormData({ ...formData, jobSource: e.target.value })}
+                style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+              >
+                <option value="">Select Source</option>
+                {jobSources && jobSources.length > 0 ? (
+                  jobSources.map((source) => (
+                    <option key={source._id} value={source._id}>
+                      {source.name}{source.isDefault ? ' (Default)' : ''}
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled>Loading sources...</option>
                 )}
               </select>
             </div>

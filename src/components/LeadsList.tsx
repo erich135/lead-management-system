@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getJobs, updateJob, getCustomers, getTechnicians, getOverdueJobs, getRepCodes, getAdminCodes, getServiceDescriptions, type Job, type Status, type Branch, type Customer, type Technician, type OverdueJob, type RepCode, type AdminCode, type ServiceDescription } from '../lib/api';
+import { getJobs, updateJob, getCustomers, getTechnicians, getOverdueJobs, getRepCodes, getAdminCodes, getServiceDescriptions, getJobSources, type Job, type Status, type Branch, type Customer, type Technician, type OverdueJob, type RepCode, type AdminCode, type ServiceDescription, type JobSource } from '../lib/api';
 import { Search, Filter, Plus, AlertCircle, Calendar, Eye, Clock, CheckCircle2, X, Zap, FileText, User, Building2, DollarSign, Wrench, Sparkles, ArrowRight, Tag, ChevronDown, ChevronUp } from 'lucide-react';
 import { LeadDetails } from './LeadDetails';
 import { useAuth } from '../contexts/AuthContext';
@@ -45,6 +45,8 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
   const [repCodes, setRepCodes] = useState<RepCode[]>([]);
   const [adminCodes, setAdminCodes] = useState<AdminCode[]>([]);
   const [serviceDescriptions, setServiceDescriptions] = useState<ServiceDescription[]>([]);
+  const [jobSources, setJobSources] = useState<JobSource[]>([]);
+  const [jobSourceFilter, setJobSourceFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(24); // 24 items per page (good for grid)
   const [isLoadingJobs, setIsLoadingJobs] = useState(false); // Track if we're actively loading jobs
@@ -124,6 +126,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
     loadRepCodes();
     loadAdminCodes();
     loadServiceDescriptions();
+    loadJobSources();
   }, []);
 
   // Admin filter auto-selection removed - admins now see "All Admins" by default
@@ -165,7 +168,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
     if (!loading && !isLoadingJobs && !priorityFilter.all) {
       applyFilters();
     }
-  }, [jobs, searchTerm, statusFilter, branchFilter, admFilter, repCodeFilter, technicianFilter, priorityFilter, overdueJobs, loading, isLoadingJobs]);
+  }, [jobs, searchTerm, statusFilter, branchFilter, admFilter, repCodeFilter, technicianFilter, jobSourceFilter, priorityFilter, overdueJobs, loading, isLoadingJobs]);
 
   // Handle filter changes when in "All Jobs" mode (re-filter existing jobs without re-fetching)
   // This only runs when filters change, NOT when jobs are initially loaded (loadAllJobs handles that)
@@ -237,6 +240,20 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
         });
       }
       
+      // Apply job source filter
+      if (jobSourceFilter !== 'all') {
+        filtered = filtered.filter(job => {
+          // Handle both string ID and object formats
+          if (typeof job.jobSource === 'string') {
+            return job.jobSource === jobSourceFilter;
+          }
+          if (typeof job.jobSource === 'object' && job.jobSource?._id) {
+            return job.jobSource._id === jobSourceFilter;
+          }
+          return false;
+        });
+      }
+      
       // Sort by job number (numeric part) descending when in "All Jobs" mode
       // Otherwise, sort by date descending for overdue/approaching/open filters
       if (priorityFilter.all) {
@@ -252,7 +269,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       setFilteredJobs(filtered);
       setCurrentPage(1);
     }
-  }, [searchTerm, statusFilter, branchFilter, admFilter, repCodeFilter, technicianFilter, priorityFilter.all]);
+  }, [searchTerm, statusFilter, branchFilter, admFilter, repCodeFilter, technicianFilter, jobSourceFilter, priorityFilter.all]);
 
   async function loadAllJobs() {
     try {
@@ -577,6 +594,15 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
     }
   }
 
+  async function loadJobSources() {
+    try {
+      const data = await getJobSources();
+      setJobSources(data.sources || []);
+    } catch (error) {
+      console.error('Error loading job sources:', error);
+    }
+  }
+
   function applyFilters() {
     // Don't apply filters if we're still loading - this prevents the glitch
     if (loading) {
@@ -652,6 +678,20 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
         }
         if (typeof job.repCode === 'object' && job.repCode?._id) {
           return job.repCode._id === repCodeFilter;
+        }
+        return false;
+      });
+    }
+
+    // Apply job source filter
+    if (jobSourceFilter !== 'all') {
+      filtered = filtered.filter(job => {
+        // Handle both string ID and object formats
+        if (typeof job.jobSource === 'string') {
+          return job.jobSource === jobSourceFilter;
+        }
+        if (typeof job.jobSource === 'object' && job.jobSource?._id) {
+          return job.jobSource._id === jobSourceFilter;
         }
         return false;
       });
@@ -1094,6 +1134,33 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                   technicians.map((technician) => (
                     <option key={technician._id} value={technician._id}>
                       {technician.name}
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled>Loading...</option>
+                )}
+              </select>
+            </div>
+
+            {/* Job Source Filter */}
+            <div className="mb-4">
+              <label className="block text-[11px] font-medium text-gray-600 mb-1">Job Source</label>
+              <select
+                value={jobSourceFilter}
+                onChange={(e) => setJobSourceFilter(e.target.value)}
+                className="w-full pl-2 pr-10 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white appearance-none"
+                style={{ 
+                  backgroundImage: "url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27currentColor%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e')",
+                  backgroundPosition: 'right 0.75rem center',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundSize: '1rem 1rem'
+                }}
+              >
+                <option value="all">All Sources</option>
+                {jobSources && jobSources.length > 0 ? (
+                  jobSources.map((source) => (
+                    <option key={source._id} value={source._id}>
+                      {source.name}
                     </option>
                   ))
                 ) : (

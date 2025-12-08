@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getJob, updateJob, getMachinesByCustomer, createMachine, updateMachine, getTechnicians, getRepCodes, getCustomers, getActivities, getServiceDescriptions, deleteJob, uploadRSRDocument, getRSRDocuments, getRSRDocumentUrl, deleteRSRDocument, createJobNote, getJobNotes, uploadJobNoteAttachment, getJobNoteAttachmentUrl, deleteJobNote, type Job, type Status, type Branch, type Machine, type Technician, type RepCode, type Customer, type Activity, type ServiceDescription, type OverdueJob, type JobRSRDocument, type JobNote, type JobNoteAttachment } from '../lib/api';
+import { getJob, updateJob, getMachinesByCustomer, createMachine, updateMachine, getTechnicians, getRepCodes, getCustomers, getActivities, getServiceDescriptions, getJobSources, deleteJob, uploadRSRDocument, getRSRDocuments, getRSRDocumentUrl, deleteRSRDocument, createJobNote, getJobNotes, uploadJobNoteAttachment, getJobNoteAttachmentUrl, deleteJobNote, type Job, type Status, type Branch, type Machine, type Technician, type RepCode, type Customer, type Activity, type ServiceDescription, type JobSource, type OverdueJob, type JobRSRDocument, type JobNote, type JobNoteAttachment } from '../lib/api';
 import { X, Edit, Save, Clock, User, Trash2, FileText, Paperclip, Upload, Download, Plus, ChevronDown, ChevronUp, Eye, Image } from 'lucide-react';
 import { HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
@@ -76,6 +76,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   const [repCodes, setRepCodes] = useState<RepCode[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [serviceDescriptions, setServiceDescriptions] = useState<ServiceDescription[]>([]);
+  const [jobSources, setJobSources] = useState<JobSource[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [showActivityHistory, setShowActivityHistory] = useState(false);
@@ -112,6 +113,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     loadRepCodes();
     loadCustomers();
     loadServiceDescriptions();
+    loadJobSources();
     loadActivityHistory();
     loadRSRDocuments();
     loadNotes();
@@ -222,6 +224,19 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     } catch (err) {
       console.error('Error loading service descriptions:', err);
       setServiceDescriptions([]);
+    }
+  }
+
+  /**
+   * Loads job sources for the dropdown.
+   */
+  async function loadJobSources() {
+    try {
+      const response = await getJobSources();
+      setJobSources(response.sources || []);
+    } catch (err) {
+      console.error('Error loading job sources:', err);
+      setJobSources([]);
     }
   }
 
@@ -700,6 +715,14 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
       // If description is cleared, set to null
       if (!payload.description) {
         payload.description = null;
+      }
+      // Serialize jobSource to ID if it's an object (only super admin can change)
+      if (payload.jobSource && typeof payload.jobSource === 'object') {
+        payload.jobSource = payload.jobSource._id;
+      }
+      // If jobSource is cleared, set to null
+      if (!payload.jobSource) {
+        payload.jobSource = null;
       }
       // Serialize machines array to IDs only
       if (Array.isArray(payload.machines)) {
@@ -1671,6 +1694,50 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                   ) : (
                     <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
                       <span className="text-ars-heading text-[15px]">{job.description?.name || '-'}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">
+                    Job Source
+                    {!isSuperAdmin && job.jobSource && (
+                      <span className="ml-2 text-xs text-gray-500 font-normal">(Read-only)</span>
+                    )}
+                  </label>
+                  {isEditing && isSuperAdmin ? (
+                    <select
+                      value={job.jobSource && typeof job.jobSource === 'object' ? job.jobSource._id : (typeof job.jobSource === 'string' ? job.jobSource : '')}
+                      onChange={(e) => {
+                        const selectedId = e.target.value || '';
+                        if (!selectedId) {
+                          setJob({ ...job, jobSource: undefined });
+                          return;
+                        }
+                        const selectedSource = jobSources.find((src) => src._id === selectedId);
+                        setJob({
+                          ...job,
+                          jobSource: selectedSource ? { _id: selectedSource._id, name: selectedSource.name } : undefined,
+                        });
+                      }}
+                      style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                    >
+                      <option value="">Select Job Source</option>
+                      {jobSources && jobSources.length > 0 ? (
+                        jobSources.map((src) => (
+                          <option key={src._id} value={src._id}>
+                            {src.name}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="" disabled>Loading job sources...</option>
+                      )}
+                    </select>
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">
+                        {job.jobSource && typeof job.jobSource === 'object' ? job.jobSource.name : (job.jobSource || '-')}
+                      </span>
                     </div>
                   )}
                 </div>

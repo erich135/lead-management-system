@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.0.9] - 2025-12-08
+
+### Added
+- **Job Source Feature**
+  - New Job Source field to differentiate between "Normal" jobs and "Web Enquiries"
+  - Job Source dropdown in LeadForm (required field for new jobs)
+  - Job Source display in LeadDetails with super_admin-only edit capability
+  - Job Source filter in LeadsList component
+  - Job Source filter in Reports (Overdue Jobs, All Jobs, Conversion Tracker sections)
+  - Job Source management in SystemManagement for super admins
+  - Backend JobSource model with CRUD operations
+  - Migration script to backfill existing jobs based on activity history
+
+- **Multi-Select Status Filter in Reports**
+  - Status filter now supports multiple selections with checkboxes
+  - Available in both Overdue Jobs and All Jobs sections
+  - Click-outside to close dropdown behavior
+  - Shows "X selected" count when multiple statuses are chosen
+  - Active filter tags display all selected statuses
+
+### Changed
+- Job Source is locked after initial save (only super_admin can modify)
+
 ## [1.0.8] - 2025-12-05
 
 ### Added

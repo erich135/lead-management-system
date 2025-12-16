@@ -15,6 +15,7 @@ import {
   getImportHistory,
   importJobs,
   importCustomers,
+  importRentalMachines,
   updateJobs,
   downloadExampleCSV,
   getRepCodes,
@@ -80,7 +81,8 @@ import {
   ChevronUp,
   Tag,
   History,
-  Building2
+  Building2,
+  Cog
 } from 'lucide-react';
 import { ChangelogViewer } from './ChangelogViewer';
 
@@ -102,7 +104,7 @@ export function SystemManagement() {
   // Import state
   const [importHistory, setImportHistory] = useState<ImportHistory | null>(null);
   const [importing, setImporting] = useState(false);
-  const [importType, setImportType] = useState<'jobs' | 'customers' | 'update-jobs' | null>(null);
+  const [importType, setImportType] = useState<'jobs' | 'customers' | 'rental-machines' | 'update-jobs' | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [clearExisting, setClearExisting] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState<string>(''); // Branch ID or code
@@ -525,6 +527,8 @@ export function SystemManagement() {
         result = await importJobs(selectedFile, clearExisting, branchId, branchCode);
       } else if (importType === 'customers') {
         result = await importCustomers(selectedFile, clearExisting);
+      } else if (importType === 'rental-machines') {
+        result = await importRentalMachines(selectedFile, clearExisting);
       } else if (importType === 'update-jobs') {
         result = await updateJobs(selectedFile);
       }
@@ -1751,6 +1755,94 @@ export function SystemManagement() {
                       <>
                         <Upload className="w-4 h-4" />
                         IMPORT CUSTOMERS
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Import Rental Machines */}
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-ars-heading flex items-center gap-2">
+                    <Cog className="w-5 h-5 text-amber-600" />
+                    Import Rental Machines
+                  </h3>
+                  <button
+                    onClick={() => downloadExampleCSV('rental-machines').catch(err => alert('Failed to download: ' + err.message))}
+                    className="px-3 py-1.5 text-sm bg-gray-100 text-ars-heading rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Example CSV
+                  </button>
+                </div>
+                <p className="text-sm text-ars-body mb-4">
+                  Import rental fleet machines from a CSV file. These machines can be assigned to rental jobs.
+                </p>
+                <div className="mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                  <p className="text-xs font-semibold text-ars-heading mb-2">CSV Column Names:</p>
+                  <ul className="text-xs text-ars-body space-y-1 list-disc list-inside">
+                    <li><strong>Make</strong> - <span className="text-red-600">Required</span> (e.g., Generator, Compressor, Dryer, Blower)</li>
+                    <li><strong>Model</strong> - <span className="text-red-600">Required</span></li>
+                    <li><strong>Serial Number</strong> - <span className="text-red-600">Required</span></li>
+                    <li><strong>Asset Number</strong> - Optional, for internal tracking</li>
+                    <li><strong>Service Type</strong> - Optional: "hours" or "date" (auto-detected by Make if not specified)</li>
+                    <li><strong>Machine Hours</strong> - For hour-based machines (Generator, Genset, Compressors)</li>
+                    <li><strong>Next Service Hours</strong> - For hour-based machines</li>
+                    <li><strong>Last Service Date</strong> - For date-based machines (Dryer, Blower, Vacuum pump)</li>
+                    <li><strong>Next Service Date</strong> - For date-based machines</li>
+                  </ul>
+                  <p className="text-xs text-ars-body mt-2 italic">
+                    Service type auto-detection: Dryer, Blower, and Vacuum pump machines use date-based service tracking. All others use hours.
+                  </p>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[11px] font-medium text-gray-600 mb-1">Select CSV File</label>
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setSelectedFile(file);
+                          setImportType('rental-machines');
+                        }
+                      }}
+                      className="w-full px-2 py-2 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[13px] file:mr-4 file:py-1.5 file:px-4 file:rounded-[6px] file:border-0 file:text-[13px] file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="clear-rental-machines"
+                      checked={clearExisting && importType === 'rental-machines'}
+                      onChange={(e) => {
+                        setClearExisting(e.target.checked);
+                        if (e.target.checked && importType !== 'rental-machines') {
+                          setImportType('rental-machines');
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary"
+                    />
+                    <label htmlFor="clear-rental-machines" className="text-sm text-ars-body cursor-pointer">
+                      Clear existing rental machines before importing
+                    </label>
+                  </div>
+                  <button
+                    onClick={handleImport}
+                    disabled={!selectedFile || importing || importType !== 'rental-machines'}
+                    className="w-full px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {importing && importType === 'rental-machines' ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        IMPORTING...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        IMPORT RENTAL MACHINES
                       </>
                     )}
                   </button>

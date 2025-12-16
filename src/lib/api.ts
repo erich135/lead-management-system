@@ -334,6 +334,7 @@ export interface Job {
     name: string;
   };
   cashCustomer?: string;
+  notes?: string;
   description?: {
     _id: string;
     name: string;
@@ -385,6 +386,7 @@ export interface Job {
   dateBooked?: string | Date;
   oilSampleNumber?: string;
   storePack?: string;
+  storePackDate?: string | Date;
   invoiceDate?: string | Date;
   invNumber?: string;
   branch: {
@@ -643,13 +645,18 @@ export interface Machine {
   make: string;
   model: string;
   serialNumber: string;
+  assetNumber?: string;
   customer?: {
     _id: string;
     name: string;
   } | string;
   cashCustomer?: string;
+  isRental?: boolean;
+  serviceType?: 'hours' | 'date';
   machineHours: number;
   nextServiceHours: number;
+  lastServiceDate?: string;
+  nextServiceDate?: string;
   isActive: boolean;
   dbStatus?: string;
   rsrDocuments?: MachineRSR[];
@@ -986,6 +993,16 @@ export async function getMachinesByCustomer(customerId?: string, cashCustomer?: 
 }
 
 /**
+ * Gets all rental fleet machines.
+ */
+export async function getRentalMachines(search?: string): Promise<{ machines: Machine[] }> {
+  const queryParams = new URLSearchParams();
+  if (search) queryParams.append('search', search);
+  const query = queryParams.toString();
+  return apiRequest(`/api/machines/rental${query ? `?${query}` : ''}`);
+}
+
+/**
  * Creates a new machine.
  */
 export async function createMachine(machineData: {
@@ -994,8 +1011,12 @@ export async function createMachine(machineData: {
   serialNumber: string;
   customer?: string;
   cashCustomer?: string;
-  machineHours: number;
-  nextServiceHours: number;
+  isRental?: boolean;
+  serviceType?: 'hours' | 'date';
+  machineHours?: number;
+  nextServiceHours?: number;
+  lastServiceDate?: string;
+  nextServiceDate?: string;
 }): Promise<{ machine: Machine }> {
   return apiRequest('/api/machines', {
     method: 'POST',
@@ -1462,9 +1483,38 @@ export async function importCustomers(file: File, clearExisting: boolean): Promi
 }
 
 /**
+ * Imports rental machines from CSV file.
+ */
+export async function importRentalMachines(file: File, clearExisting: boolean): Promise<{ message: string; data: ImportResult }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('clearExisting', clearExisting.toString());
+
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/import/rental-machines`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Failed to import rental machines' } }));
+    throw new Error(error.error?.message || 'Failed to import rental machines');
+  }
+
+  return response.json();
+}
+
+/**
  * Downloads an example CSV file.
  */
-export async function downloadExampleCSV(type: 'jobs' | 'customers'): Promise<void> {
+export async function downloadExampleCSV(type: 'jobs' | 'customers' | 'rental-machines'): Promise<void> {
   const token = getAuthToken();
   if (!token) {
     throw new Error('No authentication token found');
@@ -2215,6 +2265,7 @@ export default {
   getMachines,
   getMachine,
   getMachinesByCustomer,
+  getRentalMachines,
   createMachine,
   updateMachine,
   deleteMachine,

@@ -1,5 +1,63 @@
 # Changelog
 
+## [1.0.10] - 2025-12-16
+
+### Added
+- **Rental Machine Management System**
+  - New `isRental` field to distinguish rental vs non-rental machines
+  - Dedicated rental machine endpoints (`/rental-machines`, `/rental-machines/customer/:customerId`)
+  - Asset number tracking for rental machines
+  - CSV import for rental machines with customer assignment
+  - Rental machine selector in job creation form (filters by selected customer)
+
+- **Service Type Tracking for Machines**
+  - New `serviceType` field: "hours" (for Generator, Genset, Compressors) vs "date" (for Dryer, Blower, Vacuum pump)
+  - Hours-based machines track `currentHours`, `lastServiceHours`, `nextServiceHours`
+  - Date-based machines track `lastServiceDate`, `nextServiceDate`
+  - Service type selection in machine creation/import
+  - Visual indicators in machine details showing appropriate service fields
+
+- **Store Pack Date Field**
+  - New `storePackDate` date picker in job details panel
+  - Displayed alongside existing Store Pack checkbox
+  - Included in job exports
+
+- **Notes Field for Jobs**
+  - New Notes field (50 chars max) for site/location info under Customer
+  - Notes input in Create Job form with placeholder "e.g. Sandton Branch"
+  - Notes displayed on job cards in brackets after customer name
+  - Notes field in job details panel for viewing/editing
+
+- **Enhanced Reports Export**
+  - Added "Tech" column showing technician name from bookings
+  - Added "Tech Booked Date" column with formatted booking date
+  - Added "Store Pack" column (Yes/No)
+  - Added "Store Pack Date" column with formatted date
+
+- **Technician Booking Date on Cards**
+  - Job cards now display tech booking date alongside technician name
+  - Format: "Tech Name • 16 Dec 2025"
+
+### Fixed
+- **Reports Export Now Respects Filters**
+  - Changed export to use `getFilteredJobs()` instead of raw data
+  - All active filters (status, date range, rep code, branch, etc.) now apply to exports
+
+- **Technician Name in Exports**
+  - Fixed tech name not appearing in exports
+  - Now correctly reads from `job.bookings[0].technicianName` instead of legacy `techBooked` field
+
+- **Stale Technician Data on Job Cards**
+  - Removed reliance on legacy `techBooked` string field
+  - `getTechnicianNameFromJob()` now only uses `job.bookings` array data
+  - Cards show current technician assignment from TechBooking collection
+
+### Technical
+- Backend: Added `notes` field to Job model (String, maxlength 50)
+- Backend: Added `serviceType`, `lastServiceDate`, `nextServiceDate` to Machine model
+- Frontend: Updated Job and Machine TypeScript interfaces
+- Frontend: Updated LeadForm, LeadsList, LeadDetails, and Reports components
+
 ## [1.0.9] - 2025-12-08
 
 ### Added

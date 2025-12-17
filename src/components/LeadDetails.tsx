@@ -71,7 +71,13 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     serialNumber: '',
     machineHours: '',
     nextServiceHours: '',
+    lastServiceDate: '',
+    nextServiceDate: '',
   });
+
+  // Machine types that use date-based service tracking
+  const dateBasedMachineTypes = ['Dryer', 'Blower', 'Vacuum pump'];
+  const isDateBasedMachine = dateBasedMachineTypes.includes(newMachine.machineType);
   const [creatingMachine, setCreatingMachine] = useState(false);
   const [repCodes, setRepCodes] = useState<RepCode[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -603,15 +609,25 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     setCreatingMachine(true);
     setError('');
     try {
+      // Determine service type based on machine type
+      const serviceType = dateBasedMachineTypes.includes(newMachine.machineType) ? 'date' : 'hours';
+
       if (editingMachine) {
         // Update existing machine
-        const updatedData = {
+        const updatedData: any = {
           make: newMachine.make.trim(),
           model: newMachine.model.trim(),
           serialNumber: newMachine.serialNumber.trim(),
-          machineHours: parseFloat(newMachine.machineHours) || 0,
-          nextServiceHours: parseFloat(newMachine.nextServiceHours) || 0,
+          serviceType,
         };
+        
+        if (serviceType === 'hours') {
+          updatedData.machineHours = parseFloat(newMachine.machineHours) || 0;
+          updatedData.nextServiceHours = parseFloat(newMachine.nextServiceHours) || 0;
+        } else {
+          updatedData.lastServiceDate = newMachine.lastServiceDate || undefined;
+          updatedData.nextServiceDate = newMachine.nextServiceDate || undefined;
+        }
         
         const response = await updateMachine(editingMachine._id, updatedData);
         
@@ -638,9 +654,16 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
           make: newMachine.make.trim(),
           model: newMachine.model.trim(),
           serialNumber: newMachine.serialNumber.trim(),
-          machineHours: parseFloat(newMachine.machineHours) || 0,
-          nextServiceHours: parseFloat(newMachine.nextServiceHours) || 0,
+          serviceType,
         };
+        
+        if (serviceType === 'hours') {
+          machineData.machineHours = parseFloat(newMachine.machineHours) || 0;
+          machineData.nextServiceHours = parseFloat(newMachine.nextServiceHours) || 0;
+        } else {
+          machineData.lastServiceDate = newMachine.lastServiceDate || undefined;
+          machineData.nextServiceDate = newMachine.nextServiceDate || undefined;
+        }
 
         if (hasCustomer && job.customer && typeof job.customer === 'object') {
           machineData.customer = job.customer._id;
@@ -665,6 +688,8 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
         serialNumber: '',
         machineHours: '',
         nextServiceHours: '',
+        lastServiceDate: '',
+        nextServiceDate: '',
       });
       setShowNewMachineForm(false);
     } catch (err: any) {
@@ -1278,6 +1303,24 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                 </div>
 
                 <div>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">Notes (Site/Location)</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={job.notes || ''}
+                      onChange={(e) => setJob({ ...job, notes: e.target.value })}
+                      maxLength={50}
+                      style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      placeholder="e.g. Sandton Branch"
+                    />
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">{job.notes || '-'}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div>
                   <label className="block text-[14px] font-semibold text-slate-900 mb-2">Admin (ADM)</label>
                   {isEditing ? (
                     adminCodes.length > 0 ? (
@@ -1626,15 +1669,27 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                 <div>
                   <label className="block text-[14px] font-semibold text-slate-900 mb-2">Store Pack</label>
                   {isEditing ? (
-                    <input
-                      type="text"
-                      value={job.storePack || ''}
-                      onChange={(e) => setJob({ ...job, storePack: e.target.value })}
-                      style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={job.storePack || ''}
+                        onChange={(e) => setJob({ ...job, storePack: e.target.value })}
+                        style={{ fontSize: '15px' }} className="flex-1 px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        placeholder="Store Pack"
+                      />
+                      <input
+                        type="date"
+                        value={job.storePackDate ? new Date(job.storePackDate).toISOString().split('T')[0] : ''}
+                        onChange={(e) => setJob({ ...job, storePackDate: e.target.value || undefined })}
+                        style={{ fontSize: '15px' }} className="w-40 px-3 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      />
+                    </div>
                   ) : (
-                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px] flex items-center gap-2">
                       <span className="text-ars-heading text-[15px]">{job.storePack || '-'}</span>
+                      {job.storePackDate && (
+                        <span className="text-ars-body text-[13px]">({new Date(job.storePackDate).toLocaleDateString()})</span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1776,28 +1831,55 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                           ? machineRef
                           : machines.find(m => m._id === machineRef);
                         if (!machine) return null;
+                        
+                        // Auto-detect service type from Make field if not explicitly set
+                        const makeLC = (machine.make || '').toLowerCase();
+                        const isDateBased = machine.serviceType === 'date' || 
+                          (!machine.serviceType && (makeLC.includes('dryer') || makeLC.includes('blower') || makeLC.includes('vacuum')));
+                        const serviceInfo = isDateBased
+                          ? `Next Service: ${machine.nextServiceDate ? new Date(machine.nextServiceDate).toLocaleDateString() : 'N/A'}`
+                          : `Hours: ${machine.machineHours?.toLocaleString() || 0} • Next: ${machine.nextServiceHours?.toLocaleString() || 0}`;
+                        
                         return (
                           <div key={machine._id || index} className="p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between">
                             <div className="flex-1 min-w-0">
-                              <div className="font-semibold text-ars-heading">
+                              <div className="font-semibold text-ars-heading flex items-center gap-2">
                                 {machine.make} {machine.model}
+                                {isDateBased && (
+                                  <span className="text-[10px] font-medium text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">DATE</span>
+                                )}
                               </div>
                               <div className="text-xs text-ars-body mt-1">
-                                Serial: {machine.serialNumber} • Hours: {machine.machineHours.toLocaleString()} • Next: {machine.nextServiceHours.toLocaleString()}
+                                Serial: {machine.serialNumber} • {serviceInfo}
                               </div>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
                               <button
                                 type="button"
                                 onClick={() => {
+                                  // Auto-detect machine type from Make field
+                                  const machineTypeFromMake = (machine.make || '').toLowerCase();
+                                  let machineType = '';
+                                  if (machineTypeFromMake.includes('generator')) machineType = 'Generator';
+                                  else if (machineTypeFromMake.includes('genset')) machineType = 'Genset';
+                                  else if (machineTypeFromMake.includes('dryer')) machineType = 'Dryer';
+                                  else if (machineTypeFromMake.includes('blower')) machineType = 'Blower';
+                                  else if (machineTypeFromMake.includes('vacuum')) machineType = 'Vacuum pump';
+                                  else if (machineTypeFromMake.includes('compressor') && machineTypeFromMake.includes('oil free')) machineType = 'Compressor oil free';
+                                  else if (machineTypeFromMake.includes('compressor') && machineTypeFromMake.includes('oil injection')) machineType = 'Compressor oil injection';
+                                  else if (machineTypeFromMake.includes('diesel') && machineTypeFromMake.includes('compressor')) machineType = 'Diesel reciprocating compressor';
+                                  else if (machine.serviceType === 'date') machineType = 'Dryer'; // Default date-based
+                                  
                                   setEditingMachine(machine);
                                   setNewMachine({
-                                    machineType: machine.machineType || '',
+                                    machineType,
                                     make: machine.make || '',
                                     model: machine.model || '',
                                     serialNumber: machine.serialNumber || '',
                                     machineHours: String(machine.machineHours || 0),
                                     nextServiceHours: String(machine.nextServiceHours || 0),
+                                    lastServiceDate: machine.lastServiceDate ? new Date(machine.lastServiceDate).toISOString().split('T')[0] : '',
+                                    nextServiceDate: machine.nextServiceDate ? new Date(machine.nextServiceDate).toISOString().split('T')[0] : '',
                                   });
                                   setShowNewMachineForm(true);
                                 }}
@@ -1929,28 +2011,55 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                             placeholder="Serial number"
                           />
                         </div>
-                        <div>
-                          <label className="block text-[14px] font-semibold text-slate-900 mb-1">Machine Hours</label>
-                          <input
-                            type="number"
-                            value={newMachine.machineHours}
-                            onChange={(e) => setNewMachine({ ...newMachine, machineHours: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                            placeholder="0"
-                            min="0"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[14px] font-semibold text-slate-900 mb-1">Next Service Hours</label>
-                          <input
-                            type="number"
-                            value={newMachine.nextServiceHours}
-                            onChange={(e) => setNewMachine({ ...newMachine, nextServiceHours: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                            placeholder="0"
-                            min="0"
-                          />
-                        </div>
+                        
+                        {/* Show hours fields for hours-based machines, date fields for date-based machines */}
+                        {!isDateBasedMachine ? (
+                          <>
+                            <div>
+                              <label className="block text-[14px] font-semibold text-slate-900 mb-1">Machine Hours</label>
+                              <input
+                                type="number"
+                                value={newMachine.machineHours}
+                                onChange={(e) => setNewMachine({ ...newMachine, machineHours: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                                placeholder="0"
+                                min="0"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[14px] font-semibold text-slate-900 mb-1">Next Service Hours</label>
+                              <input
+                                type="number"
+                                value={newMachine.nextServiceHours}
+                                onChange={(e) => setNewMachine({ ...newMachine, nextServiceHours: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                                placeholder="0"
+                                min="0"
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div>
+                              <label className="block text-[14px] font-semibold text-slate-900 mb-1">Last Service Date</label>
+                              <input
+                                type="date"
+                                value={newMachine.lastServiceDate}
+                                onChange={(e) => setNewMachine({ ...newMachine, lastServiceDate: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[14px] font-semibold text-slate-900 mb-1">Next Service Date</label>
+                              <input
+                                type="date"
+                                value={newMachine.nextServiceDate}
+                                onChange={(e) => setNewMachine({ ...newMachine, nextServiceDate: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                              />
+                            </div>
+                          </>
+                        )}
                       </div>
                       <button
                         type="button"
@@ -2540,14 +2649,115 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {loadingActivities ? (
                   <div className="text-center py-8 text-ars-body">Loading activity history...</div>
-                ) : activities.length === 0 ? (
-                  <div className="text-center py-8 text-ars-body">No activity history found for this job.</div>
+                ) : activities.filter(a => a.action !== 'view').length === 0 ? (
+                  <div className="text-center py-8 text-ars-body">No changes have been made to this job yet.</div>
                 ) : (
-                  activities.map((activity) => {
+                  activities
+                    // Filter out "view" activities - we only want to see actual changes
+                    .filter((activity) => activity.action !== 'view')
+                    .map((activity) => {
                     const userName = activity.userId
                       ? `${activity.userId.firstName || ''} ${activity.userId.lastName || ''}`.trim() || activity.userId.email
                       : 'System';
                     const formattedDate = formatDateTime(activity.createdAt);
+
+                    // Helper to convert ISO dates to friendly format (Dec 2, 2025)
+                    const formatISODateInText = (text: string): string => {
+                      return text.replace(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z)/g, (match) => {
+                        try {
+                          const date = new Date(match);
+                          return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                        } catch {
+                          return match;
+                        }
+                      });
+                    };
+
+                    // Simple helper to check if a change line is a "false change" (same from/to value)
+                    // Helper to normalize a value for comparison (especially dates)
+                    // Uses LOCAL date parts to avoid timezone issues
+                    const normalizeForCompare = (val: string): string => {
+                      if (!val) return '';
+                      const trimmed = val.trim();
+                      
+                      // Check if it's an ISO date string (2025-11-21T00:00:00.000Z)
+                      if (/^\d{4}-\d{2}-\d{2}T/.test(trimmed)) {
+                        // Extract just the date part directly from the string (no timezone conversion)
+                        const datePart = trimmed.split('T')[0];
+                        return datePart; // Returns "2025-11-21"
+                      }
+                      
+                      // Check if it's a friendly date format (Nov 21, 2025)
+                      const dateMatch = trimmed.match(/^([A-Za-z]{3})\s+(\d{1,2}),?\s+(\d{4})$/);
+                      if (dateMatch) {
+                        const [, monthStr, day, year] = dateMatch;
+                        // Convert month name to number
+                        const months: Record<string, string> = {
+                          'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+                          'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
+                          'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+                        };
+                        const month = months[monthStr] || '01';
+                        const dayPadded = day.padStart(2, '0');
+                        return `${year}-${month}-${dayPadded}`; // Returns "2025-11-21"
+                      }
+                      
+                      // For non-date values, normalize: trim, lowercase, collapse whitespace
+                      return trimmed.toLowerCase().replace(/\s+/g, ' ');
+                    };
+
+                    const isFalseChange = (text: string): boolean => {
+                      const fromMatch = text.match(/from\s+"([^"]+)"/i);
+                      const toMatch = text.match(/to\s+"([^"]+)"/i);
+                      
+                      if (fromMatch && toMatch) {
+                        const fromVal = normalizeForCompare(fromMatch[1]);
+                        const toVal = normalizeForCompare(toMatch[1]);
+                        
+                        if (fromVal === toVal) {
+                          return true;
+                        }
+                      }
+                      
+                      return false;
+                    };
+
+                    // Filter false changes from description text
+                    const filterDescription = (desc: string): string => {
+                      const parts = desc.split(';').filter(part => {
+                        const trimmed = part.trim();
+                        if (!trimmed) return false;
+                        if (trimmed.toLowerCase().startsWith('changed') && isFalseChange(trimmed)) {
+                          return false; // Remove this false change
+                        }
+                        return true;
+                      });
+                      return parts.map(p => p.trim()).join('; ');
+                    };
+
+                    // Filter false changes from the changes array
+                    const filterChanges = (changes: string[]): string[] => {
+                      return changes.filter(change => {
+                        if (change.toLowerCase().startsWith('changed') && isFalseChange(change)) {
+                          return false;
+                        }
+                        return true;
+                      }).map(change => formatISODateInText(change));
+                    };
+
+                    // Process the description
+                    const processedDescription = formatISODateInText(filterDescription(activity.description));
+                    
+                    // Get meaningful changes for this activity
+                    const meaningfulChanges = activity.metadata?.changes && Array.isArray(activity.metadata.changes)
+                      ? filterChanges(activity.metadata.changes)
+                      : [];
+                    
+                    // For "update" actions, skip if there are no meaningful changes
+                    // (This happens when user clicked save without making real changes)
+                    if (activity.action === 'update' && meaningfulChanges.length === 0) {
+                      return null; // Skip this activity entirely
+                    }
 
                     return (
                       <div
@@ -2562,12 +2772,12 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                               <span className="text-xs text-ars-body">•</span>
                               <span className="text-xs text-ars-body">{formattedDate}</span>
                             </div>
-                            <p className="text-sm text-ars-body mb-2">{activity.description}</p>
-                            {activity.metadata?.changes && Array.isArray(activity.metadata.changes) && activity.metadata.changes.length > 0 && (
+                            <p className="text-sm text-ars-body mb-2">{processedDescription}</p>
+                            {meaningfulChanges.length > 0 && (
                               <div className="mt-2 space-y-1">
                                 <p className="text-xs font-semibold text-ars-heading">Changes:</p>
                                 <ul className="list-disc list-inside text-xs text-ars-body space-y-0.5">
-                                  {activity.metadata.changes.map((change: string, idx: number) => (
+                                  {meaningfulChanges.map((change: string, idx: number) => (
                                     <li key={idx}>{change}</li>
                                   ))}
                                 </ul>

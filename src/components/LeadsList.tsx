@@ -804,21 +804,14 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
   }
 
   /**
-   * Gets the technician name from a job's techBooked field (which can be a string ID or an object)
+   * Gets the technician name from a job's bookings array.
+   * Note: We only use the bookings array now, not the legacy techBooked field,
+   * as techBooked may contain stale/incorrect data.
    */
   function getTechnicianNameFromJob(job: Job): string | null {
-    if (!job.techBooked) return null;
-    
-    // If techBooked is already an object with name, use it
-    if (typeof job.techBooked === 'object' && 'name' in job.techBooked) {
-      return job.techBooked.name;
-    }
-    
-    // If techBooked is a string ID, look it up from technicians array
-    if (typeof job.techBooked === 'string') {
-      const techBookedId = job.techBooked;
-      const technician = technicians.find(t => t._id === techBookedId);
-      return technician ? technician.name : null;
+    // Only use bookings array - this is the actual tech booking system
+    if (job.bookings && job.bookings.length > 0 && job.bookings[0].technicianName) {
+      return job.bookings[0].technicianName;
     }
     
     return null;
@@ -1345,6 +1338,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                             <User className="w-4 h-4" />
                             <span className="font-medium text-ars-heading">
                               {job.customer?.name || job.cashCustomer || 'No customer'}
+                              {job.notes && <span className="text-gray-500 font-normal"> ({job.notes})</span>}
                             </span>
                           </div>
                           {job.cashCustomer && job.customer && (
@@ -1404,11 +1398,17 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                         {/* Technician - On its own line */}
                         {(() => {
                           const technicianName = getTechnicianNameFromJob(job);
+                          const techBookingDate = job.bookings && job.bookings.length > 0 
+                            ? job.bookings[0].startDate 
+                            : null;
                           return technicianName ? (
                             <div className="mb-3 pt-2 border-t border-gray-200">
                               <div className="flex items-center gap-2 text-xs text-ars-body">
                                 <User className="w-3 h-3" />
                                 <span className="font-medium">Technician: {technicianName}</span>
+                                {techBookingDate && (
+                                  <span className="text-gray-500">• {formatDate(techBookingDate)}</span>
+                                )}
                               </div>
                             </div>
                           ) : null;

@@ -983,21 +983,36 @@ export function Reports({ statuses, branches }: ReportsProps) {
       filename = `Overdue-Jobs-${startDate}-to-${endDate}.xlsx`;
     } else if (activeSection === 'jobs') {
       const filteredData = getFilteredJobs();
-      const headers = ['Job Number', 'Status', 'Customer', 'Cash Customer', 'Start Date', 'Date Quoted', 'Value ex VAT', 'Admin', 'Rep Code', 'Branch', 'Description', 'Job Source'];
-      const rows = filteredData.map(job => [
-        job.jobNumber || '',
-        job.status?.name || '',
-        typeof job.customer === 'object' ? job.customer?.name || '' : '',
-        job.cashCustomer || '',
-        job.startDate ? formatDate(job.startDate) : '',
-        job.dateQuoted ? formatDate(job.dateQuoted) : '',
-        job.valueExVat || 0,
-        job.adm || '',
-        typeof job.repCode === 'object' ? (job.repCode as any)?.code || '' : '',
-        typeof job.branch === 'object' ? job.branch?.name || '' : '',
-        typeof job.description === 'object' ? (job.description as any)?.name || '' : '',
-        typeof job.jobSource === 'object' ? (job.jobSource as any)?.name || '' : '',
-      ]);
+      const headers = ['Job Number', 'Status', 'Customer', 'Cash Customer', 'Start Date', 'Date Quoted', 'Value ex VAT', 'Admin', 'Rep Code', 'Branch', 'Description', 'Job Source', 'Tech', 'Tech Booked Date', 'Store Pack', 'Store Pack Date'];
+      const rows = filteredData.map(job => {
+        // Get tech name from bookings array only (not legacy techBooked field which may be stale)
+        const techName = job.bookings && job.bookings.length > 0 
+          ? job.bookings[0].technicianName || '' 
+          : '';
+        // Get tech booked date from bookings array only
+        const techBookedDate = job.bookings && job.bookings.length > 0 
+          ? job.bookings[0].startDate 
+          : '';
+        
+        return [
+          job.jobNumber || '',
+          job.status?.name || '',
+          typeof job.customer === 'object' ? job.customer?.name || '' : '',
+          job.cashCustomer || '',
+          job.startDate ? formatDate(job.startDate) : '',
+          job.dateQuoted ? formatDate(job.dateQuoted) : '',
+          job.valueExVat || 0,
+          job.adm || '',
+          typeof job.repCode === 'object' ? (job.repCode as any)?.code || '' : '',
+          typeof job.branch === 'object' ? job.branch?.name || '' : '',
+          typeof job.description === 'object' ? (job.description as any)?.name || '' : '',
+          typeof job.jobSource === 'object' ? (job.jobSource as any)?.name || '' : '',
+          techName,
+          techBookedDate ? formatDate(techBookedDate) : '',
+          job.storePack || '',
+          job.storePackDate ? formatDate(job.storePackDate) : '',
+        ];
+      });
       data = [[sectionTitle], [`Filters: ${filtersString}`], [`Date Range: ${startDate} to ${endDate}`], [], headers, ...rows];
       filename = `All-Jobs-${startDate}-to-${endDate}.xlsx`;
     } else if (activeSection === 'activities') {
@@ -1075,17 +1090,29 @@ export function Reports({ statuses, branches }: ReportsProps) {
       ]);
     } else if (activeSection === 'jobs') {
       const filteredData = getFilteredJobs();
-      headers = ['Job #', 'Status', 'Customer', 'Start Date', 'Value', 'Admin', 'Rep', 'Branch'];
-      rows = filteredData.map(job => [
-        job.jobNumber || '',
-        job.status?.name || '',
-        (typeof job.customer === 'object' ? job.customer?.name || '' : (job.cashCustomer || '')).substring(0, 20),
-        job.startDate ? formatDate(job.startDate) : '',
-        job.valueExVat ? `R${job.valueExVat.toLocaleString()}` : '',
-        job.adm || '',
-        typeof job.repCode === 'object' ? (job.repCode as any)?.code || '' : '',
-        typeof job.branch === 'object' ? job.branch?.name || '' : '',
-      ]);
+      headers = ['Job #', 'Status', 'Customer', 'Start', 'Value', 'Admin', 'Rep', 'Tech', 'Tech Date', 'Store Pack'];
+      rows = filteredData.map(job => {
+        // Get tech name from bookings array only (not legacy techBooked field which may be stale)
+        const techName = job.bookings && job.bookings.length > 0 
+          ? job.bookings[0].technicianName || '' 
+          : '';
+        const techBookedDate = job.bookings && job.bookings.length > 0 
+          ? job.bookings[0].startDate 
+          : '';
+        
+        return [
+          job.jobNumber || '',
+          job.status?.name || '',
+          (typeof job.customer === 'object' ? job.customer?.name || '' : (job.cashCustomer || '')).substring(0, 20),
+          job.startDate ? formatDate(job.startDate) : '',
+          job.valueExVat ? `R${job.valueExVat.toLocaleString()}` : '',
+          job.adm || '',
+          typeof job.repCode === 'object' ? (job.repCode as any)?.code || '' : '',
+          techName,
+          techBookedDate ? formatDate(techBookedDate) : '',
+          job.storePack || '',
+        ];
+      });
     } else if (activeSection === 'activities') {
       headers = ['Date', 'Time', 'Action', 'Resource', 'Description'];
       rows = userActivities.slice(0, 100).map(act => [
@@ -2261,7 +2288,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                   }`}
                 >
                   <FileText className="w-4 h-4" />
-                  All Jobs ({userJobs.length})
+                  All Jobs ({getFilteredJobs().length})
                 </button>
                 <button
                   onClick={() => setActiveSection('activities')}
@@ -2608,7 +2635,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
             {/* Jobs List */}
             {activeSection === 'jobs' && userJobs.length > 0 && (
               <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-                <h3 className="text-lg font-bold text-ars-heading mb-4">Jobs ({userJobs.length})</h3>
+                <h3 className="text-lg font-bold text-ars-heading mb-4">Jobs ({getFilteredJobs().length})</h3>
                 
                 {/* Jobs Filters */}
                 <div className="mb-4 p-4 bg-gray-50 rounded-lg overflow-visible">

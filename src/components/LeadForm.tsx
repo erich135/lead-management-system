@@ -1,5 +1,5 @@
 import { useState, FormEvent, useEffect, useRef } from 'react';
-import { createJob, getJobs, getStatuses, getBranches, getCustomers, createCustomer, getTechnicians, getServiceDescriptions, getJobSources, getRepCodes, getAdminCodes, getMachinesByCustomer, createMachine, type Status, type Branch, type Customer, type Technician, type ServiceDescription, type JobSource, type RepCode, type AdminCode, type Machine, type Job } from '../lib/api';
+import { createJob, getJobs, getStatuses, getBranches, getCustomers, createCustomer, getTechnicians, getServiceDescriptions, getJobSources, getRepCodes, getAdminCodes, getMachinesByCustomer, getRentalMachines, createMachine, type Status, type Branch, type Customer, type Technician, type ServiceDescription, type JobSource, type RepCode, type AdminCode, type Machine, type Job } from '../lib/api';
 import { X, Plus, Wrench } from 'lucide-react';
 import { HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
@@ -26,6 +26,8 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
   const [repCodes, setRepCodes] = useState<RepCode[]>([]);
   const [adminCodes, setAdminCodes] = useState<AdminCode[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
+  const [rentalMachines, setRentalMachines] = useState<Machine[]>([]);
+  const [isRentalBranch, setIsRentalBranch] = useState(false);
   const [showNewMachineForm, setShowNewMachineForm] = useState(false);
   const [newMachine, setNewMachine] = useState({
     make: '',
@@ -45,6 +47,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
     jobNumber: string,
     customer: string,
     cashCustomer: string,
+    notes: string,
     branch: string,
     status: string,
     description: string,
@@ -72,6 +75,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
       jobNumber: '',
       customer: '',
       cashCustomer: '',
+      notes: '',
       branch: '',
       status: '',
       description: '',
@@ -163,6 +167,31 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
     const today = new Date();
     return today.toISOString().split('T')[0];
   };
+
+  // Check if selected branch is "Rental" and load rental machines
+  useEffect(() => {
+    async function checkRentalBranch() {
+      if (formData.branch) {
+        const selectedBranch = branches.find(b => b._id === formData.branch);
+        const isRental = selectedBranch?.name?.toLowerCase() === 'rental';
+        setIsRentalBranch(isRental);
+        
+        if (isRental) {
+          try {
+            const rentalData = await getRentalMachines();
+            setRentalMachines(rentalData.machines || []);
+          } catch (err) {
+            console.error('Error loading rental machines:', err);
+            setRentalMachines([]);
+          }
+        }
+      } else {
+        setIsRentalBranch(false);
+      }
+    }
+    
+    checkRentalBranch();
+  }, [formData.branch, branches]);
 
   // Load machines when cash customer changes
   useEffect(() => {
@@ -374,6 +403,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
         jobSource: formData.jobSource || undefined,
         startDate: formData.startDate || undefined,
         dateQuoted: formData.dateQuoted || undefined,
+        notes: formData.notes || undefined,
       };
 
       // Add job number if provided (super admin only)
@@ -594,6 +624,21 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
                 />
               </div>
             )}
+
+            {/* Notes field - shows under customer */}
+            <div className="col-span-1">
+              <label className="block text-[14px] font-semibold text-slate-900 mb-2">
+                Notes <span className="font-normal text-gray-500 text-xs">(Site/Location)</span>
+              </label>
+              <input
+                type="text"
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                maxLength={50}
+                style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                placeholder="e.g., Sandton Branch"
+              />
+            </div>
 
             <div>
               <label className="block text-[14px] font-semibold text-slate-900 mb-2">
@@ -837,28 +882,50 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
               />
             </div>
 
-            {/* Machines Selection - Show if customer or cash customer is selected */}
-            {(formData.customer || (customerSelection === 'cash' && formData.cashCustomer)) && (
+            {/* Machines Selection - Show if customer or cash customer is selected, OR if Rental branch is selected */}
+            {(formData.customer || (customerSelection === 'cash' && formData.cashCustomer) || isRentalBranch) && (
               <div ref={machinesSectionRef} className="md:col-span-2">
                 <label className="block text-[14px] font-semibold text-slate-900 mb-2 flex items-center gap-2">
                   <Wrench className="w-4 h-4 text-ars-primary" />
-                  Machines
+                  {isRentalBranch ? 'Rental Fleet Machines' : 'Machines'}
+                  {isRentalBranch && (
+                    <span className="text-xs font-normal text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
+                      Rental Branch Selected
+                    </span>
+                  )}
                 </label>
                 <div className="space-y-3">
                   {/* Display selected machines */}
                   {Array.isArray(formData.machines) && formData.machines.length > 0 && (
                     <div className="space-y-2 max-h-48 overflow-y-auto">
                       {formData.machines.map((machineId, index) => {
-                        const machine = machines.find(m => m._id === machineId);
+                        // Look in both customer machines and rental machines
+                        const machine = machines.find(m => m._id === machineId) || rentalMachines.find(m => m._id === machineId);
                         if (!machine) return null;
+                        
+                        // Auto-detect service type from Make field if not explicitly set
+                        const makeLC = (machine.make || '').toLowerCase();
+                        const isDateBased = machine.serviceType === 'date' || 
+                          (!machine.serviceType && (makeLC.includes('dryer') || makeLC.includes('blower') || makeLC.includes('vacuum')));
+                        const serviceInfo = isDateBased
+                          ? `Next Service: ${machine.nextServiceDate ? new Date(machine.nextServiceDate).toLocaleDateString() : 'N/A'}`
+                          : `Hours: ${machine.machineHours?.toLocaleString() || 0} • Next: ${machine.nextServiceHours?.toLocaleString() || 0}`;
+                        
                         return (
-                          <div key={machine._id || index} className="p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between">
+                          <div key={machine._id || index} className={`p-3 rounded-lg border flex items-center justify-between ${machine.isRental ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'}`}>
                             <div className="flex-1 min-w-0">
-                              <div className="font-semibold text-ars-heading text-sm">
+                              <div className="font-semibold text-ars-heading text-sm flex items-center gap-2">
+                                {machine.assetNumber && <span className="text-amber-700">[{machine.assetNumber}]</span>}
                                 {machine.make} {machine.model}
+                                {machine.isRental && (
+                                  <span className="text-[10px] font-medium text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">RENTAL</span>
+                                )}
+                                {isDateBased && (
+                                  <span className="text-[10px] font-medium text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">DATE</span>
+                                )}
                               </div>
                               <div className="text-xs text-ars-body mt-1">
-                                Serial: {machine.serialNumber} • Hours: {machine.machineHours.toLocaleString()} • Next: {machine.nextServiceHours.toLocaleString()}
+                                Serial: {machine.serialNumber} • {serviceInfo}
                               </div>
                             </div>
                             <button
@@ -877,47 +944,90 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
                     </div>
                   )}
                   
-                  {/* Add machine dropdown and button - Always visible */}
-                  <div className="flex flex-col sm:flex-row gap-2 relative z-10">
-                    <select
-                      value=""
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          const currentMachines = Array.isArray(formData.machines) ? formData.machines : [];
-                          if (!currentMachines.includes(e.target.value)) {
-                            setFormData({ ...formData, machines: [...currentMachines, e.target.value] });
-                          }
-                          e.target.value = '';
-                        }
-                      }}
-                      className="flex-1 min-w-0 px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px] bg-white"
-                    >
-                      <option value="">Select Machine to Add</option>
-                      {machines && machines.length > 0 ? (
-                        machines
-                          .filter(m => {
-                            if (!m.isActive) return false;
+                  {/* Rental Machines Dropdown - Show when Rental branch is selected */}
+                  {isRentalBranch && (
+                    <div className="flex flex-col sm:flex-row gap-2 relative z-10">
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          if (e.target.value) {
                             const currentMachines = Array.isArray(formData.machines) ? formData.machines : [];
-                            return !currentMachines.includes(m._id);
-                          })
-                          .map((machine) => (
-                            <option key={machine._id} value={machine._id}>
-                              {machine.make} {machine.model} - {machine.serialNumber} ({machine.machineHours} hrs)
-                            </option>
-                          ))
-                      ) : (
-                        <option value="" disabled>No machines found for this customer</option>
-                      )}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => setShowNewMachineForm(!showNewMachineForm)}
-                      className="px-4 py-2.5 bg-ars-primary text-white rounded-[8px] hover:bg-ars-primary/90 transition-colors whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-1 sm:w-auto w-full"
-                    >
-                      <Plus className="w-4 h-4" />
-                      {showNewMachineForm ? 'Cancel' : 'New Machine'}
-                    </button>
-                  </div>
+                            if (!currentMachines.includes(e.target.value)) {
+                              setFormData({ ...formData, machines: [...currentMachines, e.target.value] });
+                            }
+                            e.target.value = '';
+                          }
+                        }}
+                        className="flex-1 min-w-0 px-4 py-2.5 border border-amber-300 rounded-[8px] focus:ring-2 focus:ring-amber-500 focus:border-transparent text-[15px] bg-amber-50"
+                      >
+                        <option value="">Select Rental Machine to Add</option>
+                        {rentalMachines && rentalMachines.length > 0 ? (
+                          rentalMachines
+                            .filter(m => {
+                              if (!m.isActive) return false;
+                              const currentMachines = Array.isArray(formData.machines) ? formData.machines : [];
+                              return !currentMachines.includes(m._id);
+                            })
+                            .map((machine) => {
+                              const serviceInfo = machine.serviceType === 'date'
+                                ? (machine.nextServiceDate ? `Due: ${new Date(machine.nextServiceDate).toLocaleDateString()}` : 'Date-based')
+                                : `${machine.machineHours || 0} hrs`;
+                              return (
+                                <option key={machine._id} value={machine._id}>
+                                  {machine.assetNumber ? `[${machine.assetNumber}] ` : ''}{machine.make} {machine.model} - {machine.serialNumber} ({serviceInfo})
+                                </option>
+                              );
+                            })
+                        ) : (
+                          <option value="" disabled>No rental machines found</option>
+                        )}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Customer Machines Dropdown - Show when customer is selected */}
+                  {(formData.customer || (customerSelection === 'cash' && formData.cashCustomer)) && (
+                    <div className="flex flex-col sm:flex-row gap-2 relative z-10">
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            const currentMachines = Array.isArray(formData.machines) ? formData.machines : [];
+                            if (!currentMachines.includes(e.target.value)) {
+                              setFormData({ ...formData, machines: [...currentMachines, e.target.value] });
+                            }
+                            e.target.value = '';
+                          }
+                        }}
+                        className="flex-1 min-w-0 px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px] bg-white"
+                      >
+                        <option value="">{isRentalBranch ? 'Or Select Customer Machine' : 'Select Machine to Add'}</option>
+                        {machines && machines.length > 0 ? (
+                          machines
+                            .filter(m => {
+                              if (!m.isActive) return false;
+                              const currentMachines = Array.isArray(formData.machines) ? formData.machines : [];
+                              return !currentMachines.includes(m._id);
+                            })
+                            .map((machine) => (
+                              <option key={machine._id} value={machine._id}>
+                                {machine.make} {machine.model} - {machine.serialNumber} ({machine.machineHours} hrs)
+                              </option>
+                            ))
+                        ) : (
+                          <option value="" disabled>No machines found for this customer</option>
+                        )}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setShowNewMachineForm(!showNewMachineForm)}
+                        className="px-4 py-2.5 bg-ars-primary text-white rounded-[8px] hover:bg-ars-primary/90 transition-colors whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-1 sm:w-auto w-full"
+                      >
+                        <Plus className="w-4 h-4" />
+                        {showNewMachineForm ? 'Cancel' : 'New Machine'}
+                      </button>
+                    </div>
+                  )}
                   
                   {/* New Machine Form */}
                   {showNewMachineForm && (

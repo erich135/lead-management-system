@@ -3,6 +3,16 @@
 ## [1.0.10] - 2025-12-16
 
 ### Added
+- **Searchable Customer Dropdown with "Create New Customer"**
+  - Replaced standard customer dropdown with type-to-search input
+  - Filters customers in real-time as user types
+  - "Create [name] as new customer" button appears when no exact match found
+  - New customers are created on-the-fly and automatically selected
+  - Green border/background indicates selected customer
+  - Clear button (X) to deselect and search again
+  - Click-outside closes the dropdown
+  - Performance optimized: shows max 50 results while typing
+
 - **Rental Machine Management System**
   - New `isRental` field to distinguish rental vs non-rental machines
   - Dedicated rental machine endpoints (`/rental-machines`, `/rental-machines/customer/:customerId`)

@@ -42,6 +42,12 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
   const [selectedCustomerName, setSelectedCustomerName] = useState('');
   const machinesSectionRef = useRef<HTMLDivElement>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  
+  // Customer search states
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
+  const customerDropdownRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState<{
     jobNumber: string,
@@ -281,6 +287,38 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
   }
 
   /**
+   * Handles selecting a customer from the dropdown.
+   */
+  async function handleCustomerSelect(customer: Customer) {
+    setFormData({ ...formData, customer: customer._id, machines: [] });
+    setSelectedCustomer(customer);
+    setSelectedCustomerName(customer.name);
+    setCustomerSearchTerm(customer.name);
+    setShowCustomerDropdown(false);
+    
+    // Add to allCustomers if it's a newly created customer
+    if (!allCustomers.find(c => c._id === customer._id)) {
+      setAllCustomers(prev => [...prev, customer].sort((a, b) => a.name.localeCompare(b.name)));
+    }
+    
+    // Load machines for this customer
+    try {
+      const machinesData = await getMachinesByCustomer(customer._id);
+      setMachines(machinesData.machines || []);
+    } catch (err) {
+      console.error('Error loading machines:', err);
+      setMachines([]);
+    }
+    
+    // Scroll to machines section
+    setTimeout(() => {
+      if (machinesSectionRef.current) {
+        machinesSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 100);
+  }
+
+  /**
    * Handles creating a new customer on the fly.
    */
   async function handleCreateCustomer() {
@@ -292,7 +330,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
     try {
       setIsCreatingCustomer(true);
       setError('');
-      const response = await createCustomer(customerSearchTerm);
+      const response = await createCustomer(customerSearchTerm.trim());
       const newCustomer = response.customer;
       
       // Select the newly created customer
@@ -304,6 +342,29 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
       setIsCreatingCustomer(false);
     }
   }
+
+  // Filter customers based on search term
+  const filteredCustomers = customerSearchTerm.length > 0
+    ? allCustomers.filter(c => 
+        c.name.toLowerCase().includes(customerSearchTerm.toLowerCase())
+      ).slice(0, 50) // Limit to 50 results for performance
+    : allCustomers.slice(0, 50);
+
+  // Check if exact match exists (for showing "Create" button)
+  const exactMatchExists = allCustomers.some(
+    c => c.name.toLowerCase() === customerSearchTerm.toLowerCase().trim()
+  );
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (customerDropdownRef.current && !customerDropdownRef.current.contains(event.target as Node)) {
+        setShowCustomerDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   /**
    * Validates if a job number already exists.
@@ -558,53 +619,98 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
             </div>
 
             {customerSelection === 'customer' && (
-              <div>
+              <div ref={customerDropdownRef} className="relative">
                 <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                   Customer *
                 </label>
-                <select
-                  value={formData.customer}
-                  onChange={async (e) => {
-                    const customerId = e.target.value;
-                    const customer = allCustomers.find(c => c._id === customerId);
-                    if (customer) {
-                      setFormData({ ...formData, customer: customerId, machines: [] });
-                      setSelectedCustomer(customer);
-                      setSelectedCustomerName(customer.name);
-                      // Load machines for this customer
-                      try {
-                        const machinesData = await getMachinesByCustomer(customerId);
-                        setMachines(machinesData.machines || []);
-                      } catch (err) {
-                        console.error('Error loading machines:', err);
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={customerSearchTerm}
+                    onChange={(e) => {
+                      setCustomerSearchTerm(e.target.value);
+                      setShowCustomerDropdown(true);
+                      // Clear selection if user is typing something different
+                      if (selectedCustomer && e.target.value !== selectedCustomer.name) {
+                        setFormData({ ...formData, customer: '', machines: [] });
+                        setSelectedCustomer(null);
+                        setSelectedCustomerName('');
                         setMachines([]);
                       }
-                      // Scroll to machines section
-                      setTimeout(() => {
-                        if (machinesSectionRef.current) {
-                          machinesSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                        }
-                      }, 100);
-                    } else {
-                      setFormData({ ...formData, customer: '', machines: [] });
-                      setSelectedCustomer(null);
-                      setSelectedCustomerName('');
-                      setMachines([]);
-                    }
-                  }}
-                  style={{ fontSize: '15px' }}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                >
-                  <option value="">Select Customer</option>
-                  {allCustomers.map((customer) => (
-                    <option key={customer._id} value={customer._id}>
-                      {customer.name}
-                    </option>
-                  ))}
-                </select>
+                    }}
+                    onFocus={() => setShowCustomerDropdown(true)}
+                    placeholder="Type to search customers..."
+                    style={{ fontSize: '15px' }}
+                    className={`w-full px-4 py-2.5 border rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent ${
+                      selectedCustomer ? 'border-green-500 bg-green-50' : 'border-gray-300'
+                    }`}
+                  />
+                  {selectedCustomer && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomerSearchTerm('');
+                        setFormData({ ...formData, customer: '', machines: [] });
+                        setSelectedCustomer(null);
+                        setSelectedCustomerName('');
+                        setMachines([]);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                
+                {/* Dropdown */}
+                {showCustomerDropdown && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {/* Create new customer option */}
+                    {customerSearchTerm.length >= 2 && !exactMatchExists && (
+                      <button
+                        type="button"
+                        onClick={handleCreateCustomer}
+                        disabled={isCreatingCustomer}
+                        className="w-full px-4 py-3 text-left flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium border-b border-blue-200"
+                      >
+                        <Plus className="w-4 h-4" />
+                        {isCreatingCustomer ? (
+                          <span>Creating "{customerSearchTerm}"...</span>
+                        ) : (
+                          <span>Create "{customerSearchTerm}" as new customer</span>
+                        )}
+                      </button>
+                    )}
+                    
+                    {/* Customer list */}
+                    {filteredCustomers.length > 0 ? (
+                      filteredCustomers.map((customer) => (
+                        <button
+                          key={customer._id}
+                          type="button"
+                          onClick={() => handleCustomerSelect(customer)}
+                          className={`w-full px-4 py-2.5 text-left hover:bg-gray-100 ${
+                            selectedCustomer?._id === customer._id ? 'bg-green-50 text-green-700' : ''
+                          }`}
+                        >
+                          {customer.name}
+                        </button>
+                      ))
+                    ) : customerSearchTerm.length > 0 ? (
+                      <div className="px-4 py-3 text-gray-500 text-sm">
+                        No customers found matching "{customerSearchTerm}"
+                      </div>
+                    ) : (
+                      <div className="px-4 py-3 text-gray-500 text-sm">
+                        Start typing to search customers...
+                      </div>
+                    )}
+                  </div>
+                )}
+                
                 {selectedCustomerName && (
-                  <p className="mt-1 text-xs text-ars-body">
-                    Selected: <span className="font-medium text-ars-heading">{selectedCustomerName}</span>
+                  <p className="mt-1 text-xs text-green-600">
+                    ✓ Selected: <span className="font-medium">{selectedCustomerName}</span>
                   </p>
                 )}
               </div>

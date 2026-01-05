@@ -127,6 +127,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
   const [overdueStatusFilter, setOverdueStatusFilter] = useState<string[]>([]);
   const [overdueStatusDropdownOpen, setOverdueStatusDropdownOpen] = useState(false);
   const [overdueAdminFilter, setOverdueAdminFilter] = useState<string>('');
+  const [overdueAssistingAdmFilter, setOverdueAssistingAdmFilter] = useState<string>('');
   const [overdueRepFilter, setOverdueRepFilter] = useState<string>('');
   const [overdueBranchFilter, setOverdueBranchFilter] = useState<string>('');
   const [overdueDescriptionFilter, setOverdueDescriptionFilter] = useState<string>('');
@@ -139,6 +140,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
   const [jobsStatusFilter, setJobsStatusFilter] = useState<string[]>([]);
   const [jobsStatusDropdownOpen, setJobsStatusDropdownOpen] = useState(false);
   const [jobsAdminFilter, setJobsAdminFilter] = useState<string>('');
+  const [jobsAssistingAdmFilter, setJobsAssistingAdmFilter] = useState<string>('');
   const [jobsRepFilter, setJobsRepFilter] = useState<string>('');
   const [jobsBranchFilter, setJobsBranchFilter] = useState<string>('');
   const [jobsDescriptionFilter, setJobsDescriptionFilter] = useState<string>('');
@@ -927,6 +929,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
     if (activeSection === 'overdue') {
       if (overdueStatusFilter.length > 0) filters.push(`Status: ${overdueStatusFilter.join(', ')}`);
       if (overdueAdminFilter) filters.push(`Admin: ${overdueAdminFilter}`);
+      if (overdueAssistingAdmFilter) filters.push(`Assisting Admin: ${overdueAssistingAdmFilter}`);
       if (overdueRepFilter) filters.push(`Rep: ${overdueRepFilter}`);
       if (overdueBranchFilter) filters.push(`Branch: ${overdueBranchFilter}`);
       if (overdueDescriptionFilter) filters.push(`Description: ${overdueDescriptionFilter}`);
@@ -936,6 +939,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
     } else if (activeSection === 'jobs') {
       if (jobsStatusFilter.length > 0) filters.push(`Status: ${jobsStatusFilter.join(', ')}`);
       if (jobsAdminFilter) filters.push(`Admin: ${jobsAdminFilter}`);
+      if (jobsAssistingAdmFilter) filters.push(`Assisting Admin: ${jobsAssistingAdmFilter}`);
       if (jobsRepFilter) filters.push(`Rep: ${jobsRepFilter}`);
       if (jobsBranchFilter) filters.push(`Branch: ${jobsBranchFilter}`);
       if (jobsDescriptionFilter) filters.push(`Description: ${jobsDescriptionFilter}`);
@@ -967,13 +971,14 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
     if (activeSection === 'overdue') {
       const filteredData = getFilteredOverdueJobs();
-      const headers = ['Job Number', 'Status', 'Days Overdue', 'Customer', 'Admin', 'Rep Code', 'Branch', 'Current Status', 'Expected Next Status'];
+      const headers = ['Job Number', 'Status', 'Days Overdue', 'Customer', 'Admin', 'Assisting Admin', 'Rep Code', 'Branch', 'Current Status', 'Expected Next Status'];
       const rows = filteredData.map(oj => [
         oj.jobNumber || '',
         oj.job?.status?.name || '',
         oj.daysOverdue || 0,
         typeof oj.job?.customer === 'object' ? oj.job.customer?.name || '' : (oj.job?.cashCustomer || ''),
         oj.job?.adm || '',
+        oj.job?.assistingAdm || '',
         typeof oj.job?.repCode === 'object' ? (oj.job.repCode as any)?.code || '' : '',
         typeof oj.job?.branch === 'object' ? oj.job.branch?.name || '' : '',
         oj.currentStatus || '',
@@ -983,7 +988,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
       filename = `Overdue-Jobs-${startDate}-to-${endDate}.xlsx`;
     } else if (activeSection === 'jobs') {
       const filteredData = getFilteredJobs();
-      const headers = ['Job Number', 'Status', 'Customer', 'Cash Customer', 'Start Date', 'Date Quoted', 'Value ex VAT', 'Admin', 'Rep Code', 'Branch', 'Description', 'Job Source', 'Tech', 'Tech Booked Date', 'Store Pack', 'Store Pack Date'];
+      const headers = ['Job Number', 'Status', 'Customer', 'Cash Customer', 'Start Date', 'Date Quoted', 'Value ex VAT', 'Admin', 'Assisting Admin', 'Rep Code', 'Branch', 'Description', 'Job Source', 'Tech', 'Tech Booked Date', 'Store Pack', 'Store Pack Date'];
       const rows = filteredData.map(job => {
         // Get tech name from bookings array only (not legacy techBooked field which may be stale)
         const techName = job.bookings && job.bookings.length > 0 
@@ -1003,6 +1008,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
           job.dateQuoted ? formatDate(job.dateQuoted) : '',
           job.valueExVat || 0,
           job.adm || '',
+          job.assistingAdm || '',
           typeof job.repCode === 'object' ? (job.repCode as any)?.code || '' : '',
           typeof job.branch === 'object' ? job.branch?.name || '' : '',
           typeof job.description === 'object' ? (job.description as any)?.name || '' : '',
@@ -1078,13 +1084,14 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
     if (activeSection === 'overdue') {
       const filteredData = getFilteredOverdueJobs();
-      headers = ['Job #', 'Status', 'Days', 'Customer', 'Admin', 'Rep', 'Branch'];
+      headers = ['Job #', 'Status', 'Days', 'Customer', 'Admin', 'Ast. Adm', 'Rep', 'Branch'];
       rows = filteredData.map(oj => [
         oj.jobNumber || '',
         oj.job?.status?.name || '',
         oj.daysOverdue || 0,
         typeof oj.job?.customer === 'object' ? (oj.job.customer?.name || '').substring(0, 25) : (oj.job?.cashCustomer || '').substring(0, 25),
         oj.job?.adm || '',
+        oj.job?.assistingAdm || '',
         typeof oj.job?.repCode === 'object' ? (oj.job.repCode as any)?.code || '' : '',
         typeof oj.job?.branch === 'object' ? oj.job.branch?.name || '' : '',
       ]);
@@ -1176,6 +1183,14 @@ export function Reports({ statuses, branches }: ReportsProps) {
       });
     }
     
+    // Filter by assisting admin
+    if (overdueAssistingAdmFilter) {
+      filtered = filtered.filter(oj => {
+        const jobAssistingAdm = oj.job?.assistingAdm || '';
+        return jobAssistingAdm.toLowerCase().includes(overdueAssistingAdmFilter.toLowerCase());
+      });
+    }
+    
     // Filter by rep code
     if (overdueRepFilter) {
       filtered = filtered.filter(oj => {
@@ -1247,6 +1262,14 @@ export function Reports({ statuses, branches }: ReportsProps) {
       filtered = filtered.filter(job => {
         const jobAdmin = job.adm || '';
         return jobAdmin.toLowerCase().includes(jobsAdminFilter.toLowerCase());
+      });
+    }
+    
+    // Filter by assisting admin
+    if (jobsAssistingAdmFilter) {
+      filtered = filtered.filter(job => {
+        const jobAssistingAdm = job.assistingAdm || '';
+        return jobAssistingAdm.toLowerCase().includes(jobsAssistingAdmFilter.toLowerCase());
       });
     }
     
@@ -1327,6 +1350,18 @@ export function Reports({ statuses, branches }: ReportsProps) {
   }
 
   /**
+   * Gets unique assisting admin codes from overdue jobs.
+   */
+  function getUniqueOverdueAssistingAdmins(): string[] {
+    const adminSet = new Set<string>();
+    userOverdueJobs.forEach(oj => {
+      const assistingAdm = oj.job?.assistingAdm;
+      if (assistingAdm) adminSet.add(assistingAdm);
+    });
+    return Array.from(adminSet).sort();
+  }
+
+  /**
    * Gets unique rep codes from overdue jobs.
    */
   function getUniqueOverdueReps(): string[] {
@@ -1394,6 +1429,18 @@ export function Reports({ statuses, branches }: ReportsProps) {
     userJobs.forEach(job => {
       const admin = job.adm;
       if (admin) adminSet.add(admin);
+    });
+    return Array.from(adminSet).sort();
+  }
+
+  /**
+   * Gets unique assisting admin codes from all jobs.
+   */
+  function getUniqueJobAssistingAdmins(): string[] {
+    const adminSet = new Set<string>();
+    userJobs.forEach(job => {
+      const assistingAdm = job.assistingAdm;
+      if (assistingAdm) adminSet.add(assistingAdm);
     });
     return Array.from(adminSet).sort();
   }
@@ -2391,6 +2438,19 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       </select>
                     </div>
                     <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Assisting Admin</label>
+                      <select
+                        value={overdueAssistingAdmFilter}
+                        onChange={(e) => setOverdueAssistingAdmFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        <option value="">All Assisting Admins</option>
+                        {getUniqueOverdueAssistingAdmins().map(admin => (
+                          <option key={admin} value={admin}>{admin}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Rep Code</label>
                       <select
                         value={overdueRepFilter}
@@ -2476,7 +2536,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       </div>
                     </label>
                   </div>
-                  {(overdueStatusFilter.length > 0 || overdueAdminFilter || overdueRepFilter || overdueBranchFilter || overdueDescriptionFilter || overdueJobSourceFilter || overdueStatusChangedFrom || overdueStatusChangedTo || showHiddenOverdue) && (
+                  {(overdueStatusFilter.length > 0 || overdueAdminFilter || overdueAssistingAdmFilter || overdueRepFilter || overdueBranchFilter || overdueDescriptionFilter || overdueJobSourceFilter || overdueStatusChangedFrom || overdueStatusChangedTo || showHiddenOverdue) && (
                     <div className="mt-3 flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-gray-600">Active filters:</span>
                       {showHiddenOverdue && (
@@ -2493,6 +2553,11 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       {overdueAdminFilter && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
                           Admin: {overdueAdminFilter}
+                        </span>
+                      )}
+                      {overdueAssistingAdmFilter && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-lime-100 text-lime-800 rounded text-xs">
+                          Ast. Admin: {overdueAssistingAdmFilter}
                         </span>
                       )}
                       {overdueRepFilter && (
@@ -2529,6 +2594,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                         onClick={() => {
                           setOverdueStatusFilter([]);
                           setOverdueAdminFilter('');
+                          setOverdueAssistingAdmFilter('');
                           setOverdueRepFilter('');
                           setOverdueBranchFilter('');
                           setOverdueDescriptionFilter('');
@@ -2708,6 +2774,19 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       </select>
                     </div>
                     <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Assisting Admin</label>
+                      <select
+                        value={jobsAssistingAdmFilter}
+                        onChange={(e) => setJobsAssistingAdmFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        <option value="">All Assisting Admins</option>
+                        {getUniqueJobAssistingAdmins().map(admin => (
+                          <option key={admin} value={admin}>{admin}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Rep Code</label>
                       <select
                         value={jobsRepFilter}
@@ -2793,7 +2872,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       </div>
                     </label>
                   </div>
-                  {(jobsStatusFilter.length > 0 || jobsAdminFilter || jobsRepFilter || jobsBranchFilter || jobsDescriptionFilter || jobsJobSourceFilter || jobsStatusChangedFrom || jobsStatusChangedTo || showHiddenJobs) && (
+                  {(jobsStatusFilter.length > 0 || jobsAdminFilter || jobsAssistingAdmFilter || jobsRepFilter || jobsBranchFilter || jobsDescriptionFilter || jobsJobSourceFilter || jobsStatusChangedFrom || jobsStatusChangedTo || showHiddenJobs) && (
                     <div className="mt-3 flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-gray-600">Active filters:</span>
                       {showHiddenJobs && (
@@ -2810,6 +2889,11 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       {jobsAdminFilter && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
                           Admin: {jobsAdminFilter}
+                        </span>
+                      )}
+                      {jobsAssistingAdmFilter && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-lime-100 text-lime-800 rounded text-xs">
+                          Ast. Admin: {jobsAssistingAdmFilter}
                         </span>
                       )}
                       {jobsRepFilter && (
@@ -2846,6 +2930,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                         onClick={() => {
                           setJobsStatusFilter([]);
                           setJobsAdminFilter('');
+                          setJobsAssistingAdmFilter('');
                           setJobsRepFilter('');
                           setJobsBranchFilter('');
                           setJobsDescriptionFilter('');

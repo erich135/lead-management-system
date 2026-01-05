@@ -47,6 +47,8 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
+  const [showCustomerConfirmation, setShowCustomerConfirmation] = useState(false);
+  const [pendingCustomerName, setPendingCustomerName] = useState('');
   const customerDropdownRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState<{
@@ -327,20 +329,41 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
       return;
     }
 
+    // Show confirmation dialog first
+    setPendingCustomerName(customerSearchTerm.trim());
+    setShowCustomerConfirmation(true);
+    setShowCustomerDropdown(false);
+  }
+
+  /**
+   * Actually creates the customer after confirmation.
+   */
+  async function confirmCreateCustomer() {
     try {
       setIsCreatingCustomer(true);
+      setShowCustomerConfirmation(false);
       setError('');
-      const response = await createCustomer(customerSearchTerm.trim());
+      const response = await createCustomer(pendingCustomerName);
       const newCustomer = response.customer;
       
       // Select the newly created customer
       handleCustomerSelect(newCustomer);
       setIsCreatingCustomer(false);
+      setPendingCustomerName('');
     } catch (err: any) {
       console.error('Error creating customer:', err);
       setError(err.message || 'Failed to create customer');
       setIsCreatingCustomer(false);
     }
+  }
+
+  /**
+   * Cancels customer creation.
+   */
+  function cancelCreateCustomer() {
+    setShowCustomerConfirmation(false);
+    setPendingCustomerName('');
+    setShowCustomerDropdown(true);
   }
 
   // Filter customers based on search term
@@ -563,6 +586,46 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
             >
               OK
             </button>
+          </div>
+        </div>
+      )}
+
+      {showCustomerConfirmation && (
+        <div className="fixed inset-0 flex items-center justify-center p-4 z-[100] bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-4xl">⚠️</span>
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-3">
+                Confirm New Customer
+              </h3>
+              <p className="text-slate-600 mb-2">
+                Are you sure you want to create:
+              </p>
+              <p className="text-2xl font-bold text-[#0969a9] mb-4 px-4 py-3 bg-blue-50 rounded-lg break-words">
+                "{pendingCustomerName}"
+              </p>
+              <p className="text-sm text-slate-500">
+                This will add a new customer to the system.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={cancelCreateCustomer}
+                disabled={isCreatingCustomer}
+                className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-bold text-[14px] hover:bg-gray-200 transition-all uppercase disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmCreateCustomer}
+                disabled={isCreatingCustomer}
+                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-lg font-bold text-[14px] hover:shadow-lg transition-all uppercase disabled:opacity-50"
+              >
+                {isCreatingCustomer ? 'Creating...' : 'Yes, Create'}
+              </button>
+            </div>
           </div>
         </div>
       )}

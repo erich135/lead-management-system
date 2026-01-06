@@ -3,91 +3,21 @@
 ## [1.0.10] - 2025-12-17
 
 ### Added
-<<<<<<< HEAD
-- **Searchable Customer Dropdown with "Create New Customer"**
-  - Replaced standard customer dropdown with type-to-search input
-  - Filters customers in real-time as user types
-  - "Create [name] as new customer" button appears when no exact match found
-  - New customers are created on-the-fly and automatically selected
-  - Green border/background indicates selected customer
-  - Clear button (X) to deselect and search again
-  - Click-outside closes the dropdown
-  - Performance optimized: shows max 50 results while typing
-
-- **Rental Machine Management System**
-  - New `isRental` field to distinguish rental vs non-rental machines
-  - Dedicated rental machine endpoints (`/rental-machines`, `/rental-machines/customer/:customerId`)
-  - Asset number tracking for rental machines
-  - CSV import for rental machines with customer assignment
-  - Rental machine selector in job creation form (filters by selected customer)
-
-- **Service Type Tracking for Machines**
-  - New `serviceType` field: "hours" (for Generator, Genset, Compressors) vs "date" (for Dryer, Blower, Vacuum pump)
-  - Hours-based machines track `currentHours`, `lastServiceHours`, `nextServiceHours`
-  - Date-based machines track `lastServiceDate`, `nextServiceDate`
-  - Service type selection in machine creation/import
-  - Visual indicators in machine details showing appropriate service fields
-
-- **Store Pack Date Field**
-  - New `storePackDate` date picker in job details panel
-  - Displayed alongside existing Store Pack checkbox
-  - Included in job exports
-
-- **Notes Field for Jobs**
-  - New Notes field (50 chars max) for site/location info under Customer
-  - Notes input in Create Job form with placeholder "e.g. Sandton Branch"
-  - Notes displayed on job cards in brackets after customer name
-  - Notes field in job details panel for viewing/editing
-
-- **Enhanced Reports Export**
-  - Added "Tech" column showing technician name from bookings
-  - Added "Tech Booked Date" column with formatted booking date
-  - Added "Store Pack" column (Yes/No)
-  - Added "Store Pack Date" column with formatted date
-
-- **Technician Booking Date on Cards**
-  - Job cards now display tech booking date alongside technician name
-  - Format: "Tech Name • 16 Dec 2025"
-=======
-- New `isRental` field to distinguish rental vs non-rental machines
-- Dedicated rental machine endpoints (`/rental-machines`, `/rental-machines/customer/:customerId`)
+- Searchable customer dropdown with type-to-search and create new customer option
+- Rental machine management system with `isRental` field and dedicated endpoints
 - Asset number tracking for rental machines
 - CSV import for rental machines with customer assignment
-- Rental machine selector in job creation form (filters by selected customer)
-- New `serviceType` field: "hours" (for Generator, Genset, Compressors) vs "date" (for Dryer, Blower, Vacuum pump)
-- Hours-based machines track `currentHours`, `lastServiceHours`, `nextServiceHours`
-- Date-based machines track `lastServiceDate`, `nextServiceDate`
-- Service type selection in machine creation/import
-- Visual indicators in machine details showing appropriate service fields
-- New `storePackDate` date picker in job details panel
-- Store Pack Date displayed alongside existing Store Pack checkbox
-- Store Pack Date included in job exports
-- New Notes field (50 chars max) for site/location info under Customer
-- Notes input in Create Job form with placeholder "e.g. Sandton Branch"
-- Notes displayed on job cards in brackets after customer name
-- Notes field in job details panel for viewing/editing
-- Added "Tech" column showing technician name from bookings in Reports Export
-- Added "Tech Booked Date" column with formatted booking date in Reports Export
-- Added "Store Pack" column (Yes/No) in Reports Export
-- Added "Store Pack Date" column with formatted date in Reports Export
-- Job cards now display tech booking date alongside technician name
-- Tech booking date format: "Tech Name • 16 Dec 2025"
->>>>>>> 838be8e7b356fa9b51a5dbee9f501787914c1073
+- Rental machine selector in job creation form
+- Service type tracking for machines (hours-based vs date-based)
+- Store Pack Date field in job details panel
+- Notes field (50 chars max) for site/location info
+- Enhanced Reports Export with Tech, Tech Booked Date, Store Pack, and Store Pack Date columns
+- Technician booking date displayed on job cards
 
 ### Fixed
-- Changed export to use `getFilteredJobs()` instead of raw data
-- All active filters (status, date range, rep code, branch, etc.) now apply to exports
-- Fixed tech name not appearing in exports
-- Tech name now correctly reads from `job.bookings[0].technicianName` instead of legacy `techBooked` field
-- Removed reliance on legacy `techBooked` string field
-- `getTechnicianNameFromJob()` now only uses `job.bookings` array data
-- Job cards show current technician assignment from TechBooking collection
-
-### Technical
-- Backend: Added `notes` field to Job model (String, maxlength 50)
-- Backend: Added `serviceType`, `lastServiceDate`, `nextServiceDate` to Machine model
-- Frontend: Updated Job and Machine TypeScript interfaces
-- Frontend: Updated LeadForm, LeadsList, LeadDetails, and Reports components
+- Reports export now respects all active filters
+- Fixed technician name not appearing in exports
+- Removed reliance on legacy `techBooked` field in favor of bookings array
 
 ## [1.0.9] - 2025-12-08
 

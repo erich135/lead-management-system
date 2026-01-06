@@ -1,9 +1,26 @@
 # Changelog
 
+## [1.0.11] - 2026-01-05
+
+### Added
+- **Assisting Admin Filter in Reports**
+  - New "Assisting Admin" dropdown filter in Overdue Jobs section
+  - New "Assisting Admin" dropdown filter in All Jobs section
+  - Assisting Admin column added to Excel exports
+  - Assisting Admin column added to PDF exports
+  - Filter displayed as active filter badge when applied
+  - Populated with unique assisting admin codes from jobs
+
+- **Double Confirmation for New Customer Creation**
+  - New confirmation dialog when creating customers from LeadForm
+  - Shows customer name prominently before creation
+  - Prevents accidental gibberish entries
+  - "Cancel" and "Yes, Create" buttons for confirmation
+  - Visual warning icon and styled confirmation UI
+
 ## [1.0.10] - 2025-12-17
 
 ### Added
-<<<<<<< HEAD
 - **Searchable Customer Dropdown with "Create New Customer"**
   - Replaced standard customer dropdown with type-to-search input
   - Filters customers in real-time as user types
@@ -48,31 +65,6 @@
 - **Technician Booking Date on Cards**
   - Job cards now display tech booking date alongside technician name
   - Format: "Tech Name • 16 Dec 2025"
-=======
-- New `isRental` field to distinguish rental vs non-rental machines
-- Dedicated rental machine endpoints (`/rental-machines`, `/rental-machines/customer/:customerId`)
-- Asset number tracking for rental machines
-- CSV import for rental machines with customer assignment
-- Rental machine selector in job creation form (filters by selected customer)
-- New `serviceType` field: "hours" (for Generator, Genset, Compressors) vs "date" (for Dryer, Blower, Vacuum pump)
-- Hours-based machines track `currentHours`, `lastServiceHours`, `nextServiceHours`
-- Date-based machines track `lastServiceDate`, `nextServiceDate`
-- Service type selection in machine creation/import
-- Visual indicators in machine details showing appropriate service fields
-- New `storePackDate` date picker in job details panel
-- Store Pack Date displayed alongside existing Store Pack checkbox
-- Store Pack Date included in job exports
-- New Notes field (50 chars max) for site/location info under Customer
-- Notes input in Create Job form with placeholder "e.g. Sandton Branch"
-- Notes displayed on job cards in brackets after customer name
-- Notes field in job details panel for viewing/editing
-- Added "Tech" column showing technician name from bookings in Reports Export
-- Added "Tech Booked Date" column with formatted booking date in Reports Export
-- Added "Store Pack" column (Yes/No) in Reports Export
-- Added "Store Pack Date" column with formatted date in Reports Export
-- Job cards now display tech booking date alongside technician name
-- Tech booking date format: "Tech Name • 16 Dec 2025"
->>>>>>> 838be8e7b356fa9b51a5dbee9f501787914c1073
 
 ### Fixed
 - Changed export to use `getFilteredJobs()` instead of raw data

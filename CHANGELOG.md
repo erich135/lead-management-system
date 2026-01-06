@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.11] - 2026-01-05
+
+### Added
+- Assisting Admin dropdown filter in Overdue Jobs and All Jobs sections
+- Assisting Admin column added to Excel and PDF exports
+- Double confirmation dialog when creating new customers from LeadForm
+
 ## [1.0.10] - 2025-12-17
 
 ### Added

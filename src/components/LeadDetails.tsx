@@ -55,10 +55,11 @@ function normalizeJob(jobData: Job): Job {
 }
 
 export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes = [], onClose, onUpdate }: LeadDetailsProps) {
-  const { user, isAdmin, isSuperAdmin } = useAuth();
+  const { user, isAdmin, isSuperAdmin, hasPermission } = useAuth();
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [job, setJob] = useState<Job>(normalizeJob(initialLead));
+  const [originalJobBeforeEdit, setOriginalJobBeforeEdit] = useState<Job | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
@@ -723,7 +724,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     setLoading(true);
     setError('');
     try {
-      const payload: any = { ...job };
+      let payload: any = { ...job };
       if (payload.techBooked && typeof payload.techBooked === 'object') {
         payload.techBooked = payload.techBooked._id;
       }
@@ -791,6 +792,78 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
       } else {
         console.log('No bookings in payload or not an array:', payload.bookings);
       }
+
+      // Reps can only update a limited set of fields.
+      // Keep the payload aligned with the backend enforcement, and show a clear warning
+      // if the user attempted to change disallowed fields (e.g., Rep Code).
+      const isRepUser = !isSuperAdmin && user?.role?.name?.toLowerCase?.() === 'rep';
+      let repDisallowedChanges: string[] = [];
+      if (isRepUser) {
+        const repAllowedKeys = ['status', 'poDate', 'description', 'poNumber', 'feedback', 'machines'];
+
+        // Fields that appear editable in the UI but are not allowed for reps.
+        // We use this to give the user clear feedback rather than silently ignoring.
+        const repWarnKeys = [
+          'repCode',
+          'adm',
+          'rsrNumber',
+          'oilSampleNumber',
+          'storePack',
+          'invNumber',
+          'invoiceDate',
+          'valueExVat',
+          'branch',
+          'customer',
+          'cashCustomer',
+          'techBooked',
+          'bookings',
+          'jobSource',
+          'dateQuoted',
+          'startDate',
+          'registerDate',
+          'dateBooked',
+        ];
+
+        const toComparable = (value: any) => {
+          if (value === null || value === undefined) return value;
+          if (Array.isArray(value)) {
+            return value
+              .map((v) => (typeof v === 'object' && v !== null ? (v._id ?? v.id ?? v) : v))
+              .filter((v) => v !== undefined);
+          }
+          if (typeof value === 'object') {
+            return value._id ?? value.id ?? value;
+          }
+          return value;
+        };
+
+        if (originalJobBeforeEdit) {
+          repDisallowedChanges = repWarnKeys.filter((key) => {
+            const before = toComparable((originalJobBeforeEdit as any)[key]);
+            const after = toComparable((job as any)[key]);
+            return JSON.stringify(before) !== JSON.stringify(after);
+          });
+        }
+
+        const repPayload: any = {};
+        repAllowedKeys.forEach((key) => {
+          if (payload[key] !== undefined) repPayload[key] = payload[key];
+        });
+
+        // If they only changed disallowed fields, don't call the API.
+        if (Object.keys(repPayload).length === 0 && repDisallowedChanges.length > 0) {
+          const displayNames = repDisallowedChanges
+            .map((k) => (k === 'repCode' ? 'Rep Code' : k))
+            .join(', ');
+          setError(
+            `❌ No Access\n\nYou don't have access to change: ${displayNames}.\n\nReps can only update: Status, PO Date, Description, PO Number, Feedback, and Machines.`
+          );
+          return;
+        }
+
+        payload = repPayload;
+      }
+
       console.log('Full payload being sent:', payload);
       const response = await updateJob(job._id, payload);
       console.log('Update job response:', response);
@@ -806,7 +879,18 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
       }
       
       setIsEditing(false);
+      setOriginalJobBeforeEdit(null);
       onUpdate();
+
+      // Show a post-save warning if the rep tried to change disallowed fields.
+      if (isRepUser && repDisallowedChanges.length > 0) {
+        const displayNames = repDisallowedChanges
+          .map((k) => (k === 'repCode' ? 'Rep Code' : k))
+          .join(', ');
+        setError(
+          `ℹ️ Some changes were not saved\n\nYou don't have access to change: ${displayNames}.\n\nReps can only update: Status, PO Date, Description, PO Number, Feedback, and Machines.`
+        );
+      }
     } catch (err: any) {
       // Parse error message for better user feedback
       const errorMsg = err.message || 'Failed to update job';
@@ -866,8 +950,8 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     });
   }
 
-  // Super admin and admin users can edit
-  const canEdit = isAdmin || isSuperAdmin;
+  // Allow editing for anyone with jobs.update (reps included)
+  const canEdit = isSuperAdmin || isAdmin || hasPermission('jobs.update');
 
   // Debug logging
   useEffect(() => {
@@ -940,6 +1024,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       if (isEditing) {
                         handleSave();
                       } else {
+                        setOriginalJobBeforeEdit(job);
                         setIsEditing(true);
                       }
                     }}
@@ -964,6 +1049,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       onClick={(e) => {
                         e.stopPropagation();
                         setIsEditing(false);
+                        setOriginalJobBeforeEdit(null);
                         loadJobDetails(); // Reload to reset changes
                       }}
                       className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-all font-bold text-[14px] uppercase"

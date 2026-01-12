@@ -668,7 +668,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
     // Jobs CSV
     const jobHeaders = [
       'Job Number', 'Status', 'Customer', 'Cash Customer', 'Start Date', 'Date Quoted',
-      'Value ex VAT', 'Admin', 'Rep Code', 'Technician', 'Branch', 'Description', 'Feedback',
+      'Value ex VAT', 'Admin', 'Rep Code', 'Technician', 'Branch', 'Description', 'Notes', 'Feedback',
       'RSR Number', 'PO Number', 'PO Date', 'Invoice Number', 'Invoice Date'
     ];
     const jobRows = userJobs.map(job => [
@@ -684,6 +684,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
       typeof job.techBooked === 'object' ? (job.techBooked as any)?.name || '' : '',
       typeof job.branch === 'object' ? job.branch?.name || '' : '',
       typeof job.description === 'object' ? (job.description as any)?.name || '' : '',
+      job.notes || '',
       job.feedback || '',
       job.rsrNumber || '',
       job.poNumber || '',
@@ -752,7 +753,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
     // Jobs CSV
     const jobHeaders = [
       'Job Number', 'Status', 'Start Date', 'Date Quoted', 'Value ex VAT',
-      'Admin', 'Rep Code', 'Technician', 'Branch', 'Description', 'Feedback',
+      'Admin', 'Rep Code', 'Technician', 'Branch', 'Description', 'Notes', 'Feedback',
       'RSR Number', 'PO Number', 'PO Date', 'Invoice Number', 'Invoice Date'
     ];
     const jobRows = customerJobs.map(job => [
@@ -766,6 +767,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
       typeof job.techBooked === 'object' ? (job.techBooked as any)?.name || '' : '',
       typeof job.branch === 'object' ? job.branch?.name || '' : '',
       typeof job.description === 'object' ? (job.description as any)?.name || '' : '',
+      job.notes || '',
       job.feedback || '',
       job.rsrNumber || '',
       job.poNumber || '',
@@ -829,7 +831,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
     // Machine and Job CSV
     const headers = [
       'Machine Make', 'Machine Model', 'Serial Number', 'Customer', 'Machine Hours', 'Next Service Hours',
-      'Job Number', 'Job Status', 'Start Date', 'Date Quoted', 'Value ex VAT', 'Admin', 'Rep Code', 'Technician', 'Branch', 'Description',
+      'Job Number', 'Job Status', 'Start Date', 'Date Quoted', 'Value ex VAT', 'Admin', 'Rep Code', 'Technician', 'Branch', 'Description', 'Notes', 'Feedback',
       'RSR Number', 'PO Number', 'PO Date', 'Invoice Number', 'Invoice Date'
     ];
     
@@ -859,7 +861,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
           customerName,
           machine.machineHours?.toString() || '',
           machine.nextServiceHours?.toString() || '',
-          '', '', '', '', '', '', '', '', '', ''
+          // Job columns (must match headers length)
+          '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
         ]);
       } else {
         // Machine with jobs - one row per job
@@ -884,6 +887,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
             typeof job.techBooked === 'object' ? (job.techBooked as any)?.name || '' : '',
             typeof job.branch === 'object' ? job.branch?.name || '' : '',
             typeof job.description === 'object' ? (job.description as any)?.name || '' : '',
+            job.notes || '',
+            job.feedback || '',
             job.rsrNumber || '',
             job.poNumber || '',
             job.poDate ? formatDate(job.poDate) : '',
@@ -988,7 +993,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
       filename = `Overdue-Jobs-${startDate}-to-${endDate}.xlsx`;
     } else if (activeSection === 'jobs') {
       const filteredData = getFilteredJobs();
-      const headers = ['Job Number', 'Status', 'Customer', 'Cash Customer', 'Start Date', 'Date Quoted', 'Value ex VAT', 'Admin', 'Assisting Admin', 'Rep Code', 'Branch', 'Description', 'Job Source', 'Tech', 'Tech Booked Date', 'Store Pack', 'Store Pack Date'];
+      const headers = ['Job Number', 'Status', 'Customer', 'Cash Customer', 'Start Date', 'Date Quoted', 'Value ex VAT', 'Admin', 'Assisting Admin', 'Rep Code', 'Branch', 'Description', 'Notes', 'Feedback', 'Invoice Number', 'Invoice Date', 'Job Source', 'Tech', 'Tech Booked Date', 'Store Pack', 'Store Pack Date'];
       const rows = filteredData.map(job => {
         // Get tech name from bookings array only (not legacy techBooked field which may be stale)
         const techName = job.bookings && job.bookings.length > 0 
@@ -1012,6 +1017,10 @@ export function Reports({ statuses, branches }: ReportsProps) {
           typeof job.repCode === 'object' ? (job.repCode as any)?.code || '' : '',
           typeof job.branch === 'object' ? job.branch?.name || '' : '',
           typeof job.description === 'object' ? (job.description as any)?.name || '' : '',
+          job.notes || '',
+          job.feedback || '',
+          job.invNumber || '',
+          job.invoiceDate ? formatDate(job.invoiceDate) : '',
           typeof job.jobSource === 'object' ? (job.jobSource as any)?.name || '' : '',
           techName,
           techBookedDate ? formatDate(techBookedDate) : '',
@@ -1035,7 +1044,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
       filename = `Activities-${startDate}-to-${endDate}.xlsx`;
     } else if (activeSection === 'conversion') {
       // Use conversionJobs directly (already filtered by the useEffect)
-      const headers = ['Job Number', 'Customer', 'Admin', 'Rep Code', 'Branch', 'Start Date', 'Date Quoted', 'Sent to Client', 'PO Date', 'Register Date', 'Invoice Date'];
+      const headers = ['Job Number', 'Customer', 'Admin', 'Rep Code', 'Branch', 'Start Date', 'Date Quoted', 'Sent to Client', 'PO Date', 'Register Date', 'Invoice Number', 'Invoice Date', 'Notes', 'Feedback'];
       const rows = conversionJobs.map(job => [
         job.jobNumber || '',
         typeof job.customer === 'object' ? job.customer?.name || '' : (job.cashCustomer || ''),
@@ -1047,7 +1056,10 @@ export function Reports({ statuses, branches }: ReportsProps) {
         job.dateSentToClient ? formatDate(job.dateSentToClient) : '',
         job.poDate ? formatDate(job.poDate) : '',
         job.registerDate ? formatDate(job.registerDate) : '',
+        job.invNumber || '',
         job.invoiceDate ? formatDate(job.invoiceDate) : '',
+        job.notes || '',
+        job.feedback || '',
       ]);
       data = [[sectionTitle], [`Filters: ${filtersString}`], [], headers, ...rows];
       filename = `Conversion-Tracker-${new Date().toISOString().split('T')[0]}.xlsx`;
@@ -1097,7 +1109,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
       ]);
     } else if (activeSection === 'jobs') {
       const filteredData = getFilteredJobs();
-      headers = ['Job #', 'Status', 'Customer', 'Start', 'Value', 'Admin', 'Rep', 'Tech', 'Tech Date', 'Store Pack'];
+      headers = ['Job #', 'Status', 'Customer', 'Start', 'Value', 'Admin', 'Rep', 'Tech', 'Tech Date', 'Store Pack', 'Inv #', 'Inv Date', 'Notes', 'Feedback'];
       rows = filteredData.map(job => {
         // Get tech name from bookings array only (not legacy techBooked field which may be stale)
         const techName = job.bookings && job.bookings.length > 0 
@@ -1118,6 +1130,10 @@ export function Reports({ statuses, branches }: ReportsProps) {
           techName,
           techBookedDate ? formatDate(techBookedDate) : '',
           job.storePack || '',
+          job.invNumber || '',
+          job.invoiceDate ? formatDate(job.invoiceDate) : '',
+          (job.notes || '').substring(0, 25),
+          (job.feedback || '').substring(0, 25),
         ];
       });
     } else if (activeSection === 'activities') {
@@ -1131,7 +1147,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
       ]);
     } else if (activeSection === 'conversion') {
       // Use conversionJobs directly (already filtered by the useEffect)
-      headers = ['Job #', 'Customer', 'Admin', 'Start', 'Quoted', 'PO Date', 'Invoiced'];
+      headers = ['Job #', 'Customer', 'Admin', 'Start', 'Quoted', 'PO Date', 'Inv #', 'Inv Date', 'Notes', 'Feedback'];
       rows = conversionJobs.map(job => [
         job.jobNumber || '',
         (typeof job.customer === 'object' ? job.customer?.name || '' : (job.cashCustomer || '')).substring(0, 20),
@@ -1139,7 +1155,10 @@ export function Reports({ statuses, branches }: ReportsProps) {
         job.startDate ? formatDate(job.startDate) : '',
         job.dateQuoted ? formatDate(job.dateQuoted) : '',
         job.poDate ? formatDate(job.poDate) : '',
+        job.invNumber || '',
         job.invoiceDate ? formatDate(job.invoiceDate) : '',
+        (job.notes || '').substring(0, 25),
+        (job.feedback || '').substring(0, 25),
       ]);
     }
 

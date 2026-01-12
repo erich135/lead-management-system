@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.12] - 2026-01-12
+
+### Added
+- Rep users can update permitted job fields (permission-based edit access)
+- Clear "no access" messaging when reps attempt restricted edits
+- Reports exports now include Invoice Number, Invoice Date, Notes, and Feedback where applicable (Excel/PDF/CSV)
+
+### Fixed
+- Machine report CSV export now outputs consistent columns for machines without jobs
+
 ## [1.0.11] - 2026-01-05
 
 ### Added

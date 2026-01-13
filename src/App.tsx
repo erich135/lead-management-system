@@ -115,6 +115,16 @@ function AppContent() {
             <Dashboard view="activities" />
           </ProtectedRoute>
         } />
+        <Route path="/job-card-templates" element={
+          <ProtectedRoute>
+            <Dashboard view="jobCardTemplates" />
+          </ProtectedRoute>
+        } />
+        <Route path="/job-card-submissions" element={
+          <ProtectedRoute>
+            <Dashboard view="jobCardSubmissions" />
+          </ProtectedRoute>
+        } />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

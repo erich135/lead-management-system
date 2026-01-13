@@ -2225,6 +2225,81 @@ export async function markTicketAsReadBySupport(ticketId: string): Promise<void>
   });
 }
 
+/**
+ * Job Card Template types.
+ */
+export interface JobCardTemplate {
+  _id?: string;
+  name: string;
+  description?: string;
+  fields?: any[]; // Legacy support
+  groups?: any[]; // New structure: groups with tables
+  header?: any; // Header configuration
+  footer?: any; // Footer configuration
+  pageWidth?: number;
+  pageHeight?: number;
+  marginTop?: number;
+  marginBottom?: number;
+  marginLeft?: number;
+  marginRight?: number;
+  createdBy?: any;
+  createdAt?: string;
+  updatedAt?: string;
+  isActive?: boolean;
+}
+
+export interface JobCardTemplatesResponse {
+  templates: JobCardTemplate[];
+}
+
+export interface JobCardTemplateResponse {
+  template: JobCardTemplate;
+}
+
+/**
+ * Gets all job card templates.
+ */
+export async function getJobCardTemplates(includeInactive?: boolean): Promise<JobCardTemplatesResponse> {
+  const params = includeInactive ? '?includeInactive=true' : '';
+  return await apiRequest<JobCardTemplatesResponse>(`/api/job-card-templates${params}`);
+}
+
+/**
+ * Gets a single job card template by ID.
+ */
+export async function getJobCardTemplate(id: string): Promise<JobCardTemplateResponse> {
+  return await apiRequest<JobCardTemplateResponse>(`/api/job-card-templates/${id}`);
+}
+
+/**
+ * Creates a new job card template.
+ */
+export async function createJobCardTemplate(template: Partial<JobCardTemplate>): Promise<JobCardTemplateResponse> {
+  return await apiRequest<JobCardTemplateResponse>('/api/job-card-templates', {
+    method: 'POST',
+    body: JSON.stringify(template),
+  });
+}
+
+/**
+ * Updates a job card template.
+ */
+export async function updateJobCardTemplate(id: string, template: Partial<JobCardTemplate>): Promise<JobCardTemplateResponse> {
+  return await apiRequest<JobCardTemplateResponse>(`/api/job-card-templates/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(template),
+  });
+}
+
+/**
+ * Deletes a job card template.
+ */
+export async function deleteJobCardTemplate(id: string): Promise<void> {
+  return await apiRequest(`/api/job-card-templates/${id}`, {
+    method: 'DELETE',
+  });
+}
+
 export default {
   login,
   logout,
@@ -2311,6 +2386,11 @@ export default {
   getSupportUnreadCount,
   updateTicketStatus,
   markTicketAsReadBySupport,
+  getJobCardTemplates,
+  getJobCardTemplate,
+  createJobCardTemplate,
+  updateJobCardTemplate,
+  deleteJobCardTemplate,
   apiRequest,
 };
 

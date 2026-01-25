@@ -3,7 +3,7 @@
  * Handles authentication, request/response formatting, and error handling.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5005';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 /**
  * API response wrapper type.

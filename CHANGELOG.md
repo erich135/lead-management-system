@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.13] - 2026-01-25
+
+### Fixed
+- Excel report exports now write real date cells (not text) and default date formatting to `mmm dd, yyyy`
+- Local dev login now targets the correct backend default (`http://localhost:5000`) when `VITE_API_BASE_URL` is not set
+
+### Changed
+- Customer/Machine/User Performance report exports now generate `.xlsx` instead of CSV to preserve date formats
+
 ## [1.0.12] - 2026-01-12
 
 ### Added

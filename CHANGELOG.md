@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.0.13] - 2026-01-25
+## [1.0.13] - 2026-01-26
 
 ### Fixed
 - Excel report exports now write real date cells (not text) and default date formatting to `mmm dd, yyyy`

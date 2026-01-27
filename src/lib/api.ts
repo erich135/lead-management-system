@@ -2389,6 +2389,89 @@ export async function getSalesLeadStats(): Promise<{
 }
 
 /**
+ * Get comprehensive sales lead analytics.
+ */
+export async function getSalesLeadAnalytics(filters?: {
+  startDate?: string;
+  endDate?: string;
+  branch?: string;
+  assignedRep?: string;
+  leadSource?: string;
+}): Promise<{
+  leadPerformance: {
+    totalLeads: number;
+    statusBreakdown: Record<string, number>;
+    conversionRate: number;
+    avgDaysToConversion: number;
+    valueMetrics: {
+      totalPipelineValue: number;
+      totalConvertedValue: number;
+      avgLeadValue: number;
+      avgConvertedValue: number;
+    };
+  };
+  sourceAnalysis: {
+    leadsBySource: Array<{
+      source: string;
+      count: number;
+      totalValue: number;
+    }>;
+    sourceConversionRates: Array<{
+      source: string;
+      conversionRate: number;
+      totalLeads: number;
+      convertedLeads: number;
+    }>;
+  };
+  repPerformance: {
+    reps: Array<{
+      repId: string;
+      repName: string;
+      totalLeads: number;
+      convertedLeads: number;
+      conversionRate: number;
+      totalValue: number;
+      avgLeadValue: number;
+    }>;
+  };
+  appointmentAnalytics: {
+    totalAppointments: number;
+    attendedAppointments: number;
+    noShowAppointments: number;
+    appointmentShowRate: number;
+  };
+  branchPerformance: Array<{
+    branch: string;
+    totalLeads: number;
+    convertedLeads: number;
+    totalValue: number;
+    avgValue: number;
+  }>;
+  leadAging: {
+    ranges: Array<{
+      range: string;
+      count: number;
+    }>;
+  };
+  lostReasons: Array<{
+    reason: string;
+    count: number;
+  }>;
+}> {
+  const params = new URLSearchParams();
+  if (filters) {
+    if (filters.startDate) params.append('startDate', filters.startDate);
+    if (filters.endDate) params.append('endDate', filters.endDate);
+    if (filters.branch) params.append('branch', filters.branch);
+    if (filters.assignedRep) params.append('assignedRep', filters.assignedRep);
+    if (filters.leadSource) params.append('leadSource', filters.leadSource);
+  }
+  const queryString = params.toString();
+  const url = `/api/sales-leads/analytics${queryString ? '?' + queryString : ''}`;
+  return apiRequest<any>(url);
+}
+
+/**
  * Create an appointment for a sales lead.
  */
 export async function createAppointment(leadId: string, data: {

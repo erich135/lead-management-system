@@ -259,7 +259,7 @@ This system adds a complete Sales Lead workflow to the existing job management s
   - Store reminder status in appointment records
   - **Files**: `ars-app-backend/src/controllers/salesLeads.controller.ts`, `src/components/LeadReminders.tsx`
 
-- [ ] **Task 27: Create Lead Status Change Validation**
+- [x] **Task 27: Create Lead Status Change Validation** ✅
   - Implement status transition rules:
     - Can only move to 'Appointment Set' if appointment scheduled
     - Can only convert if appointment attended
@@ -269,7 +269,7 @@ This system adds a complete Sales Lead workflow to the existing job management s
 
 ### Analytics & Reporting
 
-- [ ] **Task 28: Add Comprehensive Lead Analytics & Reporting Dashboard**
+- [x] **Task 28: Add Comprehensive Lead Analytics & Reporting Dashboard** ✅
   - Create dedicated Sales Lead Reports section with multiple report types:
   
   **Lead Performance Metrics**:
@@ -397,6 +397,15 @@ This system adds a complete Sales Lead workflow to the existing job management s
   - Use existing XLSX library
   - **Files**: `src/components/SalesLeadsList.tsx`
 
+- [x] **Task 34.5: Add Lead Import Functionality** ✅
+  - Add sales lead import to System Admin > Imports tab
+  - CSV format: Company Name, Contact Person, Contact Phone, Contact Email, Branch, Rep Code, Lead Source, Service Description, Estimated Value, Notes
+  - Backend controller function to parse and import leads
+  - Auto-assign status based on Rep Code (assigned if rep provided, new otherwise)
+  - Example CSV file with sample data
+  - Clear existing leads option
+  - **Files**: `ars-app-backend/src/controllers/import.controller.ts`, `ars-app-backend/src/routes/import.routes.ts`, `src/components/SystemManagement.tsx`, `src/lib/api.ts`, `csv-imports/sales-leads-example.csv`
+
 ### Notifications & Mobile
 
 - [ ] **Task 35: Add Lead Notifications**
@@ -463,13 +472,13 @@ This system adds a complete Sales Lead workflow to the existing job management s
 
 ## 📊 Progress Tracking
 
-**Completed**: 27/40 tasks (67.5%)  
-**In Progress**: 0/40 tasks  
-**Not Started**: 13/40 tasks  
+**Completed**: 31/41 tasks (75.6%)  
+**In Progress**: 0/41 tasks  
+**Not Started**: 10/41 tasks  
 
 **Phase 1**: ✅✅✅✅✅✅✅✅✅ (9/9) **COMPLETE**  
 **Phase 2**: ✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅ (15/15) **COMPLETE**  
-**Phase 3**: ⬜⬜⬜⬜⬜⬜⬜✅⬜✅⬜⬜✅ (3/13)  
+**Phase 3**: ⬜⬜⬜⬜⬜⬜⬜✅⬜✅⬜⬜✅✅ (4/14)  
 **Phase 4**: ⬜⬜⬜ (0/3)  
 
 ---

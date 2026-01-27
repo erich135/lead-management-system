@@ -16,6 +16,7 @@ import {
   importJobs,
   importCustomers,
   importRentalMachines,
+  importSalesLeads,
   updateJobs,
   downloadExampleCSV,
   getRepCodes,
@@ -529,6 +530,8 @@ export function SystemManagement() {
         result = await importCustomers(selectedFile, clearExisting);
       } else if (importType === 'rental-machines') {
         result = await importRentalMachines(selectedFile, clearExisting);
+      } else if (importType === 'sales-leads') {
+        result = await importSalesLeads(selectedFile, clearExisting);
       } else if (importType === 'update-jobs') {
         result = await updateJobs(selectedFile);
       }
@@ -1901,6 +1904,95 @@ export function SystemManagement() {
                       <>
                         <Upload className="w-4 h-4" />
                         UPDATE JOBS
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Import Sales Leads */}
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-ars-heading flex items-center gap-2">
+                    <Target className="w-5 h-5 text-green-600" />
+                    Import Sales Leads
+                  </h3>
+                  <button
+                    onClick={() => downloadExampleCSV('sales-leads').catch(err => alert('Failed to download: ' + err.message))}
+                    className="px-3 py-1.5 text-sm bg-gray-100 text-ars-heading rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Example CSV
+                  </button>
+                </div>
+                <p className="text-sm text-ars-body mb-4">
+                  Import sales leads from a CSV file. Download the example CSV to see the required format.
+                </p>
+                <div className="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
+                  <p className="text-xs font-semibold text-ars-heading mb-2">CSV Column Names:</p>
+                  <ul className="text-xs text-ars-body space-y-1 list-disc list-inside">
+                    <li><strong>Company Name</strong> - <span className="text-red-600">Required</span></li>
+                    <li><strong>Contact Person</strong> - <span className="text-red-600">Required</span></li>
+                    <li><strong>Contact Phone</strong> - <span className="text-red-600">Required</span></li>
+                    <li><strong>Contact Email</strong> - Optional</li>
+                    <li><strong>Branch</strong> - Optional (e.g., JHB, CPT, DBN)</li>
+                    <li><strong>Rep Code</strong> - Optional (assigns lead to rep)</li>
+                    <li><strong>Lead Source</strong> - Optional (Website, Referral, Cold Call, Canvassing, etc.)</li>
+                    <li><strong>Service Description</strong> - Optional</li>
+                    <li><strong>Estimated Value</strong> - Optional (numeric, supports R format)</li>
+                    <li><strong>Notes</strong> - Optional</li>
+                  </ul>
+                  <p className="text-xs text-ars-body mt-2 italic">
+                    Leads will be created with status "new" or "assigned" if a Rep Code is provided.
+                  </p>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[11px] font-medium text-gray-600 mb-1">Select CSV File</label>
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setSelectedFile(file);
+                          setImportType('sales-leads');
+                        }
+                      }}
+                      className="w-full px-2 py-2 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[13px] file:mr-4 file:py-1.5 file:px-4 file:rounded-[6px] file:border-0 file:text-[13px] file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="clear-sales-leads"
+                      checked={clearExisting && importType === 'sales-leads'}
+                      onChange={(e) => {
+                        setClearExisting(e.target.checked);
+                        if (e.target.checked && importType !== 'sales-leads') {
+                          setImportType('sales-leads');
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary"
+                    />
+                    <label htmlFor="clear-sales-leads" className="text-sm text-ars-body cursor-pointer">
+                      Clear existing sales leads before importing
+                    </label>
+                  </div>
+                  <button
+                    onClick={handleImport}
+                    disabled={!selectedFile || importing || importType !== 'sales-leads'}
+                    className="w-full px-4 py-2.5 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {importing && importType === 'sales-leads' ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#383838]"></div>
+                        IMPORTING...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        IMPORT SALES LEADS
                       </>
                     )}
                   </button>

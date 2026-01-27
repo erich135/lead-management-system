@@ -1524,9 +1524,38 @@ export async function importRentalMachines(file: File, clearExisting: boolean): 
 }
 
 /**
+ * Imports sales leads from CSV file.
+ */
+export async function importSalesLeads(file: File, clearExisting: boolean): Promise<{ message: string; data: ImportResult }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('clearExisting', clearExisting.toString());
+
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/import/sales-leads`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Failed to import sales leads' } }));
+    throw new Error(error.error?.message || 'Failed to import sales leads');
+  }
+
+  return response.json();
+}
+
+/**
  * Downloads an example CSV file.
  */
-export async function downloadExampleCSV(type: 'jobs' | 'customers' | 'rental-machines'): Promise<void> {
+export async function downloadExampleCSV(type: 'jobs' | 'customers' | 'rental-machines' | 'sales-leads'): Promise<void> {
   const token = getAuthToken();
   if (!token) {
     throw new Error('No authentication token found');

@@ -269,15 +269,80 @@ This system adds a complete Sales Lead workflow to the existing job management s
 
 ### Analytics & Reporting
 
-- [ ] **Task 28: Add Lead Analytics to Reports**
-  - Extend Reports component with Lead metrics:
-    - Leads by source
+- [ ] **Task 28: Add Comprehensive Lead Analytics & Reporting Dashboard**
+  - Create dedicated Sales Lead Reports section with multiple report types:
+  
+  **Lead Performance Metrics**:
+    - Total leads by status (New, Assigned, Appointment Set, Attended, RFC Requested, Converted, Lost)
+    - Conversion rate (Leads → Jobs) - overall and by period
+    - Average days from lead creation to conversion
+    - Average days from lead creation to first appointment
+    - Average days from appointment to conversion
+    - Lost lead analysis (reasons for loss, stage of loss)
+    - Lead value metrics (total estimated value, average value, converted value)
+    
+  **Source Analysis**:
+    - Leads by source (Website, Referral, Cold Call, Canvassing, Existing Customer, Other)
+    - Conversion rate by source
+    - Average estimated value by source
+    - ROI by source (converted value vs effort)
+    - Source performance trends over time
+    
+  **Rep Performance Reports**:
+    - Leads assigned per rep
     - Conversion rate by rep
-    - Average time to conversion
-    - Lost leads analysis
-    - Appointment show rate
-  - Include date range filters and export functionality
-  - **Files**: `src/components/Reports.tsx`
+    - Appointments scheduled per rep
+    - Appointment attendance rate by rep (attended vs no-show)
+    - Average days to conversion by rep
+    - Total converted value by rep
+    - Active leads per rep
+    - Rep leaderboard (by conversions, by value, by speed)
+    
+  **Appointment Analytics**:
+    - Total appointments scheduled
+    - Appointment show rate (attended vs no-show vs pending)
+    - No-show reasons breakdown
+    - Appointments by rep
+    - Appointments by day of week/time analysis
+    - Follow-up appointment rate
+    - Average appointments per lead before conversion
+    
+  **Branch Performance**:
+    - Leads by branch
+    - Conversion rate by branch
+    - Average lead value by branch
+    - Total converted value by branch
+    - Active leads per branch
+    
+  **Canvassing Reports**:
+    - Canvassing plans submitted (by rep, by period)
+    - Canvassing plan approval rate
+    - Leads generated from canvassing
+    - Canvassing ROI (leads/conversions vs travel costs)
+    - Areas covered
+    
+  **Time-Based Analysis**:
+    - Lead creation trends (daily, weekly, monthly)
+    - Conversion trends over time
+    - Seasonal patterns
+    - Day of week analysis
+    - Lead aging report (open leads by age: 0-7 days, 8-30 days, 31-60 days, 60+ days)
+    
+  **Export & Visualization**:
+    - Export all reports to Excel/CSV/PDF
+    - Interactive charts (bar, line, pie, funnel)
+    - Date range filters (Today, This Week, This Month, This Quarter, This Year, Custom)
+    - Rep/Branch/Source filters
+    - Print-friendly report layouts
+    - Email report scheduling (future enhancement)
+    
+  **Key Dashboards**:
+    - Executive Summary Dashboard (high-level KPIs)
+    - Rep Performance Dashboard (detailed rep metrics)
+    - Sales Pipeline Dashboard (funnel visualization)
+    - Forecast Dashboard (projected conversions based on current pipeline)
+    
+  - **Files**: `src/components/Reports.tsx`, `src/components/SalesLeadReports.tsx`, `src/components/LeadAnalyticsDashboard.tsx`
 
 - [x] **Task 29: Create Lead Activity Logging** ✅
   - Log all lead activities:

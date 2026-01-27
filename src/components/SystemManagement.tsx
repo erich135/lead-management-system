@@ -83,7 +83,12 @@ import {
   Tag,
   History,
   Building2,
-  Cog
+  Cog,
+  Target,
+  TrendingUp,
+  Calendar,
+  MapPin,
+  Banknote
 } from 'lucide-react';
 import { ChangelogViewer } from './ChangelogViewer';
 

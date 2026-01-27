@@ -282,12 +282,12 @@ const SalesLeadReports: React.FC = () => {
 
         {/* Main Content - Report Display */}
         <div className="flex-1 overflow-auto p-6">
-          {selectedCategory === 'overview' && <ExecutiveOverview data={analyticsData} formatCurrency={formatCurrency} />}
-          {selectedCategory === 'performance' && <LeadPerformanceReport data={analyticsData} formatCurrency={formatCurrency} />}
-          {selectedCategory === 'sources' && <SourceAnalysisReport data={analyticsData} formatCurrency={formatCurrency} />}
-          {selectedCategory === 'reps' && <RepPerformanceReport data={analyticsData} formatCurrency={formatCurrency} />}
-          {selectedCategory === 'appointments' && <AppointmentAnalyticsReport data={analyticsData} />}
-          {selectedCategory === 'branches' && <BranchPerformanceReport data={analyticsData} formatCurrency={formatCurrency} />}
+          {analyticsData && selectedCategory === 'overview' && <ExecutiveOverview data={analyticsData} formatCurrency={formatCurrency} />}
+          {analyticsData && selectedCategory === 'performance' && <LeadPerformanceReport data={analyticsData} formatCurrency={formatCurrency} />}
+          {analyticsData && selectedCategory === 'sources' && <SourceAnalysisReport data={analyticsData} formatCurrency={formatCurrency} />}
+          {analyticsData && selectedCategory === 'reps' && <RepPerformanceReport data={analyticsData} formatCurrency={formatCurrency} />}
+          {analyticsData && selectedCategory === 'appointments' && <AppointmentAnalyticsReport data={analyticsData} />}
+          {analyticsData && selectedCategory === 'branches' && <BranchPerformanceReport data={analyticsData} formatCurrency={formatCurrency} />}
         </div>
       </div>
     </div>

@@ -41,8 +41,8 @@ export function SalesLeadForm({ lead, branches, repCodes, onClose, onSave }: Sal
           getServiceDescriptions(),
           getJobSources(),
         ]);
-        setServiceDescriptions(descriptionsData);
-        setJobSources(sourcesData);
+        setServiceDescriptions(descriptionsData.descriptions);
+        setJobSources(sourcesData.sources);
       } catch (err) {
         console.error('Error loading reference data:', err);
       }

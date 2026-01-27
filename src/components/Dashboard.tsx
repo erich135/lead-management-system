@@ -44,7 +44,7 @@ import {
 import { LeadsList } from './LeadsList';
 import { LeadForm } from './LeadForm';
 import { LeadDetails } from './LeadDetails';
-import { SalesLeadsList } from './SalesLeadsList';
+import SalesLeadsContainer from './SalesLeadsContainer';
 import { SalesLeadForm } from './SalesLeadForm';
 import { SalesLeadDetails } from './SalesLeadDetails';
 import { SystemManagement } from './SystemManagement';
@@ -1884,40 +1884,8 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
         )}
 
         {view === 'salesLeads' && hasPermission('sales_leads.read') && (
-          <div className="space-y-6">
-            <SalesLeadsList
-              onCreateLead={() => {
-                setSelectedSalesLead(null);
-                setShowSalesLeadForm(true);
-              }}
-              onSelectLead={(lead) => {
-                setSelectedSalesLead(lead);
-              }}
-              branches={branches}
-              repCodes={repCodes}
-              refreshKey={salesLeadsRefreshKey}
-            />
-
-            {showSalesLeadForm && (
-              <SalesLeadForm
-                lead={selectedSalesLead}
-                branches={branches}
-                repCodes={repCodes}
-                onClose={() => {
-                  setShowSalesLeadForm(false);
-                  setSelectedSalesLead(null);
-                }}
-                onSave={() => {
-                  setSalesLeadsRefreshKey((prev) => prev + 1);
-                }}
-              />
-            )}
-
-            {selectedSalesLead && !showSalesLeadForm && (
-              <SalesLeadDetails
-                lead={selectedSalesLead}
-                branches={branches}
-                repCodes={repCodes}
+          <SalesLeadsContainer />
+        )}
                 onClose={() => setSelectedSalesLead(null)}
                 onEdit={(lead) => {
                   setSelectedSalesLead(lead);

@@ -2361,6 +2361,34 @@ export async function getAppointments(leadId: string): Promise<Appointment[]> {
 }
 
 /**
+ * Get sales lead statistics for dashboard.
+ */
+export async function getSalesLeadStats(): Promise<{
+  totalLeads: number;
+  openLeads: number;
+  pendingConversions: number;
+  conversionRate: number;
+  appointmentsThisWeek: number;
+  upcomingAppointments: number;
+  totalEstimatedValue: number;
+  convertedValue: number;
+  statusCounts: Record<string, number>;
+}> {
+  const response = await apiRequest<{
+    totalLeads: number;
+    openLeads: number;
+    pendingConversions: number;
+    conversionRate: number;
+    appointmentsThisWeek: number;
+    upcomingAppointments: number;
+    totalEstimatedValue: number;
+    convertedValue: number;
+    statusCounts: Record<string, number>;
+  }>('/api/sales-leads/stats');
+  return response;
+}
+
+/**
  * Create an appointment for a sales lead.
  */
 export async function createAppointment(leadId: string, data: {

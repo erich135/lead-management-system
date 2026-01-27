@@ -3,11 +3,58 @@ import { ClipboardList, Calendar, BarChart3 } from 'lucide-react';
 import { SalesLeadsList } from './SalesLeadsList';
 import SalesLeadDiary from './SalesLeadDiary';
 import SalesLeadReports from './SalesLeadReports';
+import { SalesLeadForm } from './SalesLeadForm';
+import { SalesLeadDetails } from './SalesLeadDetails';
+import type { SalesLead, Branch, RepCode } from '../lib/api';
 
 type SalesLeadTab = 'management' | 'diary' | 'reports';
 
-const SalesLeadsContainer: React.FC = () => {
+interface SalesLeadsContainerProps {
+  branches: Branch[];
+  repCodes: RepCode[];
+}
+
+const SalesLeadsContainer: React.FC<SalesLeadsContainerProps> = ({ branches, repCodes }) => {
   const [activeTab, setActiveTab] = useState<SalesLeadTab>('management');
+  const [showLeadForm, setShowLeadForm] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<SalesLead | null>(null);
+  const [editingLead, setEditingLead] = useState<SalesLead | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleCreateLead = () => {
+    setEditingLead(null);
+    setShowLeadForm(true);
+  };
+
+  const handleSelectLead = (lead: SalesLead) => {
+    setSelectedLead(lead);
+  };
+
+  const handleCloseDetails = () => {
+    setSelectedLead(null);
+  };
+
+  const handleEditLead = (lead: SalesLead) => {
+    setEditingLead(lead);
+    setShowLeadForm(true);
+    setSelectedLead(null);
+  };
+
+  const handleCloseForm = () => {
+    setShowLeadForm(false);
+    setEditingLead(null);
+  };
+
+  const handleFormSuccess = () => {
+    setShowLeadForm(false);
+    setEditingLead(null);
+    setRefreshKey(prev => prev + 1);
+  };
+
+  const handleLeadDeleted = () => {
+    setSelectedLead(null);
+    setRefreshKey(prev => prev + 1);
+  };
 
   return (
     <div className="h-full flex flex-col">
@@ -63,10 +110,41 @@ const SalesLeadsContainer: React.FC = () => {
 
       {/* Tab Content */}
       <div className="flex-1 overflow-auto">
-        {activeTab === 'management' && <SalesLeadsList />}
+        {activeTab === 'management' && (
+          <SalesLeadsList
+            onCreateLead={handleCreateLead}
+            onSelectLead={handleSelectLead}
+            branches={branches}
+            repCodes={repCodes}
+            refreshKey={refreshKey}
+          />
+        )}
         {activeTab === 'diary' && <SalesLeadDiary />}
         {activeTab === 'reports' && <SalesLeadReports />}
       </div>
+
+      {/* Lead Form Modal */}
+      {showLeadForm && (
+        <SalesLeadForm
+          lead={editingLead || undefined}
+          onClose={handleCloseForm}
+          onSave={handleFormSuccess}
+          branches={branches}
+          repCodes={repCodes}
+        />
+      )}
+
+      {/* Lead Details Modal */}
+      {selectedLead && (
+        <SalesLeadDetails
+          lead={selectedLead}
+          onClose={handleCloseDetails}
+          onEdit={handleEditLead}
+          onRefresh={handleLeadDeleted}
+          branches={branches}
+          repCodes={repCodes}
+        />
+      )}
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TrendingUp, Users, Target, Calendar, MapPin, DollarSign, Download } from 'lucide-react';
+import { TrendingUp, Users, Target, Calendar, MapPin, Banknote, Download } from 'lucide-react';
 
 type ReportCategory = 'overview' | 'performance' | 'sources' | 'reps' | 'appointments' | 'branches' | 'canvassing';
 
@@ -157,7 +157,7 @@ const ExecutiveOverview: React.FC = () => (
               <p className="text-2xl font-bold text-gray-900 mt-1">R 1.2M</p>
             </div>
             <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <DollarSign className="w-6 h-6 text-purple-600" />
+              <Banknote className="w-6 h-6 text-purple-600" />
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">

@@ -13,7 +13,7 @@ import {
   User,
   Building2,
   Calendar,
-  DollarSign,
+  Banknote,
   FileText,
   Eye,
   Edit,
@@ -583,9 +583,9 @@ export function LeadsList({
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       <div className="flex items-center gap-1">
-                        <DollarSign className="w-3 h-3" />
+                        <Banknote className="w-3 h-3" />
                         {lead.estimated_value 
-                          ? `$${lead.estimated_value.toLocaleString()}` 
+                          ? `R${lead.estimated_value.toLocaleString()}` 
                           : 'Not specified'
                         }
                       </div>

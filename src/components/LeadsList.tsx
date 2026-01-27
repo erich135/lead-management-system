@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { getJobs, updateJob, getCustomers, getTechnicians, getOverdueJobs, getRepCodes, getAdminCodes, getServiceDescriptions, getJobSources, type Job, type Status, type Branch, type Customer, type Technician, type OverdueJob, type RepCode, type AdminCode, type ServiceDescription, type JobSource } from '../lib/api';
-import { Search, Filter, Plus, AlertCircle, Calendar, Eye, Clock, CheckCircle2, X, Zap, FileText, User, Building2, DollarSign, Wrench, Sparkles, ArrowRight, Tag, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Filter, Plus, AlertCircle, Calendar, Eye, Clock, CheckCircle2, X, Zap, FileText, User, Building2, Banknote, Wrench, Sparkles, ArrowRight, Tag, ChevronDown, ChevronUp } from 'lucide-react';
 import { LeadDetails } from './LeadDetails';
 import { useAuth } from '../contexts/AuthContext';
 import { HelpIcon } from './ui';

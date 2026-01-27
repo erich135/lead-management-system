@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar as CalendarIcon, MapPin, Users } from 'lucide-react';
+import { Calendar as CalendarIcon, MapPin } from 'lucide-react';
 import WeeklyPlanner from './WeeklyPlanner';
 import CanvassingPlansList from './CanvassingPlansList';
 

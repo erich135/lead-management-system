@@ -639,7 +639,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
   return (
     <div className="min-h-screen bg-white pb-20 md:pb-0">
       {/* Desktop Navigation */}
-      <nav className={`relative bg-white sticky top-0 z-40 hidden md:block backdrop-blur-md ${isScrolled ? 'shadow-xl' : ''}`}>
+      <nav className={`sticky top-0 z-40 hidden md:block backdrop-blur-md bg-white ${isScrolled ? 'shadow-xl' : ''}`}>
         {/* Subtle pattern overlay */}
         <div className="absolute inset-0 opacity-10" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M20 20.5V18H0v-2h20v-2H0v-2h20v-2H0V8h20V6H0V4h20V2H0V0h22v20h2V0h2v20h2V0h2v20h2V0h2v20h2V0h2v22H0v-2h20zM0 20h2v20H0V20zm4 0h2v20H4V20zm4 0h2v20H8V20zm4 0h2v20h-2V20zm4 0h2v20h-2V20zm4 4h20v2H20v-2zm0 4h20v2H20v-2zm0 4h20v2H20v-2zm0 4h20v2H20v-2z'/%3E%3C/g%3E%3C/svg%3E")`,
@@ -906,7 +906,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
 
       {/* Mobile Top Bar */}
       {isMobile && (
-        <div className={`relative bg-gradient-to-r from-[#0969a9] via-[#0a7bc4] to-[#0c8dd9] sticky top-0 z-40 md:hidden backdrop-blur-md ${isScrolled ? 'shadow-xl' : ''}`}>
+        <div className={`sticky top-0 z-40 md:hidden backdrop-blur-md bg-gradient-to-r from-[#0969a9] via-[#0a7bc4] to-[#0c8dd9] ${isScrolled ? 'shadow-xl' : ''}`}>
           <div className="absolute inset-0 opacity-10" style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M20 20.5V18H0v-2h20v-2H0v-2h20v-2H0V8h20V6H0V4h20V2H0V0h22v20h2V0h2v20h2V0h2v20h2V0h2v20h2V0h2v22H0v-2h20zM0 20h2v20H0V20zm4 0h2v20H4V20zm4 0h2v20H8V20zm4 0h2v20h-2V20zm4 0h2v20h-2V20zm4 4h20v2H20v-2zm0 4h20v2H20v-2zm0 4h20v2H20v-2zm0 4h20v2H20v-2z'/%3E%3C/g%3E%3C/svg%3E")`,
             backgroundRepeat: 'repeat'

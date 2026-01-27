@@ -856,7 +856,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
 
             {/* Priority Checkboxes */}
             <div className="mb-4">
-              <label className="block text-[11px] font-medium text-gray-600 mb-2 flex items-center gap-1">
+              <label className="text-[11px] font-medium text-gray-600 mb-2 flex items-center gap-1">
                 Show Jobs
                 <HelpIcon 
                   content="Filter jobs by their urgency: Overdue (past deadline), Approaching (nearing deadline), Open (on track), or All Jobs (no filter)."

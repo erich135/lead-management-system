@@ -664,7 +664,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
             )}
 
             <div>
-              <label className="block text-[14px] font-semibold text-slate-900 mb-2 flex items-center gap-1">
+              <label className="text-[14px] font-semibold text-slate-900 mb-2 flex items-center gap-1">
                 Customer Type
                 <HelpIcon 
                   content={helpContent.jobs.customer + ' ' + helpContent.jobs.cashCustomer}
@@ -855,7 +855,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
             </div>
 
             <div>
-              <label className="block text-[14px] font-semibold text-slate-900 mb-2 flex items-center gap-1">
+              <label className="text-[14px] font-semibold text-slate-900 mb-2 flex items-center gap-1">
                 Branch *
                 <HelpIcon 
                   content={helpContent.filters.branch}
@@ -881,7 +881,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
             </div>
 
             <div>
-              <label className="block text-[14px] font-semibold text-slate-900 mb-2 flex items-center gap-1">
+              <label className="text-[14px] font-semibold text-slate-900 mb-2 flex items-center gap-1">
                 Initial Status *
                 <HelpIcon 
                   content={helpContent.jobs.status}
@@ -1000,7 +1000,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
             </div>
 
             <div>
-              <label className="block text-[14px] font-semibold text-slate-900 mb-2 flex items-center gap-1">
+              <label className="text-[14px] font-semibold text-slate-900 mb-2 flex items-center gap-1">
                 Value (ex VAT)
                 <HelpIcon 
                   content={helpContent.jobs.valueExVat}
@@ -1018,7 +1018,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
             </div>
 
             <div>
-              <label className="block text-[14px] font-semibold text-slate-900 mb-2 flex items-center gap-1">
+              <label className="text-[14px] font-semibold text-slate-900 mb-2 flex items-center gap-1">
                 Start Date
                 <HelpIcon 
                   content={helpContent.jobs.startDate}
@@ -1035,7 +1035,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
             </div>
 
             <div>
-              <label className="block text-[14px] font-semibold text-slate-900 mb-2 flex items-center gap-1">
+              <label className="text-[14px] font-semibold text-slate-900 mb-2 flex items-center gap-1">
                 Date Quoted
                 <HelpIcon 
                   content={helpContent.jobs.dateQuoted}
@@ -1054,7 +1054,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
             {/* Machines Selection - Show if customer or cash customer is selected, OR if Rental branch is selected */}
             {(formData.customer || (customerSelection === 'cash' && formData.cashCustomer) || isRentalBranch) && (
               <div ref={machinesSectionRef} className="md:col-span-2">
-                <label className="block text-[14px] font-semibold text-slate-900 mb-2 flex items-center gap-2">
+                <label className="text-[14px] font-semibold text-slate-900 mb-2 flex items-center gap-2">
                   <Wrench className="w-4 h-4 text-ars-primary" />
                   {isRentalBranch ? 'Rental Fleet Machines' : 'Machines'}
                   {isRentalBranch && (

@@ -2326,7 +2326,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
                 {/* Date Range Preset */}
                 <div>
-                  <label className="block text-[11px] font-medium text-gray-600 mb-1 flex items-center gap-2">
+                  <label className="text-[11px] font-medium text-gray-600 mb-1 flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
                     Date Range
                   </label>
@@ -3682,7 +3682,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium text-gray-600 mb-1 flex items-center gap-2">
+                  <label className="text-[11px] font-medium text-gray-600 mb-1 flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
                     Date Range
                   </label>

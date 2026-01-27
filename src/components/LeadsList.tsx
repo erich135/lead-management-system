@@ -1438,7 +1438,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                                     // Get machine types from job.machines
                                     const typeCounts: Record<string, number> = {};
                                     job.machines.forEach(m => {
-                                      const type = m.machineType || 'Machine';
+                                      const type = (typeof m === 'object' ? (m as any).machineType : null) || 'Machine';
                                       typeCounts[type] = (typeCounts[type] || 0) + 1;
                                     });
                                     const typeLabels = Object.entries(typeCounts)

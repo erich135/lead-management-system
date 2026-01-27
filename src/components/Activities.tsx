@@ -375,7 +375,7 @@ export function Activities() {
                           activity.description.toLowerCase().includes(searchLower) ||
                           activity.action.toLowerCase().includes(searchLower) ||
                           activity.resourceType.toLowerCase().includes(searchLower) ||
-                          (activity.userId?.email?.toLowerCase().includes(searchLower) || false)
+                          (typeof activity.userId === 'object' && activity.userId?.email?.toLowerCase().includes(searchLower)) || false
                         );
                       })
                       .map((activity) => (

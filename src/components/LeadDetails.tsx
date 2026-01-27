@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getJob, updateJob, getMachinesByCustomer, createMachine, updateMachine, getTechnicians, getRepCodes, getCustomers, getActivities, getServiceDescriptions, getJobSources, deleteJob, uploadRSRDocument, getRSRDocuments, getRSRDocumentUrl, deleteRSRDocument, createJobNote, getJobNotes, uploadJobNoteAttachment, getJobNoteAttachmentUrl, deleteJobNote, type Job, type Status, type Branch, type Machine, type Technician, type RepCode, type Customer, type Activity, type ServiceDescription, type JobSource, type OverdueJob, type JobRSRDocument, type JobNote, type JobNoteAttachment } from '../lib/api';
-import { X, Edit, Save, Clock, User, Trash2, FileText, Paperclip, Upload, Download, Plus, ChevronDown, ChevronUp, Eye, Image } from 'lucide-react';
+import { X, Edit, Save, Clock, User, Trash2, FileText, Paperclip, Upload, Download, Plus, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 import { HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
 
@@ -504,8 +504,8 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
       await updateJob(job._id, {
         ...updateData,
         // Add internal notes about cancellation
-        internalNotes: job.internalNotes 
-          ? `${job.internalNotes}\n\n[${new Date().toLocaleString()}] Quotation cancelled after ${job.quoteRefreshCount || 0} quote refreshes.`
+        notes: job.notes 
+          ? `${job.notes}\n\n[${new Date().toLocaleString()}] Quotation cancelled after ${job.quoteRefreshCount || 0} quote refreshes.`
           : `[${new Date().toLocaleString()}] Quotation cancelled after ${job.quoteRefreshCount || 0} quote refreshes.`,
       } as Partial<Job>);
       
@@ -1315,7 +1315,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                   <label className="block text-[14px] font-semibold text-slate-900 mb-2">Branch</label>
                   {isEditing ? (
                     <select
-                      value={job.branch._id}
+                      value={job.branch?._id || ''}
                       onChange={(e) => {
                         const branch = branches.find(b => b._id === e.target.value);
                         if (branch) {
@@ -1527,7 +1527,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                     <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
                       {(job.bookings || []).length > 0 ? (
                         <ul className="space-y-1">
-                          {job.bookings.map((booking, idx) => {
+                          {job.bookings?.map((booking, idx) => {
                             const tech = technicians.find(t => t._id === booking.technicianId);
                             const startDate = booking.startDate ? booking.startDate.split('T')[0] : '';
                             const endDate = booking.endDate ? booking.endDate.split('T')[0] : '';
@@ -1834,7 +1834,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                     </select>
                   ) : (
                     <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
-                      <span className="text-ars-heading text-[15px]">{job.description?.name || '-'}</span>
+                      <span className="text-ars-heading text-[15px]">{typeof job.description === 'object' ? job.description?.name : '-'}</span>
                     </div>
                   )}
                 </div>
@@ -1877,7 +1877,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                   ) : (
                     <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
                       <span className="text-ars-heading text-[15px]">
-                        {job.jobSource && typeof job.jobSource === 'object' ? job.jobSource.name : (job.jobSource || '-')}
+                        {job.jobSource && typeof job.jobSource === 'object' ? job.jobSource.name : (typeof job.jobSource === 'string' ? job.jobSource : '-')}
                       </span>
                     </div>
                   )}
@@ -2035,6 +2035,8 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                           serialNumber: '',
                           machineHours: '',
                           nextServiceHours: '',
+                          lastServiceDate: '',
+                          nextServiceDate: '',
                         });
                         setShowNewMachineForm(!showNewMachineForm);
                       }}
@@ -2742,7 +2744,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                     // Filter out "view" activities - we only want to see actual changes
                     .filter((activity) => activity.action !== 'view')
                     .map((activity) => {
-                    const userName = activity.userId
+                    const userName = activity.userId && typeof activity.userId === 'object'
                       ? `${activity.userId.firstName || ''} ${activity.userId.lastName || ''}`.trim() || activity.userId.email
                       : 'System';
                     const formattedDate = formatDateTime(activity.createdAt);

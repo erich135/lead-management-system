@@ -34,7 +34,6 @@ import {
   Calendar,
   Clock,
   CheckCircle2,
-  Zap,
   Shield,
   User,
   Building2,
@@ -45,8 +44,6 @@ import { LeadsList } from './LeadsList';
 import { LeadForm } from './LeadForm';
 import { LeadDetails } from './LeadDetails';
 import SalesLeadsContainer from './SalesLeadsContainer';
-import { SalesLeadForm } from './SalesLeadForm';
-import { SalesLeadDetails } from './SalesLeadDetails';
 import { LeadStatsWidget } from './LeadStatsWidget';
 import { SystemManagement } from './SystemManagement';
 import { Reports } from './Reports';
@@ -110,9 +107,6 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
   const [showNotificationPanel, setShowNotificationPanel] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
-  const [showSalesLeadForm, setShowSalesLeadForm] = useState(false);
-  const [selectedSalesLead, setSelectedSalesLead] = useState<SalesLead | null>(null);
-  const [salesLeadsRefreshKey, setSalesLeadsRefreshKey] = useState(0);
   const [isScrolled, setIsScrolled] = useState(false);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -305,27 +299,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
     return null;
   }
 
-  /**
-   * Gets the technician name from a job's techBooked field (which can be a string ID or an object)
-   * @deprecated Currently unused but kept for potential future use
-   */
-  function _getTechnicianNameFromJob(job: Job): string | null {
-    if (!job.techBooked) return null;
-    
-    // If techBooked is already an object with name, use it
-    if (typeof job.techBooked === 'object' && 'name' in job.techBooked) {
-      return job.techBooked.name;
-    }
-    
-    // If techBooked is a string ID, look it up from technicians array
-    if (typeof job.techBooked === 'string') {
-      const techBookedId = job.techBooked;
-      const technician = technicians.find(t => t._id === techBookedId);
-      return technician ? technician.name : null;
-    }
-    
-    return null;
-  }
+
 
   function formatDate(dateString?: string | Date) {
     if (!dateString) return '-';

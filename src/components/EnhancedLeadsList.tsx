@@ -46,7 +46,7 @@ export function LeadsList({
   onLeadClick, 
   onCreateLead 
 }: LeadsListProps) {
-  const { profile, isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [filteredLeads, setFilteredLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -142,11 +142,11 @@ export function LeadsList({
     // Assignee filter
     if (filters.assignee !== 'all') {
       if (filters.assignee === 'unassigned') {
-        filtered = filtered.filter(lead => !lead.assigned_to);
-      } else if (filters.assignee === 'me' && profile) {
-        filtered = filtered.filter(lead => lead.assigned_to === profile.id);
+        filtered = filtered.filter(lead => !lead.assigned_rep);
+      } else if (filters.assignee === 'me' && user) {
+        filtered = filtered.filter(lead => lead.assigned_rep === user.id);
       } else {
-        filtered = filtered.filter(lead => lead.assigned_to === filters.assignee);
+        filtered = filtered.filter(lead => lead.assigned_rep === filters.assignee);
       }
     }
 
@@ -578,7 +578,7 @@ export function LeadsList({
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       <div className="flex items-center gap-1">
                         <User className="w-3 h-3" />
-                        {lead.assigned_user?.full_name || 'Unassigned'}
+                        {lead.assigned_rep_user?.full_name || 'Unassigned'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

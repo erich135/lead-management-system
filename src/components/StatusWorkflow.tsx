@@ -21,7 +21,7 @@ interface StatusWorkflowProps {
 }
 
 export function StatusWorkflow({ lead, statuses, onStatusChange, onClose }: StatusWorkflowProps) {
-  const { profile } = useAuth();
+  const { user } = useAuth();
   const [selectedStatus, setSelectedStatus] = useState(lead.current_status_id || '');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [notes, setNotes] = useState('');
@@ -79,7 +79,7 @@ export function StatusWorkflow({ lead, statuses, onStatusChange, onClose }: Stat
             file_path: fileName,
             file_size: file.size,
             file_type: file.type,
-            uploaded_by: profile?.id
+            uploaded_by: user?.id
           });
 
         if (dbError) throw dbError;

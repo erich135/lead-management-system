@@ -172,32 +172,6 @@ export function Diary() {
   }, [techFilter, allJobs, allTechnicians, currentUser]);
 
   /**
-   * Formats a date string for display.
-   */
-  function formatDate(date: string | Date | undefined): string {
-    if (!date) return '';
-    try {
-      const d = typeof date === 'string' ? new Date(date) : date;
-      return d.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
-    } catch {
-      return '';
-    }
-  }
-
-  /**
-   * Formats time from date or returns empty string.
-   */
-  function formatTime(date: string | Date | undefined): string {
-    if (!date) return '';
-    try {
-      const d = typeof date === 'string' ? new Date(date) : date;
-      return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-    } catch {
-      return '';
-    }
-  }
-
-  /**
    * Filters jobs based on selected filters and search term.
    */
   const filtered = useMemo(() => {
@@ -314,7 +288,7 @@ export function Diary() {
           '-',
           job.branch?.name || '',
           job.status?.name || '',
-          job.description?.name || '',
+          (typeof job.description === 'object' ? job.description?.name : job.description) || '',
         ]);
       } else {
         job.bookings.forEach(booking => {
@@ -329,7 +303,7 @@ export function Diary() {
             tech?.name || booking.technicianName || '-',
             job.branch?.name || '',
             job.status?.name || '',
-            job.description?.name || '',
+            (typeof job.description === 'object' ? job.description?.name : job.description) || '',
           ]);
         });
       }
@@ -359,14 +333,14 @@ export function Diary() {
     printWindow.document.write(`<table><thead><tr><th>Date Booked</th><th>Job #</th><th>Customer</th><th>Technician</th><th>Branch</th><th>Status</th><th>Description</th></tr></thead><tbody>`);
     filtered.forEach((job) => {
       if (!job.bookings || job.bookings.length === 0) {
-        printWindow!.document.write(`<tr><td>-</td><td>${job.jobNumber || ''}</td><td>${job.customer?.name || job.cashCustomer || ''}</td><td>-</td><td>${job.branch?.name || ''}</td><td>${job.status?.name || ''}</td><td>${job.description?.name || ''}</td></tr>`);
+        printWindow!.document.write(`<tr><td>-</td><td>${job.jobNumber || ''}</td><td>${job.customer?.name || job.cashCustomer || ''}</td><td>-</td><td>${job.branch?.name || ''}</td><td>${job.status?.name || ''}</td><td>${(typeof job.description === 'object' ? job.description?.name : job.description) || ''}</td></tr>`);
       } else {
         job.bookings.forEach(booking => {
           const tech = technicians.find(t => t._id === booking.technicianId);
           const startDate = booking.startDate ? new Date(booking.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
           const endDate = booking.endDate ? new Date(booking.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
           const dateRange = startDate === endDate ? startDate : `${startDate} to ${endDate}`;
-          printWindow!.document.write(`<tr><td>${dateRange}</td><td>${job.jobNumber || ''}</td><td>${job.customer?.name || job.cashCustomer || ''}</td><td>${tech?.name || booking.technicianName || '-'}</td><td>${job.branch?.name || ''}</td><td>${job.status?.name || ''}</td><td>${job.description?.name || ''}</td></tr>`);
+          printWindow!.document.write(`<tr><td>${dateRange}</td><td>${job.jobNumber || ''}</td><td>${job.customer?.name || job.cashCustomer || ''}</td><td>${tech?.name || booking.technicianName || '-'}</td><td>${job.branch?.name || ''}</td><td>${job.status?.name || ''}</td><td>${(typeof job.description === 'object' ? job.description?.name : job.description) || ''}</td></tr>`);
         });
       }
     });
@@ -659,7 +633,7 @@ export function Diary() {
                             </span>
                           </td>
                           <td className="px-6 py-4 text-sm text-ars-body">
-                            {job.description?.name || '-'}
+                            {typeof job.description === 'object' ? job.description?.name : job.description || '-'}
                           </td>
                         </tr>
                       );
@@ -693,7 +667,7 @@ export function Diary() {
                             </span>
                           </td>
                           <td className="px-6 py-4 text-sm text-ars-body">
-                            {job.description?.name || '-'}
+                            {typeof job.description === 'object' ? job.description?.name : job.description || '-'}
                           </td>
                         </tr>
                       );
@@ -868,7 +842,7 @@ function CalendarView({ jobs, statuses, branches, technicians, onUpdate, selecte
         </div>
         <div className="space-y-1 overflow-y-auto max-h-[90px]">
           {bookingsForDate.map((bookingInfo, idx) => {
-            const { job, techId, techName } = bookingInfo;
+            const { job, techName } = bookingInfo;
             return (
               <div
                 key={idx}
@@ -959,9 +933,5 @@ function CalendarView({ jobs, statuses, branches, technicians, onUpdate, selecte
       )}
     </div>
   );
-}
-
-function formatTimeShort(date: Date): string {
-  return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 

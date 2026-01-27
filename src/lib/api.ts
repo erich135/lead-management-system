@@ -401,7 +401,7 @@ export interface Job {
   storePackDate?: string | Date;
   invoiceDate?: string | Date;
   invNumber?: string;
-  branch: {
+  branch?: {
     _id: string;
     name: string;
   };

@@ -1388,7 +1388,7 @@ alert((response as any).message || 'User invited successfully');
                         
                         return (
                           <select
-                            value={selectedUser.adminCode && typeof selectedUser.adminCode === 'object' ? selectedUser.adminCode._id : (selectedUser.adminCode || '')}
+                            value={selectedUser.adminCode && typeof selectedUser.adminCode === 'object' ? selectedUser.adminCode._id : (typeof selectedUser.adminCode === 'string' ? selectedUser.adminCode : '')}
                             onChange={(e) => {
                               const adminCodeId = e.target.value || null;
                               const adminCode = adminCodeId ? adminCodes.find(ac => ac._id === adminCodeId) : null;

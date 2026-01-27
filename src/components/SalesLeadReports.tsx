@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TrendingUp, Users, Target, Calendar, MapPin, DollarSign, Download, Filter } from 'lucide-react';
+import { TrendingUp, Users, Target, Calendar, MapPin, DollarSign, Download } from 'lucide-react';
 
 type ReportCategory = 'overview' | 'performance' | 'sources' | 'reps' | 'appointments' | 'branches' | 'canvassing';
 

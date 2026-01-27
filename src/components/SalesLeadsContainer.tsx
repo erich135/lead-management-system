@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ClipboardList, Calendar, BarChart3 } from 'lucide-react';
-import SalesLeadsList from './SalesLeadsList';
+import { SalesLeadsList } from './SalesLeadsList';
 import SalesLeadDiary from './SalesLeadDiary';
 import SalesLeadReports from './SalesLeadReports';
 

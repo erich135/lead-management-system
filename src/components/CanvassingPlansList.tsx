@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, Calendar, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 
 const CanvassingPlansList: React.FC = () => {
   return (

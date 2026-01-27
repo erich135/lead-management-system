@@ -25,7 +25,7 @@ import {
   type Branch,
   type RepCode,
 } from '../lib/api';
-import { AppointmentScheduler } from './AppointmentScheduler';
+import AppointmentScheduler from './AppointmentScheduler';
 
 interface SalesLeadDetailsProps {
   lead: SalesLead;

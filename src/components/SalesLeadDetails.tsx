@@ -44,9 +44,12 @@ export function SalesLeadDetails({ lead, branches, repCodes, onClose, onEdit, on
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [showConvertDialog, setShowConvertDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showLostReasonDialog, setShowLostReasonDialog] = useState(false);
   const [selectedRep, setSelectedRep] = useState('');
   const [conversionNotes, setConversionNotes] = useState('');
   const [deleteReason, setDeleteReason] = useState('');
+  const [lostReason, setLostReason] = useState('');
+  const [pendingStatus, setPendingStatus] = useState<SalesLead['status'] | null>(null);
 
   const canUpdate = hasPermission('sales_leads.update');
   const isSalesManager = user?.role?.name?.toLowerCase().includes('sales') && user?.role?.name?.toLowerCase().includes('manager');
@@ -138,17 +141,54 @@ export function SalesLeadDetails({ lead, branches, repCodes, onClose, onEdit, on
   }
 
   async function handleStatusChange(newStatus: SalesLead['status']) {
+    // Check if user is trying to mark as lost
+    if (newStatus === 'lost') {
+      setPendingStatus(newStatus);
+      setShowLostReasonDialog(true);
+      return;
+    }
+
+    // Proceed with status update
+    await executeStatusChange(newStatus);
+  }
+
+  async function executeStatusChange(newStatus: SalesLead['status'], reason?: string) {
     setLoading(true);
     setError(null);
 
     try {
-      await updateSalesLead(lead._id, { status: newStatus });
+      const updateData: any = { status: newStatus };
+      
+      // Add lostReason if marking as lost
+      if (newStatus === 'lost' && reason) {
+        updateData.lostReason = reason;
+      }
+
+      await updateSalesLead(lead._id, updateData);
       onRefresh();
+      
+      // Close lost reason dialog if it was open
+      if (showLostReasonDialog) {
+        setShowLostReasonDialog(false);
+        setLostReason('');
+        setPendingStatus(null);
+      }
     } catch (err: any) {
       console.error('Error updating status:', err);
       setError(err.message || 'Failed to update status');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleLostReasonSubmit() {
+    if (!lostReason.trim()) {
+      setError('Please provide a reason for marking this lead as lost');
+      return;
+    }
+
+    if (pendingStatus) {
+      await executeStatusChange(pendingStatus, lostReason);
     }
   }
 
@@ -538,6 +578,74 @@ export function SalesLeadDetails({ lead, branches, repCodes, onClose, onEdit, on
                 className="bg-red-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Deleting...' : 'Delete Lead'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lost Reason Dialog */}
+      {showLostReasonDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="flex-shrink-0 w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                <AlertCircle className="w-6 h-6 text-orange-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  Mark Lead as Lost
+                </h3>
+                <p className="text-gray-700 mb-2">
+                  You are about to mark this lead as lost:
+                </p>
+                <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                  <p className="font-semibold text-gray-900">{lead.leadNumber}</p>
+                  <p className="text-gray-700">{lead.companyName}</p>
+                </div>
+              </div>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-bold text-gray-900 mb-2">
+                Reason for Loss <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={lostReason}
+                onChange={(e) => setLostReason(e.target.value)}
+                rows={3}
+                required
+                autoFocus
+                className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                placeholder="Why was this lead lost? (e.g., chose competitor, budget constraints, timing issues...)"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                This information helps improve our sales process.
+              </p>
+            </div>
+            {error && (
+              <div className="bg-red-50 border-2 border-red-200 rounded-lg p-3 mb-4">
+                <p className="text-red-800 text-sm font-medium">{error}</p>
+              </div>
+            )}
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowLostReasonDialog(false);
+                  setLostReason('');
+                  setPendingStatus(null);
+                  setError(null);
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50"
+                disabled={loading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleLostReasonSubmit}
+                disabled={loading || !lostReason.trim()}
+                className="bg-orange-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Updating...' : 'Mark as Lost'}
               </button>
             </div>
           </div>

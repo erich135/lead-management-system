@@ -257,12 +257,6 @@ export function SalesLeadDetails({ lead, branches, repCodes, onClose, onEdit, on
                   Delete
                 </button>
               )}
-                  className="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors flex items-center gap-2 disabled:opacity-50"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete
-                </button>
-              )}
             </div>
           </div>
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Save, Loader2 } from 'lucide-react';
-import { createSalesLead, updateSalesLead, type SalesLead, type Branch, type RepCode } from '../lib/api';
+import { createSalesLead, updateSalesLead, getServiceDescriptions, getJobSources, type SalesLead, type Branch, type RepCode, type ServiceDescription, type JobSource } from '../lib/api';
 
 interface SalesLeadFormProps {
   lead?: SalesLead | null;
@@ -13,6 +13,8 @@ interface SalesLeadFormProps {
 export function SalesLeadForm({ lead, branches, repCodes, onClose, onSave }: SalesLeadFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [serviceDescriptions, setServiceDescriptions] = useState<ServiceDescription[]>([]);
+  const [jobSources, setJobSources] = useState<JobSource[]>([]);
   const [formData, setFormData] = useState({
     companyName: '',
     contactPerson: '',
@@ -21,12 +23,32 @@ export function SalesLeadForm({ lead, branches, repCodes, onClose, onSave }: Sal
     contactAddress: '',
     branch: '',
     assignedRep: '',
+    adminCode: '', // Auto-set from rep code
     leadSource: 'Other',
     priority: 'medium' as 'low' | 'medium' | 'high',
     estimatedValue: '',
+    serviceDescription: '', // For job conversion
+    jobSource: '', // For job conversion
     notes: '',
     status: 'new' as SalesLead['status'],
   });
+
+  useEffect(() => {
+    // Load service descriptions and job sources
+    async function loadReferenceData() {
+      try {
+        const [descriptionsData, sourcesData] = await Promise.all([
+          getServiceDescriptions(),
+          getJobSources(),
+        ]);
+        setServiceDescriptions(descriptionsData);
+        setJobSources(sourcesData);
+      } catch (err) {
+        console.error('Error loading reference data:', err);
+      }
+    }
+    loadReferenceData();
+  }, []);
 
   useEffect(() => {
     if (lead) {
@@ -38,9 +60,12 @@ export function SalesLeadForm({ lead, branches, repCodes, onClose, onSave }: Sal
         contactAddress: lead.contactAddress || '',
         branch: typeof lead.branch === 'object' ? lead.branch._id : lead.branch,
         assignedRep: lead.assignedRep ? (typeof lead.assignedRep === 'object' ? lead.assignedRep._id : lead.assignedRep) : '',
+        adminCode: (lead as any).adminCode || '',
         leadSource: lead.leadSource || 'Other',
         priority: lead.priority || 'medium',
         estimatedValue: lead.estimatedValue?.toString() || '',
+        serviceDescription: (lead as any).serviceDescription || '',
+        jobSource: (lead as any).jobSource || '',
         notes: lead.notes || '',
         status: lead.status,
       });
@@ -73,8 +98,20 @@ export function SalesLeadForm({ lead, branches, repCodes, onClose, onSave }: Sal
         payload.assignedRep = formData.assignedRep;
       }
 
+      if (formData.adminCode) {
+        payload.adminCode = formData.adminCode;
+      }
+
       if (formData.estimatedValue) {
         payload.estimatedValue = parseFloat(formData.estimatedValue);
+      }
+
+      if (formData.serviceDescription) {
+        payload.serviceDescription = formData.serviceDescription;
+      }
+
+      if (formData.jobSource) {
+        payload.jobSource = formData.jobSource;
       }
 
       if (lead) {
@@ -224,17 +261,41 @@ export function SalesLeadForm({ lead, branches, repCodes, onClose, onSave }: Sal
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Assigned Rep
+                  Assigned Rep <span className="text-red-500">*</span>
                 </label>
                 <select
+                  required
                   value={formData.assignedRep}
-                  onChange={(e) => handleChange('assignedRep', e.target.value)}
+                  onChange={(e) => {
+                    const selectedRepId = e.target.value;
+                    const selectedRep = repCodes.find(rc => rc._id === selectedRepId);
+                    
+                    // Auto-populate branch and admin code if rep has them linked (same as LeadForm logic)
+                    if (selectedRep) {
+                      const updates: any = { assignedRep: selectedRepId };
+                      
+                      if (selectedRep.adminCode) {
+                        updates.adminCode = selectedRep.adminCode;
+                      }
+                      
+                      if (selectedRep.branch) {
+                        const branchId = typeof selectedRep.branch === 'object' 
+                          ? selectedRep.branch._id 
+                          : selectedRep.branch;
+                        updates.branch = branchId;
+                      }
+                      
+                      setFormData({ ...formData, ...updates });
+                    } else {
+                      handleChange('assignedRep', selectedRepId);
+                    }
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                 >
-                  <option value="">Unassigned</option>
+                  <option value="">Select Rep</option>
                   {repCodes.map((rep) => (
                     <option key={rep._id} value={rep._id}>
-                      {rep.description || rep.code}
+                      {rep.code} - {rep.description || ''}
                     </option>
                   ))}
                 </select>
@@ -291,6 +352,46 @@ export function SalesLeadForm({ lead, branches, repCodes, onClose, onSave }: Sal
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                   placeholder="0.00"
                 />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Service Description <span className="text-red-500">*</span>
+                  <span className="text-xs text-gray-500 ml-1">(Required for job conversion)</span>
+                </label>
+                <select
+                  required
+                  value={formData.serviceDescription}
+                  onChange={(e) => handleChange('serviceDescription', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                >
+                  <option value="">Select Service Description</option>
+                  {serviceDescriptions.map((desc) => (
+                    <option key={desc._id} value={desc._id}>
+                      {desc.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Job Source <span className="text-red-500">*</span>
+                  <span className="text-xs text-gray-500 ml-1">(Required for job conversion)</span>
+                </label>
+                <select
+                  required
+                  value={formData.jobSource}
+                  onChange={(e) => handleChange('jobSource', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                >
+                  <option value="">Select Job Source</option>
+                  {jobSources.map((source) => (
+                    <option key={source._id} value={source._id}>
+                      {source.name}{source.isDefault ? ' (Default)' : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {isEditMode && (

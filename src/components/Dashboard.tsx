@@ -666,6 +666,19 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                   <LayoutDashboard className={`w-4 h-4 transition-transform ${view === 'dashboard' ? 'scale-110' : ''}`} />
                   <span>Dashboard</span>
                 </Link>
+                {(isSuperAdmin || hasPermission('sales_leads.read')) && (
+                  <Link
+                    to="/sales-leads"
+                    className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
+                      view === 'salesLeads'
+                        ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
+                        : 'text-[#383838] hover:text-[#f7c12b]'
+                    }`}
+                  >
+                    <User className={`w-4 h-4 transition-transform ${view === 'salesLeads' ? 'scale-110' : ''}`} />
+                    <span>Sales Leads</span>
+                  </Link>
+                )}
                 <Link
                   to="/jobs"
                   className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${

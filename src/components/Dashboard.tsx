@@ -1886,19 +1886,6 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
         {view === 'salesLeads' && hasPermission('sales_leads.read') && (
           <SalesLeadsContainer />
         )}
-                onClose={() => setSelectedSalesLead(null)}
-                onEdit={(lead) => {
-                  setSelectedSalesLead(lead);
-                  setShowSalesLeadForm(true);
-                }}
-                onRefresh={() => {
-                  setSalesLeadsRefreshKey((prev) => prev + 1);
-                  setSelectedSalesLead(null);
-                }}
-              />
-            )}
-          </div>
-        )}
 
         {view === 'salesLeads' && !hasPermission('sales_leads.read') && (
           <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">

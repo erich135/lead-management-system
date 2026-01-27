@@ -482,6 +482,10 @@ This system adds a complete Sales Lead workflow to the existing job management s
 4. **Permissions**: Sales reps locked to Leads tab only
 5. **Lead Statuses**: New → Assigned → Appointment Set → Appointment Attended → RFC Requested → Converted/Lost
 6. **Data Reuse**: Lead form includes key job fields (Branch, Rep Code, Service Description, Value) for smooth conversion
+7. **UI Structure**: Tabbed layout with 3 main sections (similar to System Admin page):
+   - **Lead Management Tab**: Kanban board, pipeline, CRUD operations
+   - **Diary Tab**: Weekly planner, appointments, canvassing plans
+   - **Reports Tab**: Comprehensive analytics with 7 report categories
 
 ---
 

@@ -2225,6 +2225,259 @@ export async function markTicketAsReadBySupport(ticketId: string): Promise<void>
   });
 }
 
+// ============================================================================
+// Sales Lead Management
+// ============================================================================
+
+import type { SalesLead, SalesLeadWithDetails, Appointment, CanvassingPlan } from '../types';
+
+/**
+ * Get all sales leads with optional filtering.
+ */
+export async function getSalesLeads(params?: {
+  status?: string;
+  branch?: string;
+  assignedRep?: string;
+  leadSource?: string;
+  priority?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}): Promise<{ leads: SalesLead[]; pagination: { page: number; limit: number; total: number; pages: number } }> {
+  const queryParams = new URLSearchParams();
+  if (params?.status) queryParams.append('status', params.status);
+  if (params?.branch) queryParams.append('branch', params.branch);
+  if (params?.assignedRep) queryParams.append('assignedRep', params.assignedRep);
+  if (params?.leadSource) queryParams.append('leadSource', params.leadSource);
+  if (params?.priority) queryParams.append('priority', params.priority);
+  if (params?.search) queryParams.append('search', params.search);
+  if (params?.page) queryParams.append('page', params.page.toString());
+  if (params?.limit) queryParams.append('limit', params.limit.toString());
+  if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
+  if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+  
+  const query = queryParams.toString();
+  const response = await apiRequest<{ leads: SalesLead[]; pagination: { page: number; limit: number; total: number; pages: number } }>(`/api/sales-leads${query ? `?${query}` : ''}`);
+  return response;
+}
+
+/**
+ * Get a single sales lead by ID with full details.
+ */
+export async function getSalesLead(id: string): Promise<SalesLeadWithDetails> {
+  const response = await apiRequest<{ lead: SalesLead; appointments: Appointment[] }>(`/api/sales-leads/${id}`);
+  return {
+    ...response.lead,
+    appointments: response.appointments,
+  };
+}
+
+/**
+ * Create a new sales lead.
+ */
+export async function createSalesLead(data: {
+  companyName: string;
+  contactPerson: string;
+  contactEmail?: string;
+  contactPhone: string;
+  contactAddress?: string;
+  branch: string;
+  assignedRep?: string;
+  leadSource: string;
+  serviceDescription?: string;
+  estimatedValue?: number;
+  priority?: string;
+  notes?: string;
+}): Promise<SalesLead> {
+  const response = await apiRequest<SalesLead>('/api/sales-leads', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  return response;
+}
+
+/**
+ * Update an existing sales lead.
+ */
+export async function updateSalesLead(id: string, data: Partial<SalesLead>): Promise<SalesLead> {
+  const response = await apiRequest<SalesLead>(`/api/sales-leads/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+  return response;
+}
+
+/**
+ * Delete a sales lead (soft delete).
+ */
+export async function deleteSalesLead(id: string): Promise<void> {
+  await apiRequest(`/api/sales-leads/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Assign a sales lead to a rep.
+ */
+export async function assignSalesLead(id: string, repCode: string): Promise<SalesLead> {
+  const response = await apiRequest<SalesLead>(`/api/sales-leads/${id}/assign`, {
+    method: 'PUT',
+    body: JSON.stringify({ repCode }),
+  });
+  return response;
+}
+
+/**
+ * Convert a sales lead to a job.
+ */
+export async function convertSalesLeadToJob(id: string, jobData: any): Promise<{ lead: SalesLead; job: any }> {
+  const response = await apiRequest<{ lead: SalesLead; job: any }>(`/api/sales-leads/${id}/convert`, {
+    method: 'POST',
+    body: JSON.stringify(jobData),
+  });
+  return response;
+}
+
+/**
+ * Get appointments for a sales lead.
+ */
+export async function getAppointments(leadId: string): Promise<Appointment[]> {
+  const response = await apiRequest<Appointment[]>(`/api/sales-leads/${leadId}/appointments`);
+  return response;
+}
+
+/**
+ * Create an appointment for a sales lead.
+ */
+export async function createAppointment(leadId: string, data: {
+  appointmentDate: string;
+  appointmentTime: string;
+  location: string;
+  purpose?: string;
+  notes?: string;
+}): Promise<Appointment> {
+  const response = await apiRequest<Appointment>(`/api/sales-leads/${leadId}/appointments`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  return response;
+}
+
+/**
+ * Update an appointment.
+ */
+export async function updateAppointment(leadId: string, appointmentId: string, data: Partial<Appointment>): Promise<Appointment> {
+  const response = await apiRequest<Appointment>(`/api/sales-leads/${leadId}/appointments/${appointmentId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+  return response;
+}
+
+/**
+ * Get all canvassing plans with optional filtering.
+ */
+export async function getCanvassingPlans(params?: {
+  status?: string;
+  repCode?: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}): Promise<{ plans: CanvassingPlan[]; pagination: { page: number; limit: number; total: number; pages: number } }> {
+  const queryParams = new URLSearchParams();
+  if (params?.status) queryParams.append('status', params.status);
+  if (params?.repCode) queryParams.append('repCode', params.repCode);
+  if (params?.startDate) queryParams.append('startDate', params.startDate);
+  if (params?.endDate) queryParams.append('endDate', params.endDate);
+  if (params?.page) queryParams.append('page', params.page.toString());
+  if (params?.limit) queryParams.append('limit', params.limit.toString());
+  if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
+  if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+  
+  const query = queryParams.toString();
+  const response = await apiRequest<{ plans: CanvassingPlan[]; pagination: { page: number; limit: number; total: number; pages: number } }>(`/api/canvassing-plans${query ? `?${query}` : ''}`);
+  return response;
+}
+
+/**
+ * Get a single canvassing plan by ID.
+ */
+export async function getCanvassingPlan(id: string): Promise<CanvassingPlan> {
+  const response = await apiRequest<CanvassingPlan>(`/api/canvassing-plans/${id}`);
+  return response;
+}
+
+/**
+ * Create a new canvassing plan.
+ */
+export async function createCanvassingPlan(data: {
+  repCode: string;
+  area: string;
+  startDate: string;
+  endDate: string;
+  travelDays: number;
+  travelTime?: string;
+  accommodationRequired: boolean;
+  preferredAccommodation?: string;
+  accommodationCost?: number;
+  possibleLeads: number;
+  appointmentsMade: number;
+  objectives?: string;
+  notes?: string;
+}): Promise<CanvassingPlan> {
+  const response = await apiRequest<CanvassingPlan>('/api/canvassing-plans', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  return response;
+}
+
+/**
+ * Update an existing canvassing plan.
+ */
+export async function updateCanvassingPlan(id: string, data: Partial<CanvassingPlan>): Promise<CanvassingPlan> {
+  const response = await apiRequest<CanvassingPlan>(`/api/canvassing-plans/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+  return response;
+}
+
+/**
+ * Delete a canvassing plan (soft delete).
+ */
+export async function deleteCanvassingPlan(id: string): Promise<void> {
+  await apiRequest(`/api/canvassing-plans/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Approve a canvassing plan.
+ */
+export async function approveCanvassingPlan(id: string): Promise<CanvassingPlan> {
+  const response = await apiRequest<CanvassingPlan>(`/api/canvassing-plans/${id}/approve`, {
+    method: 'PUT',
+  });
+  return response;
+}
+
+/**
+ * Reject a canvassing plan.
+ */
+export async function rejectCanvassingPlan(id: string, rejectionReason: string): Promise<CanvassingPlan> {
+  const response = await apiRequest<CanvassingPlan>(`/api/canvassing-plans/${id}/reject`, {
+    method: 'PUT',
+    body: JSON.stringify({ rejectionReason }),
+  });
+  return response;
+}
+
 export default {
   login,
   logout,
@@ -2311,6 +2564,24 @@ export default {
   getSupportUnreadCount,
   updateTicketStatus,
   markTicketAsReadBySupport,
+  // Sales Lead Management
+  getSalesLeads,
+  getSalesLead,
+  createSalesLead,
+  updateSalesLead,
+  deleteSalesLead,
+  assignSalesLead,
+  convertSalesLeadToJob,
+  getAppointments,
+  createAppointment,
+  updateAppointment,
+  getCanvassingPlans,
+  getCanvassingPlan,
+  createCanvassingPlan,
+  updateCanvassingPlan,
+  deleteCanvassingPlan,
+  approveCanvassingPlan,
+  rejectCanvassingPlan,
   apiRequest,
 };
 

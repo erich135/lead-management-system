@@ -130,3 +130,121 @@ export interface DashboardStats {
   leads_by_status: Record<string, number>;
   leads_by_branch: Record<string, number>;
 }
+
+// Sales Lead Management Types
+export type SalesLeadStatus = 
+  | 'new' 
+  | 'assigned' 
+  | 'contacted' 
+  | 'appointment_set' 
+  | 'appointment_attended' 
+  | 'rfc_requested' 
+  | 'converted' 
+  | 'lost';
+
+export type SalesLeadSource = 
+  | 'Referral' 
+  | 'Cold Call' 
+  | 'Website' 
+  | 'Trade Show' 
+  | 'Email Campaign' 
+  | 'Social Media' 
+  | 'Walk-in' 
+  | 'Partner' 
+  | 'Other';
+
+export type SalesLeadPriority = 'low' | 'medium' | 'high';
+
+export interface SalesLead {
+  _id: string;
+  leadNumber: string;
+  companyName: string;
+  contactPerson: string;
+  contactEmail?: string;
+  contactPhone: string;
+  contactAddress?: string;
+  branch: string | { _id: string; name: string; code: string };
+  assignedRep?: string | { _id: string; code: string; name: string; email: string };
+  leadSource: SalesLeadSource;
+  serviceDescription?: string;
+  estimatedValue?: number;
+  priority?: SalesLeadPriority;
+  status: SalesLeadStatus;
+  lostReason?: string;
+  notes?: string;
+  convertedJobId?: string;
+  convertedJobNumber?: string;
+  convertedAt?: string;
+  convertedBy?: string | { _id: string; firstName: string; lastName: string };
+  createdBy: string | { _id: string; firstName: string; lastName: string; email: string };
+  dbStatus: 'active' | 'deleted';
+  createdAt: string;
+  updatedAt: string;
+  appointmentCount?: number;
+}
+
+export interface Appointment {
+  _id: string;
+  salesLead: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  location: string;
+  purpose?: string;
+  notes?: string;
+  attended: boolean;
+  attendedAt?: string;
+  noShowReason?: string;
+  outcome?: string;
+  feedback?: string;
+  nextFollowUpDate?: string;
+  nextFollowUpNotes?: string;
+  reminderSent: boolean;
+  reminderSentAt?: string;
+  createdBy: string | { _id: string; firstName: string; lastName: string; email: string };
+  updatedBy?: string | { _id: string; firstName: string; lastName: string };
+  dbStatus: 'active' | 'deleted';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CanvassingPlanStatus = 
+  | 'draft' 
+  | 'submitted' 
+  | 'approved' 
+  | 'rejected' 
+  | 'in_progress' 
+  | 'completed';
+
+export interface CanvassingPlan {
+  _id: string;
+  repCode: string | { _id: string; code: string; name: string; email: string };
+  area: string;
+  startDate: string;
+  endDate: string;
+  travelDays: number;
+  travelTime?: string;
+  accommodationRequired: boolean;
+  preferredAccommodation?: string;
+  accommodationCost?: number;
+  possibleLeads: number;
+  appointmentsMade: number;
+  objectives?: string;
+  notes?: string;
+  status: CanvassingPlanStatus;
+  approvedBy?: string | { _id: string; firstName: string; lastName: string };
+  approvedAt?: string;
+  rejectionReason?: string;
+  actualLeadsGenerated?: number;
+  actualAppointmentsCompleted?: number;
+  actualCost?: number;
+  tripFeedback?: string;
+  createdBy: string | { _id: string; firstName: string; lastName: string };
+  updatedBy?: string | { _id: string; firstName: string; lastName: string };
+  dbStatus: 'active' | 'deleted';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SalesLeadWithDetails extends SalesLead {
+  appointments: Appointment[];
+}

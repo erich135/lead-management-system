@@ -54,7 +54,7 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import { Tooltip, HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
 
-type View = 'dashboard' | 'leads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines';
+type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines';
 
 interface DashboardProps {
   view?: View;
@@ -69,6 +69,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
   // Determine current view from URL path
   const getViewFromPath = (path: string): View => {
     if (path === '/jobs' || path === '/leads') return 'leads';
+    if (path === '/sales-leads') return 'salesLeads';
     if (path === '/reports') return 'reports';
     if (path === '/diary') return 'diary';
     if (path === '/admin') return 'admin';
@@ -85,6 +86,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
     const routes: Record<View, string> = {
       dashboard: '/dashboard',
       leads: '/jobs',
+      salesLeads: '/sales-leads',
       reports: '/reports',
       diary: '/diary',
       admin: '/admin',
@@ -1851,6 +1853,31 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
               <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
               <h1 className="text-2xl font-bold text-slate-900 mb-2">Access Denied</h1>
               <p className="text-slate-600 mb-6">You don't have permission to access the Reports page. Please contact a Super Admin to grant you the "reports.read" permission.</p>
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="px-6 py-3 bg-[#0969a9] text-white rounded-[8px] font-bold text-[14px] hover:bg-[#0a7bc4] transition-colors"
+              >
+                GO TO DASHBOARD
+              </button>
+            </div>
+          </div>
+        )}
+
+        {view === 'salesLeads' && hasPermission('sales_leads.read') && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-2xl font-bold text-ars-heading mb-4">Sales Leads</h2>
+              <p className="text-ars-body">Sales Lead Management System - Coming Soon</p>
+            </div>
+          </div>
+        )}
+
+        {view === 'salesLeads' && !hasPermission('sales_leads.read') && (
+          <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+            <div className="bg-white rounded-[8px] shadow-xl p-8 max-w-md w-full text-center">
+              <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+              <h1 className="text-2xl font-bold text-slate-900 mb-2">Access Denied</h1>
+              <p className="text-slate-600 mb-6">You don't have permission to access the Sales Leads system. Please contact a Super Admin to grant you the "sales_leads.read" permission.</p>
               <button
                 onClick={() => navigate('/dashboard')}
                 className="px-6 py-3 bg-[#0969a9] text-white rounded-[8px] font-bold text-[14px] hover:bg-[#0a7bc4] transition-colors"

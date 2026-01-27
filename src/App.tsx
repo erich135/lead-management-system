@@ -90,6 +90,11 @@ function AppContent() {
             <Dashboard view="leads" />
           </ProtectedRoute>
         } />
+        <Route path="/sales-leads" element={
+          <ProtectedRoute>
+            <Dashboard view="salesLeads" />
+          </ProtectedRoute>
+        } />
         <Route path="/reports" element={
           <ProtectedRoute>
             <Dashboard view="reports" />

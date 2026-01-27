@@ -1,9 +1,9 @@
-import { LayoutDashboard, FileText, BarChart3, Calendar, Users, Menu, X, Bell, LogOut, Clock, Cog } from 'lucide-react';
+import { LayoutDashboard, FileText, BarChart3, Calendar, Users, Menu, X, Bell, LogOut, Clock, Cog, Briefcase } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
-type View = 'dashboard' | 'leads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines';
+type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines';
 
 interface MobileNavigationProps {
   currentView: View;
@@ -30,6 +30,7 @@ export function MobileNavigation({
   const getViewFromPath = (): View => {
     const path = location.pathname;
     if (path === '/jobs' || path === '/leads') return 'leads';
+    if (path === '/sales-leads') return 'salesLeads';
     if (path === '/reports') return 'reports';
     if (path === '/diary') return 'diary';
     if (path === '/admin') return 'admin';
@@ -42,10 +43,12 @@ export function MobileNavigation({
 
   // Only show Reports to users with reports.read permission or Super Admins
   const canViewReports = user?.isSuperAdmin || hasPermission('reports.read');
+  const canViewSalesLeads = user?.isSuperAdmin || hasPermission('sales_leads.read');
 
   const navItems = [
     { id: 'dashboard' as View, label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
     { id: 'leads' as View, label: 'Jobs', icon: FileText, path: '/jobs' },
+    ...(canViewSalesLeads ? [{ id: 'salesLeads' as View, label: 'Leads', icon: Briefcase, path: '/sales-leads' }] : []),
     ...(canViewReports ? [{ id: 'reports' as View, label: 'Reports', icon: BarChart3, path: '/reports' }] : []),
     { id: 'diary' as View, label: 'Diary', icon: Calendar, path: '/diary' },
   ];

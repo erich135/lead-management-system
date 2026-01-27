@@ -20,6 +20,7 @@ import {
   type Technician,
   type AdminCode,
   type Job,
+  type SalesLead,
 } from '../lib/api';
 import {
   LogOut,
@@ -43,6 +44,9 @@ import {
 import { LeadsList } from './LeadsList';
 import { LeadForm } from './LeadForm';
 import { LeadDetails } from './LeadDetails';
+import { SalesLeadsList } from './SalesLeadsList';
+import { SalesLeadForm } from './SalesLeadForm';
+import { SalesLeadDetails } from './SalesLeadDetails';
 import { SystemManagement } from './SystemManagement';
 import { Reports } from './Reports';
 import { Diary } from './Diary';
@@ -102,6 +106,9 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
+  const [showSalesLeadForm, setShowSalesLeadForm] = useState(false);
+  const [selectedSalesLead, setSelectedSalesLead] = useState<SalesLead | null>(null);
+  const [salesLeadsRefreshKey, setSalesLeadsRefreshKey] = useState(0);
   const [isScrolled, setIsScrolled] = useState(false);
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -1865,10 +1872,50 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
 
         {view === 'salesLeads' && hasPermission('sales_leads.read') && (
           <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-2xl font-bold text-ars-heading mb-4">Sales Leads</h2>
-              <p className="text-ars-body">Sales Lead Management System - Coming Soon</p>
-            </div>
+            <SalesLeadsList
+              onCreateLead={() => {
+                setSelectedSalesLead(null);
+                setShowSalesLeadForm(true);
+              }}
+              onSelectLead={(lead) => {
+                setSelectedSalesLead(lead);
+              }}
+              branches={branches}
+              repCodes={repCodes}
+              refreshKey={salesLeadsRefreshKey}
+            />
+
+            {showSalesLeadForm && (
+              <SalesLeadForm
+                lead={selectedSalesLead}
+                branches={branches}
+                repCodes={repCodes}
+                onClose={() => {
+                  setShowSalesLeadForm(false);
+                  setSelectedSalesLead(null);
+                }}
+                onSave={() => {
+                  setSalesLeadsRefreshKey((prev) => prev + 1);
+                }}
+              />
+            )}
+
+            {selectedSalesLead && !showSalesLeadForm && (
+              <SalesLeadDetails
+                lead={selectedSalesLead}
+                branches={branches}
+                repCodes={repCodes}
+                onClose={() => setSelectedSalesLead(null)}
+                onEdit={(lead) => {
+                  setSelectedSalesLead(lead);
+                  setShowSalesLeadForm(true);
+                }}
+                onRefresh={() => {
+                  setSalesLeadsRefreshKey((prev) => prev + 1);
+                  setSelectedSalesLead(null);
+                }}
+              />
+            )}
           </div>
         )}
 

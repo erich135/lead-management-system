@@ -3,6 +3,18 @@
  * Handles authentication, request/response formatting, and error handling.
  */
 
+// Re-export types from types/index.ts for convenience
+export type {
+  SalesLead,
+  SalesLeadStatus,
+  SalesLeadSource,
+  SalesLeadPriority,
+  SalesLeadWithDetails,
+  Appointment,
+  CanvassingPlan,
+  CanvassingPlanStatus,
+} from '../types';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 /**

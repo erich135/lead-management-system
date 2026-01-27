@@ -584,11 +584,16 @@ export interface Branch {
   name: string;
   code?: string;
   isDefault?: boolean;
+  jobNumberCode?: string;
+  address?: string;
+  isActive?: boolean;
 }
 
 export interface ServiceDescription {
   _id: string;
   name: string;
+  description?: string;
+  isActive?: boolean;
 }
 
 export interface JobSource {
@@ -685,6 +690,8 @@ export interface Technician {
     lastName: string;
     email?: string;
   };
+  email?: string;
+  phone?: string;
   isActive?: boolean;
 }
 
@@ -899,6 +906,8 @@ export async function getRepCodes(): Promise<{ repCodes: RepCode[] }> {
 export async function createRepCode(repCodeData: {
   code: string;
   description?: string;
+  adminCode?: string;
+  branch?: string;
 }): Promise<{ repCode: RepCode }> {
   return apiRequest('/api/reference/rep-codes', {
     method: 'POST',
@@ -1180,6 +1189,22 @@ export interface User {
   permissions: string[];
   isActive: boolean;
   isSuperAdmin?: boolean;
+  adminCode?: {
+    _id: string;
+    code: string;
+    description?: string;
+  } | string;
+  repCode?: {
+    _id: string;
+    code: string;
+    description?: string;
+  } | string;
+  technician?: {
+    _id: string;
+    name: string;
+    email?: string;
+    phone?: string;
+  } | string;
   passwordSet?: boolean;
   createdAt: string;
   updatedAt: string;
@@ -1594,7 +1619,7 @@ export interface Activity {
     firstName?: string;
     lastName?: string;
     email: string;
-  };
+  } | string;
   action: string;
   resourceType: string;
   resourceId?: string;
@@ -2386,6 +2411,27 @@ export async function convertSalesLeadToJob(id: string, jobData: any): Promise<{
  */
 export async function getAppointments(leadId: string): Promise<Appointment[]> {
   const response = await apiRequest<Appointment[]>(`/api/sales-leads/${leadId}/appointments`);
+  return response;
+}
+
+/**
+ * Get weekly appointments across all sales leads.
+ * Optional filters: startDate, endDate, branch, assignedRep.
+ */
+export async function getWeeklyAppointments(params?: {
+  startDate?: string;
+  endDate?: string;
+  branch?: string;
+  assignedRep?: string;
+}): Promise<any[]> {
+  const query = new URLSearchParams();
+  if (params?.startDate) query.append('startDate', params.startDate);
+  if (params?.endDate) query.append('endDate', params.endDate);
+  if (params?.branch) query.append('branch', params.branch);
+  if (params?.assignedRep) query.append('assignedRep', params.assignedRep);
+
+  const qs = query.toString();
+  const response = await apiRequest<any[]>(`/api/sales-leads/appointments/weekly${qs ? `?${qs}` : ''}`);
   return response;
 }
 

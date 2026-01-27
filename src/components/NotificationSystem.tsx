@@ -14,6 +14,7 @@ import {
   Mail,
   ExternalLink
 } from 'lucide-react';
+import { formatDateTime } from '../utils/dateFormat';
 
 interface DailyTask {
   lead_id: string;
@@ -30,7 +31,7 @@ interface NotificationSystemProps {
 }
 
 export function NotificationSystem({ onLeadClick }: NotificationSystemProps) {
-  const { profile } = useAuth();
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [dailyTasks, setDailyTasks] = useState<DailyTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +50,7 @@ export function NotificationSystem({ onLeadClick }: NotificationSystemProps) {
           event: '*',
           schema: 'public',
           table: 'notifications',
-          filter: `user_id=eq.${profile?.id}`
+          filter: `user_id=eq.${user?.id}`
         },
         () => loadNotifications()
       )
@@ -58,7 +59,7 @@ export function NotificationSystem({ onLeadClick }: NotificationSystemProps) {
     return () => {
       notificationSubscription.unsubscribe();
     };
-  }, [profile?.id]);
+  }, [user?.id]);
 
   async function loadData() {
     await Promise.all([
@@ -73,7 +74,7 @@ export function NotificationSystem({ onLeadClick }: NotificationSystemProps) {
       const { data } = await supabase
         .from('notifications')
         .select('*, lead:leads(*)')
-        .eq('user_id', profile?.id)
+        .eq('user_id', user?.id)
         .eq('is_read', false)
         .order('created_at', { ascending: false })
         .limit(20);
@@ -85,11 +86,11 @@ export function NotificationSystem({ onLeadClick }: NotificationSystemProps) {
   }
 
   async function loadDailyTasks() {
-    if (!profile?.id) return;
+    if (!user?.id) return;
 
     try {
       const { data, error } = await supabase
-        .rpc('get_daily_tasks', { user_uuid: profile.id });
+        .rpc('get_daily_tasks', { user_uuid: user.id });
 
       if (error) throw error;
       if (data) setDailyTasks(data);
@@ -116,7 +117,7 @@ export function NotificationSystem({ onLeadClick }: NotificationSystemProps) {
       await supabase
         .from('notifications')
         .update({ is_read: true })
-        .eq('user_id', profile?.id)
+        .eq('user_id', user?.id)
         .eq('is_read', false);
 
       setNotifications([]);
@@ -147,7 +148,7 @@ export function NotificationSystem({ onLeadClick }: NotificationSystemProps) {
     const overdueTasks = dailyTasks.filter(t => t.is_overdue);
     const regularTasks = dailyTasks.filter(t => !t.is_overdue);
 
-    let content = `Daily Task Summary for ${profile?.full_name}\n\n`;
+    let content = `Daily Task Summary for ${user?.fullName}\n\n`;
     
     if (overdueTasks.length > 0) {
       content += `🚨 OVERDUE TASKS (${overdueTasks.length}):\n`;

@@ -110,11 +110,11 @@ export function SystemManagement() {
   // Import state
   const [importHistory, setImportHistory] = useState<ImportHistory | null>(null);
   const [importing, setImporting] = useState(false);
-  const [importType, setImportType] = useState<'jobs' | 'customers' | 'rental-machines' | 'update-jobs' | null>(null);
+  const [importType, setImportType] = useState<'jobs' | 'customers' | 'rental-machines' | 'update-jobs' | 'sales-leads' | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [clearExisting, setClearExisting] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState<string>(''); // Branch ID or code
-  const [importResult, setImportResult] = useState<{ imported: number; updated: number; errors: string[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ imported?: number; updated: number; errors: string[]; notFound?: number } | null>(null);
   
   // Branches state
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -311,10 +311,10 @@ export function SystemManagement() {
         firstName: selectedUser.firstName,
         lastName: selectedUser.lastName,
         email: selectedUser.email,
-        role: selectedUser.role._id,
+        role: selectedUser.role._id as any,
         isActive: selectedUser.isActive,
         adminCodeId: selectedUser.adminCode && typeof selectedUser.adminCode === 'object' ? selectedUser.adminCode._id : (selectedUser.adminCode || null),
-      });
+      } as any);
       
       // Reload users
       await loadData();
@@ -482,7 +482,7 @@ export function SystemManagement() {
       // Manager role doesn't need additional data
 
       const response = await inviteUser(invitePayload);
-      alert(response.message || 'User invited successfully');
+alert((response as any).message || 'User invited successfully');
       
       // Reset form and close modal
       setShowInviteForm(false);
@@ -541,7 +541,7 @@ export function SystemManagement() {
         result = await updateJobs(selectedFile);
       }
 
-      setImportResult(result.data);
+      setImportResult(result?.data as any);
       await loadImportHistory();
     } catch (err: any) {
       console.error('Error importing:', err);
@@ -595,7 +595,7 @@ export function SystemManagement() {
         description: editingRepCode.description,
         isActive: editingRepCode.isActive,
         adminCode: editingRepCode.adminCode || undefined,
-        branch: editingRepCode.branch?._id || editingRepCode.branch || undefined,
+        branch: (editingRepCode.branch?._id || editingRepCode.branch || undefined) as any,
       });
       setRepCodes(repCodes.map(rc => rc._id === editingRepCode._id ? response.repCode : rc));
       setEditingRepCode(null);
@@ -665,9 +665,9 @@ export function SystemManagement() {
       const response = await updateAdminCode(editingAdminCode._id, {
         code: editingAdminCode.code,
         description: editingAdminCode.description,
-        userId: editingAdminCode.user?._id || undefined,
+        userId: (editingAdminCode.user?._id || undefined),
         isActive: editingAdminCode.isActive,
-      });
+      } as any);
       setAdminCodes(adminCodes.map(ac => ac._id === editingAdminCode._id ? response.adminCode : ac).sort((a, b) => a.code.localeCompare(b.code)));
       setEditingAdminCode(null);
       setShowAdminCodeForm(false);
@@ -877,7 +877,7 @@ export function SystemManagement() {
         name: editingTechnician.name,
         email: editingTechnician.email,
         phone: editingTechnician.phone,
-        user: editingTechnician.user?._id || undefined,
+        user: (editingTechnician.user?._id || undefined) as any,
         isActive: editingTechnician.isActive,
       });
       setTechnicians(technicians.map(t => t._id === editingTechnician._id ? response.technician : t).sort((a, b) => a.name.localeCompare(b.name)));
@@ -1395,7 +1395,7 @@ export function SystemManagement() {
                               console.log('[SystemManagement] Admin code changed:', adminCodeId, adminCode);
                               setSelectedUser({ 
                                 ...selectedUser, 
-                                adminCode: adminCode ? { _id: adminCode._id, code: adminCode.code, description: adminCode.description } : null 
+                                adminCode: adminCode ? { _id: adminCode._id, code: adminCode.code, description: adminCode.description } : undefined 
                               });
                             }}
                             className="w-full pl-2 pr-10 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[13px] h-[38px] appearance-none bg-white"
@@ -2537,7 +2537,7 @@ export function SystemManagement() {
                 <button
                   onClick={() => {
                     setEditingRepCode(null);
-                    setNewRepCode({ code: '', description: '', adminCode: '' });
+                    setNewRepCode({ code: '', description: '', adminCode: '', branch: '' });
                     setShowRepCodeForm(true);
                   }}
                   className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
@@ -2633,13 +2633,13 @@ export function SystemManagement() {
                         Linked Branch
                       </label>
                       <select
-                        value={editingRepCode?.branch?._id || editingRepCode?.branch || newRepCode.branch || ''}
+                        value={(editingRepCode?.branch?._id || editingRepCode?.branch || newRepCode.branch || '') as string}
                         onChange={(e) => {
                           if (editingRepCode) {
                             const selectedBranch = branches.find(b => b._id === e.target.value);
                             setEditingRepCode({ 
                               ...editingRepCode, 
-                              branch: selectedBranch || e.target.value 
+                              branch: (selectedBranch || e.target.value) as any 
                             });
                           } else {
                             setNewRepCode({ ...newRepCode, branch: e.target.value });

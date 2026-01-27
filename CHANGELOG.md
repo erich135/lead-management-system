@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.0.1] - 2026-01-27
+
+### Added
+- Integrated changes from 'Leadsystem' branch
+
 ## [1.0.13] - 2026-01-26
 
 ### Fixed

@@ -55,6 +55,8 @@ import { Activities } from './Activities';
 import { Machines } from './Machines';
 import { MobileNavigation } from './MobileNavigation';
 import { SupportTicketButton } from './SupportTicketWidget';
+import { NotificationBell } from './NotificationBell';
+import { NotificationPanel } from './NotificationPanel';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { Tooltip, HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
@@ -105,6 +107,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showNotificationPanel, setShowNotificationPanel] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
   const [showSalesLeadForm, setShowSalesLeadForm] = useState(false);
@@ -762,25 +765,8 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                 <SupportTicketButton />
               </div>
 
-              {/* Notifications */}
-              <div className="relative">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowNotifications(!showNotifications);
-                  }}
-                  className="group relative p-2.5 bg-gray-100 hover:bg-gray-200 rounded-[8px] transition-all duration-300 hover:scale-105"
-                >
-                  <Bell className="w-5 h-5 text-[#0969a9] transition-transform group-hover:scale-110" />
-                  {stats && (stats.overdueReminders > 0 || stats.approachingReminders > 0) && (
-                    <span className="absolute -top-1 -right-2 min-w-[20px] h-5 bg-gradient-to-r from-red-500 to-orange-500 rounded-full flex items-center justify-center shadow-lg animate-pulse px-1.5">
-                      <span className="text-xs font-bold text-white">
-                        {stats.overdueReminders + stats.approachingReminders}
-                      </span>
-                    </span>
-                  )}
-                </button>
-              </div>
+              {/* Notification Bell - in-app notifications */}
+              <NotificationBell onOpenPanel={() => setShowNotificationPanel(true)} />
 
               {/* User Profile */}
 
@@ -1962,6 +1948,12 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           onNotificationsClick={() => setShowNotifications(!showNotifications)}
         />
       )}
+
+      {/* Notification Panel */}
+      <NotificationPanel 
+        isOpen={showNotificationPanel} 
+        onClose={() => setShowNotificationPanel(false)}
+      />
 
       {/* Scroll to Top Button */}
       <button

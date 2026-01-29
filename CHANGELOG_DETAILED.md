@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Development Branches
 
+### Branch: `chatbot` - 2026-01-29
+
+#### Added
+- **Branch Permissions System**: Implemented branch-based data visibility control for users
+  - Added `branches` field to User model (array of ObjectIds)
+  - Created Branch API endpoints (CRUD operations)
+  - Added branch filtering utility functions (`getBranchFilter`, `canAccessBranch`, `applyBranchFilter`)
+  - Implemented user branch assignment endpoint (`PUT /api/users/:id/branches`)
+  - Created comprehensive documentation (8 MD files)
+  - Added Branch Access section in System Management UI
+  - Users can be restricted to specific branches or have access to all (default)
+  - Empty branches array = access to ALL branches
+  - Non-empty array = access restricted to selected branches only
+  - UI includes checkboxes for all branches with Select All/Clear All functionality
+  - Real-time updates with loading states
+  - Integrated with existing user management workflow
+
 ### Branch: `chatbot` - 2025-11-25
 
 #### Added

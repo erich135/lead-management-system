@@ -9,6 +9,7 @@ import {
   inviteUser, 
   updateUser, 
   updateUserPermissions,
+  updateUserBranches,
   resendInvitation,
   getRoles,
   getPermissions,
@@ -344,6 +345,36 @@ export function SystemManagement() {
     } catch (err: any) {
       console.error('Error updating permissions:', err);
       alert('Failed to update permissions: ' + (err.message || 'Unknown error'));
+      // Reload to revert UI changes on error
+      if (selectedUser?._id === userId) {
+        const response = await getUser(userId);
+        setSelectedUser(response.user);
+      }
+    } finally {
+      setUpdatingPermissions(false);
+    }
+  }
+
+  /**
+   * Handles updating user branch access.
+   */
+  async function handleUpdateBranches(userId: string, newBranches: string[]) {
+    try {
+      setUpdatingPermissions(true);
+      await updateUserBranches(userId, newBranches);
+      // Update selected user's branches immediately for responsive UI
+      if (selectedUser?._id === userId) {
+        const updatedBranches = newBranches.map(branchId => {
+          const branch = branches.find(b => b._id === branchId);
+          return branch ? { _id: branch._id, name: branch.name, code: branch.code } : branchId;
+        });
+        setSelectedUser({ ...selectedUser, branches: updatedBranches as any });
+      }
+      // Reload full data in background
+      await loadData();
+    } catch (err: any) {
+      console.error('Error updating branch access:', err);
+      alert('Failed to update branch access: ' + (err.message || 'Unknown error'));
       // Reload to revert UI changes on error
       if (selectedUser?._id === userId) {
         const response = await getUser(userId);
@@ -1556,6 +1587,71 @@ alert((response as any).message || 'User invited successfully');
                             </div>
                           </div>
                         ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-2">Branch Access</label>
+                      <div className="border border-gray-200 rounded-lg p-3">
+                        <div className="space-y-2">
+                          {branches.length === 0 ? (
+                            <p className="text-sm text-ars-body italic">No branches available</p>
+                          ) : (
+                            <>
+                              <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-200">
+                                <button
+                                  onClick={() => {
+                                    const allBranchIds = branches.map(b => b._id);
+                                    const userBranchIds = (selectedUser.branches || []).map(b => 
+                                      typeof b === 'object' ? b._id : b
+                                    );
+                                    const allSelected = branches.every(b => userBranchIds.includes(b._id));
+                                    handleUpdateBranches(selectedUser._id, allSelected ? [] : allBranchIds);
+                                  }}
+                                  disabled={updatingPermissions}
+                                  className="text-xs text-ars-primary hover:text-ars-primary/80 underline disabled:opacity-50"
+                                >
+                                  {(selectedUser.branches || []).length === branches.length ? 'Clear All' : 'Select All'}
+                                </button>
+                                <span className="text-xs text-ars-body">
+                                  {(selectedUser.branches || []).length === 0 
+                                    ? 'All branches (default)' 
+                                    : `${(selectedUser.branches || []).length} selected`}
+                                </span>
+                              </div>
+                              {branches.map((branch) => {
+                                const userBranchIds = (selectedUser.branches || []).map(b => 
+                                  typeof b === 'object' ? b._id : b
+                                );
+                                const hasBranch = userBranchIds.includes(branch._id);
+                                return (
+                                  <label
+                                    key={branch._id}
+                                    className="flex items-center gap-2 cursor-pointer group"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={hasBranch}
+                                      disabled={updatingPermissions}
+                                      onChange={(e) => {
+                                        const newBranches = e.target.checked
+                                          ? [...userBranchIds, branch._id]
+                                          : userBranchIds.filter(b => b !== branch._id);
+                                        handleUpdateBranches(selectedUser._id, newBranches);
+                                      }}
+                                      className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                    />
+                                    <span className="text-sm text-ars-body group-hover:text-ars-heading">
+                                      {branch.name}
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                              <p className="text-xs text-ars-body italic mt-2 pt-2 border-t border-gray-200">
+                                Note: If no branches are selected, the user will have access to ALL branches.
+                              </p>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <button

@@ -17,6 +17,11 @@ export interface FrontendUser {
     isActive: boolean;
   };
   permissions: string[];
+  branches?: {
+    id: string;
+    name: string;
+    code?: string;
+  }[];
   isActive: boolean;
   isSuperAdmin: boolean;
   createdAt: string;
@@ -80,6 +85,14 @@ function transformUser(backendUser: BackendUser): FrontendUser {
       }
     : undefined;
 
+  const branches = backendUser.branches 
+    ? backendUser.branches.map(branch => 
+        typeof branch === 'object' 
+          ? { id: branch._id, name: branch.name, code: branch.code }
+          : { id: branch, name: '', code: '' }
+      )
+    : undefined;
+
   return {
     id: backendUser._id,
     email: backendUser.email,
@@ -93,6 +106,7 @@ function transformUser(backendUser: BackendUser): FrontendUser {
       isActive: backendUser.role.isActive,
     },
     permissions: backendUser.permissions || [],
+    branches,
     isActive: backendUser.isActive,
     isSuperAdmin: backendUser.isSuperAdmin || backendUser.role.name === 'super_admin',
     createdAt: backendUser.createdAt,

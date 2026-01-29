@@ -1187,6 +1187,11 @@ export interface User {
     isActive: boolean;
   };
   permissions: string[];
+  branches?: {
+    _id: string;
+    name: string;
+    code?: string;
+  }[] | string[];
   isActive: boolean;
   isSuperAdmin?: boolean;
   adminCode?: {
@@ -1312,6 +1317,16 @@ export async function updateUserPermissions(id: string, permissions: string[]): 
   return apiRequest(`/api/users/${id}/permissions`, {
     method: 'PUT',
     body: JSON.stringify({ permissions }),
+  });
+}
+
+/**
+ * Updates user branch access.
+ */
+export async function updateUserBranches(id: string, branches: string[]): Promise<{ user: User }> {
+  return apiRequest(`/api/users/${id}/branches`, {
+    method: 'PUT',
+    body: JSON.stringify({ branches }),
   });
 }
 

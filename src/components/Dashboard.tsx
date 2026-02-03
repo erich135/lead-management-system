@@ -39,6 +39,9 @@ import {
   Building2,
   Tag,
   Cog,
+  ChevronDown,
+  ChevronUp,
+  ClipboardList,
 } from 'lucide-react';
 import { LeadsList } from './LeadsList';
 import { LeadForm } from './LeadForm';
@@ -54,11 +57,13 @@ import { MobileNavigation } from './MobileNavigation';
 import { SupportTicketButton } from './SupportTicketWidget';
 import { NotificationBell } from './NotificationBell';
 import { NotificationPanel } from './NotificationPanel';
+import { JobCardTemplates } from './JobCardTemplates';
+import { JobCardSubmissions } from './JobCardSubmissions';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { Tooltip, HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
 
-type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines';
+type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions';
 
 interface DashboardProps {
   view?: View;
@@ -79,6 +84,8 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
     if (path === '/admin') return 'admin';
     if (path === '/activities') return 'activities';
     if (path === '/machines') return 'machines';
+    if (path === '/job-card-templates') return 'jobCardTemplates';
+    if (path === '/job-card-submissions') return 'jobCardSubmissions';
     return 'dashboard';
   };
   
@@ -96,6 +103,8 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
       admin: '/admin',
       activities: '/activities',
       machines: '/machines',
+      jobCardTemplates: '/job-card-templates',
+      jobCardSubmissions: '/job-card-submissions',
     };
     navigate(routes[newView]);
   };
@@ -116,6 +125,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
   const [_adminCodes, setAdminCodes] = useState<AdminCode[]>([]);
   const [selectedPriority, setSelectedPriority] = useState<'all' | 'critical' | 'warning' | 'info'>('all');
   const [leadsListRefreshKey, setLeadsListRefreshKey] = useState(0);
+  const [isJobsMenuExpanded, setIsJobsMenuExpanded] = useState(false);
   
   // Filter and sorting states
   const [filters, setFilters] = useState({
@@ -148,6 +158,21 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Close Jobs menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.jobs-menu-container')) {
+        setIsJobsMenuExpanded(false);
+      }
+    };
+
+    if (isJobsMenuExpanded) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isJobsMenuExpanded]);
+
   // Scroll to top when view changes
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -167,6 +192,10 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
       logViewActivity('view', 'Page', 'Viewed activities page');
     } else if (view === 'admin') {
       logViewActivity('view', 'Page', 'Viewed system admin page');
+    } else if (view === 'jobCardTemplates') {
+      logViewActivity('view', 'Page', 'Viewed job card templates page');
+    } else if (view === 'jobCardSubmissions') {
+      logViewActivity('view', 'Page', 'Viewed job card submissions page');
     }
   }, [view]);
 
@@ -644,15 +673,88 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                   <LayoutDashboard className={`w-4 h-4 transition-transform ${view === 'dashboard' ? 'scale-110' : ''}`} />
                   <span>Dashboard</span>
                 </Link>
+<<<<<<< HEAD
                 {(isSuperAdmin || hasPermission('sales_leads.read')) && (
                   <Link
                     to="/sales-leads"
                     className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
                       view === 'salesLeads'
+=======
+                {/* Jobs Menu - Expandable for super admins */}
+                {(isSuperAdmin || hasPermission('job_card_templates.read') || hasPermission('job_card_submissions.read')) ? (
+                  <div className="relative group jobs-menu-container">
+                    <button
+                      onClick={() => setIsJobsMenuExpanded(!isJobsMenuExpanded)}
+                      className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
+                        view === 'leads' || view === 'jobCardTemplates' || view === 'jobCardSubmissions'
+                          ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
+                          : 'text-[#383838] hover:text-[#f7c12b]'
+                      }`}
+                    >
+                      <FileText className={`w-4 h-4 transition-transform ${view === 'leads' || view === 'jobCardTemplates' || view === 'jobCardSubmissions' ? 'scale-110' : ''}`} />
+                      <span>Jobs</span>
+                      {isJobsMenuExpanded ? (
+                        <ChevronUp className="w-3 h-3" />
+                      ) : (
+                        <ChevronDown className="w-3 h-3" />
+                      )}
+                    </button>
+                    {isJobsMenuExpanded && (
+                      <div className="absolute top-full left-0 mt-2 bg-white rounded-[8px] shadow-xl border border-gray-200 py-2 min-w-[200px] z-50">
+                        <Link
+                          to="/jobs"
+                          onClick={() => setIsJobsMenuExpanded(false)}
+                          className={`block px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
+                            view === 'leads'
+                              ? 'bg-[#f7c12b]/20 text-[#383838] font-medium'
+                              : 'text-[#383838] hover:bg-gray-100'
+                          }`}
+                        >
+                          <FileText className="w-4 h-4" />
+                          <span>All Jobs</span>
+                        </Link>
+                        {(isSuperAdmin || hasPermission('job_card_templates.read')) && (
+                          <Link
+                            to="/job-card-templates"
+                            onClick={() => setIsJobsMenuExpanded(false)}
+                            className={`block px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
+                              view === 'jobCardTemplates'
+                                ? 'bg-[#f7c12b]/20 text-[#383838] font-medium'
+                                : 'text-[#383838] hover:bg-gray-100'
+                            }`}
+                          >
+                            <ClipboardList className="w-4 h-4" />
+                            <span>Job Card Templates</span>
+                          </Link>
+                        )}
+                        {(isSuperAdmin || hasPermission('job_card_submissions.read')) && (
+                          <Link
+                            to="/job-card-submissions"
+                            onClick={() => setIsJobsMenuExpanded(false)}
+                            className={`block px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
+                              view === 'jobCardSubmissions'
+                                ? 'bg-[#f7c12b]/20 text-[#383838] font-medium'
+                                : 'text-[#383838] hover:bg-gray-100'
+                            }`}
+                          >
+                            <FileText className="w-4 h-4" />
+                            <span>Job Card Submissions</span>
+                          </Link>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <Link
+                    to="/jobs"
+                    className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
+                      view === 'leads'
+>>>>>>> e7508872301b26a91cabb4a8d39a1fa1384a0246
                         ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
                         : 'text-[#383838] hover:text-[#f7c12b]'
                     }`}
                   >
+<<<<<<< HEAD
                     <User className={`w-4 h-4 transition-transform ${view === 'salesLeads' ? 'scale-110' : ''}`} />
                     <span>Sales Leads</span>
                   </Link>
@@ -668,6 +770,12 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                   <FileText className={`w-4 h-4 transition-transform ${view === 'leads' ? 'scale-110' : ''}`} />
                   <span>Jobs</span>
                 </Link>
+=======
+                    <FileText className={`w-4 h-4 transition-transform ${view === 'leads' ? 'scale-110' : ''}`} />
+                    <span>Jobs</span>
+                  </Link>
+                )}
+>>>>>>> e7508872301b26a91cabb4a8d39a1fa1384a0246
                 {(isSuperAdmin || hasPermission('reports.read')) && (
                   <Link
                     to="/reports"
@@ -1881,6 +1989,28 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
 
         {view === 'admin' && isSuperAdmin && (
           <SystemManagement />
+        )}
+
+        {view === 'jobCardTemplates' && (isSuperAdmin || hasPermission('job_card_templates.read')) && (
+          <JobCardTemplates />
+        )}
+
+        {view === 'jobCardSubmissions' && (isSuperAdmin || hasPermission('job_card_submissions.read')) && (
+          <JobCardSubmissions />
+        )}
+
+        {view === 'jobCardTemplates' && !isSuperAdmin && !hasPermission('job_card_templates.read') && (
+          <div className="p-8 bg-white rounded-[8px] shadow-lg max-w-lg mx-auto mt-8">
+            <h2 className="text-xl font-semibold text-[#383838] mb-2">Access restricted</h2>
+            <p className="text-slate-600 mb-6">You don&apos;t have permission to view Job Card Templates. Ask a Super Admin to grant you the &quot;Job Card Templates&quot; permission in System Admin → User Management.</p>
+          </div>
+        )}
+
+        {view === 'jobCardSubmissions' && !isSuperAdmin && !hasPermission('job_card_submissions.read') && (
+          <div className="p-8 bg-white rounded-[8px] shadow-lg max-w-lg mx-auto mt-8">
+            <h2 className="text-xl font-semibold text-[#383838] mb-2">Access restricted</h2>
+            <p className="text-slate-600 mb-6">You don&apos;t have permission to view Job Card Submissions. Ask a Super Admin to grant you the &quot;Job Card Submissions&quot; permission in System Admin → User Management.</p>
+          </div>
         )}
 
         {view === 'activities' && (

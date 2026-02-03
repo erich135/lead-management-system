@@ -442,14 +442,15 @@ export function SystemManagement() {
   }
 
   /**
-   * Groups permissions by resource for better display.
+   * Groups permissions by category (when present) or resource for better display.
+   * Permissions with the same category (e.g. "Job Cards") appear in one section.
    */
   const groupedPermissions = useMemo(() => {
     if (!permissions || permissions.length === 0) return {} as Record<string, Permission[]>;
     return permissions.reduce((acc, perm) => {
-      const resource = perm.resource || 'other';
-      if (!acc[resource]) acc[resource] = [];
-      acc[resource].push(perm);
+      const groupKey = perm.category && perm.category.trim() ? perm.category.trim() : (perm.resource || 'other');
+      if (!acc[groupKey]) acc[groupKey] = [];
+      acc[groupKey].push(perm);
       return acc;
     }, {} as Record<string, Permission[]>);
   }, [permissions]);
@@ -1554,10 +1555,11 @@ alert((response as any).message || 'User invited successfully');
                     )}
                     <div>
                       <label className="block text-sm font-semibold text-ars-body mb-2">Permissions</label>
+                      <p className="text-xs text-ars-body mb-2">Grant access to Job Card Templates, Submissions, Reports, etc.</p>
                       <div className="max-h-64 overflow-y-auto space-y-2">
-                        {Object.entries(groupedPermissions).map(([resource, perms]) => (
-                          <div key={resource} className="border border-gray-200 rounded-lg p-3">
-                            <p className="text-xs font-bold text-ars-heading mb-2 uppercase">{resource}</p>
+                        {Object.entries(groupedPermissions).map(([groupKey, perms]) => (
+                          <div key={groupKey} className="border border-gray-200 rounded-lg p-3">
+                            <p className="text-xs font-bold text-ars-heading mb-2">{groupKey}</p>
                             <div className="space-y-1">
                               {perms.map((perm) => {
                                 const hasPermission = selectedUser.permissions.includes(perm.name);

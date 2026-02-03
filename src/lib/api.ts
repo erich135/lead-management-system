@@ -2306,6 +2306,7 @@ export async function markTicketAsReadBySupport(ticketId: string): Promise<void>
   });
 }
 
+<<<<<<< HEAD
 // ============================================================================
 // Sales Lead Management
 // ============================================================================
@@ -2395,10 +2396,85 @@ export async function updateSalesLead(id: string, data: Partial<SalesLead>): Pro
  */
 export async function deleteSalesLead(id: string): Promise<void> {
   await apiRequest(`/api/sales-leads/${id}`, {
+=======
+/**
+ * Job Card Template types.
+ */
+export interface JobCardTemplate {
+  _id?: string;
+  name: string;
+  description?: string;
+  fields?: any[]; // Legacy support
+  groups?: any[]; // New structure: groups with tables
+  header?: any; // Header configuration
+  footer?: any; // Footer configuration
+  showHeader?: boolean; // Whether to display header on report (default: true)
+  pageWidth?: number;
+  pageHeight?: number;
+  marginTop?: number;
+  marginBottom?: number;
+  marginLeft?: number;
+  marginRight?: number;
+  createdBy?: any;
+  createdAt?: string;
+  updatedAt?: string;
+  isActive?: boolean;
+}
+
+export interface JobCardTemplatesResponse {
+  templates: JobCardTemplate[];
+}
+
+export interface JobCardTemplateResponse {
+  template: JobCardTemplate;
+}
+
+/**
+ * Gets all job card templates.
+ */
+export async function getJobCardTemplates(includeInactive?: boolean): Promise<JobCardTemplatesResponse> {
+  const params = includeInactive ? '?includeInactive=true' : '';
+  return await apiRequest<JobCardTemplatesResponse>(`/api/job-card-templates${params}`);
+}
+
+/**
+ * Gets a single job card template by ID.
+ */
+export async function getJobCardTemplate(id: string): Promise<JobCardTemplateResponse> {
+  return await apiRequest<JobCardTemplateResponse>(`/api/job-card-templates/${id}`);
+}
+
+/**
+ * Creates a new job card template.
+ */
+export async function createJobCardTemplate(template: Partial<JobCardTemplate>): Promise<JobCardTemplateResponse> {
+  return await apiRequest<JobCardTemplateResponse>('/api/job-card-templates', {
+    method: 'POST',
+    body: JSON.stringify(template),
+  });
+}
+
+/**
+ * Updates a job card template.
+ */
+export async function updateJobCardTemplate(id: string, template: Partial<JobCardTemplate>): Promise<JobCardTemplateResponse> {
+  return await apiRequest<JobCardTemplateResponse>(`/api/job-card-templates/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(template),
+  });
+}
+
+/**
+ * Deletes a job card template.
+ */
+export async function deleteJobCardTemplate(id: string): Promise<void> {
+  return await apiRequest(`/api/job-card-templates/${id}`, {
+>>>>>>> e7508872301b26a91cabb4a8d39a1fa1384a0246
     method: 'DELETE',
   });
 }
 
+<<<<<<< HEAD
 /**
  * Assign a sales lead to a rep.
  */
@@ -2691,6 +2767,8 @@ export async function rejectCanvassingPlan(id: string, rejectionReason: string):
   return response;
 }
 
+=======
+>>>>>>> e7508872301b26a91cabb4a8d39a1fa1384a0246
 export default {
   login,
   logout,
@@ -2777,6 +2855,7 @@ export default {
   getSupportUnreadCount,
   updateTicketStatus,
   markTicketAsReadBySupport,
+<<<<<<< HEAD
   // Sales Lead Management
   getSalesLeads,
   getSalesLead,
@@ -2795,6 +2874,13 @@ export default {
   deleteCanvassingPlan,
   approveCanvassingPlan,
   rejectCanvassingPlan,
+=======
+  getJobCardTemplates,
+  getJobCardTemplate,
+  createJobCardTemplate,
+  updateJobCardTemplate,
+  deleteJobCardTemplate,
+>>>>>>> e7508872301b26a91cabb4a8d39a1fa1384a0246
   apiRequest,
 };
 

@@ -3,6 +3,7 @@ import {
   Save, 
   X, 
   Plus,
+  Minus,
   Trash2,
   Eye,
   GripVertical,
@@ -15,7 +16,9 @@ import {
   PenTool,
   List,
   Table,
-  Edit2
+  Edit2,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import { JobCardPreview } from './JobCardPreview';
 import type { JobCardTemplate } from '../lib/api';
@@ -51,13 +54,81 @@ export interface TableRow {
 }
 
 /**
+ * Cell type for grid-based checklist (Word-style blocks).
+ */
+export type GridCellType = 'label' | 'staticText' | 'checkbox' | 'text' | 'textarea' | 'number' | 'date' | 'select' | 'jobField' | 'reportNumber';
+
+/**
+ * Job field keys that can be pulled from the job when a job is assigned.
+ * Used when type is 'jobField'; jobFieldKey must be one of these.
+ */
+export const JOB_FIELD_KEYS: { value: string; label: string }[] = [
+  { value: 'jobNumber', label: 'Job number' },
+  { value: 'customer', label: 'Customer name' },
+  { value: 'cashCustomer', label: 'Cash customer' },
+  { value: 'serialNumber', label: 'Serial number (first machine)' },
+  { value: 'branch', label: 'Branch' },
+  { value: 'status', label: 'Status' },
+  { value: 'adm', label: 'Admin' },
+  { value: 'assistingAdm', label: 'Assisting admin' },
+  { value: 'repCode', label: 'Rep code' },
+  { value: 'notes', label: 'Notes' },
+  { value: 'startDate', label: 'Start date' },
+  { value: 'dateQuoted', label: 'Date quoted' },
+  { value: 'valueExVat', label: 'Value ex VAT' },
+  { value: 'poNumber', label: 'PO number' },
+  { value: 'rsrNumber', label: 'RSR number (job)' },
+  { value: 'description', label: 'Service description' },
+  { value: 'techBooked', label: 'Technician booked' },
+  { value: 'dateBooked', label: 'Date booked' },
+  { value: 'storePack', label: 'Store pack' },
+  { value: 'storePackDate', label: 'Store pack date' },
+  { value: 'invNumber', label: 'Inv number' },
+  { value: 'invoiceDate', label: 'Invoice date' },
+  { value: 'oilSampleNumber', label: 'Oil sample number' },
+];
+
+/**
+ * Single cell in a grid-based table.
+ */
+export interface GridCell {
+  id: string;
+  row: number;
+  col: number;
+  type: GridCellType;
+  label?: string;       // Label above/beside the field
+  value?: string;       // Static text content or default value
+  required?: boolean;
+  options?: string[];   // For select type
+  /** When type is 'jobField', which job property to display (e.g. jobNumber, customer). */
+  jobFieldKey?: string;
+  colSpan?: number;     // Merge with next columns (default 1)
+  rowSpan?: number;     // Merge with next rows (default 1)
+  boldBorder?: boolean; // Thicker border for this cell
+  boldText?: boolean;   // Bold text for this cell
+  /** Override text alignment for this cell (overrides table default). */
+  textAlign?: 'left' | 'center' | 'right';
+}
+
+/**
  * Table definition within a group.
+ * Supports legacy columns/rows or new grid (rows × cols + cells).
  */
 export interface TableDefinition {
   id: string;
   name: string;
-  columns: TableColumn[];
-  rows?: TableRow[]; // Pre-filled rows when columns have allowMultipleRows
+  columns?: TableColumn[];  // Legacy
+  rows?: TableRow[];
+  /** Grid layout: number of rows (up/down) */
+  gridRows?: number;
+  /** Grid layout: number of columns (left/right) */
+  gridCols?: number;
+  /** Grid layout: cell definitions */
+  cells?: GridCell[];
+  /** Default text alignment for all cells in this table. */
+  textAlign?: 'left' | 'center' | 'right';
+  /** Table width/layout: full = one per row, half = two side-by-side, third = three side-by-side. */
+  layout?: 'full' | 'half' | 'third';
 }
 
 /**
@@ -82,6 +153,10 @@ export interface HeaderConfig {
   postalCode?: string;
   phone?: string;
   email?: string;
+  /** When true, show report/RSR number in the header (when header is shown). */
+  showReportNumberInHeader?: boolean;
+  /** Label for report number in header (e.g. "Report #" or "RSR #"). */
+  reportNumberHeaderLabel?: string;
 }
 
 /**
@@ -122,6 +197,7 @@ interface JobCardFormBuilderProps {
     groups?: TemplateGroup[];
     header?: HeaderConfig;
     footer?: FooterConfig;
+    showHeader?: boolean;
     pageWidth?: number;
     pageHeight?: number;
     marginTop?: number;
@@ -138,11 +214,26 @@ interface JobCardFormBuilderProps {
  * Structured builder for creating job card templates with groups and tables.
  */
 export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBuilderProps) {
+  /**
+   * Normalizes template groups to a single group (for UI: checklist tables only). Merges multiple groups into one.
+   */
+  const normalizeToSingleGroup = (templateGroups: TemplateGroup[] | undefined): TemplateGroup[] => {
+    if (!templateGroups || templateGroups.length === 0) return [];
+    if (templateGroups.length === 1) return templateGroups;
+    const first = templateGroups[0];
+    return [{ ...first, name: 'Job Card', tables: templateGroups.flatMap((g) => g.tables) }];
+  };
+
   const [templateName, setTemplateName] = useState(template?.name || '');
   const [templateDescription, setTemplateDescription] = useState(template?.description || '');
-  const [groups, setGroups] = useState<TemplateGroup[]>(template?.groups || []);
-  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
+  const [groups, setGroups] = useState<TemplateGroup[]>(() => normalizeToSingleGroup(template?.groups));
+  const [showHeader, setShowHeader] = useState(template?.showHeader !== false);
+  const [showTableTitles, setShowTableTitles] = useState((template as any)?.showTableTitles !== false);
+  const [showGroupTitle, setShowGroupTitle] = useState((template as any)?.showGroupTitle === true);
+  const [showReportTitle, setShowReportTitle] = useState((template as any)?.showReportTitle === true); // default: hide
+  const [spaceBetweenBlocks, setSpaceBetweenBlocks] = useState((template as any)?.spaceBetweenBlocks !== false);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
+  const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
   const [headerConfig, setHeaderConfig] = useState<HeaderConfig>(getGlobalHeaderConfig());
   const [footerConfig, setFooterConfig] = useState<FooterConfig>(getGlobalFooterConfig());
   const [showPreview, setShowPreview] = useState(false);
@@ -155,80 +246,189 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
     return `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   };
 
-  /**
-   * Adds a new group.
-   */
-  const handleAddGroup = () => {
-    const newGroup: TemplateGroup = {
-      id: generateId(),
-      name: 'New Group',
-      tables: [],
-    };
-    setGroups([...groups, newGroup]);
-    setSelectedGroup(newGroup.id);
-  };
+  /** Single group used internally (checklist tables only; sections removed for now). */
+  const singleGroup = groups[0] ?? null;
 
   /**
-   * Deletes a group.
+   * Adds a new checklist table with grid layout (Word-style blocks). Starts as 2×2 empty grid.
    */
-  const handleDeleteGroup = (groupId: string) => {
-    setGroups(groups.filter(g => g.id !== groupId));
-    if (selectedGroup === groupId) {
-      setSelectedGroup(null);
-    }
-  };
-
-  /**
-   * Updates a group name.
-   */
-  const handleUpdateGroupName = (groupId: string, name: string) => {
-    setGroups(groups.map(g => g.id === groupId ? { ...g, name } : g));
-  };
-
-  /**
-   * Adds a table to a group.
-   */
-  const handleAddTable = (groupId: string) => {
+  const handleAddChecklistTable = () => {
+    const tableId = generateId();
     const newTable: TableDefinition = {
-      id: generateId(),
-      name: 'New Table',
-      columns: [],
+      id: tableId,
+      name: 'Checklist',
+      gridRows: 2,
+      gridCols: 2,
+      cells: [],
     };
-    setGroups(groups.map(g => 
-      g.id === groupId 
-        ? { ...g, tables: [...g.tables, newTable] }
-        : g
-    ));
-    setSelectedTable(newTable.id);
+    if (singleGroup) {
+      setGroups([{ ...singleGroup, tables: [...singleGroup.tables, newTable] }]);
+    } else {
+      setGroups([{ id: generateId(), name: 'Job Card', tables: [newTable] }]);
+    }
+    setSelectedTable(tableId);
+    setSelectedCellId(null);
   };
 
   /**
-   * Deletes a table.
+   * Moves a checklist table up in the display order.
    */
-  const handleDeleteTable = (groupId: string, tableId: string) => {
-    setGroups(groups.map(g => 
-      g.id === groupId 
-        ? { ...g, tables: g.tables.filter(t => t.id !== tableId) }
-        : g
-    ));
+  const handleMoveTableUp = (index: number) => {
+    if (!singleGroup || index <= 0) return;
+    const tables = [...singleGroup.tables];
+    [tables[index - 1], tables[index]] = [tables[index], tables[index - 1]];
+    setGroups([{ ...singleGroup, tables }]);
+  };
+
+  /**
+   * Moves a checklist table down in the display order.
+   */
+  const handleMoveTableDown = (index: number) => {
+    if (!singleGroup || index >= singleGroup.tables.length - 1) return;
+    const tables = [...singleGroup.tables];
+    [tables[index], tables[index + 1]] = [tables[index + 1], tables[index]];
+    setGroups([{ ...singleGroup, tables }]);
+  };
+
+  /**
+   * Deletes a table from the single group.
+   */
+  const handleDeleteTable = (tableId: string) => {
+    if (!singleGroup) return;
+    setGroups([{ ...singleGroup, tables: singleGroup.tables.filter((t) => t.id !== tableId) }]);
     if (selectedTable === tableId) {
       setSelectedTable(null);
+      setSelectedCellId(null);
     }
   };
 
   /**
    * Updates a table name.
    */
-  const handleUpdateTableName = (groupId: string, tableId: string, name: string) => {
-    setGroups(groups.map(g => 
-      g.id === groupId 
-        ? { 
-            ...g, 
-            tables: g.tables.map(t => t.id === tableId ? { ...t, name } : t)
-          }
-        : g
-    ));
+  const handleUpdateTableName = (tableId: string, name: string) => {
+    if (!singleGroup) return;
+    setGroups([{
+      ...singleGroup,
+      tables: singleGroup.tables.map((t) => (t.id === tableId ? { ...t, name } : t)),
+    }]);
   };
+
+  /**
+   * Updates table-level options (e.g. textAlign).
+   */
+  const handleUpdateTable = (tableId: string, updates: Partial<TableDefinition>) => {
+    if (!singleGroup) return;
+    setGroups([{
+      ...singleGroup,
+      tables: singleGroup.tables.map((t) => (t.id === tableId ? { ...t, ...updates } : t)),
+    }]);
+  };
+
+  /** Whether the table uses grid layout (Word-style blocks). */
+  const isGridTable = (t: TableDefinition) => t.gridRows != null && t.gridCols != null;
+
+  /**
+   * Changes grid rows or columns and keeps cells within bounds.
+   */
+  const handleSetGridSize = (tableId: string, kind: 'rows' | 'cols', delta: number) => {
+    if (!singleGroup) return;
+    const table = singleGroup.tables.find((t) => t.id === tableId);
+    if (!table || !isGridTable(table)) return;
+    const rows = Math.max(1, (table.gridRows ?? 2) + (kind === 'rows' ? delta : 0));
+    const cols = Math.max(1, (table.gridCols ?? 2) + (kind === 'cols' ? delta : 0));
+    const cells = (table.cells ?? []).filter((c) => c.row < rows && c.col < cols);
+    setGroups([{
+      ...singleGroup,
+      tables: singleGroup.tables.map((t) =>
+        t.id === tableId ? { ...t, gridRows: rows, gridCols: cols, cells } : t
+      ),
+    }]);
+  };
+
+  /**
+   * Sets or updates a cell at (row, col). Creates cell if none exists. Pass id in updates when creating so caller can set selectedCellId.
+   */
+  const handleSetCell = (tableId: string, row: number, col: number, updates: Partial<GridCell>) => {
+    if (!singleGroup) return;
+    const table = singleGroup.tables.find((t) => t.id === tableId);
+    if (!table) return;
+    const cells = [...(table.cells ?? [])];
+    const idx = cells.findIndex((c) => c.row === row && c.col === col);
+    const base: GridCell = {
+      id: updates.id ?? generateId(),
+      row,
+      col,
+      type: 'label',
+      label: '',
+      value: '',
+      required: false,
+    };
+    if (idx >= 0) {
+      cells[idx] = { ...cells[idx], ...updates };
+    } else {
+      cells.push({ ...base, ...updates });
+    }
+    setGroups([{
+      ...singleGroup,
+      tables: singleGroup.tables.map((t) =>
+        t.id === tableId ? { ...t, cells } : t
+      ),
+    }]);
+  };
+
+  /**
+   * Updates an existing cell by id.
+   */
+  const handleUpdateCell = (tableId: string, cellId: string, updates: Partial<GridCell>) => {
+    if (!singleGroup) return;
+    setGroups([{
+      ...singleGroup,
+      tables: singleGroup.tables.map((t) =>
+        t.id === tableId
+          ? {
+              ...t,
+              cells: (t.cells ?? []).map((c) => (c.id === cellId ? { ...c, ...updates } : c)),
+            }
+          : t
+      ),
+    }]);
+  };
+
+  /**
+   * Clears the cell at (row, col) so the block is empty again.
+   */
+  const handleClearCell = (tableId: string, row: number, col: number) => {
+    if (!singleGroup) return;
+    const table = singleGroup.tables.find((t) => t.id === tableId);
+    if (!table) return;
+    const cells = (table.cells ?? []).filter((c) => !(c.row === row && c.col === col));
+    setGroups([{
+      ...singleGroup,
+      tables: singleGroup.tables.map((t) =>
+        t.id === tableId ? { ...t, cells } : t
+      ),
+    }]);
+    if (selectedCellId && cells.every((c) => c.id !== selectedCellId)) setSelectedCellId(null);
+  };
+
+  /** Gets the cell that owns (row, col), considering colSpan/rowSpan. Returns the cell and whether (row,col) is its top-left. */
+  const getCellAt = (table: TableDefinition, row: number, col: number): GridCell | null => {
+    const cells = table.cells ?? [];
+    const owner = cells.find(
+      (c) =>
+        row >= c.row &&
+        row < c.row + (c.rowSpan ?? 1) &&
+        col >= c.col &&
+        col < c.col + (c.colSpan ?? 1)
+    );
+    return owner ?? null;
+  };
+
+  /** True if (row, col) is the top-left of the cell that owns it (used to render one block per cell with span). */
+  const isCellTopLeft = (table: TableDefinition, row: number, col: number): boolean => {
+    const cell = getCellAt(table, row, col);
+    return cell != null && cell.row === row && cell.col === col;
+  }
 
   /**
    * Adds a column to a table.
@@ -244,11 +444,11 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
     };
     setGroups(groups.map(g => 
       g.id === groupId 
-        ? { 
+                ? { 
             ...g, 
             tables: g.tables.map(t => 
               t.id === tableId 
-                ? { ...t, columns: [...t.columns, newColumn] }
+                ? { ...t, columns: [...(t.columns ?? []), newColumn] }
                 : t
             )
           }
@@ -266,7 +466,7 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
             ...g, 
             tables: g.tables.map(t => 
               t.id === tableId 
-                ? { ...t, columns: t.columns.filter(c => c.id !== columnId) }
+                ? { ...t, columns: (t.columns ?? []).filter(c => c.id !== columnId) }
                 : t
             )
           }
@@ -286,7 +486,7 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
               t.id === tableId 
                 ? { 
                     ...t, 
-                    columns: t.columns.map(c => 
+                    columns: (t.columns ?? []).map(c => 
                       c.id === columnId ? { ...c, ...updates } : c
                     )
                   }
@@ -306,7 +506,7 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
 
     // Initialize values for all columns (empty for others, empty string for the target column)
     const initialValues: Record<string, string | number | boolean> = {};
-    table.columns.forEach(col => {
+    (table.columns ?? []).forEach(col => {
       if (col.id === columnId) {
         initialValues[col.id] = '';
       } else if (col.isPreFilled && col.defaultValue) {
@@ -345,7 +545,7 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
     if (!table) return;
 
     const initialValues: Record<string, string | number | boolean> = {};
-    table.columns.forEach(col => {
+    (table.columns ?? []).forEach(col => {
       if (col.isPreFilled && col.defaultValue) {
         initialValues[col.id] = col.defaultValue;
       } else if (col.type === 'checkbox') {
@@ -427,6 +627,11 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
       description: templateDescription,
       fields: [], // Legacy support
       groups,
+      showHeader,
+      showTableTitles,
+      showGroupTitle,
+      showReportTitle,
+      spaceBetweenBlocks,
       header: getGlobalHeaderConfig(), // Use global config
       footer: getGlobalFooterConfig(), // Use global config
       pageWidth: template?.pageWidth || 8.5,
@@ -456,7 +661,11 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
       name: templateName,
       description: templateDescription,
       groups,
-      // Don't save header/footer in template - they're global
+      showHeader,
+      showTableTitles,
+      showGroupTitle,
+      showReportTitle,
+      spaceBetweenBlocks,
       pageWidth: template?.pageWidth || 8.5,
       pageHeight: template?.pageHeight || 11,
       marginTop: template?.marginTop || 0.5,
@@ -478,8 +687,8 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
     );
   }
 
-  const currentGroup = groups.find(g => g.id === selectedGroup);
-  const currentTable = currentGroup?.tables.find(t => t.id === selectedTable);
+  const currentGroup = singleGroup;
+  const currentTable = singleGroup?.tables.find((t) => t.id === selectedTable) ?? null;
 
   // Header/Footer Configuration Modal
   if (showHeaderFooterConfig) {
@@ -583,6 +792,25 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                   />
                 </div>
+                <div className="col-span-2 border-t border-gray-200 pt-4 mt-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={headerConfig.showReportNumberInHeader ?? false}
+                      onChange={(e) => setHeaderConfig({ ...headerConfig, showReportNumberInHeader: e.target.checked })}
+                      className="w-4 h-4 rounded border-gray-300"
+                    />
+                    Show report/RSR number in header
+                  </label>
+                  <input
+                    type="text"
+                    value={headerConfig.reportNumberHeaderLabel ?? ''}
+                    onChange={(e) => setHeaderConfig({ ...headerConfig, reportNumberHeaderLabel: e.target.value })}
+                    placeholder="Report # or RSR #"
+                    className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg text-sm mt-1"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Label shown next to the report number (e.g. &quot;Report #&quot; or &quot;RSR #&quot;). Each report gets a unique number when submitted.</p>
+                </div>
               </div>
             </div>
 
@@ -672,6 +900,51 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
             placeholder="Template Description (optional)"
             className="text-sm text-gray-600 border-none outline-none bg-transparent w-full mt-1"
           />
+          <label className="flex items-center gap-2 mt-2 text-sm text-gray-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showHeader}
+              onChange={(e) => setShowHeader(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300"
+            />
+            Show header on report
+          </label>
+          <label className="flex items-center gap-2 mt-2 text-sm text-gray-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showTableTitles}
+              onChange={(e) => setShowTableTitles(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300"
+            />
+            Show checklist table titles on report
+          </label>
+          <label className="flex items-center gap-2 mt-2 text-sm text-gray-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showGroupTitle}
+              onChange={(e) => setShowGroupTitle(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300"
+            />
+            Show section title (e.g. &quot;Job Card&quot;) on report
+          </label>
+          <label className="flex items-center gap-2 mt-2 text-sm text-gray-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showReportTitle}
+              onChange={(e) => setShowReportTitle(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300"
+            />
+            Show report title (centered below header)
+          </label>
+          <label className="flex items-center gap-2 mt-2 text-sm text-gray-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={spaceBetweenBlocks}
+              onChange={(e) => setSpaceBetweenBlocks(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300"
+            />
+            Spacing between blocks (tables)
+          </label>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -708,63 +981,80 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - Groups */}
-        <div className="w-80 bg-white border-r border-gray-200 overflow-y-auto">
-          <div className="p-4 border-b border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-gray-800">Groups</h3>
-              <button
-                onClick={handleAddGroup}
-                className="p-1.5 bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors"
-                title="Add Group"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
-            <p className="text-xs text-gray-500">Add groups like "Checklist" or "Inspect"</p>
+        {/* Left Sidebar - Checklist tables only */}
+        <div className="w-80 bg-white border-r border-gray-200 overflow-y-auto flex flex-col">
+          <div className="p-4 border-b border-gray-200 shrink-0">
+            <h3 className="font-semibold text-gray-800 mb-2">Checklist tables</h3>
+            <p className="text-xs text-gray-500 mb-3">Each table has Item, OK, and Remarks. Add rows for checklist items.</p>
+            <button
+              onClick={handleAddChecklistTable}
+              className="w-full px-3 py-2.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
+              title="Add a checklist table (Item, OK, Remarks)"
+            >
+              <CheckSquare className="w-4 h-4" />
+              Add checklist table
+            </button>
           </div>
 
-          <div className="p-2 space-y-2">
-            {groups.length === 0 ? (
+          <div className="p-2 space-y-2 overflow-y-auto flex-1">
+            {!singleGroup || singleGroup.tables.length === 0 ? (
               <div className="text-center py-8 text-gray-500 text-sm">
                 <List className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p>No groups yet</p>
-                <p className="text-xs mt-1">Click + to add a group</p>
+                <p>No checklist tables yet</p>
+                <p className="text-xs mt-1">Click &quot;Add checklist table&quot; above</p>
               </div>
             ) : (
-              groups.map((group) => (
+              singleGroup.tables.map((table, index) => (
                 <div
-                  key={group.id}
+                  key={table.id}
                   className={`p-3 rounded-lg border-2 transition-all cursor-pointer ${
-                    selectedGroup === group.id
+                    selectedTable === table.id
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 bg-gray-50 hover:border-gray-300'
                   }`}
-                  onClick={() => {
-                    setSelectedGroup(group.id);
-                    setSelectedTable(null);
-                  }}
+                  onClick={() => setSelectedTable(table.id)}
                 >
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between gap-1 mb-2">
                     <input
                       type="text"
-                      value={group.name}
-                      onChange={(e) => handleUpdateGroupName(group.id, e.target.value)}
+                      value={table.name}
+                      onChange={(e) => handleUpdateTableName(table.id, e.target.value)}
                       onClick={(e) => e.stopPropagation()}
-                      className="font-semibold text-gray-800 bg-transparent border-none outline-none flex-1"
+                      className="font-medium text-gray-800 bg-transparent border-none outline-none flex-1 min-w-0"
+                      placeholder="Table name"
                     />
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteGroup(group.id);
-                      }}
-                      className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleMoveTableUp(index); }}
+                        disabled={index === 0}
+                        className="p-1 text-gray-600 hover:bg-gray-200 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                        title="Move up"
+                      >
+                        <ChevronUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleMoveTableDown(index); }}
+                        disabled={index === singleGroup.tables.length - 1}
+                        className="p-1 text-gray-600 hover:bg-gray-200 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                        title="Move down"
+                      >
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteTable(table.id);
+                        }}
+                        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                   <div className="text-xs text-gray-600">
-                    {group.tables.length} table{group.tables.length !== 1 ? 's' : ''}
+                    {isGridTable(table)
+                      ? `${table.gridRows ?? 0}×${table.gridCols ?? 0} grid · ${(table.cells ?? []).length} block(s)`
+                      : `${(table.columns ?? []).length} column(s) · ${(table.rows?.length ?? 0)} row(s)`}
                   </div>
                 </div>
               ))
@@ -772,83 +1062,321 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
           </div>
         </div>
 
-        {/* Middle - Tables */}
-        <div className="w-80 bg-gray-50 border-r border-gray-200 overflow-y-auto">
-          {currentGroup ? (
-            <>
-              <div className="p-4 border-b border-gray-200 bg-white">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold text-gray-800">{currentGroup.name}</h3>
-                  <button
-                    onClick={() => handleAddTable(currentGroup.id)}
-                    className="p-1.5 bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors"
-                    title="Add Table"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-                <p className="text-xs text-gray-500">Add tables to this group</p>
-              </div>
-
-              <div className="p-2 space-y-2">
-                {currentGroup.tables.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500 text-sm">
-                    <Table className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p>No tables yet</p>
-                    <p className="text-xs mt-1">Click + to add a table</p>
-                  </div>
-                ) : (
-                  currentGroup.tables.map((table) => (
-                    <div
-                      key={table.id}
-                      className={`p-3 rounded-lg border-2 transition-all cursor-pointer ${
-                        selectedTable === table.id
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 bg-white hover:border-gray-300'
-                      }`}
-                      onClick={() => setSelectedTable(table.id)}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <input
-                          type="text"
-                          value={table.name}
-                          onChange={(e) => handleUpdateTableName(currentGroup.id, table.id, e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="font-medium text-gray-800 bg-transparent border-none outline-none flex-1"
-                        />
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteTable(currentGroup.id, table.id);
-                          }}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                      <div className="text-xs text-gray-600">
-                        {table.columns.length} column{table.columns.length !== 1 ? 's' : ''}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="p-8 text-center text-gray-500">
-              <List className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>Select a group to manage tables</p>
-            </div>
-          )}
-        </div>
-
-        {/* Right - Column Configuration */}
+        {/* Right - Grid blocks or legacy column configuration */}
         <div className="flex-1 bg-white overflow-y-auto">
           {currentTable ? (
+            isGridTable(currentTable) ? (
+              /* Grid builder (Word-style blocks) */
+              <div className="p-6">
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">Checklist: {currentTable.name}</h3>
+                  <p className="text-sm text-gray-600">Set how many blocks left–right and up–down, then click a block to add a label, static text, checkbox, or answer field. Mark required if the technician must fill it.</p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-6 mb-6">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-700">Rows (up/down)</span>
+                    <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => handleSetGridSize(currentTable.id, 'rows', -1)}
+                        className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                      <span className="px-4 py-2 bg-white text-sm font-mono min-w-[2.5rem] text-center">{currentTable.gridRows ?? 2}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleSetGridSize(currentTable.id, 'rows', 1)}
+                        className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-700">Columns (left/right)</span>
+                    <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => handleSetGridSize(currentTable.id, 'cols', -1)}
+                        className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                      <span className="px-4 py-2 bg-white text-sm font-mono min-w-[2.5rem] text-center">{currentTable.gridCols ?? 2}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleSetGridSize(currentTable.id, 'cols', 1)}
+                        className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-700">Table text alignment</span>
+                    <select
+                      value={currentTable.textAlign ?? 'left'}
+                      onChange={(e) => handleUpdateTable(currentTable.id, { textAlign: e.target.value as 'left' | 'center' | 'right' })}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                    >
+                      <option value="left">Left</option>
+                      <option value="center">Center</option>
+                      <option value="right">Right</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-700">Table width</span>
+                    <select
+                      value={currentTable.layout ?? 'full'}
+                      onChange={(e) => handleUpdateTable(currentTable.id, { layout: e.target.value as 'full' | 'half' | 'third' })}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                    >
+                      <option value="full">Full width (one per row)</option>
+                      <option value="half">Half (2 tables side-by-side)</option>
+                      <option value="third">Third (3 tables side-by-side)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <p className="text-xs text-gray-500 mb-2">Click a block to configure it. Use Column/Row span to merge cells (e.g. title across top).</p>
+                  <div
+                    className="inline-grid gap-0 border border-gray-300 p-2 bg-gray-50"
+                    style={{
+                      gridTemplateColumns: `repeat(${currentTable.gridCols ?? 2}, minmax(80px, 1fr))`,
+                      gridTemplateRows: `repeat(${currentTable.gridRows ?? 2}, 72px)`,
+                    }}
+                  >
+                    {Array.from({ length: (currentTable.gridRows ?? 2) * (currentTable.gridCols ?? 2) }, (_, i) => {
+                      const r = Math.floor(i / (currentTable.gridCols ?? 2));
+                      const c = i % (currentTable.gridCols ?? 2);
+                      const cell = getCellAt(currentTable, r, c);
+                      const topLeft = isCellTopLeft(currentTable, r, c);
+                      const isSelected = selectedCellId === cell?.id;
+                      const colSpan = Math.min((cell?.colSpan ?? 1), (currentTable.gridCols ?? 2) - c);
+                      const rowSpan = Math.min((cell?.rowSpan ?? 1), (currentTable.gridRows ?? 2) - r);
+                      if (!topLeft && cell) {
+                        return (
+                          <div
+                            key={`${r}-${c}`}
+                            className="min-h-[72px]"
+                            style={{ gridColumn: `${c + 1} / span 1`, gridRow: `${r + 1} / span 1` }}
+                            aria-hidden
+                          />
+                        );
+                      }
+                      return (
+                        <button
+                          key={`${r}-${c}`}
+                          type="button"
+                          style={{
+                            gridColumn: `${c + 1} / span ${topLeft && cell ? colSpan : 1}`,
+                            gridRow: `${r + 1} / span ${topLeft && cell ? rowSpan : 1}`,
+                          }}
+                          onClick={() => {
+                            if (cell) {
+                              setSelectedCellId(cell.id);
+                            } else {
+                              const newId = generateId();
+                              handleSetCell(currentTable.id, r, c, { id: newId, type: 'label', label: '', value: '', required: false });
+                              setSelectedCellId(newId);
+                            }
+                          }}
+                          className={`rounded-lg flex flex-col items-center justify-center p-2 text-left min-h-[72px] transition-colors ${
+                            cell?.boldBorder ? 'border-2 border-gray-800' : 'border-2 border-gray-300'
+                          } ${isSelected ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'bg-white hover:border-gray-400 hover:bg-gray-50'}`}
+                        >
+                          {cell ? (
+                            <>
+                              <span className="text-[10px] uppercase text-gray-500 font-medium">
+                                {cell.type === 'jobField' ? 'Job' : cell.type === 'reportNumber' ? 'Report #' : cell.type}
+                              </span>
+                              <span className="text-xs font-medium text-gray-800 truncate w-full text-center">
+                                {cell.type === 'jobField'
+                                  ? (cell.label || JOB_FIELD_KEYS.find((k) => k.value === (cell.jobFieldKey ?? 'jobNumber'))?.label || '—')
+                                  : cell.type === 'reportNumber'
+                                    ? (cell.label || 'Report #')
+                                    : (cell.label || cell.value || '—')}
+                              </span>
+                              {(cell.colSpan ?? 1) > 1 || (cell.rowSpan ?? 1) > 1 ? (
+                                <span className="text-[10px] text-gray-500">{(cell.colSpan ?? 1)}×{cell.rowSpan ?? 1}</span>
+                              ) : null}
+                              {cell.required && <span className="text-red-500 text-xs">*</span>}
+                            </>
+                          ) : (
+                            <span className="text-gray-400 text-xs">Empty</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {selectedCellId && (() => {
+                  const cell = (currentTable.cells ?? []).find((c) => c.id === selectedCellId);
+                  if (!cell) return null;
+                  return (
+                    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                      <h4 className="font-semibold text-gray-800 mb-3">Block settings</h4>
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                          <select
+                            value={cell.type}
+                            onChange={(e) => handleUpdateCell(currentTable.id, cell.id, { type: e.target.value as GridCellType })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          >
+                            <option value="label">Label</option>
+                            <option value="staticText">Static text (in box)</option>
+                            <option value="checkbox">Checkbox</option>
+                            <option value="text">Text (answer)</option>
+                            <option value="textarea">Text area / Comments (expands with content)</option>
+                            <option value="number">Number</option>
+                            <option value="date">Date</option>
+                            <option value="select">Dropdown (select)</option>
+                            <option value="jobField">Job field (from job)</option>
+                            <option value="reportNumber">Report/RSR number</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Label (above/beside)</label>
+                          <input
+                            type="text"
+                            value={cell.label ?? ''}
+                            onChange={(e) => handleUpdateCell(currentTable.id, cell.id, { label: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            placeholder="e.g. Item"
+                          />
+                        </div>
+                      </div>
+                      {cell.type === 'jobField' && (
+                        <div className="mb-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Job field to display</label>
+                          <select
+                            value={cell.jobFieldKey ?? 'jobNumber'}
+                            onChange={(e) => handleUpdateCell(currentTable.id, cell.id, { jobFieldKey: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          >
+                            {JOB_FIELD_KEYS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
+                          <p className="text-xs text-gray-500 mt-1">When a job is assigned, this value will be pulled from the job.</p>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        {(cell.type !== 'jobField' && cell.type !== 'reportNumber') && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Text / default value</label>
+                            <input
+                              type="text"
+                              value={cell.value ?? ''}
+                              onChange={(e) => handleUpdateCell(currentTable.id, cell.id, { value: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                              placeholder="Static text or default"
+                            />
+                          </div>
+                        )}
+                        <div className={`flex items-center gap-2 pt-6 ${(cell.type === 'jobField' || cell.type === 'reportNumber') ? 'col-span-2' : ''}`}>
+                          <input
+                            type="checkbox"
+                            checked={cell.required ?? false}
+                            onChange={(e) => handleUpdateCell(currentTable.id, cell.id, { required: e.target.checked })}
+                            className="w-4 h-4"
+                          />
+                          <label className="text-sm text-gray-700">Required</label>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Column span (merge right)</label>
+                          <select
+                            value={cell.colSpan ?? 1}
+                            onChange={(e) => handleUpdateCell(currentTable.id, cell.id, { colSpan: Number(e.target.value) })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          >
+                            {Array.from({ length: currentTable.gridCols ?? 2 }, (_, i) => i + 1).map((n) => (
+                              <option key={n} value={n}>{n}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Row span (merge down)</label>
+                          <select
+                            value={cell.rowSpan ?? 1}
+                            onChange={(e) => handleUpdateCell(currentTable.id, cell.id, { rowSpan: Number(e.target.value) })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          >
+                            {Array.from({ length: currentTable.gridRows ?? 2 }, (_, i) => i + 1).map((n) => (
+                              <option key={n} value={n}>{n}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-4 mb-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={cell.boldBorder ?? false}
+                            onChange={(e) => handleUpdateCell(currentTable.id, cell.id, { boldBorder: e.target.checked })}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm text-gray-700">Bold border</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={cell.boldText ?? false}
+                            onChange={(e) => handleUpdateCell(currentTable.id, cell.id, { boldText: e.target.checked })}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm text-gray-700">Bold text</span>
+                        </label>
+                      </div>
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Text alignment (overrides table)</label>
+                        <select
+                          value={cell.textAlign ?? ''}
+                          onChange={(e) => handleUpdateCell(currentTable.id, cell.id, { textAlign: e.target.value === '' ? undefined : e.target.value as 'left' | 'center' | 'right' })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        >
+                          <option value="">Default (use table alignment)</option>
+                          <option value="left">Left</option>
+                          <option value="center">Center</option>
+                          <option value="right">Right</option>
+                        </select>
+                      </div>
+                      {cell.type === 'select' && (
+                        <div className="mb-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Options (one per line)</label>
+                          <textarea
+                            value={cell.options?.join('\n') ?? ''}
+                            onChange={(e) => handleUpdateCell(currentTable.id, cell.id, { options: e.target.value.split('\n').filter(Boolean) })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            rows={3}
+                            placeholder="Option 1&#10;Option 2"
+                          />
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => { handleClearCell(currentTable.id, cell.row, cell.col); setSelectedCellId(null); }}
+                        className="text-sm text-red-600 hover:bg-red-50 px-3 py-1.5 rounded"
+                      >
+                        Clear block
+                      </button>
+                    </div>
+                  );
+                })()}
+              </div>
+            ) : (
+            /* Legacy column-based editor */
             <div className="p-6">
               <div className="mb-6">
                 <h3 className="text-lg font-semibold text-gray-800 mb-2">Table: {currentTable.name}</h3>
-                <p className="text-sm text-gray-600">Configure columns for this table</p>
+                <p className="text-sm text-gray-600">Add columns (headers). Choose who fills each: <strong>Admin</strong> (pre-filled for technician) or <strong>Technician</strong> (filled on site). For checklists, use &quot;Admin&quot; and enable multiple rows.</p>
               </div>
 
               <div className="mb-4">
@@ -862,14 +1390,14 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
               </div>
 
               <div className="space-y-4">
-                {currentTable.columns.length === 0 ? (
+                {(currentTable.columns ?? []).length === 0 ? (
                   <div className="text-center py-12 text-gray-500">
                     <Table className="w-12 h-12 mx-auto mb-4 opacity-50" />
                     <p>No columns yet</p>
                     <p className="text-xs mt-2">Click "Add Column" to get started</p>
                   </div>
                 ) : (
-                  currentTable.columns.map((column) => (
+                  (currentTable.columns ?? []).map((column) => (
                     <div key={column.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                       <div className="grid grid-cols-2 gap-4 mb-4">
                         <div>
@@ -900,31 +1428,51 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
                       </div>
 
                       <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={column.isPreFilled}
-                            onChange={(e) => handleUpdateColumn(currentGroup!.id, currentTable.id, column.id, { 
-                              isPreFilled: e.target.checked,
-                              isRequired: e.target.checked ? false : column.isRequired,
-                              allowMultipleRows: e.target.checked ? column.allowMultipleRows : false
-                            })}
-                            className="w-4 h-4"
-                          />
-                          <label className="text-sm text-gray-700">Admin Pre-fills</label>
+                        <div>
+                          <span className="block text-sm font-medium text-gray-700 mb-2">Filled by</span>
+                          <div className="flex gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name={`filled-by-${column.id}`}
+                                checked={column.isPreFilled}
+                                onChange={() => handleUpdateColumn(currentGroup!.id, currentTable.id, column.id, { 
+                                  isPreFilled: true,
+                                  isRequired: false,
+                                  allowMultipleRows: column.allowMultipleRows ?? false
+                                })}
+                                className="w-4 h-4"
+                              />
+                              <span className="text-sm text-gray-700">Admin</span>
+                              <span className="text-xs text-gray-500">(pre-filled)</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name={`filled-by-${column.id}`}
+                                checked={!column.isPreFilled}
+                                onChange={() => handleUpdateColumn(currentGroup!.id, currentTable.id, column.id, { 
+                                  isPreFilled: false,
+                                  allowMultipleRows: false
+                                })}
+                                className="w-4 h-4"
+                              />
+                              <span className="text-sm text-gray-700">Technician</span>
+                              <span className="text-xs text-gray-500">(on site)</span>
+                            </label>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={column.isRequired}
-                            onChange={(e) => handleUpdateColumn(currentGroup!.id, currentTable.id, column.id, { isRequired: e.target.checked })}
-                            disabled={column.isPreFilled}
-                            className="w-4 h-4"
-                          />
-                          <label className={`text-sm ${column.isPreFilled ? 'text-gray-400' : 'text-gray-700'}`}>
-                            Technician Required
-                          </label>
-                        </div>
+                        {!column.isPreFilled && (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={column.isRequired}
+                              onChange={(e) => handleUpdateColumn(currentGroup!.id, currentTable.id, column.id, { isRequired: e.target.checked })}
+                              className="w-4 h-4"
+                            />
+                            <label className="text-sm text-gray-700">Required (technician must fill)</label>
+                          </div>
+                        )}
                       </div>
 
                       {column.isPreFilled && (
@@ -938,8 +1486,8 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
                               })}
                               className="w-4 h-4"
                             />
-                            <label className="text-sm font-medium text-gray-700">Allow Multiple Rows</label>
-                            <span className="text-xs text-gray-500">(Add multiple checklist items)</span>
+                            <label className="text-sm font-medium text-gray-700">Checklist: allow multiple rows</label>
+                            <span className="text-xs text-gray-500">(one row per item)</span>
                           </div>
                           {!column.allowMultipleRows && (
                             <div>
@@ -954,17 +1502,17 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
                             </div>
                           )}
                           
-                          {/* Row Management for this specific column */}
+                          {/* Checklist rows: one row per item */}
                           {column.allowMultipleRows && (
-                            <div className="mt-4 border border-blue-200 rounded-lg p-4 bg-blue-50">
+                            <div className="mt-4 border border-emerald-200 rounded-lg p-4 bg-emerald-50">
                               <div className="flex items-center justify-between mb-3">
-                                <h5 className="font-semibold text-sm text-gray-800">Rows for "{column.label}"</h5>
+                                <h5 className="font-semibold text-sm text-gray-800">Checklist items (one per row)</h5>
                                 <button
                                   onClick={() => handleAddRowForColumn(currentGroup!.id, currentTable.id, column.id)}
-                                  className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 text-xs"
+                                  className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2 text-xs"
                                 >
                                   <Plus className="w-3 h-3" />
-                                  Add Row
+                                  Add row
                                 </button>
                               </div>
                               {currentTable.rows && currentTable.rows.filter(row => row.columnId === column.id).length > 0 ? (
@@ -1021,7 +1569,7 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
                                     ))}
                                 </div>
                               ) : (
-                                <p className="text-sm text-gray-600">No rows added yet. Click "Add Row" to create checklist items for this column.</p>
+                                <p className="text-sm text-gray-600">No checklist items yet. Click &quot;Add row&quot; to add rows (e.g. &quot;Check oil&quot;, &quot;Check water&quot;).</p>
                               )}
                             </div>
                           )}
@@ -1057,10 +1605,11 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
                 )}
               </div>
             </div>
+            )
           ) : (
             <div className="p-8 text-center text-gray-500">
               <Settings className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>Select a table to configure columns</p>
+              <p>Select a checklist table to configure blocks or columns</p>
             </div>
           )}
         </div>

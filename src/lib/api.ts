@@ -2236,6 +2236,7 @@ export interface JobCardTemplate {
   groups?: any[]; // New structure: groups with tables
   header?: any; // Header configuration
   footer?: any; // Footer configuration
+  showHeader?: boolean; // Whether to display header on report (default: true)
   pageWidth?: number;
   pageHeight?: number;
   marginTop?: number;

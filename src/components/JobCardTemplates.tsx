@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, ClipboardList, Edit, Trash2, Eye, X } from 'lucide-react';
+import { Plus, ClipboardList, Edit, Trash2, Eye, X, CheckCircle } from 'lucide-react';
 import { 
   getJobCardTemplates, 
   createJobCardTemplate, 
@@ -21,6 +21,7 @@ export function JobCardTemplates() {
   const [editingTemplate, setEditingTemplate] = useState<JobCardTemplate | null>(null);
   const [previewTemplate, setPreviewTemplate] = useState<JobCardTemplate | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   /**
    * Loads templates from the API.
@@ -60,24 +61,24 @@ export function JobCardTemplates() {
   };
 
   /**
-   * Handles saving a template.
+   * Handles saving a template. Stays in the builder after save so the user can continue editing.
    */
   const handleSave = async (templateData: any) => {
     try {
       setLoading(true);
       setError(null);
 
+      let saved: { template: JobCardTemplate };
       if (templateData._id) {
-        // Update existing template
-        await updateJobCardTemplate(templateData._id, templateData);
+        saved = await updateJobCardTemplate(templateData._id, templateData);
       } else {
-        // Create new template
-        await createJobCardTemplate(templateData);
+        saved = await createJobCardTemplate(templateData);
       }
 
       await loadTemplates();
-      setShowBuilder(false);
-      setEditingTemplate(null);
+      setEditingTemplate(saved.template);
+      setSuccessMessage('Template saved successfully');
+      // Keep showBuilder true so user stays in the builder and can continue editing
     } catch (err: any) {
       setError(err.message || 'Failed to save template');
       console.error('Error saving template:', err);
@@ -113,6 +114,7 @@ export function JobCardTemplates() {
   const handleCancel = () => {
     setShowBuilder(false);
     setEditingTemplate(null);
+    setSuccessMessage(null);
   };
 
   /**
@@ -139,14 +141,39 @@ export function JobCardTemplates() {
     );
   }
 
+  // Auto-dismiss success message after 4 seconds
+  useEffect(() => {
+    if (!successMessage) return;
+    const t = setTimeout(() => setSuccessMessage(null), 4000);
+    return () => clearTimeout(t);
+  }, [successMessage]);
+
   // Show form builder if active
   if (showBuilder) {
     return (
-      <JobCardFormBuilder
-        template={editingTemplate || undefined}
-        onSave={handleSave}
-        onCancel={handleCancel}
-      />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        {successMessage && (
+          <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-[8px] mx-4 mt-4 mb-0 flex items-center justify-between gap-3 shadow-sm">
+            <span className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
+              {successMessage}
+            </span>
+            <button
+              type="button"
+              onClick={() => setSuccessMessage(null)}
+              className="text-green-700 hover:text-green-900 p-1 rounded"
+              aria-label="Dismiss"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+        <JobCardFormBuilder
+          template={editingTemplate || undefined}
+          onSave={handleSave}
+          onCancel={handleCancel}
+        />
+      </div>
     );
   }
 
@@ -162,7 +189,7 @@ export function JobCardTemplates() {
                 Job Card Templates
               </h1>
               <p className="text-sm text-gray-600">
-                Create and manage templates for job cards that technicians will fill out
+                Create and manage templates for job cards that technicians will fill out. Add checklist tables (Item, OK, Remarks) and optional pre-filled rows.
               </p>
             </div>
             <button 

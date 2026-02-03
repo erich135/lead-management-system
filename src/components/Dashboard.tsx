@@ -687,7 +687,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                   <span>Dashboard</span>
                 </Link>
                 {/* Jobs Menu - Expandable for super admins */}
-                {(isSuperAdmin || hasPermission('jobCards.view')) ? (
+                {(isSuperAdmin || hasPermission('job_card_templates.read') || hasPermission('job_card_submissions.read')) ? (
                   <div className="relative group jobs-menu-container">
                     <button
                       onClick={() => setIsJobsMenuExpanded(!isJobsMenuExpanded)}
@@ -719,30 +719,34 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                           <FileText className="w-4 h-4" />
                           <span>All Jobs</span>
                         </Link>
-                        <Link
-                          to="/job-card-templates"
-                          onClick={() => setIsJobsMenuExpanded(false)}
-                          className={`block px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
-                            view === 'jobCardTemplates'
-                              ? 'bg-[#f7c12b]/20 text-[#383838] font-medium'
-                              : 'text-[#383838] hover:bg-gray-100'
-                          }`}
-                        >
-                          <ClipboardList className="w-4 h-4" />
-                          <span>Job Card Templates</span>
-                        </Link>
-                        <Link
-                          to="/job-card-submissions"
-                          onClick={() => setIsJobsMenuExpanded(false)}
-                          className={`block px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
-                            view === 'jobCardSubmissions'
-                              ? 'bg-[#f7c12b]/20 text-[#383838] font-medium'
-                              : 'text-[#383838] hover:bg-gray-100'
-                          }`}
-                        >
-                          <FileText className="w-4 h-4" />
-                          <span>Job Card Submissions</span>
-                        </Link>
+                        {(isSuperAdmin || hasPermission('job_card_templates.read')) && (
+                          <Link
+                            to="/job-card-templates"
+                            onClick={() => setIsJobsMenuExpanded(false)}
+                            className={`block px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
+                              view === 'jobCardTemplates'
+                                ? 'bg-[#f7c12b]/20 text-[#383838] font-medium'
+                                : 'text-[#383838] hover:bg-gray-100'
+                            }`}
+                          >
+                            <ClipboardList className="w-4 h-4" />
+                            <span>Job Card Templates</span>
+                          </Link>
+                        )}
+                        {(isSuperAdmin || hasPermission('job_card_submissions.read')) && (
+                          <Link
+                            to="/job-card-submissions"
+                            onClick={() => setIsJobsMenuExpanded(false)}
+                            className={`block px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
+                              view === 'jobCardSubmissions'
+                                ? 'bg-[#f7c12b]/20 text-[#383838] font-medium'
+                                : 'text-[#383838] hover:bg-gray-100'
+                            }`}
+                          >
+                            <FileText className="w-4 h-4" />
+                            <span>Job Card Submissions</span>
+                          </Link>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1964,12 +1968,26 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           <SystemManagement />
         )}
 
-        {view === 'jobCardTemplates' && (isSuperAdmin || hasPermission('jobCards.view')) && (
+        {view === 'jobCardTemplates' && (isSuperAdmin || hasPermission('job_card_templates.read')) && (
           <JobCardTemplates />
         )}
 
-        {view === 'jobCardSubmissions' && (isSuperAdmin || hasPermission('jobCards.view')) && (
+        {view === 'jobCardSubmissions' && (isSuperAdmin || hasPermission('job_card_submissions.read')) && (
           <JobCardSubmissions />
+        )}
+
+        {view === 'jobCardTemplates' && !isSuperAdmin && !hasPermission('job_card_templates.read') && (
+          <div className="p-8 bg-white rounded-[8px] shadow-lg max-w-lg mx-auto mt-8">
+            <h2 className="text-xl font-semibold text-[#383838] mb-2">Access restricted</h2>
+            <p className="text-slate-600 mb-6">You don&apos;t have permission to view Job Card Templates. Ask a Super Admin to grant you the &quot;Job Card Templates&quot; permission in System Admin → User Management.</p>
+          </div>
+        )}
+
+        {view === 'jobCardSubmissions' && !isSuperAdmin && !hasPermission('job_card_submissions.read') && (
+          <div className="p-8 bg-white rounded-[8px] shadow-lg max-w-lg mx-auto mt-8">
+            <h2 className="text-xl font-semibold text-[#383838] mb-2">Access restricted</h2>
+            <p className="text-slate-600 mb-6">You don&apos;t have permission to view Job Card Submissions. Ask a Super Admin to grant you the &quot;Job Card Submissions&quot; permission in System Admin → User Management.</p>
+          </div>
         )}
 
         {view === 'activities' && (

@@ -673,14 +673,20 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                   <LayoutDashboard className={`w-4 h-4 transition-transform ${view === 'dashboard' ? 'scale-110' : ''}`} />
                   <span>Dashboard</span>
                 </Link>
-<<<<<<< HEAD
                 {(isSuperAdmin || hasPermission('sales_leads.read')) && (
                   <Link
                     to="/sales-leads"
                     className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
                       view === 'salesLeads'
-=======
-                {/* Jobs Menu - Expandable for super admins */}
+                        ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
+                        : 'text-[#383838] hover:text-[#f7c12b]'
+                    }`}
+                  >
+                    <User className={`w-4 h-4 transition-transform ${view === 'salesLeads' ? 'scale-110' : ''}`} />
+                    <span>Sales Leads</span>
+                  </Link>
+                )}
+                {/* Jobs Menu - Expandable for super admins / job card permissions */}
                 {(isSuperAdmin || hasPermission('job_card_templates.read') || hasPermission('job_card_submissions.read')) ? (
                   <div className="relative group jobs-menu-container">
                     <button
@@ -749,33 +755,14 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                     to="/jobs"
                     className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
                       view === 'leads'
->>>>>>> e7508872301b26a91cabb4a8d39a1fa1384a0246
                         ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
                         : 'text-[#383838] hover:text-[#f7c12b]'
                     }`}
                   >
-<<<<<<< HEAD
-                    <User className={`w-4 h-4 transition-transform ${view === 'salesLeads' ? 'scale-110' : ''}`} />
-                    <span>Sales Leads</span>
-                  </Link>
-                )}
-                <Link
-                  to="/jobs"
-                  className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
-                    view === 'leads'
-                      ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
-                      : 'text-[#383838] hover:text-[#f7c12b]'
-                  }`}
-                >
-                  <FileText className={`w-4 h-4 transition-transform ${view === 'leads' ? 'scale-110' : ''}`} />
-                  <span>Jobs</span>
-                </Link>
-=======
                     <FileText className={`w-4 h-4 transition-transform ${view === 'leads' ? 'scale-110' : ''}`} />
                     <span>Jobs</span>
                   </Link>
                 )}
->>>>>>> e7508872301b26a91cabb4a8d39a1fa1384a0246
                 {(isSuperAdmin || hasPermission('reports.read')) && (
                   <Link
                     to="/reports"

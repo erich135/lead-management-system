@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
-type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines';
+type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions';
 
 interface MobileNavigationProps {
   currentView: View;
@@ -36,6 +36,8 @@ export function MobileNavigation({
     if (path === '/admin') return 'admin';
     if (path === '/activities') return 'activities';
     if (path === '/machines') return 'machines';
+    if (path === '/job-card-templates') return 'jobCardTemplates';
+    if (path === '/job-card-submissions') return 'jobCardSubmissions';
     return 'dashboard';
   };
 

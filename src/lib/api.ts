@@ -2306,7 +2306,6 @@ export async function markTicketAsReadBySupport(ticketId: string): Promise<void>
   });
 }
 
-<<<<<<< HEAD
 // ============================================================================
 // Sales Lead Management
 // ============================================================================
@@ -2396,7 +2395,14 @@ export async function updateSalesLead(id: string, data: Partial<SalesLead>): Pro
  */
 export async function deleteSalesLead(id: string): Promise<void> {
   await apiRequest(`/api/sales-leads/${id}`, {
-=======
+    method: 'DELETE',
+  });
+}
+
+// ============================================================================
+// Job Card Templates
+// ============================================================================
+
 /**
  * Job Card Template types.
  */
@@ -2469,12 +2475,10 @@ export async function updateJobCardTemplate(id: string, template: Partial<JobCar
  */
 export async function deleteJobCardTemplate(id: string): Promise<void> {
   return await apiRequest(`/api/job-card-templates/${id}`, {
->>>>>>> e7508872301b26a91cabb4a8d39a1fa1384a0246
     method: 'DELETE',
   });
 }
 
-<<<<<<< HEAD
 /**
  * Assign a sales lead to a rep.
  */
@@ -2767,8 +2771,6 @@ export async function rejectCanvassingPlan(id: string, rejectionReason: string):
   return response;
 }
 
-=======
->>>>>>> e7508872301b26a91cabb4a8d39a1fa1384a0246
 export default {
   login,
   logout,
@@ -2855,7 +2857,6 @@ export default {
   getSupportUnreadCount,
   updateTicketStatus,
   markTicketAsReadBySupport,
-<<<<<<< HEAD
   // Sales Lead Management
   getSalesLeads,
   getSalesLead,
@@ -2874,13 +2875,11 @@ export default {
   deleteCanvassingPlan,
   approveCanvassingPlan,
   rejectCanvassingPlan,
-=======
   getJobCardTemplates,
   getJobCardTemplate,
   createJobCardTemplate,
   updateJobCardTemplate,
   deleteJobCardTemplate,
->>>>>>> e7508872301b26a91cabb4a8d39a1fa1384a0246
   apiRequest,
 };
 

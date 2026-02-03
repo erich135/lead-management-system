@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ComponentProps } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -2033,8 +2033,8 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
       {/* Mobile Bottom Navigation */}
       {isMobile && (
         <MobileNavigation
-          currentView={view}
-          onViewChange={navigateToView}
+          currentView={view as ComponentProps<typeof MobileNavigation>['currentView']}
+          onViewChange={navigateToView as ComponentProps<typeof MobileNavigation>['onViewChange']}
           notificationsCount={stats ? stats.overdueReminders + stats.approachingReminders : 0}
           onNotificationsClick={() => setShowNotifications(!showNotifications)}
         />

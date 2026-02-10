@@ -1,6 +1,6 @@
 # Changelog
 
-## [2.1.0] - 2026-02-10
+## [1.0.16] - 2026-02-10
 
 ### Added
 - **Sales Leads Granular Permission System** - Complete RBAC for Sales Leads feature
@@ -48,7 +48,7 @@
 - Fixed syntax errors in SystemManagement.tsx from incomplete Branch Access section
 - Cleaned up duplicate code and improved component structure
 
-## [2.0.2] - 2026-01-27
+## [1.0.15] - 2026-01-27
 
 ### Fixed
 - Resolved all remaining TypeScript build errors in `LeadDetails.tsx`, `LeadsList.tsx`, and `SystemManagement.tsx`.
@@ -56,7 +56,7 @@
 ### Changed
 - Relaxed TypeScript configuration in `tsconfig.app.json` (disabled strict mode) to allow for faster development iteration.
 
-## [2.0.1] - 2026-01-27
+## [1.0.14] - 2026-01-27
 
 ### Added
 - Integrated changes from 'Leadsystem' branch

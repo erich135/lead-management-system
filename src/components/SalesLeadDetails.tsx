@@ -52,8 +52,7 @@ export function SalesLeadDetails({ lead, branches, repCodes, onClose, onEdit, on
   const [pendingStatus, setPendingStatus] = useState<SalesLead['status'] | null>(null);
 
   const canUpdate = hasPermission('sales_leads.update');
-  const isSalesManager = user?.role?.name?.toLowerCase().includes('sales') && user?.role?.name?.toLowerCase().includes('manager');
-  const canDelete = (isSuperAdmin || isSalesManager) && hasPermission('sales_leads.delete');
+  const canDelete = hasPermission('sales_leads.delete');
   const canAssign = hasPermission('sales_leads.assign');
   const canConvert = hasPermission('sales_leads.convert');
   const canManageAppointments = hasPermission('appointments.create');

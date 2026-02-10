@@ -455,6 +455,27 @@ export function SystemManagement() {
     }, {} as Record<string, Permission[]>);
   }, [permissions]);
 
+  const allPermissionNames = useMemo(() => {
+    return Object.values(groupedPermissions)
+      .flat()
+      .map((perm) => perm.name);
+  }, [groupedPermissions]);
+
+  const hasAllPermissionsSelected = useMemo(() => {
+    if (!selectedUser || allPermissionNames.length === 0) return false;
+    return allPermissionNames.every((permName) => selectedUser.permissions.includes(permName));
+  }, [allPermissionNames, selectedUser]);
+
+  function handleToggleAllPermissions() {
+    if (!selectedUser || allPermissionNames.length === 0) return;
+
+    const newPerms = hasAllPermissionsSelected
+      ? selectedUser.permissions.filter((perm) => !allPermissionNames.includes(perm))
+      : Array.from(new Set([...selectedUser.permissions, ...allPermissionNames]));
+
+    handleUpdatePermissions(selectedUser._id, newPerms);
+  }
+
   /**
    * Handles inviting a new user with role-specific connections.
    */
@@ -1556,10 +1577,57 @@ alert((response as any).message || 'User invited successfully');
                     <div>
                       <label className="block text-sm font-semibold text-ars-body mb-2">Permissions</label>
                       <p className="text-xs text-ars-body mb-2">Grant access to Job Card Templates, Submissions, Reports, etc.</p>
+                      <div className="flex items-center justify-between mb-3">
+                        <button
+                          type="button"
+                          onClick={handleToggleAllPermissions}
+                          disabled={updatingPermissions || allPermissionNames.length === 0}
+                          className="text-xs text-ars-primary hover:text-ars-primary/80 underline disabled:opacity-50"
+                        >
+                          {hasAllPermissionsSelected ? 'Clear All' : 'Select All'}
+                        </button>
+                        <span className="text-xs text-ars-body">
+                          {allPermissionNames.length === 0
+                            ? 'No permissions available'
+                            : `${selectedUser?.permissions?.filter((perm) => allPermissionNames.includes(perm)).length || 0} selected`}
+                        </span>
+                      </div>
                       <div className="max-h-64 overflow-y-auto space-y-2">
                         {Object.entries(groupedPermissions).map(([groupKey, perms]) => (
                           <div key={groupKey} className="border border-gray-200 rounded-lg p-3">
-                            <p className="text-xs font-bold text-ars-heading mb-2">{groupKey}</p>
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-xs font-bold text-ars-heading">{groupKey}</p>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!selectedUser) return;
+                                  const groupPermissionNames = perms.map((perm) => perm.name);
+                                  const groupAllSelected = groupPermissionNames.every((permName) =>
+                                    selectedUser.permissions.includes(permName),
+                                  );
+                                  const newPerms = groupAllSelected
+                                    ? selectedUser.permissions.filter(
+                                        (perm) => !groupPermissionNames.includes(perm),
+                                      )
+                                    : Array.from(
+                                        new Set([
+                                          ...selectedUser.permissions,
+                                          ...groupPermissionNames,
+                                        ]),
+                                      );
+                                  handleUpdatePermissions(selectedUser._id, newPerms);
+                                }}
+                                disabled={updatingPermissions}
+                                className="text-[11px] text-ars-primary hover:text-ars-primary/80 underline disabled:opacity-50"
+                              >
+                                {selectedUser && perms.length > 0 &&
+                                perms.every((perm) =>
+                                  selectedUser.permissions.includes(perm.name),
+                                )
+                                  ? 'Clear All'
+                                  : 'Select All'}
+                              </button>
+                            </div>
                             <div className="space-y-1">
                               {perms.map((perm) => {
                                 const hasPermission = selectedUser.permissions.includes(perm.name);

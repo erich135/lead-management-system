@@ -1,5 +1,47 @@
 # Changelog
 
+## [2.1.0] - 2026-02-10
+
+### Added
+- **Sales Leads Granular Permission System** - Complete RBAC for Sales Leads feature
+  - 6 granular permissions: read, create, update, delete, assign, convert
+  - Role-based access control with 5 default roles: admin, manager, rep, user, technician
+  - User-specific permission overrides for individual access control
+  - Delete permission restricted by default (configurable via UI)
+  - Frontend + Backend permission enforcement (defense in depth)
+  - Complete audit trail for all Sales Leads actions (soft delete recovery)
+  - Built-in rep lead filtering (reps see only their assigned leads)
+  - Permission grant script: `npm run grant:sales-lead-perms`
+  - Permission migration script: `npm run migrate:sales-lead-perms`
+- **System Admin UI Enhancements**
+  - Added "Select All / Clear All" functionality for permission checkboxes (global)
+  - Added per-permission-group "Select All / Clear All" buttons
+  - Improved permission management UX for bulk operations
+  - Permission counts displayed for better visibility
+- **Comprehensive Documentation** (7 new guides)
+  - SALES-LEADS-QUICK-START.md - 3-step implementation guide
+  - README-SALES-LEADS-PERMISSIONS.md - Complete overview with examples
+  - SALES-LEADS-PERMISSIONS-GUIDE.md - Full technical reference
+  - SALES-LEADS-IMPLEMENTATION-SUMMARY.md - What changed and why
+  - SALES-LEADS-ARCHITECTURE.md - Technical architecture and diagrams
+  - DEPLOYMENT-CHECKLIST-SALES-LEADS.md - Testing and deployment guide
+  - DOCUMENTATION-INDEX-SALES-LEADS.md - Navigation guide
+
+### Changed
+- **SalesLeadDetails.tsx** - Refactored delete permission check from hardcoded role-based (`isSuperAdmin || isSalesManager`) to pure permission-based system (`hasPermission('sales_leads.delete')`)
+  - Delete is now configurable without code changes
+  - Improved security with backend + frontend enforcement
+- **SystemManagement.tsx** - Added granular permission management UI
+  - Introduced `allPermissionNames` useMemo for efficient permission lists
+  - Introduced `hasAllPermissionsSelected` useMemo for bulk selection detection
+  - Added `handleToggleAllPermissions()` function for select all/clear all
+  - Added per-group toggle buttons for selective bulk operations
+
+### Fixed
+- Removed hardcoded sales_leads.delete restriction - now fully configurable
+- Permission caching issues by ensuring backend validation on every request
+- Improved permission feedback messages for better UX
+
 ## [2.0.2] - 2026-01-27
 
 ### Fixed

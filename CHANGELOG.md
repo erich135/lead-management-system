@@ -16,8 +16,10 @@
 - **System Admin UI Enhancements**
   - Added "Select All / Clear All" functionality for permission checkboxes (global)
   - Added per-permission-group "Select All / Clear All" buttons
+  - Alphabetical sorting of permission group headers for better navigation
   - Improved permission management UX for bulk operations
   - Permission counts displayed for better visibility
+  - Increased scroll height (max-h-80) for better permission visibility
 - **Comprehensive Documentation** (7 new guides)
   - SALES-LEADS-QUICK-START.md - 3-step implementation guide
   - README-SALES-LEADS-PERMISSIONS.md - Complete overview with examples
@@ -31,16 +33,20 @@
 - **SalesLeadDetails.tsx** - Refactored delete permission check from hardcoded role-based (`isSuperAdmin || isSalesManager`) to pure permission-based system (`hasPermission('sales_leads.delete')`)
   - Delete is now configurable without code changes
   - Improved security with backend + frontend enforcement
-- **SystemManagement.tsx** - Added granular permission management UI
+- **SystemManagement.tsx** - Enhanced permission management interface
   - Introduced `allPermissionNames` useMemo for efficient permission lists
   - Introduced `hasAllPermissionsSelected` useMemo for bulk selection detection
   - Added `handleToggleAllPermissions()` function for select all/clear all
   - Added per-group toggle buttons for selective bulk operations
+  - Implemented alphabetical sorting using `localeCompare` with numeric and case-insensitive options
+  - Improved scroll height for better permission visibility
 
 ### Fixed
 - Removed hardcoded sales_leads.delete restriction - now fully configurable
 - Permission caching issues by ensuring backend validation on every request
 - Improved permission feedback messages for better UX
+- Fixed syntax errors in SystemManagement.tsx from incomplete Branch Access section
+- Cleaned up duplicate code and improved component structure
 
 ## [2.0.2] - 2026-01-27
 

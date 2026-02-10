@@ -1592,8 +1592,10 @@ alert((response as any).message || 'User invited successfully');
                             : `${selectedUser?.permissions?.filter((perm) => allPermissionNames.includes(perm)).length || 0} selected`}
                         </span>
                       </div>
-                      <div className="max-h-64 overflow-y-auto space-y-2">
-                        {Object.entries(groupedPermissions).map(([groupKey, perms]) => (
+                      <div className="max-h-80 overflow-y-auto space-y-2">
+                        {Object.entries(groupedPermissions)
+                          .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+                          .map(([groupKey, perms]) => (
                           <div key={groupKey} className="border border-gray-200 rounded-lg p-3">
                             <div className="flex items-center justify-between mb-2">
                               <p className="text-xs font-bold text-ars-heading">{groupKey}</p>
@@ -1657,71 +1659,6 @@ alert((response as any).message || 'User invited successfully');
                             </div>
                           </div>
                         ))}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Branch Access</label>
-                      <div className="border border-gray-200 rounded-lg p-3">
-                        <div className="space-y-2">
-                          {branches.length === 0 ? (
-                            <p className="text-sm text-ars-body italic">No branches available</p>
-                          ) : (
-                            <>
-                              <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-200">
-                                <button
-                                  onClick={() => {
-                                    const allBranchIds = branches.map(b => b._id);
-                                    const userBranchIds = (selectedUser.branches || []).map(b => 
-                                      typeof b === 'object' ? b._id : b
-                                    );
-                                    const allSelected = branches.every(b => userBranchIds.includes(b._id));
-                                    handleUpdateBranches(selectedUser._id, allSelected ? [] : allBranchIds);
-                                  }}
-                                  disabled={updatingPermissions}
-                                  className="text-xs text-ars-primary hover:text-ars-primary/80 underline disabled:opacity-50"
-                                >
-                                  {(selectedUser.branches || []).length === branches.length ? 'Clear All' : 'Select All'}
-                                </button>
-                                <span className="text-xs text-ars-body">
-                                  {(selectedUser.branches || []).length === 0 
-                                    ? 'All branches (default)' 
-                                    : `${(selectedUser.branches || []).length} selected`}
-                                </span>
-                              </div>
-                              {branches.map((branch) => {
-                                const userBranchIds = (selectedUser.branches || []).map(b => 
-                                  typeof b === 'object' ? b._id : b
-                                );
-                                const hasBranch = userBranchIds.includes(branch._id);
-                                return (
-                                  <label
-                                    key={branch._id}
-                                    className="flex items-center gap-2 cursor-pointer group"
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={hasBranch}
-                                      disabled={updatingPermissions}
-                                      onChange={(e) => {
-                                        const newBranches = e.target.checked
-                                          ? [...userBranchIds, branch._id]
-                                          : userBranchIds.filter(b => b !== branch._id);
-                                        handleUpdateBranches(selectedUser._id, newBranches);
-                                      }}
-                                      className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                    />
-                                    <span className="text-sm text-ars-body group-hover:text-ars-heading">
-                                      {branch.name}
-                                    </span>
-                                  </label>
-                                );
-                              })}
-                              <p className="text-xs text-ars-body italic mt-2 pt-2 border-t border-gray-200">
-                                Note: If no branches are selected, the user will have access to ALL branches.
-                              </p>
-                            </>
-                          )}
-                        </div>
                       </div>
                     </div>
                     <button

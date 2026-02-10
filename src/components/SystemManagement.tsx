@@ -3,6 +3,7 @@
  * Provides user management, role/permission assignment, and import functionality.
  */
 import { useState, useEffect, useMemo } from 'react';
+import { BranchPermissionsSection } from './BranchPermissionsSection';
 import { 
   getUsers, 
   getUser, 
@@ -1661,6 +1662,22 @@ alert((response as any).message || 'User invited successfully');
                         ))}
                       </div>
                     </div>
+                    
+                    {/* Branch Permissions */}
+                    <div className="pt-4 border-t border-gray-200">
+                      <label className="block text-sm font-semibold text-ars-body mb-2">Branch Access</label>
+                      <p className="text-xs text-ars-body mb-3">
+                        Control which branches this user can view and manage data for. Leave empty for unrestricted access to all branches.
+                      </p>
+                      <BranchPermissionsSection
+                        branches={branches}
+                        selectedBranches={selectedUser.branches ? selectedUser.branches.map((b: any) => typeof b === 'string' ? b : b._id) : []}
+                        onChange={(newBranches) => handleUpdateBranches(selectedUser._id, newBranches)}
+                        isLoading={updatingPermissions}
+                        disabled={updatingPermissions}
+                      />
+                    </div>
+                    
                     <button
                       onClick={() => setIsEditingUser(true)}
                       className="w-full px-4 py-2.5 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2"

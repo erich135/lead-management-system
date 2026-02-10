@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.1.1] - 2026-02-10
+
+### Fixed
+- Restored a lightweight Supabase compatibility stub so legacy imports stay functional while the app continues to use the MongoDB API (no external Supabase calls are made)
+
 ## [2.1.0] - 2026-02-10
 
 ### Added

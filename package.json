@@ -11,7 +11,6 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.57.4",
     "@types/mocha": "^10.0.10",
     "emoji-picker-react": "^4.15.1",
     "jspdf": "^3.0.4",

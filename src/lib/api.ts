@@ -75,6 +75,13 @@ export interface BackendUser {
     _id: string;
     name: string;
   } | string;
+  branches?: {
+    _id: string;
+    name: string;
+    code?: string;
+  }[] | string[];
+  cellPhone?: string;
+  locationTrackingEnabled?: boolean;
 }
 
 /**
@@ -1268,6 +1275,11 @@ export async function createUser(userData: {
   lastName: string;
   role: string;
   permissions?: string[];
+  cellPhone?: string;
+  locationTrackingEnabled?: boolean;
+  repCodeId?: string;
+  technicianId?: string;
+  branches?: string[];
 }): Promise<{ user: User }> {
   return apiRequest('/api/users', {
     method: 'POST',
@@ -1284,6 +1296,14 @@ export async function inviteUser(userData: {
   lastName: string;
   role: string;
   permissions?: string[];
+  cellPhone?: string;
+  locationTrackingEnabled?: boolean;
+  adminCodeId?: string;
+  adminCode?: { code: string; description?: string };
+  repCodeId?: string;
+  repCode?: { code: string; description?: string };
+  technicianId?: string;
+  technician?: { name: string; email?: string; phone?: string };
 }): Promise<{ user: User }> {
   return apiRequest('/api/users/invite', {
     method: 'POST',
@@ -2531,6 +2551,56 @@ export async function getWeeklyAppointments(params?: {
 }
 
 /**
+ * Manual check-in for an appointment (geofence fallback).
+ */
+export async function appointmentCheckIn(
+  leadId: string,
+  appointmentId: string,
+  location?: { latitude: number; longitude: number; accuracy?: number }
+): Promise<Appointment> {
+  const response = await apiRequest<Appointment>(
+    `/api/sales-leads/${leadId}/appointments/${appointmentId}/checkin`,
+    {
+      method: 'POST',
+      body: JSON.stringify(location || {}),
+    }
+  );
+  return response;
+}
+
+/**
+ * Geocode a sales lead's contact address.
+ */
+export async function geocodeSalesLead(leadId: string): Promise<{
+  geoLocation: { type: 'Point'; coordinates: [number, number] };
+  displayName: string;
+}> {
+  const response = await apiRequest<{
+    geoLocation: { type: 'Point'; coordinates: [number, number] };
+    displayName: string;
+  }>(`/api/sales-leads/${leadId}/geocode`, { method: 'POST' });
+  return response;
+}
+
+/**
+ * Get appointments with geolocation data for map display.
+ */
+export async function getGeoAppointments(params?: {
+  startDate?: string;
+  endDate?: string;
+}): Promise<Appointment[]> {
+  const query = new URLSearchParams();
+  if (params?.startDate) query.append('startDate', params.startDate);
+  if (params?.endDate) query.append('endDate', params.endDate);
+
+  const qs = query.toString();
+  const response = await apiRequest<Appointment[]>(
+    `/api/sales-leads/appointments/geo${qs ? `?${qs}` : ''}`
+  );
+  return response;
+}
+
+/**
  * Get sales lead statistics for dashboard.
  */
 export async function getSalesLeadStats(): Promise<{
@@ -2771,6 +2841,245 @@ export async function rejectCanvassingPlan(id: string, rejectionReason: string):
   return response;
 }
 
+// ============================================================
+// Location Tracking API
+// ============================================================
+
+/** Live rep location (in-memory snapshot from server). */
+export interface LiveRepLocation {
+  userId: string;
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  speed: number | null;
+  timestamp: number;
+  socketId: string;
+}
+
+/** A single point on a daily route trail. */
+export interface RoutePoint {
+  lat: number;
+  lng: number;
+  time: string;
+  speed: number | null;
+  isAtBranch: boolean;
+}
+
+/** A stop event from the aggregation service. */
+export interface StopEvent {
+  latitude: number;
+  longitude: number;
+  arrivalTime: string;
+  departureTime: string;
+  durationMinutes: number;
+  isAtBranch: boolean;
+  branchName?: string;
+  pingCount: number;
+}
+
+/** A trip segment between stops. */
+export interface TripSegment {
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  distanceMeters: number;
+  startLocation: { latitude: number; longitude: number };
+  endLocation: { latitude: number; longitude: number };
+  avgSpeed: number;
+}
+
+/** Full daily route data with stops and trips. */
+export interface DailyRouteData {
+  userId: string;
+  date: string;
+  stops: StopEvent[];
+  trips: TripSegment[];
+  totalDistanceKm: number;
+  totalMovingMinutes: number;
+  totalStoppedMinutes: number;
+  firstPingTime?: string;
+  lastPingTime?: string;
+  pingCount: number;
+}
+
+/** Daily summary for a rep. */
+export interface DailySummary {
+  userId: string;
+  userName: string;
+  date: string;
+  totalDistanceKm: number;
+  totalMovingMinutes: number;
+  totalStoppedMinutes: number;
+  stopsCount: number;
+  tripsCount: number;
+  firstActivity?: string;
+  lastActivity?: string;
+  branchTimeMinutes: number;
+  fieldTimeMinutes: number;
+  stops: StopEvent[];
+}
+
+/**
+ * Get real-time locations of all tracked reps.
+ */
+export async function getLiveRepLocations(): Promise<LiveRepLocation[]> {
+  return apiRequest<LiveRepLocation[]>('/api/location/live');
+}
+
+/**
+ * Get real-time location of a specific rep.
+ */
+export async function getLiveRepLocation(userId: string): Promise<LiveRepLocation> {
+  return apiRequest<LiveRepLocation>(`/api/location/live/${userId}`);
+}
+
+/**
+ * Get a rep's daily route trail (polyline points).
+ */
+export async function getRepDailyRoute(userId: string, date: string): Promise<RoutePoint[]> {
+  return apiRequest<RoutePoint[]>(`/api/location/route/${userId}/${date}`);
+}
+
+/**
+ * Get stops and trips aggregation for a rep on a date.
+ */
+export async function getRepStopsAndTrips(userId: string, date: string): Promise<DailyRouteData> {
+  return apiRequest<DailyRouteData>(`/api/location/stops/${userId}/${date}`);
+}
+
+/**
+ * Get daily summary for a specific rep.
+ */
+export async function getRepDailySummary(userId: string, date: string): Promise<DailySummary> {
+  return apiRequest<DailySummary>(`/api/location/summary/${userId}/${date}`);
+}
+
+/**
+ * Get all reps' daily summaries (manager overview).
+ */
+export async function getAllRepSummaries(date: string, branchId?: string): Promise<DailySummary[]> {
+  const params = branchId ? `?branchId=${branchId}` : '';
+  return apiRequest<DailySummary[]>(`/api/location/summaries/${date}${params}`);
+}
+
+/**
+ * Get paginated location history for a rep.
+ */
+export async function getLocationHistory(userId: string, params?: {
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{
+  data: Array<{
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+    speed: number | null;
+    heading: number | null;
+    isAtBranch: boolean;
+    isMoving: boolean;
+    recordedAt: string;
+    batteryLevel?: number;
+  }>;
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+}> {
+  const query = new URLSearchParams();
+  if (params?.startDate) query.append('startDate', params.startDate);
+  if (params?.endDate) query.append('endDate', params.endDate);
+  if (params?.page) query.append('page', params.page.toString());
+  if (params?.limit) query.append('limit', params.limit.toString());
+  const qs = query.toString();
+  return apiRequest(`/api/location/history/${userId}${qs ? `?${qs}` : ''}`);
+}
+
+// ============================================================
+// Area Overlap API
+// ============================================================
+
+/** A nearby appointment returned by overlap checks. */
+export interface NearbyAppointmentItem {
+  appointmentId: string;
+  salesLeadId: string;
+  companyName: string;
+  contactAddress: string;
+  repCodeId: string;
+  repCode: string;
+  repName: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  latitude: number;
+  longitude: number;
+  distanceMeters: number;
+  distanceKm: number;
+}
+
+/** Overlap check result from the scheduling endpoint. */
+export interface OverlapCheckResult {
+  hasOverlaps: boolean;
+  centerLocation: { latitude: number; longitude: number };
+  radiusMeters: number;
+  nearbyAppointments: NearbyAppointmentItem[];
+  otherRepsCount: number;
+  consolidationPossible: boolean;
+  consolidationMessage?: string;
+}
+
+/** A group of overlapping appointments on a given day. */
+export interface DailyOverlapGroup {
+  date: string;
+  area: { latitude: number; longitude: number };
+  radiusMeters: number;
+  appointments: NearbyAppointmentItem[];
+  uniqueReps: string[];
+  potentialSavingsKm: number;
+}
+
+/**
+ * Check overlap when scheduling a new appointment.
+ */
+export async function checkAppointmentOverlap(data: {
+  latitude: number;
+  longitude: number;
+  appointmentDate: string;
+  proposingRepCodeId?: string;
+  radiusMeters?: number;
+}): Promise<OverlapCheckResult> {
+  return apiRequest<OverlapCheckResult>('/api/overlap/check', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Find appointments near a location.
+ */
+export async function getNearbyAppointments(params: {
+  lat: number;
+  lng: number;
+  radius?: number;
+  startDate?: string;
+  endDate?: string;
+  excludeRepCodeId?: string;
+}): Promise<NearbyAppointmentItem[]> {
+  const query = new URLSearchParams();
+  query.append('lat', params.lat.toString());
+  query.append('lng', params.lng.toString());
+  if (params.radius) query.append('radius', params.radius.toString());
+  if (params.startDate) query.append('startDate', params.startDate);
+  if (params.endDate) query.append('endDate', params.endDate);
+  if (params.excludeRepCodeId) query.append('excludeRepCodeId', params.excludeRepCodeId);
+  return apiRequest<NearbyAppointmentItem[]>(`/api/overlap/nearby?${query.toString()}`);
+}
+
+/**
+ * Get daily overlap groups for a date (manager reports).
+ */
+export async function getDailyOverlaps(date: string, radius?: number): Promise<DailyOverlapGroup[]> {
+  const params = radius ? `?radius=${radius}` : '';
+  return apiRequest<DailyOverlapGroup[]>(`/api/overlap/daily/${date}${params}`);
+}
+
 export default {
   login,
   logout,
@@ -2880,6 +3189,18 @@ export default {
   createJobCardTemplate,
   updateJobCardTemplate,
   deleteJobCardTemplate,
+  // Location Tracking
+  getLiveRepLocations,
+  getLiveRepLocation,
+  getRepDailyRoute,
+  getRepStopsAndTrips,
+  getRepDailySummary,
+  getAllRepSummaries,
+  getLocationHistory,
+  // Area Overlap
+  checkAppointmentOverlap,
+  getNearbyAppointments,
+  getDailyOverlaps,
   apiRequest,
 };
 

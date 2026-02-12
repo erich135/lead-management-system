@@ -49,7 +49,7 @@ export function useChatSocket(
     const newSocket = io(SOCKET_URL, {
       path: '/socket.io',
       auth: { token },
-      transports: ['websocket', 'polling'],
+      transports: ['websocket'],  // WebSocket only — no HTTP polling
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,

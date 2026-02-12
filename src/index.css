@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Leaflet Map Styles */
+@import 'leaflet/dist/leaflet.css';
+
+.custom-map-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Map container styles */
+.leaflet-container {
+  font-family: inherit;
+  z-index: 1;
+}
+
 /* Mobile app-like styles */
 @layer base {
   body {

@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { ClipboardList, Calendar, BarChart3 } from 'lucide-react';
+import { ClipboardList, Calendar, MapPin, BarChart3 } from 'lucide-react';
 import { SalesLeadsList } from './SalesLeadsList';
 import SalesLeadDiary from './SalesLeadDiary';
 import SalesLeadReports from './SalesLeadReports';
+import SalesLeadMapsTab from './SalesLeadMapsTab';
 import { SalesLeadForm } from './SalesLeadForm';
 import { SalesLeadDetails } from './SalesLeadDetails';
+import { LeadStatsWidget } from './LeadStatsWidget';
 import type { SalesLead, Branch, RepCode } from '../lib/api';
 
-type SalesLeadTab = 'management' | 'diary' | 'reports';
+type SalesLeadTab = 'management' | 'diary' | 'maps' | 'reports';
 
 interface SalesLeadsContainerProps {
   branches: Branch[];
@@ -58,6 +60,11 @@ const SalesLeadsContainer: React.FC<SalesLeadsContainerProps> = ({ branches, rep
 
   return (
     <div className="h-full flex flex-col">
+      {/* Sales Lead Metrics */}
+      <div className="px-6 pt-4">
+        <LeadStatsWidget />
+      </div>
+
       {/* Tab Navigation */}
       <div className="bg-white border-b border-gray-200 px-6">
         <nav className="flex space-x-8" aria-label="Sales Leads Tabs">
@@ -92,6 +99,21 @@ const SalesLeadsContainer: React.FC<SalesLeadsContainerProps> = ({ branches, rep
           </button>
 
           <button
+            onClick={() => setActiveTab('maps')}
+            className={`
+              flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors
+              ${
+                activeTab === 'maps'
+                  ? 'border-ars-primary text-ars-primary'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }
+            `}
+          >
+            <MapPin className="w-5 h-5" />
+            Maps
+          </button>
+
+          <button
             onClick={() => setActiveTab('reports')}
             className={`
               flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors
@@ -120,6 +142,7 @@ const SalesLeadsContainer: React.FC<SalesLeadsContainerProps> = ({ branches, rep
           />
         )}
         {activeTab === 'diary' && <SalesLeadDiary />}
+        {activeTab === 'maps' && <SalesLeadMapsTab branches={branches} repCodes={repCodes} />}
         {activeTab === 'reports' && <SalesLeadReports />}
       </div>
 

@@ -47,7 +47,6 @@ import { LeadsList } from './LeadsList';
 import { LeadForm } from './LeadForm';
 import { LeadDetails } from './LeadDetails';
 import SalesLeadsContainer from './SalesLeadsContainer';
-import { LeadStatsWidget } from './LeadStatsWidget';
 import { SystemManagement } from './SystemManagement';
 import { Reports } from './Reports';
 import { Diary } from './Diary';
@@ -1192,13 +1191,6 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                 </div>
               </div>
             </div>
-
-            {/* Sales Lead Stats Widget - Only show if user has sales_leads.read permission */}
-            {hasPermission('sales_leads.read') && (
-              <div className="mt-6">
-                <LeadStatsWidget />
-              </div>
-            )}
 
             {/* Priority Filter Tabs */}
             <div className="space-y-2 mt-[60px] pt-[30px]">

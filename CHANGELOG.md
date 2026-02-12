@@ -1,5 +1,61 @@
 # Changelog
 
+## [1.0.17] - 2026-02-13
+
+### Added
+- **Sales Lead Maps Tab** (`SalesLeadMapsTab.tsx`) – Comprehensive manager map hub with 4 sub-views:
+  - **Live Tracking** – Real-time rep locations via `LiveRepMap` with sidebar (active reps, dwell alerts, daily summaries), route trail overlay, stop/trip detail panel
+  - **Appointments Map** – Upcoming appointment markers with filters (date range, branch, rep, status), color-coded attended/missed/upcoming, geocoded appointment pins
+  - **Daily Routes** – Rep selector + date picker, daily route polyline with stop markers, summary stats (distance, stops, moving/stopped time)
+  - **Overlap Report** – `DailyOverlapReport` showing clustered appointments from different reps, consolidation suggestions, potential travel savings
+- **Map Component Library** (`src/components/map/`)
+  - `MapComponent.tsx` – Reusable Leaflet map with markers, circles, routes, custom icons, fit-bounds
+  - `LiveRepMap.tsx` – Manager live tracking dashboard with socket subscription
+  - `RepDailyRouteView.tsx` – Rep own-route viewer
+  - `OverlapWarningBanner.tsx` – Inline overlap warning for appointment scheduling
+  - `DailyOverlapReport.tsx` – Full overlap analysis dashboard
+- **Attendance Components** (`src/components/attendance/`)
+  - `AttendanceStatusBadge.tsx` – Badge showing auto_geofence / manual_checkin / manual_override status
+  - `ManualCheckIn.tsx` – "I'm Here" button with GPS capture for fallback check-in
+  - `TrackingIndicator.tsx` – Persistent header indicator showing tracking active/offline
+- **AutoLocationTracker** (`src/components/AutoLocationTracker.tsx`) – Invisible side-effect component that:
+  - Connects a WebSocket (websocket-only transport) when `locationTrackingEnabled` is true
+  - Runs `useLocationTracking` hook to send GPS pings every 30s
+  - Registers Service Worker for background tracking when tab is minimized
+  - Requests Screen Wake Lock to keep device awake during tracking
+- **Location Tracking Service Worker** (`public/location-tracking-sw.js`) – Heartbeat pings from background SW, push notification re-engagement, notification click handler
+- **Geo Hooks** (`src/hooks/`)
+  - `useGeolocation.ts` – Browser Geolocation API wrapper (watch mode, permissions, single read)
+  - `useLocationTracking.ts` – Socket.IO + geolocation integration, battery level, attendance events
+  - `useManagerLocationSocket.ts` – Manager socket subscription for live rep broadcasts, dwell alerts
+- **Frontend API** (`src/lib/api.ts`) – Added 20+ new API functions and types:
+  - Location Tracking: `getLiveRepLocations`, `getRepDailyRoute`, `getRepStopsAndTrips`, `getRepDailySummary`, `getAllRepSummaries`, `getLocationHistory`
+  - Area Overlap: `checkAppointmentOverlap`, `getNearbyAppointments`, `getDailyOverlaps`
+  - Geofence: `appointmentCheckIn`, `geocodeSalesLead`, `getGeoAppointments`
+  - Types: `LiveRepLocation`, `RoutePoint`, `StopEvent`, `TripSegment`, `DailyRouteData`, `DailySummary`, `NearbyAppointmentItem`, `OverlapCheckResult`, `DailyOverlapGroup`
+- **Geocoding Utility** (`src/utils/geocoding.ts`) – Nominatim geocoding, reverse geocoding, Haversine distance, geofence check, GeoJSON ↔ Leaflet coordinate conversion
+- **GeoLocation Types** (`src/types/index.ts`) – Added `GeoPoint`, `AttendanceMethod`, geo fields on `Branch`, `SalesLead`, `Appointment`, `CanvassingPlan`
+- **Location Tracking Toggle in User Management** (`SystemManagement.tsx`)
+  - Edit form: GPS Location Tracking switch toggle
+  - Read-only User Details: ENABLE / DISABLE button (same pattern as ACTIVATE / DEACTIVATE)
+  - `handleToggleTracking()` function for inline toggle
+  - Invite form: GPS toggle before action buttons
+  - `locationTrackingEnabled` in payload for save, invite, and all 3 form reset locations
+- **LeadStatsWidget** moved from Dashboard to SalesLeadsContainer (top of Sales Leads tab)
+- **Leaflet dependencies** – `leaflet@1.9.4`, `react-leaflet@4.2.1`, `@types/leaflet@1.9.21`
+- Leaflet CSS import and custom map marker styles in `index.css`
+
+### Changed
+- **SalesLeadsContainer.tsx** – Added `'maps'` tab with `MapPin` icon between Diary and Reports; renders `SalesLeadMapsTab`
+- **App.tsx** – Added `<AutoLocationTracker />` inside authenticated app shell
+- **AuthContext.tsx** – Added `cellPhone` and `locationTrackingEnabled` fields to `FrontendUser` and `transformUser`
+- **useChatSocket.ts** – Changed transport from `['websocket', 'polling']` to `['websocket']` (anti-polling)
+- **Dashboard.tsx** – Removed `LeadStatsWidget` from dashboard (moved to Sales Leads tab)
+- **api.ts** – Extended `BackendUser` with `branches`, `cellPhone`, `locationTrackingEnabled`; extended `createUser` and `inviteUser` signatures
+
+### Fixed
+- **AutoLocationTracker socket rendering bug** – `useRef` for socket didn't trigger re-render, so `<TrackingRunner>` with geolocation hook never mounted. Fixed by adding `socketReady` state variable that causes re-render on socket connect/disconnect, properly mounting the tracking runner component
+
 ## [1.0.16] - 2026-02-10
 
 ### Added

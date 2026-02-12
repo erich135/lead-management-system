@@ -170,6 +170,7 @@ export function SystemManagement() {
     repCode: { code: '', description: '' },
     technicianId: '',
     technician: { name: '', email: '', phone: '' },
+    locationTrackingEnabled: false,
   });
   const [inviting, setInviting] = useState(false);
 
@@ -316,6 +317,7 @@ export function SystemManagement() {
         role: selectedUser.role._id as any,
         isActive: selectedUser.isActive,
         adminCodeId: selectedUser.adminCode && typeof selectedUser.adminCode === 'object' ? selectedUser.adminCode._id : (selectedUser.adminCode || null),
+        locationTrackingEnabled: !!selectedUser.locationTrackingEnabled,
       } as any);
       
       // Reload users
@@ -415,6 +417,25 @@ export function SystemManagement() {
     }
   }
 
+  async function handleToggleTracking(user: User) {
+    const newVal = !user.locationTrackingEnabled;
+    try {
+      setLoading(true);
+      await updateUser(user._id, { locationTrackingEnabled: newVal } as any);
+      await loadData();
+      if (selectedUser?._id === user._id) {
+        const response = await getUser(user._id);
+        setSelectedUser(response.user);
+      }
+      alert(`Location tracking ${newVal ? 'enabled' : 'disabled'} for ${user.firstName} ${user.lastName}`);
+    } catch (err: any) {
+      console.error('Error toggling tracking:', err);
+      alert('Failed to update tracking: ' + (err.message || 'Unknown error'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   /**
    * Handles resending invitation email to a user.
    */
@@ -499,6 +520,7 @@ export function SystemManagement() {
         firstName: inviteFormData.firstName,
         lastName: inviteFormData.lastName,
         role: inviteFormData.role,
+        locationTrackingEnabled: inviteFormData.locationTrackingEnabled,
       };
 
       // Add role-specific data
@@ -551,6 +573,7 @@ alert((response as any).message || 'User invited successfully');
         repCode: { code: '', description: '' },
         technicianId: '',
         technician: { name: '', email: '', phone: '' },
+        locationTrackingEnabled: false,
       });
       
       // Reload users
@@ -1210,6 +1233,7 @@ alert((response as any).message || 'User invited successfully');
                       repCode: { code: '', description: '' },
                       technicianId: '',
                       technician: { name: '', email: '', phone: '' },
+                      locationTrackingEnabled: false,
                     });
                   }}
                   className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
@@ -1470,6 +1494,28 @@ alert((response as any).message || 'User invited successfully');
                         );
                       })()}
                     </div>
+                    {/* Location Tracking Toggle */}
+                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-blue-600" />
+                        <div>
+                          <p className="text-[13px] font-medium text-gray-800">GPS Location Tracking</p>
+                          <p className="text-[11px] text-gray-500">Enable real-time GPS tracking for this user</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedUser({ ...selectedUser, locationTrackingEnabled: !selectedUser.locationTrackingEnabled })}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          selectedUser.locationTrackingEnabled ? 'bg-blue-600' : 'bg-gray-300'
+                        }`}
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                          selectedUser.locationTrackingEnabled ? 'translate-x-6' : 'translate-x-1'
+                        }`} />
+                      </button>
+                    </div>
+
                     <div className="flex items-center gap-2 pt-4">
                       <button
                         onClick={handleSaveUser}
@@ -1550,6 +1596,34 @@ alert((response as any).message || 'User invited successfully');
                               ACTIVATE
                             </>
                           )}
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-1">Location Tracking</label>
+                      <div className="flex items-center gap-2">
+                        <p className={`px-3 py-1.5 rounded-lg inline-block font-medium ${
+                          selectedUser.locationTrackingEnabled
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          <span className="flex items-center gap-1.5">
+                            <MapPin className="w-3.5 h-3.5" />
+                            {selectedUser.locationTrackingEnabled ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </p>
+                        <button
+                          onClick={() => handleToggleTracking(selectedUser)}
+                          disabled={loading}
+                          className={`px-3 py-1.5 rounded-[8px] font-bold text-[13px] transition-all duration-300 hover:scale-105 flex items-center gap-1 disabled:opacity-50 ${
+                            selectedUser.locationTrackingEnabled
+                              ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                              : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                          }`}
+                          title={selectedUser.locationTrackingEnabled ? 'Disable tracking' : 'Enable tracking'}
+                        >
+                          <MapPin className="w-4 h-4" />
+                          {selectedUser.locationTrackingEnabled ? 'DISABLE' : 'ENABLE'}
                         </button>
                       </div>
                     </div>
@@ -3889,6 +3963,28 @@ alert((response as any).message || 'User invited successfully');
                 }
                 return null;
               })()}
+
+              {/* Location Tracking Toggle */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <div className="flex items-center gap-3">
+                  <MapPin className="w-5 h-5 text-blue-600" />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">GPS Location Tracking</p>
+                    <p className="text-xs text-gray-500">Enable real-time GPS tracking for this user</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setInviteFormData({ ...inviteFormData, locationTrackingEnabled: !inviteFormData.locationTrackingEnabled })}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    inviteFormData.locationTrackingEnabled ? 'bg-blue-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    inviteFormData.locationTrackingEnabled ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
+              </div>
 
               {/* Action Buttons */}
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">

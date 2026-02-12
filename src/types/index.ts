@@ -2,10 +2,20 @@ export type UserRole = 'admin' | 'user';
 
 export type NotificationType = 'alert' | 'assignment' | 'status_change' | 'overdue';
 
+// Geolocation types
+export interface GeoPoint {
+  type: 'Point';
+  coordinates: [number, number]; // [longitude, latitude]
+}
+
+export type AttendanceMethod = 'auto_geofence' | 'manual_checkin' | 'manual_override';
+
 export interface Branch {
   id: string;
   name: string;
   location: string | null;
+  geoLocation?: GeoPoint;
+  geofenceRadius?: number;
   created_at: string;
 }
 
@@ -163,6 +173,7 @@ export interface SalesLead {
   contactEmail?: string;
   contactPhone: string;
   contactAddress?: string;
+  geoLocation?: GeoPoint;
   branch: string | { _id: string; name: string; code: string };
   assignedRep?: string | { _id: string; code: string; name: string; email: string };
   leadSource: SalesLeadSource;
@@ -189,11 +200,17 @@ export interface Appointment {
   appointmentDate: string;
   appointmentTime: string;
   location: string;
+  geoLocation?: GeoPoint;
+  geofenceRadius?: number;
   purpose?: string;
   notes?: string;
   attended: boolean;
   attendedAt?: string;
+  attendanceMethod?: AttendanceMethod;
+  attendanceLocation?: GeoPoint;
+  attendanceAccuracy?: number;
   noShowReason?: string;
+  noShowAutoDetected?: boolean;
   outcome?: string;
   feedback?: string;
   nextFollowUpDate?: string;
@@ -219,6 +236,8 @@ export interface CanvassingPlan {
   _id: string;
   repCode: string | { _id: string; code: string; name: string; email: string };
   area: string;
+  geoLocation?: GeoPoint;
+  geoRadius?: number;
   startDate: string;
   endDate: string;
   travelDays: number;

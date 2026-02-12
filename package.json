@@ -11,13 +11,16 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
+    "@types/leaflet": "^1.9.21",
     "@types/mocha": "^10.0.10",
     "emoji-picker-react": "^4.15.1",
     "jspdf": "^3.0.4",
     "jspdf-autotable": "^5.0.2",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-leaflet": "^4.2.1",
     "react-router-dom": "^7.9.5",
     "socket.io-client": "^4.8.1",
     "ts-node": "^10.9.2",

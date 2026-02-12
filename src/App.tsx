@@ -5,6 +5,7 @@ import { SetPasswordPage } from './components/SetPasswordPage';
 import { ResetPasswordPage } from './components/ResetPasswordPage';
 import { Dashboard } from './components/Dashboard';
 import { ChatWidget } from './components/ChatWidget';
+import { AutoLocationTracker } from './components/AutoLocationTracker';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -136,6 +137,9 @@ function AppContent() {
 
       {/* Chat widget - only show when logged in */}
       {user && <ChatWidget />}
+
+      {/* Auto-start GPS tracking for enabled users */}
+      {user && <AutoLocationTracker />}
     </>
   );
 }

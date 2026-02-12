@@ -41,6 +41,8 @@ export interface FrontendUser {
     id: string;
     name: string;
   };
+  cellPhone?: string;
+  locationTrackingEnabled: boolean;
 }
 
 interface AuthContextType {
@@ -115,6 +117,8 @@ function transformUser(backendUser: BackendUser): FrontendUser {
     adminCode,
     repCode,
     technician,
+    cellPhone: backendUser.cellPhone,
+    locationTrackingEnabled: backendUser.locationTrackingEnabled ?? false,
   };
 }
 

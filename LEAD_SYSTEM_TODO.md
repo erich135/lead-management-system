@@ -508,7 +508,21 @@ This system adds a complete Sales Lead workflow to the existing job management s
 
 ---
 
-## 🚀 Getting Started Tomorrow
+## �️ Tomorrow's TODO
+
+### GPS Accuracy Display Fix (Priority: High)
+- [ ] **Accuracy value shown in Live Tracking sidebar is inflated** – Browser reports ±125m but actual position is accurate to ~10-20m in city environments. 125m is the *worst-case* the Geolocation API guarantees, not the real error. In urban areas this makes the display misleading and could affect geofence decisions.
+  - Investigate using `GeolocationPosition.coords.accuracy` more intelligently (e.g. discard pings with accuracy > threshold, show "High / Medium / Low" labels instead of raw metres, or use a rolling average of recent accuracy values)
+  - Consider preferring `enableHighAccuracy: true` + filtering out high-accuracy pings only
+  - Update `LiveRepMap` sidebar card and `TrackingRunner` to display a more meaningful accuracy indicator
+  - **Files**: `AutoLocationTracker.tsx`, `useGeolocation.ts`, `useLocationTracking.ts`, `LiveRepMap.tsx`, backend `socket.ts` (location:update handler)
+
+### Mobile App for Reps (Priority: Medium)
+- [ ] **Evaluate building a lightweight mobile app** (React Native / Expo or PWA) for sales reps to get reliable background GPS tracking, push notifications, and offline support — browser limitations make sustained background tracking unreliable on mobile devices.
+
+---
+
+## �🚀 Getting Started Tomorrow
 
 **Start with Phase 1, Task 1**: Design the lead numbering system in the backend model.
 

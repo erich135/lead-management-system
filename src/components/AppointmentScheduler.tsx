@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, Save, Loader2, Calendar, Clock, User, MapPin, FileText } from 'lucide-react';
 import { createAppointment, type RepCode } from '../lib/api';
+import { AddressAutocomplete } from './AddressAutocomplete';
 
 interface AppointmentSchedulerProps {
   leadId: string;
@@ -13,6 +14,7 @@ interface AppointmentSchedulerProps {
 export function AppointmentScheduler({ leadId, leadCompanyName, repCodes, onClose, onSave }: AppointmentSchedulerProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [geoCoordinates, setGeoCoordinates] = useState<[number, number] | null>(null);
   const [formData, setFormData] = useState({
     scheduledDate: '',
     scheduledTime: '',
@@ -33,13 +35,21 @@ export function AppointmentScheduler({ leadId, leadCompanyName, repCodes, onClos
     setError(null);
 
     try {
-      const payload = {
+      const payload: any = {
         appointmentDate: formData.scheduledDate,
         appointmentTime: formData.scheduledTime,
         location: formData.location.trim() || 'Not specified',
         purpose: formData.purpose.trim() || undefined,
         notes: formData.notes.trim() || undefined,
       };
+
+      // Include geo coordinates if address was selected from autocomplete
+      if (geoCoordinates) {
+        payload.geoLocation = {
+          type: 'Point',
+          coordinates: geoCoordinates,
+        };
+      }
 
       await createAppointment(leadId, payload);
       onSave();
@@ -160,12 +170,13 @@ export function AppointmentScheduler({ leadId, leadCompanyName, repCodes, onClos
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Location
               </label>
-              <input
-                type="text"
+              <AddressAutocomplete
                 value={formData.location}
-                onChange={(e) => handleChange('location', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                placeholder="e.g., Client office, ARS Branch, etc."
+                onChange={(address, coordinates) => {
+                  handleChange('location', address);
+                  setGeoCoordinates(coordinates || null);
+                }}
+                placeholder="Start typing an address to search..."
               />
             </div>
 

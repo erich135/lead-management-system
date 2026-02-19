@@ -3,11 +3,11 @@
 ## [1.0.18] - 2026-02-18
 
 ### Added
-- **Address Autocomplete** (`AddressAutocomplete.tsx`): type-ahead address search powered by OpenStreetMap via backend proxy, debounced input, formatted address results with coordinates, "Address verified with coordinates" indicator
-- **Pin on Map** (`MapPinSelector.tsx`): full-screen Leaflet map modal for pinning exact locations, ideal for rural/farm addresses; includes search bar, "My Location" GPS button, red pin marker, reverse geocoding, and "Confirm Location" flow
+- Address Autocomplete component (`AddressAutocomplete.tsx`): type-ahead address search powered by OpenStreetMap via backend proxy, debounced input, formatted address results with coordinates, "Address verified with coordinates" indicator
+- Pin on Map component (`MapPinSelector.tsx`): full-screen Leaflet map modal for pinning exact locations, ideal for rural/farm addresses; includes search bar, "My Location" GPS button, red pin marker, reverse geocoding, and "Confirm Location" flow
 - Geocode proxy API functions (`geocodeSearch`, `geocodeReverse`) in `api.ts` to route Nominatim calls through the backend, avoiding browser CORS issues
-- Address autocomplete + Pin on Map integrated into **New Sales Lead** form (`SalesLeadForm.tsx`) — coordinates saved with lead on creation
-- Address autocomplete + Pin on Map integrated into **Schedule Appointment** form (`AppointmentScheduler.tsx`) — coordinates saved with appointment on creation
+- Address autocomplete + Pin on Map integrated into New Sales Lead form (`SalesLeadForm.tsx`) — coordinates saved with lead on creation
+- Address autocomplete + Pin on Map integrated into Schedule Appointment form (`AppointmentScheduler.tsx`) — coordinates saved with appointment on creation
 - Leaflet tile fix in `index.css`: `.leaflet-container img { max-width: none }` to prevent Tailwind preflight from breaking map tiles
 
 ### Changed

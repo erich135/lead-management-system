@@ -56,7 +56,7 @@ export interface TableRow {
 /**
  * Cell type for grid-based checklist (Word-style blocks).
  */
-export type GridCellType = 'label' | 'staticText' | 'checkbox' | 'text' | 'textarea' | 'number' | 'date' | 'select' | 'jobField' | 'reportNumber';
+export type GridCellType = 'label' | 'staticText' | 'checkbox' | 'text' | 'textarea' | 'number' | 'date' | 'select' | 'jobField' | 'machineField' | 'reportNumber';
 
 /**
  * Job field keys that can be pulled from the job when a job is assigned.
@@ -89,6 +89,24 @@ export const JOB_FIELD_KEYS: { value: string; label: string }[] = [
 ];
 
 /**
+ * Machine field keys that can be pulled from the assigned machine when the job card is for a specific machine.
+ * Used when type is 'machineField'; machineFieldKey must be one of these.
+ */
+export const MACHINE_FIELD_KEYS: { value: string; label: string }[] = [
+  { value: 'make', label: 'Make' },
+  { value: 'model', label: 'Model' },
+  { value: 'serialNumber', label: 'Serial number' },
+  { value: 'assetNumber', label: 'Asset number' },
+  { value: 'machineHours', label: 'Machine hours' },
+  { value: 'nextServiceHours', label: 'Next service hours' },
+  { value: 'lastServiceDate', label: 'Last service date' },
+  { value: 'nextServiceDate', label: 'Next service date' },
+  { value: 'serviceType', label: 'Service type (hours/date)' },
+  { value: 'isRental', label: 'Is rental' },
+  { value: 'dbStatus', label: 'DB status' },
+];
+
+/**
  * Single cell in a grid-based table.
  */
 export interface GridCell {
@@ -102,10 +120,14 @@ export interface GridCell {
   options?: string[];   // For select type
   /** When type is 'jobField', which job property to display (e.g. jobNumber, customer). */
   jobFieldKey?: string;
+  /** When type is 'machineField', which machine property to display (e.g. make, serialNumber). */
+  machineFieldKey?: string;
   colSpan?: number;     // Merge with next columns (default 1)
   rowSpan?: number;     // Merge with next rows (default 1)
   boldBorder?: boolean; // Thicker border for this cell
   boldText?: boolean;   // Bold text for this cell
+  /** When true, this cell is the column header for all cells in this column below it (e.g. "Item", "OK", "Status"). */
+  isColumnHeader?: boolean;
   /** Override text alignment for this cell (overrides table default). */
   textAlign?: 'left' | 'center' | 'right';
 }
@@ -129,6 +151,8 @@ export interface TableDefinition {
   textAlign?: 'left' | 'center' | 'right';
   /** Table width/layout: full = one per row, half = two side-by-side, third = three side-by-side. */
   layout?: 'full' | 'half' | 'third';
+  /** When true, table is a single row of label+value pairs (e.g. Client: ___, Contact Person: ___) with no grid borders. */
+  isFieldRow?: boolean;
 }
 
 /**
@@ -271,6 +295,53 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
   };
 
   /**
+   * Adds a new field row: a single row of label + value pairs (e.g. Client: ___, Contact Person: ___, Job no: ___).
+   * Values are replaced with job data or static text when the report is generated (no printed fill-in lines).
+   */
+  const handleAddFieldRow = () => {
+    const tableId = generateId();
+    const defaultPairs = [
+      { label: 'Client', valueType: 'jobField' as const, jobFieldKey: 'customer', staticValue: '' },
+      { label: 'Contact Person', valueType: 'jobField' as const, jobFieldKey: 'notes', staticValue: '' },
+      { label: 'Job no', valueType: 'jobField' as const, jobFieldKey: 'jobNumber', staticValue: '' },
+    ];
+    const cells: GridCell[] = [];
+    defaultPairs.forEach((pair, i) => {
+      cells.push({
+        id: generateId(),
+        row: 0,
+        col: i * 2,
+        type: 'label',
+        label: pair.label,
+        value: '',
+      });
+      cells.push({
+        id: generateId(),
+        row: 0,
+        col: i * 2 + 1,
+        type: pair.valueType === 'jobField' ? 'jobField' : 'staticText',
+        jobFieldKey: pair.valueType === 'jobField' ? pair.jobFieldKey : undefined,
+        value: pair.valueType === 'staticText' ? pair.staticValue : undefined,
+      });
+    });
+    const newTable: TableDefinition = {
+      id: tableId,
+      name: 'Info row',
+      gridRows: 1,
+      gridCols: defaultPairs.length * 2,
+      cells,
+      isFieldRow: true,
+    };
+    if (singleGroup) {
+      setGroups([{ ...singleGroup, tables: [...singleGroup.tables, newTable] }]);
+    } else {
+      setGroups([{ id: generateId(), name: 'Job Card', tables: [newTable] }]);
+    }
+    setSelectedTable(tableId);
+    setSelectedCellId(null);
+  };
+
+  /**
    * Moves a checklist table up in the display order.
    */
   const handleMoveTableUp = (index: number) => {
@@ -326,6 +397,140 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
 
   /** Whether the table uses grid layout (Word-style blocks). */
   const isGridTable = (t: TableDefinition) => t.gridRows != null && t.gridCols != null;
+
+  /**
+   * Gets field row pairs from a table (label cell at even col, value cell at odd col).
+   */
+  const getFieldRowPairs = (table: TableDefinition): { labelCell: GridCell; valueCell: GridCell }[] => {
+    if (!table.isFieldRow || !table.cells) return [];
+    const cols = table.gridCols ?? 0;
+    const pairs: { labelCell: GridCell; valueCell: GridCell }[] = [];
+    for (let i = 0; i < cols / 2; i++) {
+      const labelCell = table.cells.find((c) => c.row === 0 && c.col === i * 2);
+      const valueCell = table.cells.find((c) => c.row === 0 && c.col === i * 2 + 1);
+      if (labelCell && valueCell) pairs.push({ labelCell, valueCell });
+    }
+    return pairs;
+  };
+
+  /**
+   * Adds a pair to a field row (label + value cell).
+   */
+  const handleFieldRowAddPair = (tableId: string) => {
+    if (!singleGroup) return;
+    const table = singleGroup.tables.find((t) => t.id === tableId);
+    if (!table || !table.isFieldRow) return;
+    const pairs = getFieldRowPairs(table);
+    const newCol = pairs.length * 2;
+    const newCells = [...(table.cells ?? [])];
+    newCells.push({
+      id: generateId(),
+      row: 0,
+      col: newCol,
+      type: 'label',
+      label: 'Label',
+      value: '',
+    });
+    newCells.push({
+      id: generateId(),
+      row: 0,
+      col: newCol + 1,
+      type: 'jobField',
+      jobFieldKey: 'jobNumber',
+    });
+    setGroups([{
+      ...singleGroup,
+      tables: singleGroup.tables.map((t) =>
+        t.id === tableId ? { ...t, gridCols: newCol + 2, cells: newCells } : t
+      ),
+    }]);
+  };
+
+  /**
+   * Removes a pair from a field row at index pairIndex.
+   */
+  const handleFieldRowRemovePair = (tableId: string, pairIndex: number) => {
+    if (!singleGroup) return;
+    const table = singleGroup.tables.find((t) => t.id === tableId);
+    if (!table || !table.isFieldRow || !table.cells) return;
+    const pairs = getFieldRowPairs(table);
+    if (pairIndex < 0 || pairIndex >= pairs.length) return;
+    const { labelCell, valueCell } = pairs[pairIndex];
+    const newCells = table.cells
+      .filter((c) => c.id !== labelCell.id && c.id !== valueCell.id)
+      .map((c) => {
+        const col = c.col;
+        if (col > pairIndex * 2 + 1) return { ...c, col: col - 2 };
+        return c;
+      });
+    const newCols = Math.max(2, (table.gridCols ?? 2) - 2);
+    setGroups([{
+      ...singleGroup,
+      tables: singleGroup.tables.map((t) =>
+        t.id === tableId ? { ...t, gridCols: newCols, cells: newCells } : t
+      ),
+    }]);
+  };
+
+  /**
+   * Updates the label of a field row pair.
+   */
+  const handleFieldRowUpdateLabel = (tableId: string, pairIndex: number, label: string) => {
+    if (!singleGroup) return;
+    const table = singleGroup.tables.find((t) => t.id === tableId);
+    if (!table || !table.isFieldRow) return;
+    const pairs = getFieldRowPairs(table);
+    if (pairIndex < 0 || pairIndex >= pairs.length) return;
+    const labelCellId = pairs[pairIndex].labelCell.id;
+    setGroups([{
+      ...singleGroup,
+      tables: singleGroup.tables.map((t) =>
+        t.id === tableId
+          ? { ...t, cells: (t.cells ?? []).map((c) => (c.id === labelCellId ? { ...c, label } : c)) }
+          : t
+      ),
+    }]);
+  };
+
+  /**
+   * Updates the value part of a field row pair (jobField, machineField, or staticText).
+   */
+  const handleFieldRowUpdateValue = (
+    tableId: string,
+    pairIndex: number,
+    valueType: 'jobField' | 'machineField' | 'staticText',
+    jobFieldKey?: string,
+    staticValue?: string,
+    machineFieldKey?: string
+  ) => {
+    if (!singleGroup) return;
+    const table = singleGroup.tables.find((t) => t.id === tableId);
+    if (!table || !table.isFieldRow) return;
+    const pairs = getFieldRowPairs(table);
+    if (pairIndex < 0 || pairIndex >= pairs.length) return;
+    const valueCellId = pairs[pairIndex].valueCell.id;
+    setGroups([{
+      ...singleGroup,
+      tables: singleGroup.tables.map((t) =>
+        t.id === tableId
+          ? {
+              ...t,
+              cells: (t.cells ?? []).map((c) =>
+                c.id === valueCellId
+                  ? {
+                      ...c,
+                      type: valueType === 'jobField' ? 'jobField' : valueType === 'machineField' ? 'machineField' : 'staticText',
+                      jobFieldKey: valueType === 'jobField' ? jobFieldKey : undefined,
+                      machineFieldKey: valueType === 'machineField' ? machineFieldKey : undefined,
+                      value: valueType === 'staticText' ? staticValue : c.value,
+                    }
+                  : c
+              ),
+            }
+          : t
+      ),
+    }]);
+  };
 
   /**
    * Changes grid rows or columns and keeps cells within bounds.
@@ -994,6 +1199,14 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
               <CheckSquare className="w-4 h-4" />
               Add checklist table
             </button>
+            <button
+              onClick={handleAddFieldRow}
+              className="w-full mt-2 px-3 py-2.5 bg-sky-50 text-sky-800 border border-sky-200 rounded-lg hover:bg-sky-100 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
+              title="Add a row of label + value fields (e.g. Client: ___, Contact Person: ___, Job no: ___)"
+            >
+              <PenTool className="w-4 h-4" />
+              Add field row
+            </button>
           </div>
 
           <div className="p-2 space-y-2 overflow-y-auto flex-1">
@@ -1052,9 +1265,11 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
                     </div>
                   </div>
                   <div className="text-xs text-gray-600">
-                    {isGridTable(table)
-                      ? `${table.gridRows ?? 0}×${table.gridCols ?? 0} grid · ${(table.cells ?? []).length} block(s)`
-                      : `${(table.columns ?? []).length} column(s) · ${(table.rows?.length ?? 0)} row(s)`}
+                    {table.isFieldRow
+                      ? `Field row · ${Math.floor((table.gridCols ?? 0) / 2)} field(s)`
+                      : isGridTable(table)
+                        ? `${table.gridRows ?? 0}×${table.gridCols ?? 0} grid · ${(table.cells ?? []).length} block(s)`
+                        : `${(table.columns ?? []).length} column(s) · ${(table.rows?.length ?? 0)} row(s)`}
                   </div>
                 </div>
               ))
@@ -1062,10 +1277,110 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
           </div>
         </div>
 
-        {/* Right - Grid blocks or legacy column configuration */}
+        {/* Right - Field row editor, grid blocks, or legacy column configuration */}
         <div className="flex-1 bg-white overflow-y-auto">
           {currentTable ? (
-            isGridTable(currentTable) ? (
+            currentTable.isFieldRow ? (
+              /* Field row editor: label + value pairs (e.g. Client: ___, Contact Person: ___, Job no: ___) */
+              <div className="p-6">
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">Field row: {currentTable.name}</h3>
+                  <p className="text-sm text-gray-600">Each pair shows as &quot;Label: value&quot; on the report. The value is replaced with job data or static text when the report is generated (no printed fill-in lines).</p>
+                </div>
+                <div className="space-y-4">
+                  {getFieldRowPairs(currentTable).map((pair, idx) => (
+                    <div key={pair.labelCell.id} className="flex flex-wrap items-center gap-3 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                      <span className="text-xs font-medium text-gray-500 w-8">#{idx + 1}</span>
+                      <input
+                        type="text"
+                        value={pair.labelCell.label ?? ''}
+                        onChange={(e) => handleFieldRowUpdateLabel(currentTable.id, idx, e.target.value)}
+                        placeholder="Label (e.g. Client)"
+                        className="flex-1 min-w-[100px] px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      />
+                      <span className="text-gray-400">→</span>
+                      <select
+                        value={pair.valueCell.type === 'jobField' ? 'jobField' : pair.valueCell.type === 'machineField' ? 'machineField' : 'staticText'}
+                        onChange={(e) => {
+                          const v = e.target.value as 'jobField' | 'machineField' | 'staticText';
+                          handleFieldRowUpdateValue(
+                            currentTable.id,
+                            idx,
+                            v,
+                            v === 'jobField' ? pair.valueCell.jobFieldKey ?? 'jobNumber' : undefined,
+                            v === 'staticText' ? pair.valueCell.value ?? '' : undefined,
+                            v === 'machineField' ? (pair.valueCell.machineFieldKey ?? 'serialNumber') : undefined
+                          );
+                        }}
+                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                      >
+                        <option value="jobField">Job field (from job)</option>
+                        <option value="machineField">Machine field (from assigned machine)</option>
+                        <option value="staticText">Static text</option>
+                      </select>
+                      {pair.valueCell.type === 'jobField' ? (
+                        <select
+                          value={pair.valueCell.jobFieldKey ?? 'jobNumber'}
+                          onChange={(e) => handleFieldRowUpdateValue(currentTable.id, idx, 'jobField', e.target.value, undefined, undefined)}
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white min-w-[180px]"
+                        >
+                          {JOB_FIELD_KEYS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      ) : pair.valueCell.type === 'machineField' ? (
+                        <select
+                          value={pair.valueCell.machineFieldKey ?? 'serialNumber'}
+                          onChange={(e) => handleFieldRowUpdateValue(currentTable.id, idx, 'machineField', undefined, undefined, e.target.value)}
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white min-w-[180px]"
+                        >
+                          {MACHINE_FIELD_KEYS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={pair.valueCell.value ?? ''}
+                          onChange={(e) => handleFieldRowUpdateValue(currentTable.id, idx, 'staticText', undefined, e.target.value, undefined)}
+                          placeholder="Static text"
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm min-w-[120px]"
+                        />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleFieldRowRemovePair(currentTable.id, idx)}
+                        disabled={getFieldRowPairs(currentTable).length <= 1}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                        title="Remove field"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleFieldRowAddPair(currentTable.id)}
+                  className="mt-4 px-4 py-2 bg-sky-100 text-sky-800 border border-sky-200 rounded-lg hover:bg-sky-200 text-sm font-medium flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add field
+                </button>
+                <div className="mt-6 flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-700">Table width</span>
+                  <select
+                    value={currentTable.layout ?? 'full'}
+                    onChange={(e) => handleUpdateTable(currentTable.id, { layout: e.target.value as 'full' | 'half' | 'third' })}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                  >
+                    <option value="full">Full width</option>
+                    <option value="half">Half</option>
+                    <option value="third">Third</option>
+                  </select>
+                </div>
+              </div>
+            ) : isGridTable(currentTable) ? (
               /* Grid builder (Word-style blocks) */
               <div className="p-6">
                 <div className="mb-6">
@@ -1191,14 +1506,16 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
                           {cell ? (
                             <>
                               <span className="text-[10px] uppercase text-gray-500 font-medium">
-                                {cell.type === 'jobField' ? 'Job' : cell.type === 'reportNumber' ? 'Report #' : cell.type}
+                                {cell.type === 'jobField' ? 'Job' : cell.type === 'machineField' ? 'Machine' : cell.type === 'reportNumber' ? 'Report #' : cell.type}
                               </span>
                               <span className="text-xs font-medium text-gray-800 truncate w-full text-center">
                                 {cell.type === 'jobField'
                                   ? (cell.label || JOB_FIELD_KEYS.find((k) => k.value === (cell.jobFieldKey ?? 'jobNumber'))?.label || '—')
-                                  : cell.type === 'reportNumber'
-                                    ? (cell.label || 'Report #')
-                                    : (cell.label || cell.value || '—')}
+                                  : cell.type === 'machineField'
+                                    ? (cell.label || MACHINE_FIELD_KEYS.find((k) => k.value === (cell.machineFieldKey ?? 'serialNumber'))?.label || '—')
+                                    : cell.type === 'reportNumber'
+                                      ? (cell.label || 'Report #')
+                                      : (cell.label || cell.value || '—')}
                               </span>
                               {(cell.colSpan ?? 1) > 1 || (cell.rowSpan ?? 1) > 1 ? (
                                 <span className="text-[10px] text-gray-500">{(cell.colSpan ?? 1)}×{cell.rowSpan ?? 1}</span>
@@ -1225,7 +1542,13 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
                           <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
                           <select
                             value={cell.type}
-                            onChange={(e) => handleUpdateCell(currentTable.id, cell.id, { type: e.target.value as GridCellType })}
+                            onChange={(e) => {
+                              const newType = e.target.value as GridCellType;
+                              const updates: Partial<GridCell> = { type: newType };
+                              if (newType === 'machineField' && !cell.machineFieldKey) updates.machineFieldKey = 'serialNumber';
+                              if (newType === 'jobField' && !cell.jobFieldKey) updates.jobFieldKey = 'jobNumber';
+                              handleUpdateCell(currentTable.id, cell.id, updates);
+                            }}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           >
                             <option value="label">Label</option>
@@ -1237,6 +1560,7 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
                             <option value="date">Date</option>
                             <option value="select">Dropdown (select)</option>
                             <option value="jobField">Job field (from job)</option>
+                            <option value="machineField">Machine field (from assigned machine)</option>
                             <option value="reportNumber">Report/RSR number</option>
                           </select>
                         </div>
@@ -1266,8 +1590,23 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
                           <p className="text-xs text-gray-500 mt-1">When a job is assigned, this value will be pulled from the job.</p>
                         </div>
                       )}
+                      {cell.type === 'machineField' && (
+                        <div className="mb-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Machine field to display</label>
+                          <select
+                            value={cell.machineFieldKey ?? 'serialNumber'}
+                            onChange={(e) => handleUpdateCell(currentTable.id, cell.id, { machineFieldKey: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          >
+                            {MACHINE_FIELD_KEYS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
+                          <p className="text-xs text-gray-500 mt-1">When the technician selects a machine for this job card, this value will be pulled from that machine.</p>
+                        </div>
+                      )}
                       <div className="grid grid-cols-2 gap-4 mb-4">
-                        {(cell.type !== 'jobField' && cell.type !== 'reportNumber') && (
+                        {(cell.type !== 'jobField' && cell.type !== 'machineField' && cell.type !== 'reportNumber') && (
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Text / default value</label>
                             <input
@@ -1279,7 +1618,7 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
                             />
                           </div>
                         )}
-                        <div className={`flex items-center gap-2 pt-6 ${(cell.type === 'jobField' || cell.type === 'reportNumber') ? 'col-span-2' : ''}`}>
+                        <div className={`flex items-center gap-2 pt-6 ${(cell.type === 'jobField' || cell.type === 'machineField' || cell.type === 'reportNumber') ? 'col-span-2' : ''}`}>
                           <input
                             type="checkbox"
                             checked={cell.required ?? false}
@@ -1334,7 +1673,19 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
                           />
                           <span className="text-sm text-gray-700">Bold text</span>
                         </label>
+                        <label className="flex items-center gap-2 cursor-pointer" title="Header for this column so fill-in rows are clear (e.g. Item, OK, Status)">
+                          <input
+                            type="checkbox"
+                            checked={cell.isColumnHeader ?? false}
+                            onChange={(e) => handleUpdateCell(currentTable.id, cell.id, { isColumnHeader: e.target.checked })}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm text-gray-700">Column header</span>
+                        </label>
                       </div>
+                      {cell.isColumnHeader && (
+                        <p className="text-xs text-gray-500 mb-4">This block will show as the column header so users know what to fill in for each column below.</p>
+                      )}
                       <div className="mb-4">
                         <label className="block text-sm font-medium text-gray-700 mb-1">Text alignment (overrides table)</label>
                         <select

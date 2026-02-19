@@ -2499,6 +2499,72 @@ export async function deleteJobCardTemplate(id: string): Promise<void> {
   });
 }
 
+/** Parts Ready job row: job + optional assignment + optional submission. */
+export interface PartsReadyItem {
+  job: Job & { bookings?: Array<{ technicianId: string; technicianName?: string }> };
+  assignment: {
+    _id: string;
+    template: { _id: string; name: string };
+    status: 'assigned' | 'started' | 'submitted';
+    assignedAt: string;
+    assignedBy?: { firstName?: string; lastName?: string };
+    notifiedAt?: string;
+    submission?: string;
+  } | null;
+  submission: {
+    _id: string;
+    submittedAt: string;
+    reportNumber?: string;
+    submittedBy?: { firstName?: string; lastName?: string };
+  } | null;
+}
+
+/**
+ * Gets all jobs with status "Parts Ready" and their job card assignment/submission info.
+ */
+export async function getPartsReadyJobs(): Promise<{
+  items: PartsReadyItem[];
+  statusId: string | null;
+}> {
+  return apiRequest<{ items: PartsReadyItem[]; statusId: string | null }>(
+    '/api/job-card-assignments/parts-ready'
+  );
+}
+
+/**
+ * Assigns a job card template to a job (job must be Parts Ready).
+ */
+export async function createJobCardAssignment(params: {
+  jobId: string;
+  templateId: string;
+  notes?: string;
+}): Promise<{ assignment: any }> {
+  return apiRequest<{ assignment: any }>(
+    '/api/job-card-assignments',
+    { method: 'POST', body: JSON.stringify(params) }
+  );
+}
+
+/**
+ * Updates a job card assignment (e.g. notify technician, or set status).
+ */
+export async function updateJobCardAssignment(
+  id: string,
+  updates: { notifyTechnician?: boolean; status?: 'assigned' | 'started' | 'submitted' }
+): Promise<{ assignment: any }> {
+  return apiRequest<{ assignment: any }>(
+    `/api/job-card-assignments/${id}`,
+    { method: 'PATCH', body: JSON.stringify(updates) }
+  );
+}
+
+/**
+ * Deletes a job card assignment (soft delete).
+ */
+export async function deleteJobCardAssignment(id: string): Promise<void> {
+  await apiRequest(`/api/job-card-assignments/${id}`, { method: 'DELETE' });
+}
+
 /**
  * Assign a sales lead to a rep.
  */

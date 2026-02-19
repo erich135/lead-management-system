@@ -58,11 +58,12 @@ import { NotificationBell } from './NotificationBell';
 import { NotificationPanel } from './NotificationPanel';
 import { JobCardTemplates } from './JobCardTemplates';
 import { JobCardSubmissions } from './JobCardSubmissions';
+import { PartsReadyJobCards } from './PartsReadyJobCards';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { Tooltip, HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
 
-type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions';
+type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady';
 
 interface DashboardProps {
   view?: View;
@@ -85,6 +86,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
     if (path === '/machines') return 'machines';
     if (path === '/job-card-templates') return 'jobCardTemplates';
     if (path === '/job-card-submissions') return 'jobCardSubmissions';
+    if (path === '/parts-ready') return 'partsReady';
     return 'dashboard';
   };
   
@@ -104,6 +106,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
       machines: '/machines',
       jobCardTemplates: '/job-card-templates',
       jobCardSubmissions: '/job-card-submissions',
+      partsReady: '/parts-ready',
     };
     navigate(routes[newView]);
   };
@@ -195,6 +198,8 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
       logViewActivity('view', 'Page', 'Viewed job card templates page');
     } else if (view === 'jobCardSubmissions') {
       logViewActivity('view', 'Page', 'Viewed job card submissions page');
+    } else if (view === 'partsReady') {
+      logViewActivity('view', 'Page', 'Viewed Parts Ready (Job Cards) page');
     }
   }, [view]);
 
@@ -691,12 +696,12 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                     <button
                       onClick={() => setIsJobsMenuExpanded(!isJobsMenuExpanded)}
                       className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
-                        view === 'leads' || view === 'jobCardTemplates' || view === 'jobCardSubmissions'
+                        view === 'leads' || view === 'jobCardTemplates' || view === 'jobCardSubmissions' || view === 'partsReady'
                           ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
                           : 'text-[#383838] hover:text-[#f7c12b]'
                       }`}
                     >
-                      <FileText className={`w-4 h-4 transition-transform ${view === 'leads' || view === 'jobCardTemplates' || view === 'jobCardSubmissions' ? 'scale-110' : ''}`} />
+                      <FileText className={`w-4 h-4 transition-transform ${view === 'leads' || view === 'jobCardTemplates' || view === 'jobCardSubmissions' || view === 'partsReady' ? 'scale-110' : ''}`} />
                       <span>Jobs</span>
                       {isJobsMenuExpanded ? (
                         <ChevronUp className="w-3 h-3" />
@@ -718,6 +723,20 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                           <FileText className="w-4 h-4" />
                           <span>All Jobs</span>
                         </Link>
+                        {(isSuperAdmin || hasPermission('job_card_templates.read')) && (
+                          <Link
+                            to="/parts-ready"
+                            onClick={() => setIsJobsMenuExpanded(false)}
+                            className={`block px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
+                              view === 'partsReady'
+                                ? 'bg-[#f7c12b]/20 text-[#383838] font-medium'
+                                : 'text-[#383838] hover:bg-gray-100'
+                            }`}
+                          >
+                            <ClipboardList className="w-4 h-4" />
+                            <span>Parts Ready (Job Cards)</span>
+                          </Link>
+                        )}
                         {(isSuperAdmin || hasPermission('job_card_templates.read')) && (
                           <Link
                             to="/job-card-templates"
@@ -1978,6 +1997,10 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           <JobCardSubmissions />
         )}
 
+        {view === 'partsReady' && (isSuperAdmin || hasPermission('job_card_templates.read')) && (
+          <PartsReadyJobCards />
+        )}
+
         {view === 'jobCardTemplates' && !isSuperAdmin && !hasPermission('job_card_templates.read') && (
           <div className="p-8 bg-white rounded-[8px] shadow-lg max-w-lg mx-auto mt-8">
             <h2 className="text-xl font-semibold text-[#383838] mb-2">Access restricted</h2>
@@ -1989,6 +2012,13 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           <div className="p-8 bg-white rounded-[8px] shadow-lg max-w-lg mx-auto mt-8">
             <h2 className="text-xl font-semibold text-[#383838] mb-2">Access restricted</h2>
             <p className="text-slate-600 mb-6">You don&apos;t have permission to view Job Card Submissions. Ask a Super Admin to grant you the &quot;Job Card Submissions&quot; permission in System Admin → User Management.</p>
+          </div>
+        )}
+
+        {view === 'partsReady' && !isSuperAdmin && !hasPermission('job_card_templates.read') && (
+          <div className="p-8 bg-white rounded-[8px] shadow-lg max-w-lg mx-auto mt-8">
+            <h2 className="text-xl font-semibold text-[#383838] mb-2">Access restricted</h2>
+            <p className="text-slate-600 mb-6">You don&apos;t have permission to view Parts Ready (Job Cards). Ask a Super Admin to grant you the &quot;Job Card Templates&quot; permission in System Admin → User Management.</p>
           </div>
         )}
 

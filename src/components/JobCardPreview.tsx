@@ -3,7 +3,7 @@ import { X, Download, Printer, FileImage } from 'lucide-react';
 import jsPDF from 'jspdf';
 import type { JobCardTemplate } from '../lib/api';
 import type { TemplateGroup, TableColumn, TableDefinition, TableRow, HeaderConfig, FooterConfig, GridCell } from './JobCardFormBuilder';
-import { JOB_FIELD_KEYS } from './JobCardFormBuilder';
+import { JOB_FIELD_KEYS, MACHINE_FIELD_KEYS } from './JobCardFormBuilder';
 import { getGlobalHeaderConfig, getGlobalFooterConfig } from '../utils/jobCardConfig';
 
 /**
@@ -24,6 +24,8 @@ interface JobCardPreviewProps {
   onClose: () => void;
   /** Job data when previewing with an assigned job (pulls job field values). */
   jobData?: Record<string, any>;
+  /** Assigned machine data when the job card is for a specific machine (pulls machine field values). */
+  machineData?: Record<string, any>;
   /** Report/RSR number when previewing a specific report. */
   reportNumber?: string;
 }
@@ -77,6 +79,35 @@ function getJobFieldLabel(key: string): string {
 }
 
 /**
+ * Returns display value for a machine field key from machine data.
+ */
+function getMachineFieldValue(machineData: Record<string, any> | undefined, key: string): string {
+  if (!machineData) return '';
+  switch (key) {
+    case 'make': return machineData.make ?? '';
+    case 'model': return machineData.model ?? '';
+    case 'serialNumber': return machineData.serialNumber ?? '';
+    case 'assetNumber': return machineData.assetNumber ?? '';
+    case 'machineHours': return machineData.machineHours != null ? String(machineData.machineHours) : '';
+    case 'nextServiceHours': return machineData.nextServiceHours != null ? String(machineData.nextServiceHours) : '';
+    case 'lastServiceDate': return machineData.lastServiceDate ? new Date(machineData.lastServiceDate).toLocaleDateString() : '';
+    case 'nextServiceDate': return machineData.nextServiceDate ? new Date(machineData.nextServiceDate).toLocaleDateString() : '';
+    case 'serviceType': return machineData.serviceType ?? '';
+    case 'isRental': return machineData.isRental === true ? 'Yes' : 'No';
+    case 'dbStatus': return machineData.dbStatus ?? '';
+    default: return '';
+  }
+}
+
+/**
+ * Returns human-readable label for a machine field key (for placeholders).
+ */
+function getMachineFieldLabel(key: string): string {
+  const found = MACHINE_FIELD_KEYS.find((o) => o.value === key);
+  return found ? found.label : key;
+}
+
+/**
  * Returns whether a checkbox cell is considered checked (for preview/PDF when form is filled).
  * Accepts boolean, "true", "yes", "1", "x" (case-insensitive).
  */
@@ -93,7 +124,7 @@ function isCheckboxChecked(value: unknown): boolean {
  * Job Card Preview component.
  * Allows previewing a job card template with example data and generating PDF.
  */
-export function JobCardPreview({ template, onClose, jobData, reportNumber }: JobCardPreviewProps) {
+export function JobCardPreview({ template, onClose, jobData, machineData, reportNumber }: JobCardPreviewProps) {
   const [exampleData, setExampleData] = useState<ExampleData>({});
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -253,9 +284,61 @@ export function JobCardPreview({ template, onClose, jobData, reportNumber }: Job
   };
 
   /**
+   * Renders a field row: a single line of "Label: value" pairs with no table borders.
+   * Values are replaced with job data or static text (no printed fill-in lines).
+   */
+  const renderFieldRow = (_group: TemplateGroup, table: TableDefinition) => {
+    const cells = table.cells ?? [];
+    const numCols = table.gridCols ?? 0;
+    const pairs: { label: string; value: string }[] = [];
+    for (let i = 0; i < numCols / 2; i++) {
+      const labelCell = cells.find((c) => c.row === 0 && c.col === i * 2);
+      const valueCell = cells.find((c) => c.row === 0 && c.col === i * 2 + 1);
+      if (!labelCell || !valueCell) continue;
+      const label = labelCell.label ?? '';
+      let value = '';
+      if (valueCell.type === 'jobField') {
+        value = getJobFieldValue(jobData, valueCell.jobFieldKey ?? 'jobNumber') || `[Job: ${getJobFieldLabel(valueCell.jobFieldKey ?? 'jobNumber')}]`;
+      } else if (valueCell.type === 'machineField') {
+        value = getMachineFieldValue(machineData, valueCell.machineFieldKey ?? 'serialNumber') || `[Machine: ${getMachineFieldLabel(valueCell.machineFieldKey ?? 'serialNumber')}]`;
+      } else if (valueCell.type === 'staticText' && valueCell.value != null) {
+        value = valueCell.value;
+      }
+      pairs.push({ label, value });
+    }
+    if (pairs.length === 0) return null;
+    const layout = table.layout ?? 'full';
+    const blockSpacingClass = spaceBetweenBlocks ? 'mb-6' : 'mb-0';
+    const numPairs = pairs.length;
+    return (
+      <div key={table.id} className={`${blockSpacingClass} w-full min-w-0 ${layout === 'full' ? 'max-w-2xl' : ''}`}>
+        {showTableTitles && <h3 className="font-semibold text-lg mb-3">{table.name}</h3>}
+        {/* Bootstrap-style row: equal-width columns (e.g. 3 cols = each 1/3 of row) */}
+        <div
+          className={`grid w-full text-sm ${!showTableTitles ? 'mt-0' : ''}`}
+          style={{ gridTemplateColumns: `repeat(${numPairs}, minmax(0, 1fr))` }}
+        >
+          {pairs.map((p, i) => (
+            <div
+              key={i}
+              className="flex items-baseline gap-1.5 px-3 py-1.5 border-r border-gray-200 last:border-r-0 min-w-0"
+            >
+              <span className="text-gray-700 font-medium shrink-0">{p.label}:</span>
+              <span className={`min-w-0 truncate ${p.value ? 'text-gray-900' : 'text-gray-500 italic'}`} title={p.value || '—'}>
+                {p.value || '—'}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  /**
    * Renders a grid-based table (Word-style blocks) with merge (colSpan/rowSpan) and bold borders.
    */
   const renderGridTable = (_group: TemplateGroup, table: TableDefinition) => {
+    if (table.isFieldRow) return renderFieldRow(_group, table);
     const numRows = table.gridRows ?? 2;
     const numCols = table.gridCols ?? 2;
     const cells = table.cells ?? [];
@@ -303,10 +386,11 @@ export function JobCardPreview({ template, onClose, jobData, reportNumber }: Job
             }
             const cellAlign = cell?.textAlign ?? tableAlign;
             const alignClass = cellAlign === 'center' ? 'text-center' : cellAlign === 'right' ? 'text-right' : 'text-left';
+            const headerClass = cell?.isColumnHeader ? 'bg-gray-200 font-semibold text-gray-800' : 'bg-white';
             return (
               <div
                 key={`${r}-${c}`}
-                className={`pt-3 px-2 pb-2 bg-white flex flex-col min-h-[80px] border border-gray-300 -mr-px -mb-px ${alignClass} ${
+                className={`pt-3 px-2 pb-2 ${headerClass} flex flex-col min-h-[80px] border border-gray-300 -mr-px -mb-px ${alignClass} ${
                   cell?.boldBorder ? 'border-2 border-gray-800' : ''
                 } ${cell?.type === 'textarea' ? 'justify-start' : 'justify-center'}`}
                 style={{
@@ -344,6 +428,15 @@ export function JobCardPreview({ template, onClose, jobData, reportNumber }: Job
                     {cell.type === 'jobField' && (() => {
                       const val = getJobFieldValue(jobData, cell.jobFieldKey ?? 'jobNumber');
                       const placeholder = `[Job: ${getJobFieldLabel(cell.jobFieldKey ?? 'jobNumber')}]`;
+                      return (
+                        <div className={`text-sm border-0 no-underline ${cell.boldText ? 'font-bold' : ''} ${!val ? 'text-gray-500 italic' : 'text-gray-800'}`} style={{ borderWidth: 0 }}>
+                          {val || placeholder}
+                        </div>
+                      );
+                    })()}
+                    {cell.type === 'machineField' && (() => {
+                      const val = getMachineFieldValue(machineData, cell.machineFieldKey ?? 'serialNumber');
+                      const placeholder = `[Machine: ${getMachineFieldLabel(cell.machineFieldKey ?? 'serialNumber')}]`;
                       return (
                         <div className={`text-sm border-0 no-underline ${cell.boldText ? 'font-bold' : ''} ${!val ? 'text-gray-500 italic' : 'text-gray-800'}`} style={{ borderWidth: 0 }}>
                           {val || placeholder}
@@ -637,6 +730,77 @@ export function JobCardPreview({ template, onClose, jobData, reportNumber }: Job
         }
         const tableTitleY = showTableTitles ? rowStartY + 0.15 : rowStartY;
 
+        if (table.isFieldRow) {
+          const cells = table.cells ?? [];
+          const numCols = table.gridCols ?? 0;
+          const pairs: { label: string; value: string }[] = [];
+          for (let i = 0; i < numCols / 2; i++) {
+            const labelCell = cells.find((c: GridCell) => c.row === 0 && c.col === i * 2);
+            const valueCell = cells.find((c: GridCell) => c.row === 0 && c.col === i * 2 + 1);
+            if (!labelCell || !valueCell) continue;
+            const label = labelCell.label ?? '';
+            let value = '';
+            if (valueCell.type === 'jobField') {
+              value = getJobFieldValue(jobData, valueCell.jobFieldKey ?? 'jobNumber') || `[Job: ${getJobFieldLabel(valueCell.jobFieldKey ?? 'jobNumber')}]`;
+            } else if (valueCell.type === 'machineField') {
+              value = getMachineFieldValue(machineData, valueCell.machineFieldKey ?? 'serialNumber') || `[Machine: ${getMachineFieldLabel(valueCell.machineFieldKey ?? 'serialNumber')}]`;
+            } else if (valueCell.type === 'staticText' && valueCell.value != null) {
+              value = valueCell.value;
+            }
+            pairs.push({ label, value: value || '—' });
+          }
+          if (pairs.length > 0) {
+            checkPageBreak(0.4);
+            const startY = showTableTitles ? tableTitleY - 0.05 : rowStartY;
+            const cellW = tableWidth / pairs.length;
+            const padding = 0.08;
+            const colMaxWidth = Math.max(0.3, cellW - padding * 2);
+            const lineHeightIn = 0.05;
+            pdf.setFontSize(9);
+            pdf.setFont('helvetica', 'normal');
+            pdf.setTextColor(0, 0, 0);
+            const lineCounts: number[] = [];
+            pairs.forEach((p) => {
+              const fullText = `${p.label}: ${p.value}`;
+              const lines = (pdf as any).splitTextToSize?.(fullText, colMaxWidth) ?? [fullText];
+              lineCounts.push(Array.isArray(lines) ? lines.length : 1);
+            });
+            const maxLines = Math.max(1, ...lineCounts);
+            const fieldRowHeight = maxLines * lineHeightIn + 0.25;
+            pairs.forEach((p, i) => {
+              const colX = startX + i * cellW + padding;
+              const fullText = `${p.label}: ${p.value}`;
+              const lines = (pdf as any).splitTextToSize?.(fullText, colMaxWidth) ?? [fullText];
+              const lineArr = Array.isArray(lines) ? lines : [String(lines)];
+              pdf.text(lineArr, colX, startY + 0.2, { maxWidth: colMaxWidth, align: 'left' });
+              if (i < pairs.length - 1) {
+                pdf.setDrawColor(200, 200, 200);
+                pdf.setLineWidth(0.002);
+                pdf.line(startX + (i + 1) * cellW, startY, startX + (i + 1) * cellW, startY + fieldRowHeight);
+              }
+            });
+            pdf.setDrawColor(0, 0, 0);
+            const fullBlockHeight = (showTableTitles ? tableTitleY - rowStartY : 0) + fieldRowHeight;
+            rowHeight = Math.max(rowHeight, fullBlockHeight);
+            if (layout === 'full') {
+              y = rowStartY + fullBlockHeight + blockGap;
+              currentX = marginLeft + 0.1;
+              rowHeight = 0;
+            } else {
+              currentX += tableWidth + gap;
+              const nextTableWidth = nextTable ? (nextLayout === 'full' ? availableWidth : nextLayout === 'half' ? (availableWidth - gap) / 2 : (availableWidth - 2 * gap) / 3) : 0;
+              const rightEdge = marginLeft + 0.1 + availableWidth + 0.005;
+              const nextFitsInRow = nextLayout === layout && currentX + nextTableWidth <= rightEdge;
+              if (!nextFitsInRow) {
+                y = rowStartY + rowHeight + blockGap;
+                currentX = marginLeft + 0.1;
+                rowHeight = 0;
+              }
+            }
+          }
+          continue;
+        }
+
         if (table.gridRows != null && table.gridCols != null) {
           // Grid table: draw at startX with tableWidth; row heights can expand for textarea/comment cells
           const cells = table.cells ?? [];
@@ -685,17 +849,23 @@ export function JobCardPreview({ template, onClose, jobData, reportNumber }: Job
               } else {
                 pdf.rect(x, cellY, w, h, 'S');
               }
+            } else if (cell.isColumnHeader) {
+              pdf.setFillColor(220, 220, 220);
+              pdf.rect(x, cellY, w, h, 'FD');
             } else {
               pdf.rect(x, cellY, w, h, 'S');
             }
             pdf.setFontSize(9);
-            pdf.setFont('helvetica', cell.boldText ? 'bold' : 'normal');
+            pdf.setFont('helvetica', (cell.boldText || cell.isColumnHeader) ? 'bold' : 'normal');
             let cellContent: string;
             if (cell.type === 'checkbox') {
               cellContent = '';
             } else if (cell.type === 'jobField') {
               const val = getJobFieldValue(jobData, cell.jobFieldKey ?? 'jobNumber');
               cellContent = val || `[Job: ${getJobFieldLabel(cell.jobFieldKey ?? 'jobNumber')}]`;
+            } else if (cell.type === 'machineField') {
+              const val = getMachineFieldValue(machineData, cell.machineFieldKey ?? 'serialNumber');
+              cellContent = val || `[Machine: ${getMachineFieldLabel(cell.machineFieldKey ?? 'serialNumber')}]`;
             } else if (cell.type === 'reportNumber') {
               cellContent = reportNumber ?? '[Report #]';
             } else if (cell.value != null && cell.value !== '') {
@@ -1027,9 +1197,11 @@ export function JobCardPreview({ template, onClose, jobData, reportNumber }: Job
                             : 'w-full md:flex-[0_0_33.333%] md:min-w-0';
                       return (
                         <div key={table.id} className={`flex-none ${widthClass}`}>
-                          {table.gridRows != null && table.gridCols != null
-                            ? renderGridTable(group, table)
-                            : renderTable(group, table)}
+                          {table.isFieldRow
+                            ? renderFieldRow(group, table)
+                            : table.gridRows != null && table.gridCols != null
+                              ? renderGridTable(group, table)
+                              : renderTable(group, table)}
                         </div>
                       );
                     })}

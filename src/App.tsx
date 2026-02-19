@@ -131,6 +131,11 @@ function AppContent() {
             <Dashboard view="jobCardSubmissions" />
           </ProtectedRoute>
         } />
+        <Route path="/parts-ready" element={
+          <ProtectedRoute>
+            <Dashboard view="partsReady" />
+          </ProtectedRoute>
+        } />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

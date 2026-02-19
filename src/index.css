@@ -16,6 +16,16 @@
   z-index: 1;
 }
 
+/* Fix Leaflet tiles broken by Tailwind's CSS reset */
+.leaflet-container img {
+  max-width: none !important;
+  max-height: none !important;
+}
+
+.leaflet-tile-pane {
+  z-index: 1;
+}
+
 /* Mobile app-like styles */
 @layer base {
   body {

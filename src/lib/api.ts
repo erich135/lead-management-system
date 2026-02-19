@@ -2384,6 +2384,7 @@ export async function createSalesLead(data: {
   contactEmail?: string;
   contactPhone: string;
   contactAddress?: string;
+  geoLocation?: { type: 'Point'; coordinates: [number, number] };
   branch: string;
   assignedRep?: string;
   leadSource: string;
@@ -2786,6 +2787,7 @@ export async function createAppointment(leadId: string, data: {
   location: string;
   purpose?: string;
   notes?: string;
+  geoLocation?: { type: 'Point'; coordinates: [number, number] };
 }): Promise<Appointment> {
   const response = await apiRequest<Appointment>(`/api/sales-leads/${leadId}/appointments`, {
     method: 'POST',
@@ -3268,5 +3270,47 @@ export default {
   getNearbyAppointments,
   getDailyOverlaps,
   apiRequest,
+  // Geocoding proxy
+  geocodeSearch,
+  geocodeReverse,
 };
+
+// ============================================================
+// Geocode Proxy (avoids browser CORS issues with Nominatim)
+// ============================================================
+
+export interface GeoSearchResult {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
+  address?: {
+    road?: string;
+    house_number?: string;
+    suburb?: string;
+    city?: string;
+    town?: string;
+    state?: string;
+    postcode?: string;
+    country?: string;
+  };
+}
+
+/**
+ * Search for addresses via backend proxy.
+ */
+export async function geocodeSearch(query: string, limit = 6): Promise<GeoSearchResult[]> {
+  const params = new URLSearchParams({ q: query, limit: limit.toString(), countrycodes: 'za' });
+  const response = await apiRequest<GeoSearchResult[]>(`/api/geocode/search?${params}`, { method: 'GET' });
+  return response;
+}
+
+/**
+ * Reverse geocode coordinates via backend proxy.
+ */
+export async function geocodeReverse(lat: number, lon: number): Promise<{ display_name: string; lat: string; lon: string; address?: any }> {
+  const params = new URLSearchParams({ lat: lat.toString(), lon: lon.toString() });
+  const response = await apiRequest<{ display_name: string; lat: string; lon: string; address?: any }>(`/api/geocode/reverse?${params}`, { method: 'GET' });
+  return response;
+}
 

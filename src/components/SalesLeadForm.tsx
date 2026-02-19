@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Save, Loader2 } from 'lucide-react';
 import { createSalesLead, updateSalesLead, getServiceDescriptions, getJobSources, type SalesLead, type Branch, type RepCode, type ServiceDescription, type JobSource } from '../lib/api';
+import { AddressAutocomplete } from './AddressAutocomplete';
 
 interface SalesLeadFormProps {
   lead?: SalesLead | null;
@@ -15,6 +16,7 @@ export function SalesLeadForm({ lead, branches, repCodes, onClose, onSave }: Sal
   const [error, setError] = useState<string | null>(null);
   const [serviceDescriptions, setServiceDescriptions] = useState<ServiceDescription[]>([]);
   const [jobSources, setJobSources] = useState<JobSource[]>([]);
+  const [geoCoordinates, setGeoCoordinates] = useState<[number, number] | null>(null);
   const [formData, setFormData] = useState({
     companyName: '',
     contactPerson: '',
@@ -93,6 +95,14 @@ export function SalesLeadForm({ lead, branches, repCodes, onClose, onSave }: Sal
         priority: formData.priority,
         notes: formData.notes.trim(),
       };
+
+      // Include geo coordinates if address was selected from autocomplete
+      if (geoCoordinates) {
+        payload.geoLocation = {
+          type: 'Point',
+          coordinates: geoCoordinates, // [longitude, latitude]
+        };
+      }
 
       if (formData.assignedRep) {
         payload.assignedRep = formData.assignedRep;
@@ -224,12 +234,13 @@ export function SalesLeadForm({ lead, branches, repCodes, onClose, onSave }: Sal
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Address
                 </label>
-                <textarea
+                <AddressAutocomplete
                   value={formData.contactAddress}
-                  onChange={(e) => handleChange('contactAddress', e.target.value)}
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                  placeholder="Enter physical address"
+                  onChange={(address, coordinates) => {
+                    handleChange('contactAddress', address);
+                    setGeoCoordinates(coordinates || null);
+                  }}
+                  placeholder="Start typing an address to search..."
                 />
               </div>
             </div>

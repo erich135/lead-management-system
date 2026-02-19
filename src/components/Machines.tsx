@@ -471,7 +471,16 @@ export function Machines() {
                         S/N: {machine.serialNumber}
                       </div>
                       <div className="text-xs text-slate-400 mt-1">
-                        Hours: {machine.machineHours} | Next Service: {machine.nextServiceHours}
+                        {(() => {
+                          const makeLC = (machine.make || '').toLowerCase();
+                          const typeLC = (machine.machineType || '').toLowerCase();
+                          const isDateBased = machine.serviceType === 'date' || 
+                            (!machine.serviceType && (typeLC.includes('dryer') || typeLC.includes('blower') || typeLC.includes('vacuum') || makeLC.includes('dryer') || makeLC.includes('blower') || makeLC.includes('vacuum')));
+                          if (isDateBased) {
+                            return `Last Service: ${machine.lastServiceDate ? new Date(machine.lastServiceDate).toLocaleDateString() : 'N/A'} | Next Service: ${machine.nextServiceDate ? new Date(machine.nextServiceDate).toLocaleDateString() : 'N/A'}`;
+                          }
+                          return `Hours: ${machine.machineHours || 0} | Next Service: ${machine.nextServiceHours || 0}`;
+                        })()}
                       </div>
                     </div>
                     {selectedMachine?._id === machine._id && (

@@ -1072,10 +1072,11 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
                         const machine = machines.find(m => m._id === machineId) || rentalMachines.find(m => m._id === machineId);
                         if (!machine) return null;
                         
-                        // Auto-detect service type from Make field if not explicitly set
+                        // Auto-detect service type from Make or machineType field if not explicitly set
                         const makeLC = (machine.make || '').toLowerCase();
+                        const typeLC = (machine.machineType || '').toLowerCase();
                         const isDateBased = machine.serviceType === 'date' || 
-                          (!machine.serviceType && (makeLC.includes('dryer') || makeLC.includes('blower') || makeLC.includes('vacuum')));
+                          (!machine.serviceType && (typeLC.includes('dryer') || typeLC.includes('blower') || typeLC.includes('vacuum') || makeLC.includes('dryer') || makeLC.includes('blower') || makeLC.includes('vacuum')));
                         const serviceInfo = isDateBased
                           ? `Next Service: ${machine.nextServiceDate ? new Date(machine.nextServiceDate).toLocaleDateString() : 'N/A'}`
                           : `Hours: ${machine.machineHours?.toLocaleString() || 0} • Next: ${machine.nextServiceHours?.toLocaleString() || 0}`;

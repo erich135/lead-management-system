@@ -1918,10 +1918,11 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                           : machines.find(m => m._id === machineRef);
                         if (!machine) return null;
                         
-                        // Auto-detect service type from Make field if not explicitly set
+                        // Auto-detect service type from Make or machineType field if not explicitly set
                         const makeLC = (machine.make || '').toLowerCase();
+                        const typeLC = (machine.machineType || '').toLowerCase();
                         const isDateBased = machine.serviceType === 'date' || 
-                          (!machine.serviceType && (makeLC.includes('dryer') || makeLC.includes('blower') || makeLC.includes('vacuum')));
+                          (!machine.serviceType && (typeLC.includes('dryer') || typeLC.includes('blower') || typeLC.includes('vacuum') || makeLC.includes('dryer') || makeLC.includes('blower') || makeLC.includes('vacuum')));
                         const serviceInfo = isDateBased
                           ? `Next Service: ${machine.nextServiceDate ? new Date(machine.nextServiceDate).toLocaleDateString() : 'N/A'}`
                           : `Hours: ${machine.machineHours?.toLocaleString() || 0} • Next: ${machine.nextServiceHours?.toLocaleString() || 0}`;
@@ -2178,8 +2179,26 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                               Serial: {machine.serialNumber}
                             </div>
                             <div className="flex items-center gap-4 text-sm text-ars-body">
-                              <span>Hours: <span className="font-medium">{machine.machineHours.toLocaleString()}</span></span>
-                              <span>Next Service: <span className="font-medium">{machine.nextServiceHours.toLocaleString()}</span></span>
+                              {(() => {
+                                const makeLC = (machine.make || '').toLowerCase();
+                                const typeLC = (machine.machineType || '').toLowerCase();
+                                const isDateBased = machine.serviceType === 'date' || 
+                                  (!machine.serviceType && (typeLC.includes('dryer') || typeLC.includes('blower') || typeLC.includes('vacuum') || makeLC.includes('dryer') || makeLC.includes('blower') || makeLC.includes('vacuum')));
+                                if (isDateBased) {
+                                  return (
+                                    <>
+                                      <span>Last Service: <span className="font-medium">{machine.lastServiceDate ? new Date(machine.lastServiceDate).toLocaleDateString() : 'N/A'}</span></span>
+                                      <span>Next Service: <span className="font-medium">{machine.nextServiceDate ? new Date(machine.nextServiceDate).toLocaleDateString() : 'N/A'}</span></span>
+                                    </>
+                                  );
+                                }
+                                return (
+                                  <>
+                                    <span>Hours: <span className="font-medium">{machine.machineHours?.toLocaleString() || 0}</span></span>
+                                    <span>Next Service: <span className="font-medium">{machine.nextServiceHours?.toLocaleString() || 0}</span></span>
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
                         </div>

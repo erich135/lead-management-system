@@ -15,6 +15,9 @@
 - `AppointmentScheduler.tsx`: replaced plain location text input with `AddressAutocomplete` component; sends `geoLocation` coordinates in create payload
 - `api.ts`: added `geoLocation` field to `createSalesLead` and `createAppointment` type signatures
 
+### Fixed
+- Date-based machine display: Dryer/Blower/Vacuum machines now correctly show "Last Service Date" and "Next Service Date" instead of "Hours" and "Next" across all views (job card, job details view mode, job details edit mode, leads list card). Detection logic updated to check `machine.machineType` and `machine.serviceType` fields in addition to `machine.make`.
+
 ## [1.0.17] - 2026-02-13
 
 ### Added

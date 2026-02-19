@@ -1471,9 +1471,28 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                                       </div>
                                       <div className="text-xs text-ars-body pl-4">
                                         <div className="flex items-center gap-2">
-                                          <span>Hours: <span className="font-semibold text-ars-primary">{machine.machineHours.toLocaleString()}</span></span>
-                                          <span className="text-gray-400">•</span>
-                                          <span>Next: <span className="font-semibold text-orange-600">{machine.nextServiceHours.toLocaleString()}</span></span>
+                                          {(() => {
+                                            const makeLC = (machine.make || '').toLowerCase();
+                                            const typeLC = (machine.machineType || '').toLowerCase();
+                                            const isDateBased = machine.serviceType === 'date' || 
+                                              (!machine.serviceType && (typeLC.includes('dryer') || typeLC.includes('blower') || typeLC.includes('vacuum') || makeLC.includes('dryer') || makeLC.includes('blower') || makeLC.includes('vacuum')));
+                                            if (isDateBased) {
+                                              return (
+                                                <>
+                                                  <span>Last Service: <span className="font-semibold text-ars-primary">{machine.lastServiceDate ? new Date(machine.lastServiceDate).toLocaleDateString() : 'N/A'}</span></span>
+                                                  <span className="text-gray-400">•</span>
+                                                  <span>Next: <span className="font-semibold text-orange-600">{machine.nextServiceDate ? new Date(machine.nextServiceDate).toLocaleDateString() : 'N/A'}</span></span>
+                                                </>
+                                              );
+                                            }
+                                            return (
+                                              <>
+                                                <span>Hours: <span className="font-semibold text-ars-primary">{machine.machineHours?.toLocaleString() || 0}</span></span>
+                                                <span className="text-gray-400">•</span>
+                                                <span>Next: <span className="font-semibold text-orange-600">{machine.nextServiceHours?.toLocaleString() || 0}</span></span>
+                                              </>
+                                            );
+                                          })()}
                                         </div>
                                       </div>
                                     </div>

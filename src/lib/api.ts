@@ -532,6 +532,26 @@ export async function getJob(id: string): Promise<{ job: Job; reminder: OverdueJ
 }
 
 /**
+ * Gets diary/calendar jobs — only jobs with active bookings, minimal payload.
+ * Replaces the paginated getJobs loop for the Diary page.
+ */
+export async function getDiaryJobs(params?: {
+  technicianId?: string;
+  startDate?: string;
+  endDate?: string;
+  branch?: string;
+}): Promise<{ jobs: Job[]; total: number }> {
+  const queryParams = new URLSearchParams();
+  if (params?.technicianId) queryParams.append('technicianId', params.technicianId);
+  if (params?.startDate) queryParams.append('startDate', params.startDate);
+  if (params?.endDate) queryParams.append('endDate', params.endDate);
+  if (params?.branch) queryParams.append('branch', params.branch);
+
+  const query = queryParams.toString();
+  return apiRequest(`/api/jobs/diary${query ? `?${query}` : ''}`);
+}
+
+/**
  * Creates a new job.
  */
 export async function createJob(jobData: Partial<Job>): Promise<{ job: Job }> {

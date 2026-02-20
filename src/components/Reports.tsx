@@ -654,6 +654,31 @@ export function Reports({ statuses, branches }: ReportsProps) {
   }
 
   /**
+   * Auto-sizes worksheet columns based on content width.
+   * Ensures date columns (dd MMMM yyyy) and other content display properly.
+   */
+  function autoSizeColumns(ws: XLSX.WorkSheet) {
+    if (!ws['!ref']) return;
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    const colWidths: number[] = [];
+
+    for (let col = range.s.c; col <= range.e.c; col++) {
+      let maxWidth = 8; // minimum column width
+      for (let row = range.s.r; row <= range.e.r; row++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+        const cell = ws[cellAddress];
+        if (cell && cell.v != null) {
+          const cellText = String(cell.v);
+          maxWidth = Math.max(maxWidth, Math.min(cellText.length + 2, 50));
+        }
+      }
+      colWidths.push(maxWidth);
+    }
+
+    ws['!cols'] = colWidths.map(w => ({ wch: w }));
+  }
+
+  /**
    * Exports user performance report to CSV.
    */
   function exportUserPerformanceReport() {
@@ -676,8 +701,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
       job.status?.name || '',
       typeof job.customer === 'object' ? job.customer?.name || '' : '',
       job.cashCustomer || '',
-      job.startDate ? new Date(job.startDate) : '',
-      job.dateQuoted ? new Date(job.dateQuoted) : '',
+      formatDate(job.startDate),
+      formatDate(job.dateQuoted),
       job.valueExVat || 0,
       job.adm || '',
       typeof job.repCode === 'object' ? (job.repCode as any)?.code || '' : '',
@@ -688,15 +713,15 @@ export function Reports({ statuses, branches }: ReportsProps) {
       job.feedback || '',
       job.rsrNumber || '',
       job.poNumber || '',
-      job.poDate ? new Date(job.poDate) : '',
+      formatDate(job.poDate),
       job.invNumber || '',
-      job.invoiceDate ? new Date(job.invoiceDate) : '',
+      formatDate(job.invoiceDate),
     ]);
 
     // Activities data
     const activityHeaders = ['Date', 'Time', 'Action', 'Resource Type', 'Description', 'IP Address'];
     const activityRows = userActivities.map(act => [
-      act.createdAt ? new Date(act.createdAt) : '',
+      formatDate(act.createdAt),
       act.createdAt ? new Date(act.createdAt).toLocaleTimeString() : '',
       act.action || '',
       act.resourceType || '',
@@ -734,38 +759,9 @@ export function Reports({ statuses, branches }: ReportsProps) {
     ];
 
     const ws = XLSX.utils.aoa_to_sheet(data);
-    
-    // Apply date formatting to job date columns (Start Date, Date Quoted, PO Date, Invoice Date)
-    if (ws['!ref']) {
-      const jobHeaderRow = 4; // Row index where job headers are
-      const jobDateColumns = [4, 5, 16, 18]; // Start Date, Date Quoted, PO Date, Invoice Date
-      
-      for (let row = jobHeaderRow + 1; row < jobHeaderRow + 1 + jobRows.length; row++) {
-        jobDateColumns.forEach(col => {
-          const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
-          const cell = ws[cellAddress];
-          if (cell && cell.v instanceof Date) {
-            cell.t = 'd';
-            cell.z = 'mmm dd, yyyy';
-          }
-        });
-      }
-      
-      // Apply date formatting to activity date column
-      const activityHeaderRow = jobHeaderRow + jobRows.length + 3; // After jobs section
-      const activityDateColumn = 0; // Date column
-      
-      for (let row = activityHeaderRow + 1; row < activityHeaderRow + 1 + activityRows.length; row++) {
-        const cellAddress = XLSX.utils.encode_cell({ r: row, c: activityDateColumn });
-        const cell = ws[cellAddress];
-        if (cell && cell.v instanceof Date) {
-          cell.t = 'd';
-          cell.z = 'mmm dd, yyyy';
-        }
-      }
-    }
 
     const wb = XLSX.utils.book_new();
+    autoSizeColumns(ws);
     XLSX.utils.book_append_sheet(wb, ws, 'User Performance');
     XLSX.writeFile(wb, `${roleLabel}-Performance-${selectedLabel}-${startDate}-to-${endDate}.xlsx`);
   }
@@ -787,8 +783,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
     const jobRows = customerJobs.map(job => [
       job.jobNumber || '',
       job.status?.name || '',
-      job.startDate ? new Date(job.startDate) : '',
-      job.dateQuoted ? new Date(job.dateQuoted) : '',
+      formatDate(job.startDate),
+      formatDate(job.dateQuoted),
       job.valueExVat || 0,
       job.adm || '',
       typeof job.repCode === 'object' ? (job.repCode as any)?.code || '' : '',
@@ -799,9 +795,9 @@ export function Reports({ statuses, branches }: ReportsProps) {
       job.feedback || '',
       job.rsrNumber || '',
       job.poNumber || '',
-      job.poDate ? new Date(job.poDate) : '',
+      formatDate(job.poDate),
       job.invNumber || '',
-      job.invoiceDate ? new Date(job.invoiceDate) : '',
+      formatDate(job.invoiceDate),
     ]);
 
     // Machines data
@@ -817,7 +813,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
     // Activities data
     const activityHeaders = ['Date', 'Time', 'Action', 'Description', 'User'];
     const activityRows = customerActivities.map(act => [
-      act.createdAt ? new Date(act.createdAt) : '',
+      formatDate(act.createdAt),
       act.createdAt ? new Date(act.createdAt).toLocaleTimeString() : '',
       act.action || '',
       act.description || '',
@@ -846,37 +842,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
     const ws = XLSX.utils.aoa_to_sheet(data);
     
-    // Apply date formatting to job date columns (Start Date, Date Quoted, PO Date, Invoice Date)
-    if (ws['!ref']) {
-      const jobHeaderRow = 4; // Row index where job headers are
-      const jobDateColumns = [2, 3, 14, 16]; // Start Date, Date Quoted, PO Date, Invoice Date
-      
-      for (let row = jobHeaderRow + 1; row < jobHeaderRow + 1 + jobRows.length; row++) {
-        jobDateColumns.forEach(col => {
-          const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
-          const cell = ws[cellAddress];
-          if (cell && cell.v instanceof Date) {
-            cell.t = 'd';
-            cell.z = 'mmm dd, yyyy';
-          }
-        });
-      }
-      
-      // Apply date formatting to activity date column
-      const activityHeaderRow = jobHeaderRow + jobRows.length + 5; // After jobs section
-      const activityDateColumn = 0; // Date column
-      
-      for (let row = activityHeaderRow + 1; row < activityHeaderRow + 1 + activityRows.length; row++) {
-        const cellAddress = XLSX.utils.encode_cell({ r: row, c: activityDateColumn });
-        const cell = ws[cellAddress];
-        if (cell && cell.v instanceof Date) {
-          cell.t = 'd';
-          cell.z = 'mmm dd, yyyy';
-        }
-      }
-    }
-    
     const wb = XLSX.utils.book_new();
+    autoSizeColumns(ws);
     XLSX.utils.book_append_sheet(wb, ws, 'Customer Report');
     XLSX.writeFile(wb, `Customer-Report-${customerName}-${startDate}-to-${endDate}.xlsx`);
   }
@@ -936,8 +903,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
             machine.nextServiceHours || '',
             job.jobNumber || '',
             job.status?.name || '',
-            job.startDate ? new Date(job.startDate) : '',
-            job.dateQuoted ? new Date(job.dateQuoted) : '',
+            formatDate(job.startDate),
+            formatDate(job.dateQuoted),
             job.valueExVat || 0,
             job.adm || '',
             typeof job.repCode === 'object' ? (job.repCode as any)?.code || '' : '',
@@ -948,9 +915,9 @@ export function Reports({ statuses, branches }: ReportsProps) {
             job.feedback || '',
             job.rsrNumber || '',
             job.poNumber || '',
-            job.poDate ? new Date(job.poDate) : '',
+            formatDate(job.poDate),
             job.invNumber || '',
-            job.invoiceDate ? new Date(job.invoiceDate) : ''
+            formatDate(job.invoiceDate)
           ]);
         });
       }
@@ -959,24 +926,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
     const data = [headers, ...rows];
     const ws = XLSX.utils.aoa_to_sheet(data);
     
-    // Apply date formatting to date columns (Start Date, Date Quoted, PO Date, Invoice Date)
-    if (ws['!ref']) {
-      const range = XLSX.utils.decode_range(ws['!ref']);
-      const dateColumns = [8, 9, 20, 22]; // Start Date, Date Quoted, PO Date, Invoice Date
-      
-      for (let row = 1; row <= range.e.r; row++) { // Start from 1 to skip header
-        dateColumns.forEach(col => {
-          const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
-          const cell = ws[cellAddress];
-          if (cell && cell.v instanceof Date) {
-            cell.t = 'd';
-            cell.z = 'mmm dd, yyyy';
-          }
-        });
-      }
-    }
-    
     const wb = XLSX.utils.book_new();
+    autoSizeColumns(ws);
     XLSX.utils.book_append_sheet(wb, ws, 'Machine Report');
     XLSX.writeFile(wb, `machine-report-${new Date().toISOString().split('T')[0]}.xlsx`);
   }
@@ -1042,8 +993,6 @@ export function Reports({ statuses, branches }: ReportsProps) {
     const filtersString = getActiveFiltersString();
     let data: any[][] = [];
     let filename = '';
-    let dateColumns: number[] = []; // Track which columns contain dates
-    let headerRowIndex = 0; // Track where the header row is
 
     if (activeSection === 'overdue') {
       const filteredData = getFilteredOverdueJobs();
@@ -1061,7 +1010,6 @@ export function Reports({ statuses, branches }: ReportsProps) {
         oj.expectedNextStatus || '',
       ]);
       data = [[sectionTitle], [`Filters: ${filtersString}`], [`Date Range: ${startDate} to ${endDate}`], [], headers, ...rows];
-      headerRowIndex = 4;
       filename = `Overdue-Jobs-${startDate}-to-${endDate}.xlsx`;
     } else if (activeSection === 'jobs') {
       const filteredData = getFilteredJobs();
@@ -1081,8 +1029,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
           job.status?.name || '',
           typeof job.customer === 'object' ? job.customer?.name || '' : '',
           job.cashCustomer || '',
-          job.startDate ? new Date(job.startDate) : '',
-          job.dateQuoted ? new Date(job.dateQuoted) : '',
+          formatDate(job.startDate),
+          formatDate(job.dateQuoted),
           job.valueExVat || 0,
           job.adm || '',
           job.assistingAdm || '',
@@ -1092,22 +1040,20 @@ export function Reports({ statuses, branches }: ReportsProps) {
           job.notes || '',
           job.feedback || '',
           job.invNumber || '',
-          job.invoiceDate ? new Date(job.invoiceDate) : '',
+          formatDate(job.invoiceDate),
           typeof job.jobSource === 'object' ? (job.jobSource as any)?.name || '' : '',
           techName,
-          techBookedDate ? new Date(techBookedDate) : '',
+          formatDate(techBookedDate),
           job.storePack || '',
-          job.storePackDate ? new Date(job.storePackDate) : '',
+          formatDate(job.storePackDate),
         ];
       });
       data = [[sectionTitle], [`Filters: ${filtersString}`], [`Date Range: ${startDate} to ${endDate}`], [], headers, ...rows];
-      headerRowIndex = 4;
-      dateColumns = [4, 5, 15, 18, 20]; // Start Date, Date Quoted, Invoice Date, Tech Booked Date, Store Pack Date
       filename = `All-Jobs-${startDate}-to-${endDate}.xlsx`;
     } else if (activeSection === 'activities') {
       const headers = ['Date', 'Time', 'Action', 'Resource Type', 'Description', 'IP Address'];
       const rows = userActivities.map(act => [
-        act.createdAt ? new Date(act.createdAt) : '',
+        formatDate(act.createdAt),
         act.createdAt ? new Date(act.createdAt).toLocaleTimeString() : '',
         act.action || '',
         act.resourceType || '',
@@ -1115,8 +1061,6 @@ export function Reports({ statuses, branches }: ReportsProps) {
         act.ipAddress || '',
       ]);
       data = [[sectionTitle], [`Date Range: ${startDate} to ${endDate}`], [], headers, ...rows];
-      headerRowIndex = 3;
-      dateColumns = [0]; // Date column
       filename = `Activities-${startDate}-to-${endDate}.xlsx`;
     } else if (activeSection === 'conversion') {
       // Use conversionJobs directly (already filtered by the useEffect)
@@ -1127,42 +1071,24 @@ export function Reports({ statuses, branches }: ReportsProps) {
         job.adm || '',
         typeof job.repCode === 'object' ? (job.repCode as any)?.code || '' : '',
         typeof job.branch === 'object' ? job.branch?.name || '' : '',
-        job.startDate ? new Date(job.startDate) : '',
-        job.dateQuoted ? new Date(job.dateQuoted) : '',
-        job.dateSentToClient ? new Date(job.dateSentToClient) : '',
-        job.poDate ? new Date(job.poDate) : '',
-        job.registerDate ? new Date(job.registerDate) : '',
+        formatDate(job.startDate),
+        formatDate(job.dateQuoted),
+        formatDate(job.dateSentToClient),
+        formatDate(job.poDate),
+        formatDate(job.registerDate),
         job.invNumber || '',
-        job.invoiceDate ? new Date(job.invoiceDate) : '',
+        formatDate(job.invoiceDate),
         job.notes || '',
         job.feedback || '',
       ]);
       data = [[sectionTitle], [`Filters: ${filtersString}`], [], headers, ...rows];
-      headerRowIndex = 3;
-      dateColumns = [5, 6, 7, 8, 9, 11]; // Start Date, Date Quoted, Sent to Client, PO Date, Register Date, Invoice Date
       filename = `Conversion-Tracker-${new Date().toISOString().split('T')[0]}.xlsx`;
     }
 
     const ws = XLSX.utils.aoa_to_sheet(data);
     
-    // Apply date formatting to date columns
-    if (dateColumns.length > 0 && ws['!ref']) {
-      const range = XLSX.utils.decode_range(ws['!ref']);
-      // Start from the row after headers
-      for (let row = headerRowIndex + 1; row <= range.e.r; row++) {
-        dateColumns.forEach(col => {
-          const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
-          const cell = ws[cellAddress];
-          if (cell && cell.v instanceof Date) {
-            // Set cell type to date and apply format "mmm dd, yyyy"
-            cell.t = 'd';
-            cell.z = 'mmm dd, yyyy';
-          }
-        });
-      }
-    }
-    
     const wb = XLSX.utils.book_new();
+    autoSizeColumns(ws);
     XLSX.utils.book_append_sheet(wb, ws, sectionTitle.substring(0, 31)); // Excel sheet name limit is 31 chars
     XLSX.writeFile(wb, filename);
     setShowExportDropdown(false);

@@ -4,9 +4,10 @@
  * Role-based: Super Admin must select technician, Admin/Rep see linked technicians, Technician sees own jobs.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { getJobs, getTechnicians, getStatuses, getBranches, Job, Technician, Status, Branch } from '../lib/api';
+import { getDiaryJobs, getJobs, getTechnicians, getStatuses, getBranches, getCustomers, getServiceDescriptions, getRepCodes, createJob, updateJob, Job, Technician, Status, Branch, Customer, ServiceDescription, RepCode } from '../lib/api';
+import { formatDate } from '../utils/dateFormat';
 import { useAuth } from '../contexts/AuthContext';
-import { Download, Calendar, Filter, Search, ChevronLeft, ChevronRight, Table } from 'lucide-react';
+import { Download, Calendar, Filter, Search, ChevronLeft, ChevronRight, Table, X, Plus, Loader2 } from 'lucide-react';
 import { LeadDetails } from './LeadDetails';
 
 export function Diary() {
@@ -33,43 +34,17 @@ export function Diary() {
   }, []);
 
   /**
-   * Loads jobs and technicians from the API based on user role.
-   * Paginates through all pages to get all jobs (like LeadsList does).
+   * Loads diary jobs (only jobs with active bookings) from the dedicated diary endpoint.
+   * Single request replaces the old multi-page pagination loop.
    */
   async function loadData() {
     try {
       setLoading(true);
       setError(null);
       
-      // Load all jobs by paginating through all pages (backend will filter based on role)
-      let allJobsList: Job[] = [];
-      let currentPage = 1;
-      let hasMore = true;
-      const pageSize = 1000; // Large page size to minimize requests
-      
-      while (hasMore) {
-        const jobsResponse = await getJobs({
-          allTime: 'true',
-          page: currentPage,
-          limit: pageSize,
-          sortBy: 'startDate',
-          sortOrder: 'desc',
-        });
-        
-        const jobsList = jobsResponse.jobs || [];
-        allJobsList = [...allJobsList, ...jobsList];
-        
-        // Check if there are more pages
-        const totalPages = jobsResponse.pagination?.pages || 1;
-        hasMore = currentPage < totalPages && jobsList.length === pageSize;
-        currentPage++;
-        
-        // Safety limit: don't fetch more than 10 pages (10,000 jobs)
-        if (currentPage > 10) break;
-      }
-      
-      // Filter to only jobs with bookings
-      const jobsWithBookings = allJobsList.filter(job => job.bookings && Array.isArray(job.bookings) && job.bookings.length > 0);
+      // Load diary jobs (server returns only jobs with active bookings, minimal payload)
+      const diaryResponse = await getDiaryJobs();
+      const jobsWithBookings = diaryResponse.jobs || [];
       setAllJobs(jobsWithBookings);
 
       // Load all technicians
@@ -97,11 +72,10 @@ export function Diary() {
         if (userTechnician) {
           setTechFilter(userTechnician._id);
           const techJobs = jobsWithBookings.filter(job => {
-            // Check if any booking has this technician
             return job.bookings?.some(b => b.technicianId === userTechnician._id);
           });
           setJobs(techJobs);
-          setTechnicians([userTechnician]); // Only show themselves
+          setTechnicians([userTechnician]);
         } else {
           setJobs([]);
           setTechnicians([]);
@@ -119,11 +93,11 @@ export function Diary() {
         });
         const linkedTechnicians = allTechs.filter(t => techIds.has(t._id));
         setTechnicians(linkedTechnicians);
-        setJobs(userJobs); // Show all their jobs initially
+        setJobs(userJobs);
       } else {
         // Super Admin or Manager: Show all technicians, but no jobs until technician is selected
         setTechnicians(allTechs);
-        setJobs([]); // Don't show jobs until technician is selected
+        setJobs([]);
       }
     } catch (err: any) {
       console.error('Error loading diary data:', err);
@@ -273,13 +247,56 @@ export function Diary() {
   }, [techFilter, dateFrom, dateTo, bookedDateOnly, searchTerm]);
 
   /**
+   * Jobs to display and export.
+   * For Super Admin with no technician selected, applies date/search filters directly to allJobs
+   * (matching the calendar view behavior). For all other cases, uses the standard filtered list.
+   */
+  const displayedJobs = useMemo(() => {
+    if (currentUser?.isSuperAdmin && techFilter === 'all') {
+      return allJobs.filter((job) => {
+        // Apply date range filter using bookings
+        if (dateFrom || dateTo) {
+          if (!job.bookings || job.bookings.length === 0) return false;
+          const hasBookingInRange = job.bookings.some(booking => {
+            const bookingStart = booking.startDate;
+            const bookingEnd = booking.endDate;
+            if (!bookingStart || !bookingEnd) return false;
+            if (dateFrom && bookingEnd < dateFrom) return false;
+            if (dateTo && bookingStart > dateTo) return false;
+            return true;
+          });
+          if (!hasBookingInRange) return false;
+        }
+        // Apply booked date only filter
+        if (bookedDateOnly && (!job.bookings || job.bookings.length === 0)) return false;
+        // Apply search filter
+        if (searchTerm) {
+          const searchLower = searchTerm.toLowerCase();
+          const customerName = typeof job.customer === 'object' && job.customer !== null
+            ? (job.customer as any).name?.toLowerCase() || ''
+            : '';
+          const cashCustomer = job.cashCustomer?.toLowerCase() || '';
+          const jobNumber = job.jobNumber?.toLowerCase() || '';
+          if (!customerName.includes(searchLower) && 
+              !cashCustomer.includes(searchLower) && 
+              !jobNumber.includes(searchLower)) {
+            return false;
+          }
+        }
+        return true;
+      });
+    }
+    return filtered;
+  }, [currentUser, techFilter, allJobs, filtered, dateFrom, dateTo, bookedDateOnly, searchTerm]);
+
+  /**
    * Exports filtered bookings to CSV.
    */
   function toCSV() {
     const header = ['Date Booked', 'Job #', 'Customer', 'Technician', 'Branch', 'Status', 'Description'];
     const rows: string[][] = [];
     
-    filtered.forEach((job) => {
+    displayedJobs.forEach((job) => {
       if (!job.bookings || job.bookings.length === 0) {
         rows.push([
           '-',
@@ -292,9 +309,9 @@ export function Diary() {
         ]);
       } else {
         job.bookings.forEach(booking => {
-          const tech = technicians.find(t => t._id === booking.technicianId);
-          const startDate = booking.startDate ? new Date(booking.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
-          const endDate = booking.endDate ? new Date(booking.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
+          const tech = allTechnicians.find(t => t._id === booking.technicianId) || technicians.find(t => t._id === booking.technicianId);
+          const startDate = booking.startDate ? formatDate(booking.startDate) : '-';
+          const endDate = booking.endDate ? formatDate(booking.endDate) : '-';
           const dateRange = startDate === endDate ? startDate : `${startDate} to ${endDate}`;
           rows.push([
             dateRange,
@@ -331,14 +348,14 @@ export function Diary() {
     printWindow.document.write(`</head><body>`);
     printWindow.document.write(`<h3>Technician Diary</h3>`);
     printWindow.document.write(`<table><thead><tr><th>Date Booked</th><th>Job #</th><th>Customer</th><th>Technician</th><th>Branch</th><th>Status</th><th>Description</th></tr></thead><tbody>`);
-    filtered.forEach((job) => {
+    displayedJobs.forEach((job) => {
       if (!job.bookings || job.bookings.length === 0) {
         printWindow!.document.write(`<tr><td>-</td><td>${job.jobNumber || ''}</td><td>${job.customer?.name || job.cashCustomer || ''}</td><td>-</td><td>${job.branch?.name || ''}</td><td>${job.status?.name || ''}</td><td>${(typeof job.description === 'object' ? job.description?.name : job.description) || ''}</td></tr>`);
       } else {
         job.bookings.forEach(booking => {
-          const tech = technicians.find(t => t._id === booking.technicianId);
-          const startDate = booking.startDate ? new Date(booking.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
-          const endDate = booking.endDate ? new Date(booking.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
+          const tech = allTechnicians.find(t => t._id === booking.technicianId) || technicians.find(t => t._id === booking.technicianId);
+          const startDate = booking.startDate ? formatDate(booking.startDate) : '-';
+          const endDate = booking.endDate ? formatDate(booking.endDate) : '-';
           const dateRange = startDate === endDate ? startDate : `${startDate} to ${endDate}`;
           printWindow!.document.write(`<tr><td>${dateRange}</td><td>${job.jobNumber || ''}</td><td>${job.customer?.name || job.cashCustomer || ''}</td><td>${tech?.name || booking.technicianName || '-'}</td><td>${job.branch?.name || ''}</td><td>${job.status?.name || ''}</td><td>${(typeof job.description === 'object' ? job.description?.name : job.description) || ''}</td></tr>`);
         });
@@ -522,74 +539,16 @@ export function Diary() {
 
           {/* Show calendar or table view based on viewMode */}
           {viewMode === 'calendar' ? (
-            (() => {
-              // For Super Admin with no technician selected, use allJobs and apply date/search filters
-              // For others, use filtered jobs
-              const calendarJobs = currentUser?.isSuperAdmin && techFilter === 'all' 
-                ? (() => {
-                    let result = allJobs.filter((job) => {
-                      // Apply date range filter using bookings
-                      if (dateFrom || dateTo) {
-                        if (!job.bookings || job.bookings.length === 0) {
-                          // If date filter is set but job has no bookings, exclude it
-                          return false;
-                        }
-                        
-                        const hasBookingInRange = job.bookings.some(booking => {
-                          // A booking is in range if its date range overlaps with the filter range
-                          const bookingStart = booking.startDate;
-                          const bookingEnd = booking.endDate;
-                          if (!bookingStart || !bookingEnd) return false;
-                          
-                          // Check if booking overlaps with filter range
-                          if (dateFrom && bookingEnd < dateFrom) return false;
-                          if (dateTo && bookingStart > dateTo) return false;
-                          return true;
-                        });
-                        
-                        if (!hasBookingInRange) {
-                          return false;
-                        }
-                      }
-                      // Apply booked date only filter
-                      if (bookedDateOnly && (!job.bookings || job.bookings.length === 0)) return false;
-                      // Apply search filter
-                      if (searchTerm) {
-                        const searchLower = searchTerm.toLowerCase();
-                        const customerName = typeof job.customer === 'object' && job.customer !== null
-                          ? (job.customer as any).name?.toLowerCase() || ''
-                          : '';
-                        const cashCustomer = job.cashCustomer?.toLowerCase() || '';
-                        const jobNumber = job.jobNumber?.toLowerCase() || '';
-                        if (!customerName.includes(searchLower) && 
-                            !cashCustomer.includes(searchLower) && 
-                            !jobNumber.includes(searchLower)) {
-                          return false;
-                        }
-                      }
-                      return true;
-                    });
-                    return result;
-                  })()
-                : filtered;
-              
-              return calendarJobs.length > 0 ? (
-                <CalendarView 
-                  jobs={calendarJobs} 
-                  statuses={statuses}
-                  branches={branches}
-                  technicians={technicians}
-                  onUpdate={loadData}
-                  selectedTechnician={techFilter !== 'all' ? techFilter : undefined}
-                />
-              ) : (
-                <div className="text-center py-12 bg-gray-50 rounded-xl">
-                  <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-lg font-semibold text-ars-heading mb-2">No bookings found</p>
-                  <p className="text-sm text-ars-body">Try adjusting your filters or check back later</p>
-                </div>
-              );
-            })()
+            <CalendarView 
+              jobs={displayedJobs} 
+              statuses={statuses}
+              branches={branches}
+              allTechnicians={allTechnicians}
+              technicians={technicians}
+              onUpdate={loadData}
+              selectedTechnician={techFilter !== 'all' ? techFilter : undefined}
+              searchTerm={searchTerm}
+            />
           ) : filtered.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-xl">
               <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -750,20 +709,38 @@ interface CalendarViewProps {
   jobs: Job[];
   statuses: Status[];
   branches: Branch[];
+  allTechnicians: Technician[];
   technicians: Technician[];
   onUpdate: () => void;
   selectedTechnician?: string; // Optional technician ID to show in description
+  searchTerm?: string; // When set, auto-navigate to the month of the earliest matching booking
 }
 
-function CalendarView({ jobs, statuses, branches, technicians, onUpdate, selectedTechnician }: CalendarViewProps) {
-  console.log('CalendarView received jobs:', jobs.length);
-  console.log('Jobs with bookings:', jobs.filter(j => j.bookings && j.bookings.length > 0).map(j => ({
-    id: j._id,
-    bookings: j.bookings
-  })));
-  
+function CalendarView({ jobs, statuses, branches, allTechnicians, technicians, onUpdate, selectedTechnician, searchTerm }: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [quickBookDate, setQuickBookDate] = useState<string | null>(null);
+
+  // When a search term is active, auto-navigate to the month of the earliest matching booking
+  useEffect(() => {
+    if (!searchTerm || jobs.length === 0) return;
+    let earliest: string | null = null;
+    for (const job of jobs) {
+      if (Array.isArray(job.bookings)) {
+        for (const booking of job.bookings) {
+          if (booking.startDate && (!earliest || booking.startDate < earliest)) {
+            earliest = booking.startDate;
+          }
+        }
+      }
+    }
+    if (earliest) {
+      const d = new Date(earliest + 'T00:00:00');
+      if (!isNaN(d.getTime())) {
+        setCurrentDate(new Date(d.getFullYear(), d.getMonth(), 1));
+      }
+    }
+  }, [searchTerm, jobs]);
   
   // Get the first and last day of the current month
   const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -832,13 +809,30 @@ function CalendarView({ jobs, statuses, branches, technicians, onUpdate, selecte
       <div
         key={i}
         className={`min-h-[120px] border p-2 ${
-          isCurrentMonth ? 'bg-white' : 'bg-gray-50'
+          isCurrentMonth ? 'bg-white hover:bg-gray-50 group' : 'bg-gray-50'
         } ${isToday ? 'border-[#0969a9] border-2 bg-blue-50' : 'border-gray-200'}`}
       >
-        <div className={`text-sm font-semibold mb-1 ${
-          isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
-        } ${isToday ? 'text-[#0969a9]' : ''}`}>
-          {isCurrentMonth ? dayNumber : ''}
+        <div className="flex items-center justify-between mb-1">
+          <div className={`text-sm font-semibold ${
+            isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
+          } ${isToday ? 'text-[#0969a9]' : ''}`}>
+            {isCurrentMonth ? dayNumber : ''}
+          </div>
+          {isCurrentMonth && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const y = cellDate.getFullYear();
+                const m = String(cellDate.getMonth() + 1).padStart(2, '0');
+                const d = String(cellDate.getDate()).padStart(2, '0');
+                setQuickBookDate(`${y}-${m}-${d}`);
+              }}
+              className="w-5 h-5 flex items-center justify-center rounded-full bg-[#0969a9] text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[#0a7bc4]"
+              title="Book technician for this date"
+            >
+              <Plus className="w-3 h-3" />
+            </button>
+          )}
         </div>
         <div className="space-y-1 overflow-y-auto max-h-[90px]">
           {bookingsForDate.map((bookingInfo, idx) => {
@@ -931,7 +925,375 @@ function CalendarView({ jobs, statuses, branches, technicians, onUpdate, selecte
           }}
         />
       )}
+
+      {/* Quick Book Modal */}
+      {quickBookDate && (
+        <QuickBookModal
+          date={quickBookDate}
+          branches={branches}
+          allTechnicians={allTechnicians}
+          onClose={() => setQuickBookDate(null)}
+          onBooked={() => {
+            setQuickBookDate(null);
+            onUpdate();
+          }}
+        />
+      )}
     </div>
   );
 }
 
+/**
+ * Quick Book Modal
+ * Allows booking a technician for a date without needing an existing job.
+ * Creates a new job and then adds the booking to it.
+ */
+interface QuickBookModalProps {
+  date: string; // YYYY-MM-DD
+  branches: Branch[];
+  allTechnicians: Technician[];
+  onClose: () => void;
+  onBooked: () => void;
+}
+
+function QuickBookModal({ date, branches, allTechnicians, onClose, onBooked }: QuickBookModalProps) {
+  const [clientName, setClientName] = useState('');
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [customerResults, setCustomerResults] = useState<Customer[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [repCodeId, setRepCodeId] = useState('');
+  const [technicianId, setTechnicianId] = useState('');
+  const [descriptionId, setDescriptionId] = useState('');
+  const [notes, setNotes] = useState('');
+  const [branchId, setBranchId] = useState(branches.length === 1 ? branches[0]._id : '');
+  const [endDate, setEndDate] = useState(date);
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const [repCodes, setRepCodes] = useState<RepCode[]>([]);
+  const [descriptions, setDescriptions] = useState<ServiceDescription[]>([]);
+  const [loadingRef, setLoadingRef] = useState(true);
+
+  // Load reference data on mount
+  useEffect(() => {
+    async function loadRef() {
+      try {
+        const [repRes, descRes] = await Promise.all([
+          getRepCodes(),
+          getServiceDescriptions(),
+        ]);
+        setRepCodes(repRes.repCodes || []);
+        setDescriptions(descRes.descriptions || []);
+      } catch (err) {
+        console.error('Error loading reference data for quick book:', err);
+      } finally {
+        setLoadingRef(false);
+      }
+    }
+    loadRef();
+  }, []);
+
+  // Customer search with debounce
+  useEffect(() => {
+    if (customerSearch.length < 2) {
+      setCustomerResults([]);
+      setShowCustomerDropdown(false);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await getCustomers({ search: customerSearch, limit: 10 });
+        setCustomerResults(res.customers || []);
+        setShowCustomerDropdown(true);
+      } catch (err) {
+        console.error('Customer search error:', err);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [customerSearch]);
+
+  const handleSubmit = async () => {
+    setErrorMsg('');
+
+    // Validation
+    if (!clientName.trim() && !selectedCustomer) {
+      setErrorMsg('Client name is required');
+      return;
+    }
+    if (!repCodeId) {
+      setErrorMsg('Rep is required');
+      return;
+    }
+    if (!technicianId) {
+      setErrorMsg('Technician is required');
+      return;
+    }
+    if (!descriptionId) {
+      setErrorMsg('Job type is required');
+      return;
+    }
+    if (!branchId) {
+      setErrorMsg('Branch is required');
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      // Step 1: Create the job
+      const jobPayload: any = {
+        branch: branchId,
+        description: descriptionId,
+        repCode: repCodeId,
+        notes: notes.substring(0, 50), // notes field max 50 chars
+        feedback: notes, // full description in feedback
+        startDate: date,
+        dateBooked: date,
+      };
+
+      if (selectedCustomer) {
+        jobPayload.customer = selectedCustomer._id;
+      } else {
+        jobPayload.cashCustomer = clientName.trim();
+      }
+
+      const { job: createdJob } = await createJob(jobPayload);
+
+      // Step 2: Update the job with booking
+      await updateJob(createdJob._id, {
+        bookings: [{
+          technicianId,
+          startDate: date,
+          endDate: endDate || date,
+        }],
+      } as any);
+
+      onBooked();
+    } catch (err: any) {
+      console.error('Quick book error:', err);
+      setErrorMsg(err.message || 'Failed to create booking');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const displayDate = new Date(date + 'T00:00:00').toLocaleDateString('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+  });
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] rounded-t-2xl">
+          <div>
+            <h3 className="text-lg font-bold text-white">Quick Book Technician</h3>
+            <p className="text-sm text-blue-100">{displayDate}</p>
+          </div>
+          <button onClick={onClose} className="text-white hover:text-gray-200 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 space-y-4">
+          {loadingRef ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-[#0969a9]" />
+              <span className="ml-2 text-sm text-gray-600">Loading...</span>
+            </div>
+          ) : (
+            <>
+              {/* Client Name — searchable customer dropdown or free text */}
+              <div className="relative">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Client Name <span className="text-red-500">*</span>
+                </label>
+                {selectedCustomer ? (
+                  <div className="flex items-center gap-2 px-3 py-2.5 border border-gray-300 rounded-lg bg-gray-50">
+                    <span className="text-sm flex-1">{selectedCustomer.name}</span>
+                    <button
+                      onClick={() => {
+                        setSelectedCustomer(null);
+                        setCustomerSearch('');
+                        setClientName('');
+                      }}
+                      className="text-gray-400 hover:text-red-500"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      value={clientName || customerSearch}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setClientName(val);
+                        setCustomerSearch(val);
+                      }}
+                      onFocus={() => customerResults.length > 0 && setShowCustomerDropdown(true)}
+                      placeholder="Search existing customer or type new name..."
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#0969a9] focus:border-transparent"
+                    />
+                    {showCustomerDropdown && customerResults.length > 0 && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                        {customerResults.map(c => (
+                          <button
+                            key={c._id}
+                            onClick={() => {
+                              setSelectedCustomer(c);
+                              setClientName(c.name);
+                              setCustomerSearch('');
+                              setShowCustomerDropdown(false);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors"
+                          >
+                            {c.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Rep */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Rep <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={repCodeId}
+                  onChange={e => setRepCodeId(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#0969a9] focus:border-transparent bg-white"
+                >
+                  <option value="">Select Rep...</option>
+                  {repCodes.filter(r => r.isActive !== false).map(r => (
+                    <option key={r._id} value={r._id}>
+                      {r.code}{r.description ? ` - ${r.description}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Technician */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Technician <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={technicianId}
+                  onChange={e => setTechnicianId(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#0969a9] focus:border-transparent bg-white"
+                >
+                  <option value="">Select Technician...</option>
+                  {allTechnicians.map(t => (
+                    <option key={t._id} value={t._id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Job Type (Service Description) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Job Type <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={descriptionId}
+                  onChange={e => setDescriptionId(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#0969a9] focus:border-transparent bg-white"
+                >
+                  <option value="">Select Job Type...</option>
+                  {descriptions.filter(d => (d as any).isActive !== false).map(d => (
+                    <option key={d._id} value={d._id}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Branch */}
+              {branches.length > 1 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Branch <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={branchId}
+                    onChange={e => setBranchId(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#0969a9] focus:border-transparent bg-white"
+                  >
+                    <option value="">Select Branch...</option>
+                    {branches.map(b => (
+                      <option key={b._id} value={b._id}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* End Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  min={date}
+                  onChange={e => setEndDate(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#0969a9] focus:border-transparent"
+                />
+              </div>
+
+              {/* Description / Notes */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  rows={3}
+                  placeholder="Add details about this booking..."
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#0969a9] focus:border-transparent resize-none"
+                />
+              </div>
+
+              {/* Error */}
+              {errorMsg && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                  {errorMsg}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        {!loadingRef && (
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
+            <button
+              onClick={onClose}
+              className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={saving}
+              className="px-6 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-lg text-sm font-bold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Calendar className="w-4 h-4" />
+                  Book Technician
+                </>
+              )}
+            </button>
+          </div>
+        )}
+      </div>    </div>
+  );
+}

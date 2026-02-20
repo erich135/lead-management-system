@@ -5,6 +5,7 @@ import type { JobCardTemplate } from '../lib/api';
 import type { TemplateGroup, TableColumn, TableDefinition, TableRow, HeaderConfig, FooterConfig, GridCell } from './JobCardFormBuilder';
 import { JOB_FIELD_KEYS, MACHINE_FIELD_KEYS } from './JobCardFormBuilder';
 import { getGlobalHeaderConfig, getGlobalFooterConfig } from '../utils/jobCardConfig';
+import { formatDate } from '../utils/dateFormat';
 
 /**
  * Example data structure for preview.
@@ -53,18 +54,18 @@ function getJobFieldValue(jobData: Record<string, any> | undefined, key: string)
     case 'assistingAdm': return jobData.assistingAdm ?? '';
     case 'repCode': return (typeof jobData.repCode === 'object' && jobData.repCode?.code) ? jobData.repCode.code : (jobData.repCode ?? '');
     case 'notes': return jobData.notes ?? '';
-    case 'startDate': return jobData.startDate ? new Date(jobData.startDate).toLocaleDateString() : '';
-    case 'dateQuoted': return jobData.dateQuoted ? new Date(jobData.dateQuoted).toLocaleDateString() : '';
+    case 'startDate': return jobData.startDate ? formatDate(jobData.startDate) : '';
+    case 'dateQuoted': return jobData.dateQuoted ? formatDate(jobData.dateQuoted) : '';
     case 'valueExVat': return jobData.valueExVat != null ? String(jobData.valueExVat) : '';
     case 'poNumber': return jobData.poNumber ?? '';
     case 'rsrNumber': return jobData.rsrNumber ?? '';
     case 'description': return (typeof jobData.description === 'object' && jobData.description?.name) ? jobData.description.name : (jobData.description ?? '');
     case 'techBooked': return (typeof jobData.techBooked === 'object' && jobData.techBooked?.name) ? jobData.techBooked.name : (jobData.techBooked ?? '');
-    case 'dateBooked': return jobData.dateBooked ? new Date(jobData.dateBooked).toLocaleDateString() : '';
+    case 'dateBooked': return jobData.dateBooked ? formatDate(jobData.dateBooked) : '';
     case 'storePack': return jobData.storePack ?? '';
-    case 'storePackDate': return jobData.storePackDate ? new Date(jobData.storePackDate).toLocaleDateString() : '';
+    case 'storePackDate': return jobData.storePackDate ? formatDate(jobData.storePackDate) : '';
     case 'invNumber': return jobData.invNumber ?? '';
-    case 'invoiceDate': return jobData.invoiceDate ? new Date(jobData.invoiceDate).toLocaleDateString() : '';
+    case 'invoiceDate': return jobData.invoiceDate ? formatDate(jobData.invoiceDate) : '';
     case 'oilSampleNumber': return jobData.oilSampleNumber ?? '';
     default: return '';
   }
@@ -90,8 +91,8 @@ function getMachineFieldValue(machineData: Record<string, any> | undefined, key:
     case 'assetNumber': return machineData.assetNumber ?? '';
     case 'machineHours': return machineData.machineHours != null ? String(machineData.machineHours) : '';
     case 'nextServiceHours': return machineData.nextServiceHours != null ? String(machineData.nextServiceHours) : '';
-    case 'lastServiceDate': return machineData.lastServiceDate ? new Date(machineData.lastServiceDate).toLocaleDateString() : '';
-    case 'nextServiceDate': return machineData.nextServiceDate ? new Date(machineData.nextServiceDate).toLocaleDateString() : '';
+    case 'lastServiceDate': return machineData.lastServiceDate ? formatDate(machineData.lastServiceDate) : '';
+    case 'nextServiceDate': return machineData.nextServiceDate ? formatDate(machineData.nextServiceDate) : '';
     case 'serviceType': return machineData.serviceType ?? '';
     case 'isRental': return machineData.isRental === true ? 'Yes' : 'No';
     case 'dbStatus': return machineData.dbStatus ?? '';

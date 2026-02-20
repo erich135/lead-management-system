@@ -170,8 +170,8 @@ async function exportToExcel() {
       'Order Number': lead.order_number || '',
       'Invoice Number': lead.invoice_number || '',
       'Estimated Value': lead.estimated_value || 0,
-      'Created Date': new Date(lead.created_at).toLocaleDateString(),
-      'Updated Date': new Date(lead.updated_at).toLocaleDateString(),
+      'Created Date': new Date(lead.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }),
+      'Updated Date': new Date(lead.updated_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }),
       'Created By': lead.created_by_user?.full_name || ''
     }));
 

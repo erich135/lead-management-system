@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.0.19] - 2026-02-20
+
+### Added
+- Dedicated diary API endpoint (`getDiaryJobs`) — single lightweight request replaces up to 10 paginated `/api/jobs` calls; returns only jobs with active bookings and minimal field projection
+- `getDiaryJobs()` function in `api.ts` with optional `technicianId`, `startDate`, `endDate`, `branch` filters
+- `autoSizeColumns()` utility in Reports — auto-sizes Excel column widths based on cell content
+
+### Changed
+- **Date format standardised to `dd MMM yyyy`** (e.g., "19 Feb 2026") across all exports:
+  - `formatDate()` in `dateFormat.ts` updated from `"Jul 2, 2025"` to `"19 Feb 2026"` format
+  - `formatDateTime()` updated to match (`"19 Feb 2026, 3:02 PM"`)
+  - Reports Excel exports (`exportUserPerformanceReport`, `exportCustomerReport`, `exportMachineReport`, `exportToExcel`) — dates now output as pre-formatted text strings instead of Date objects, avoiding Excel locale override (South Africa `yyyy/mm/dd`)
+  - Reports PDF export (`exportToPDF`) — uses updated `formatDate()`
+  - Diary CSV/PDF exports (`toCSV`, `toPDF`) — switched from `toLocaleDateString('en-US', ...)` to `formatDate()`
+  - Job Card Preview PDF (`JobCardPreview.tsx`) — all 7 date fields switched from `toLocaleDateString()` to `formatDate()`
+  - Legacy leads export (`excelImport.js`) — switched to explicit `en-GB` locale with full date formatting
+- Diary `loadData()` — replaced multi-page pagination loop (up to 10 requests × 1000 jobs) with single `getDiaryJobs()` call
+
+### Fixed
+- Diary CSV/PDF export returning blank data — created shared `displayedJobs` memo used by both calendar view and export functions
+- Diary search only matching current displayed month — added `searchTerm` prop to `CalendarView` with auto-navigation to earliest matching booking month
+- QuickBookModal missing closing JSX tags causing "Unterminated JSX contents" compile error
+
 ## [1.0.18] - 2026-02-18
 
 ### Added

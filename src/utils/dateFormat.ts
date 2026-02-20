@@ -1,35 +1,35 @@
 /**
  * Utility functions for consistent date formatting across the application.
- * Standard format: "Jul 2, 2025" (month abbreviation, day, year)
+ * Standard format: "15 Feb 2026" (dd MMM yyyy)
  */
 
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH_NAMES_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /**
- * Formats a date to the standard format: "Jul 2, 2025"
+ * Formats a date to the standard format: "15 Feb 2026"
  */
 export function formatDate(date: string | Date | undefined | null): string {
   if (!date) return '-';
   const d = typeof date === 'string' ? new Date(date) : date;
   if (isNaN(d.getTime())) return '-';
   
-  const month = MONTH_NAMES[d.getMonth()];
-  const day = d.getDate();
+  const month = MONTH_NAMES_SHORT[d.getMonth()];
+  const day = d.getDate().toString().padStart(2, '0');
   const year = d.getFullYear();
   
-  return `${month} ${day}, ${year}`;
+  return `${day} ${month} ${year}`;
 }
 
 /**
- * Formats a date with time to the standard format: "Nov 27, 2025, 3:02 PM"
+ * Formats a date with time to the standard format: "15 Feb 2026, 3:02 PM"
  */
 export function formatDateTime(date: string | Date | undefined | null): string {
   if (!date) return '-';
   const d = typeof date === 'string' ? new Date(date) : date;
   if (isNaN(d.getTime())) return '-';
   
-  const month = MONTH_NAMES[d.getMonth()];
-  const day = d.getDate();
+  const month = MONTH_NAMES_SHORT[d.getMonth()];
+  const day = d.getDate().toString().padStart(2, '0');
   const year = d.getFullYear();
   
   let hours = d.getHours();
@@ -37,7 +37,7 @@ export function formatDateTime(date: string | Date | undefined | null): string {
   const ampm = hours >= 12 ? 'PM' : 'AM';
   hours = hours % 12 || 12;
   
-  return `${month} ${day}, ${year}, ${hours}:${minutes} ${ampm}`;
+  return `${day} ${month} ${year}, ${hours}:${minutes} ${ampm}`;
 }
 
 /**

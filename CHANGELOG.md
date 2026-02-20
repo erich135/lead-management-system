@@ -8,7 +8,7 @@
 - `autoSizeColumns()` utility in Reports — auto-sizes Excel column widths based on cell content
 
 ### Changed
-- **Date format standardised to `dd MMM yyyy`** (e.g., "19 Feb 2026") across all exports:
+- Date format standardised to `dd MMM yyyy` (e.g., "19 Feb 2026") across all exports:
   - `formatDate()` in `dateFormat.ts` updated from `"Jul 2, 2025"` to `"19 Feb 2026"` format
   - `formatDateTime()` updated to match (`"19 Feb 2026, 3:02 PM"`)
   - Reports Excel exports (`exportUserPerformanceReport`, `exportCustomerReport`, `exportMachineReport`, `exportToExcel`) — dates now output as pre-formatted text strings instead of Date objects, avoiding Excel locale override (South Africa `yyyy/mm/dd`)

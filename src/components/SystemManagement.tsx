@@ -1988,6 +1988,7 @@ alert((response as any).message || 'User invited successfully');
                     <li><strong>Model</strong> - <span className="text-red-600">Required</span></li>
                     <li><strong>Serial Number</strong> - <span className="text-red-600">Required</span></li>
                     <li><strong>Asset Number</strong> - Optional, for internal tracking</li>
+                    <li><strong>Customer</strong> - Optional: customer name to link the machine to. If empty, machine is created as a rental fleet machine. If the customer doesn't exist, it will be auto-created.</li>
                     <li><strong>Service Type</strong> - Optional: "hours" or "date" (auto-detected by Make if not specified)</li>
                     <li><strong>Machine Hours</strong> - For hour-based machines (Generator, Genset, Compressors)</li>
                     <li><strong>Next Service Hours</strong> - For hour-based machines</li>

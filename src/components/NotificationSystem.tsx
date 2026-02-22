@@ -1,7 +1,14 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Notification } from '../types';
+import {
+  getNotifications,
+  markNotificationRead as apiMarkRead,
+  markAllNotificationsRead as apiMarkAllRead,
+  getDailyTasks,
+  sendDailyReminderEmail,
+  AppNotification,
+  DailyTask,
+} from '../lib/api';
 import {
   Bell,
   Clock,
@@ -12,182 +19,162 @@ import {
   FileText,
   Calendar,
   Mail,
-  ExternalLink
+  ExternalLink,
+  Briefcase,
 } from 'lucide-react';
 import { formatDateTime } from '../utils/dateFormat';
-
-interface DailyTask {
-  lead_id: string;
-  lead_number: string;
-  client_name: string;
-  current_status: string;
-  days_in_status: number;
-  is_overdue: boolean;
-  requires_action: string;
-}
 
 interface NotificationSystemProps {
   onLeadClick?: (leadId: string) => void;
 }
 
+const POLL_INTERVAL = 30000; // 30 seconds
+
 export function NotificationSystem({ onLeadClick }: NotificationSystemProps) {
   const { user } = useAuth();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [dailyTasks, setDailyTasks] = useState<DailyTask[]>([]);
+  const [taskSummary, setTaskSummary] = useState({ total: 0, critical: 0, warning: 0, info: 0 });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'notifications' | 'tasks'>('notifications');
   const [emailSent, setEmailSent] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    if (!user?.id) return;
+
     loadData();
-    
-    // Set up real-time subscriptions
-    const notificationSubscription = supabase
-      .channel('notifications')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user?.id}`
-        },
-        () => loadNotifications()
-      )
-      .subscribe();
+
+    // Poll for updates every 30 seconds
+    intervalRef.current = setInterval(loadData, POLL_INTERVAL);
 
     return () => {
-      notificationSubscription.unsubscribe();
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
     };
   }, [user?.id]);
 
   async function loadData() {
-    await Promise.all([
-      loadNotifications(),
-      loadDailyTasks()
-    ]);
-    setLoading(false);
+    try {
+      await Promise.all([loadNotifications(), loadDailyTasks()]);
+    } catch (error) {
+      console.error('Error loading notification data:', error);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function loadNotifications() {
     try {
-      const { data } = await supabase
-        .from('notifications')
-        .select('*, lead:leads(*)')
-        .eq('user_id', user?.id)
-        .eq('is_read', false)
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (data) setNotifications(data);
+      const result = await getNotifications({ unreadOnly: true, limit: 50 });
+      setNotifications(result.notifications || []);
     } catch (error) {
       console.error('Error loading notifications:', error);
     }
   }
 
   async function loadDailyTasks() {
-    if (!user?.id) return;
-
     try {
-      const { data, error } = await supabase
-        .rpc('get_daily_tasks', { user_uuid: user.id });
-
-      if (error) throw error;
-      if (data) setDailyTasks(data);
+      const result = await getDailyTasks();
+      setDailyTasks(result.tasks || []);
+      setTaskSummary(result.summary || { total: 0, critical: 0, warning: 0, info: 0 });
     } catch (error) {
       console.error('Error loading daily tasks:', error);
     }
   }
 
-  async function markNotificationRead(id: string) {
+  async function handleMarkRead(id: string) {
     try {
-      await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('id', id);
-
-      setNotifications(prev => prev.filter(n => n.id !== id));
+      await apiMarkRead(id);
+      setNotifications(prev => prev.filter(n => n._id !== id));
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
   }
 
-  async function markAllNotificationsRead() {
+  async function handleMarkAllRead() {
     try {
-      await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('user_id', user?.id)
-        .eq('is_read', false);
-
+      await apiMarkAllRead();
       setNotifications([]);
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
     }
   }
 
-  async function sendDailyEmailSummary() {
-    if (dailyTasks.length === 0) return;
+  async function handleSendEmailSummary() {
+    if (emailSending) return;
 
     try {
-      // This would typically integrate with your email service
-      // For now, we'll simulate the email content generation
-      const emailContent = generateEmailSummary();
-      
-      // In a real implementation, you would call your email service API here
-      console.log('Daily email summary:', emailContent);
-      
+      setEmailSending(true);
+      await sendDailyReminderEmail();
       setEmailSent(true);
       setTimeout(() => setEmailSent(false), 3000);
     } catch (error) {
       console.error('Error sending email summary:', error);
+    } finally {
+      setEmailSending(false);
     }
-  }
-
-  function generateEmailSummary(): string {
-    const overdueTasks = dailyTasks.filter(t => t.is_overdue);
-    const regularTasks = dailyTasks.filter(t => !t.is_overdue);
-
-    let content = `Daily Task Summary for ${user?.fullName}\n\n`;
-    
-    if (overdueTasks.length > 0) {
-      content += `🚨 OVERDUE TASKS (${overdueTasks.length}):\n`;
-      overdueTasks.forEach(task => {
-        content += `- ${task.lead_number} - ${task.client_name}\n`;
-        content += `  Status: ${task.current_status} (${task.days_in_status} days)\n`;
-        content += `  Action: ${task.requires_action}\n\n`;
-      });
-    }
-
-    if (regularTasks.length > 0) {
-      content += `📋 TODAY'S TASKS (${regularTasks.length}):\n`;
-      regularTasks.forEach(task => {
-        content += `- ${task.lead_number} - ${task.client_name}\n`;
-        content += `  Status: ${task.current_status} (${task.days_in_status} days)\n`;
-        content += `  Action: ${task.requires_action}\n\n`;
-      });
-    }
-
-    return content;
   }
 
   function getNotificationIcon(type: string) {
     switch (type) {
-      case 'alert':
-        return <AlertTriangle className="w-5 h-5 text-red-500" />;
-      case 'assignment':
+      case 'lead_assigned':
         return <Users className="w-5 h-5 text-blue-500" />;
-      case 'status_change':
+      case 'lead_status_changed':
         return <FileText className="w-5 h-5 text-green-500" />;
+      case 'appointment_created':
+      case 'appointment_reminder':
+        return <Calendar className="w-5 h-5 text-purple-500" />;
+      case 'appointment_attended':
+      case 'appointment_no_show':
+      case 'attendance_auto_verified':
+        return <CheckCircle className="w-5 h-5 text-teal-500" />;
+      case 'geofence_alert':
+      case 'dwell_time_alert':
+      case 'area_overlap_warning':
+        return <AlertTriangle className="w-5 h-5 text-red-500" />;
       default:
         return <Bell className="w-5 h-5 text-gray-500" />;
     }
   }
 
-  function getNotificationPriority(notification: Notification): 'high' | 'medium' | 'low' {
-    if (notification.type === 'alert') return 'high';
-    if (notification.type === 'assignment') return 'medium';
-    return 'low';
+  function getNotificationPriorityClass(priority: string): string {
+    switch (priority) {
+      case 'urgent':
+      case 'high':
+        return 'bg-red-50 border-red-200 hover:bg-red-100';
+      case 'medium':
+        return 'bg-blue-50 border-blue-200 hover:bg-blue-100';
+      default:
+        return 'bg-gray-50 border-gray-200 hover:bg-gray-100';
+    }
+  }
+
+  function getSeverityBadge(severity: string) {
+    switch (severity) {
+      case 'critical':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-700">
+            <AlertTriangle className="w-3 h-3" /> OVERDUE
+          </span>
+        );
+      case 'warning':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-orange-100 text-orange-700">
+            <Clock className="w-3 h-3" /> APPROACHING
+          </span>
+        );
+      case 'info':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-700">
+            <Briefcase className="w-3 h-3" /> MONITORED
+          </span>
+        );
+      default:
+        return null;
+    }
   }
 
   const unreadCount = notifications.length;
@@ -220,14 +207,16 @@ export function NotificationSystem({ onLeadClick }: NotificationSystemProps) {
                 Email sent!
               </span>
             )}
-            <button
-              onClick={sendDailyEmailSummary}
-              disabled={dailyTasks.length === 0 || emailSent}
-              className="text-sm text-blue-600 hover:text-blue-800 disabled:text-gray-400 flex items-center gap-1"
-            >
-              <Mail className="w-4 h-4" />
-              Send Summary
-            </button>
+            {(user?.isSuperAdmin || user?.role?.name === 'admin') && (
+              <button
+                onClick={handleSendEmailSummary}
+                disabled={emailSending || emailSent}
+                className="text-sm text-blue-600 hover:text-blue-800 disabled:text-gray-400 flex items-center gap-1"
+              >
+                <Mail className="w-4 h-4" />
+                {emailSending ? 'Sending...' : 'Send Summary'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -286,72 +275,62 @@ export function NotificationSystem({ onLeadClick }: NotificationSystemProps) {
                     {notifications.length} unread notification{notifications.length !== 1 ? 's' : ''}
                   </p>
                   <button
-                    onClick={markAllNotificationsRead}
+                    onClick={handleMarkAllRead}
                     className="text-sm text-blue-600 hover:text-blue-800"
                   >
                     Mark all read
                   </button>
                 </div>
 
-                {notifications
-                  .sort((a, b) => {
-                    const priorityOrder = { high: 3, medium: 2, low: 1 };
-                    return priorityOrder[getNotificationPriority(b)] - priorityOrder[getNotificationPriority(a)];
-                  })
-                  .map((notification) => {
-                    const priority = getNotificationPriority(notification);
-                    return (
-                      <div
-                        key={notification.id}
-                        className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                          priority === 'high' 
-                            ? 'bg-red-50 border-red-200 hover:bg-red-100'
-                            : priority === 'medium'
-                            ? 'bg-blue-50 border-blue-200 hover:bg-blue-100'
-                            : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-                        }`}
-                        onClick={() => {
-                          if (notification.lead_id && onLeadClick) {
-                            onLeadClick(notification.lead_id);
-                          }
-                          markNotificationRead(notification.id);
-                        }}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start gap-3 flex-1">
-                            {getNotificationIcon(notification.type)}
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-gray-900">
-                                {notification.message}
-                              </p>
-                              <div className="flex items-center gap-4 mt-1">
-                                <p className="text-xs text-gray-500">
-                                  {formatDateTime(notification.created_at)}
-                                </p>
-                                {notification.lead && (
-                                  <div className="flex items-center gap-1">
-                                    <ExternalLink className="w-3 h-3 text-gray-400" />
-                                    <span className="text-xs text-gray-500">
-                                      {notification.lead.lead_number}
-                                    </span>
-                                  </div>
-                                )}
+                {notifications.map((notification) => (
+                  <div
+                    key={notification._id}
+                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${getNotificationPriorityClass(notification.priority)}`}
+                    onClick={() => {
+                      if (notification.leadId && onLeadClick) {
+                        onLeadClick(notification.leadId);
+                      }
+                      handleMarkRead(notification._id);
+                    }}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-3 flex-1">
+                        {getNotificationIcon(notification.type)}
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900">
+                            {notification.title}
+                          </p>
+                          <p className="text-sm text-gray-700 mt-0.5">
+                            {notification.message}
+                          </p>
+                          <div className="flex items-center gap-4 mt-1">
+                            <p className="text-xs text-gray-500">
+                              {formatDateTime(notification.createdAt)}
+                            </p>
+                            {notification.leadNumber && (
+                              <div className="flex items-center gap-1">
+                                <ExternalLink className="w-3 h-3 text-gray-400" />
+                                <span className="text-xs text-gray-500">
+                                  {notification.leadNumber}
+                                  {notification.companyName && ` - ${notification.companyName}`}
+                                </span>
                               </div>
-                            </div>
+                            )}
                           </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              markNotificationRead(notification.id);
-                            }}
-                            className="text-gray-400 hover:text-gray-600 p-1"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
                         </div>
                       </div>
-                    );
-                  })}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMarkRead(notification._id);
+                        }}
+                        className="text-gray-400 hover:text-gray-600 p-1"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -360,59 +339,74 @@ export function NotificationSystem({ onLeadClick }: NotificationSystemProps) {
             {dailyTasks.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>No tasks for today</p>
+                <p>No tasks requiring attention</p>
+                <p className="text-sm mt-1">All jobs are on track!</p>
               </div>
             ) : (
               <div className="space-y-3">
-                <p className="text-sm text-gray-600 mb-4">
-                  {dailyTasks.length} task{dailyTasks.length !== 1 ? 's' : ''} assigned to you
-                </p>
+                {/* Summary bar */}
+                <div className="flex items-center gap-4 mb-4 text-sm">
+                  <span className="text-gray-600">{taskSummary.total} total</span>
+                  {taskSummary.critical > 0 && (
+                    <span className="text-red-600 font-medium">{taskSummary.critical} overdue</span>
+                  )}
+                  {taskSummary.warning > 0 && (
+                    <span className="text-orange-600 font-medium">{taskSummary.warning} approaching</span>
+                  )}
+                  {taskSummary.info > 0 && (
+                    <span className="text-blue-600 font-medium">{taskSummary.info} monitored</span>
+                  )}
+                </div>
 
-                {dailyTasks
-                  .sort((a, b) => (b.is_overdue ? 1 : 0) - (a.is_overdue ? 1 : 0))
-                  .map((task) => (
-                    <div
-                      key={task.lead_id}
-                      className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                        task.is_overdue
-                          ? 'bg-red-50 border-red-200 hover:bg-red-100'
-                          : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-                      }`}
-                      onClick={() => onLeadClick?.(task.lead_id)}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3 flex-1">
-                          {task.is_overdue ? (
-                            <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5" />
-                          ) : (
-                            <Clock className="w-5 h-5 text-blue-500 mt-0.5" />
-                          )}
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="text-sm font-medium text-gray-900">
-                                {task.lead_number}
-                              </p>
-                              <span className="text-xs text-gray-500">•</span>
-                              <p className="text-sm text-gray-700">{task.client_name}</p>
-                            </div>
-                            <p className="text-xs text-gray-500 mb-2">
-                              Status: {task.current_status} ({task.days_in_status} days)
+                {dailyTasks.map((task) => (
+                  <div
+                    key={task.job_id}
+                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                      task.severity === 'critical'
+                        ? 'bg-red-50 border-red-200 hover:bg-red-100'
+                        : task.severity === 'warning'
+                        ? 'bg-orange-50 border-orange-200 hover:bg-orange-100'
+                        : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                    }`}
+                    onClick={() => onLeadClick?.(task.job_id)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-3 flex-1">
+                        {task.severity === 'critical' ? (
+                          <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
+                        ) : task.severity === 'warning' ? (
+                          <Clock className="w-5 h-5 text-orange-500 mt-0.5 shrink-0" />
+                        ) : (
+                          <Briefcase className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <p className="text-sm font-bold text-gray-900">
+                              {task.job_number}
                             </p>
-                            <p className="text-sm text-gray-700">
-                              <span className="font-medium">Action needed:</span> {task.requires_action}
-                            </p>
-                            {task.is_overdue && (
-                              <div className="flex items-center gap-1 mt-2">
-                                <AlertTriangle className="w-3 h-3 text-red-500" />
-                                <span className="text-xs font-medium text-red-600">OVERDUE</span>
-                              </div>
-                            )}
+                            <span className="text-xs text-gray-400">•</span>
+                            <p className="text-sm text-gray-700 truncate">{task.client_name}</p>
+                            {getSeverityBadge(task.severity)}
                           </div>
+                          <div className="flex items-center gap-3 text-xs text-gray-500 mb-1.5">
+                            <span>Status: <span className="font-medium text-gray-700">{task.current_status}</span></span>
+                            <span>{task.days_in_status} day{task.days_in_status !== 1 ? 's' : ''} in status</span>
+                            {task.branch_name !== 'N/A' && <span>{task.branch_name}</span>}
+                          </div>
+                          <p className="text-sm text-gray-700">
+                            <span className="font-medium">Action:</span> {task.requires_action}
+                          </p>
+                          {task.technician !== 'N/A' && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              Tech: {task.technician}
+                            </p>
+                          )}
                         </div>
-                        <ExternalLink className="w-4 h-4 text-gray-400" />
                       </div>
+                      <ExternalLink className="w-4 h-4 text-gray-400 shrink-0 mt-1" />
                     </div>
-                  ))}
+                  </div>
+                ))}
               </div>
             )}
           </div>

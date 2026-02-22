@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.0.20] - 2026-02-22
+
+### Added
+- **Machine Planner Report** — "Generate Machine Report" button on Machines page; opens modal with customer dropdown (shows machine count), downloads a multi-sheet Excel workbook matching the client Planner format (one sheet per machine with full service history)
+- `getCustomersWithMachines()` and `downloadMachinePlannerReport()` API functions in `api.ts`
+- `CustomerWithMachines` type interface
+- `FileSpreadsheet` icon import from lucide-react
+
+### Changed
+- **Machines page header redesigned** — title and description moved left, "Generate Machine Report" button added to the right
+- **CSV Import — Customer column** — SystemManagement rental machines import instructions updated to document the new optional Customer column (machines linked to customer if provided, rental if empty; auto-creates customer if not found)
+- **Machines page complete rewrite** (from previous session) — all machines shown with search/filter, clickable expandable rows, inline edit form, RSR document management with service-tracking fields (Date on RSR, Current Hours, Next Service Hours, Next Service Date)
+
+### Fixed
+- **Notification system restored** — `NotificationBell.tsx`, `NotificationSystem.tsx` rewritten from Supabase stubs to use MongoDB API; bell icon now shows combined count of unread notifications + overdue (critical) daily tasks; Daily Tasks tab shows 3 severity levels (OVERDUE/APPROACHING/MONITORED) with branch, technician, and action descriptions; 30-second polling
+- **Notification bell count** — previously showed 0 because it only checked notification documents (none created yet); now also counts critical daily tasks from the new `/api/notifications/daily-tasks` endpoint
+
 ## [1.0.19] - 2026-02-20
 
 ### Added

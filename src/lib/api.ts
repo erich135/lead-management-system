@@ -676,6 +676,10 @@ export interface MachineRSR {
   fileSize: number;
   mimeType: string;
   description?: string;
+  workDate?: string;
+  currentHours?: number;
+  nextServiceHours?: number;
+  nextServiceDate?: string;
   uploadedBy: {
     _id: string;
     firstName: string;
@@ -1089,6 +1093,55 @@ export async function deleteMachine(id: string): Promise<void> {
   await apiRequest(`/api/machines/${id}`, {
     method: 'DELETE',
   });
+}
+
+/**
+ * Report API functions.
+ */
+
+export interface CustomerWithMachines {
+  _id: string;
+  name: string;
+  machineCount: number;
+}
+
+/**
+ * Gets customers that have machines (for report selection).
+ */
+export async function getCustomersWithMachines(): Promise<{ customers: CustomerWithMachines[] }> {
+  return apiRequest<{ customers: CustomerWithMachines[] }>('/api/reports/customers-with-machines');
+}
+
+/**
+ * Downloads the machine planner report as an Excel file.
+ */
+export async function downloadMachinePlannerReport(customerId: string, customerName: string): Promise<void> {
+  const token = getAuthToken();
+  if (!token) throw new Error('No authentication token found');
+
+  const response = await fetch(`${API_BASE_URL}/api/reports/machine-planner/${customerId}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Failed to generate report' } }));
+    throw new Error(error.error?.message || 'Failed to generate report');
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const safeName = customerName.replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
+  const dateStr = new Date().toISOString().split('T')[0];
+  a.download = `${safeName}_Machine_Planner_${dateStr}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  a.remove();
 }
 
 /**
@@ -2115,12 +2168,22 @@ export async function uploadMachineRSR(
   machineId: string,
   file: File,
   title: string,
-  description?: string
+  description?: string,
+  extraFields?: {
+    workDate?: string;
+    currentHours?: number;
+    nextServiceHours?: number;
+    nextServiceDate?: string;
+  }
 ): Promise<MachineRSR> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('title', title);
   if (description) formData.append('description', description);
+  if (extraFields?.workDate) formData.append('workDate', extraFields.workDate);
+  if (extraFields?.currentHours !== undefined) formData.append('currentHours', String(extraFields.currentHours));
+  if (extraFields?.nextServiceHours !== undefined) formData.append('nextServiceHours', String(extraFields.nextServiceHours));
+  if (extraFields?.nextServiceDate) formData.append('nextServiceDate', extraFields.nextServiceDate);
 
   const token = getAuthToken();
   const response = await fetch(`${API_BASE_URL}/api/machines/${machineId}/rsr`, {
@@ -3332,5 +3395,133 @@ export async function geocodeReverse(lat: number, lon: number): Promise<{ displa
   const params = new URLSearchParams({ lat: lat.toString(), lon: lon.toString() });
   const response = await apiRequest<{ display_name: string; lat: string; lon: string; address?: any }>(`/api/geocode/reverse?${params}`, { method: 'GET' });
   return response;
+}
+
+
+// ============================================================
+// Notifications
+// ============================================================
+
+export interface AppNotification {
+  _id: string;
+  userId: string;
+  type: string;
+  title: string;
+  message: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  leadId?: string;
+  appointmentId?: string;
+  leadNumber?: string;
+  companyName?: string;
+  isRead: boolean;
+  readAt?: string;
+  isDismissed: boolean;
+  dismissedAt?: string;
+  actionUrl?: string;
+  actionLabel?: string;
+  emailSent: boolean;
+  metadata?: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NotificationListResponse {
+  notifications: AppNotification[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+  };
+  unreadCount: number;
+}
+
+export interface DailyTask {
+  job_id: string;
+  job_number: string;
+  client_name: string;
+  branch_name: string;
+  technician: string;
+  current_status: string;
+  expected_next_status: string;
+  days_in_status: number;
+  days_overdue: number;
+  max_days_allowed: number;
+  is_overdue: boolean;
+  is_approaching: boolean;
+  severity: 'critical' | 'warning' | 'info';
+  reminder_type: string;
+  follow_up_level?: number;
+  requires_action: string;
+}
+
+export interface DailyTasksResponse {
+  tasks: DailyTask[];
+  summary: {
+    total: number;
+    critical: number;
+    warning: number;
+    info: number;
+  };
+}
+
+/**
+ * Get notifications for the current user.
+ */
+export async function getNotifications(options?: {
+  unreadOnly?: boolean;
+  type?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<NotificationListResponse> {
+  const params = new URLSearchParams();
+  if (options?.unreadOnly) params.set('unreadOnly', 'true');
+  if (options?.type) params.set('type', options.type);
+  if (options?.limit) params.set('limit', options.limit.toString());
+  if (options?.offset) params.set('offset', options.offset.toString());
+  const qs = params.toString();
+  return apiRequest<NotificationListResponse>(`/api/notifications${qs ? '?' + qs : ''}`, { method: 'GET' });
+}
+
+/**
+ * Get unread notification count.
+ */
+export async function getUnreadNotificationCount(): Promise<number> {
+  const result = await apiRequest<{ count: number }>('/api/notifications/unread-count', { method: 'GET' });
+  return result.count;
+}
+
+/**
+ * Mark a notification as read.
+ */
+export async function markNotificationRead(id: string): Promise<void> {
+  await apiRequest(`/api/notifications/${id}/read`, { method: 'PUT' });
+}
+
+/**
+ * Mark all notifications as read.
+ */
+export async function markAllNotificationsRead(): Promise<{ modifiedCount: number }> {
+  return apiRequest<{ modifiedCount: number }>('/api/notifications/read-all', { method: 'PUT' });
+}
+
+/**
+ * Dismiss a notification.
+ */
+export async function dismissNotification(id: string): Promise<void> {
+  await apiRequest(`/api/notifications/${id}/dismiss`, { method: 'PUT' });
+}
+
+/**
+ * Get daily tasks (overdue/approaching jobs) for the current user.
+ */
+export async function getDailyTasks(): Promise<DailyTasksResponse> {
+  return apiRequest<DailyTasksResponse>('/api/notifications/daily-tasks', { method: 'GET' });
+}
+
+/**
+ * Trigger sending of daily reminder email (super admin only).
+ */
+export async function sendDailyReminderEmail(): Promise<{ sentTo: string[] }> {
+  return apiRequest<{ sentTo: string[] }>('/api/reminders/send', { method: 'POST' });
 }
 

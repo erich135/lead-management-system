@@ -14,6 +14,7 @@ import {
   resendInvitation,
   getRoles,
   getPermissions,
+  applyGroupPermissions,
   getImportHistory,
   importJobs,
   importCustomers,
@@ -103,11 +104,17 @@ export function SystemManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditingUser, setIsEditingUser] = useState(false);
-  const [activeTab, setActiveTab] = useState<'users' | 'imports' | 'reference' | 'changelog'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'imports' | 'reference' | 'changelog' | 'group-permissions'>('users');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 20;
   const [updatingPermissions, setUpdatingPermissions] = useState(false);
+  
+  // Group permissions state
+  const [selectedGroupRole, setSelectedGroupRole] = useState<Role | null>(null);
+  const [groupPermissions, setGroupPermissions] = useState<string[]>([]);
+  const [applyingGroupPermissions, setApplyingGroupPermissions] = useState(false);
+  const [groupPermissionsMessage, setGroupPermissionsMessage] = useState<string | null>(null);
   
   // Import state
   const [importHistory, setImportHistory] = useState<ImportHistory | null>(null);
@@ -496,6 +503,82 @@ export function SystemManagement() {
       : Array.from(new Set([...selectedUser.permissions, ...allPermissionNames]));
 
     handleUpdatePermissions(selectedUser._id, newPerms);
+  }
+
+  /**
+   * Handle selecting a role group - loads that role's current permissions into the editor.
+   */
+  function handleSelectGroupRole(roleId: string) {
+    const role = roles.find(r => r._id === roleId);
+    if (role) {
+      setSelectedGroupRole(role);
+      setGroupPermissions([...role.permissions]);
+      setGroupPermissionsMessage(null);
+    } else {
+      setSelectedGroupRole(null);
+      setGroupPermissions([]);
+      setGroupPermissionsMessage(null);
+    }
+  }
+
+  /**
+   * Toggle a single permission in the group permissions editor.
+   */
+  function handleToggleGroupPermission(permName: string) {
+    setGroupPermissions(prev =>
+      prev.includes(permName)
+        ? prev.filter(p => p !== permName)
+        : [...prev, permName]
+    );
+  }
+
+  /**
+   * Toggle all permissions in a category for the group editor.
+   */
+  function handleToggleGroupCategory(categoryPerms: string[]) {
+    const allSelected = categoryPerms.every(p => groupPermissions.includes(p));
+    setGroupPermissions(prev =>
+      allSelected
+        ? prev.filter(p => !categoryPerms.includes(p))
+        : Array.from(new Set([...prev, ...categoryPerms]))
+    );
+  }
+
+  /**
+   * Toggle all permissions for the group editor.
+   */
+  function handleToggleAllGroupPermissions() {
+    if (allPermissionNames.length === 0) return;
+    const allSelected = allPermissionNames.every(p => groupPermissions.includes(p));
+    setGroupPermissions(allSelected ? [] : [...allPermissionNames]);
+  }
+
+  /**
+   * Apply the configured group permissions to all users in the selected role.
+   * Super admin only. After applying, individual user permissions can still be edited.
+   */
+  async function handleApplyGroupPermissions() {
+    if (!selectedGroupRole) return;
+
+    const usersInGroup = users.filter(u => u.role?.name === selectedGroupRole.name && u.isActive);
+    const confirmMessage = `This will apply ${groupPermissions.length} permission(s) to ALL active users in the "${selectedGroupRole.name}" group (${usersInGroup.length} user(s)).\n\nIndividual user permissions can still be modified afterwards.\n\nContinue?`;
+
+    if (!confirm(confirmMessage)) return;
+
+    try {
+      setApplyingGroupPermissions(true);
+      setGroupPermissionsMessage(null);
+      const response = await applyGroupPermissions(selectedGroupRole._id, groupPermissions);
+      setGroupPermissionsMessage(`✓ ${response.message || `Permissions applied to ${response.usersUpdated} user(s)`}`);
+      // Refresh data to reflect changes
+      setSelectedGroupRole({ ...selectedGroupRole, permissions: groupPermissions });
+      await loadData();
+    } catch (err: any) {
+      console.error('Error applying group permissions:', err);
+      setGroupPermissionsMessage(`✗ Failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setApplyingGroupPermissions(false);
+    }
   }
 
   /**
@@ -1161,6 +1244,19 @@ alert((response as any).message || 'User invited successfully');
               </div>
             </button>
             <button
+              onClick={() => setActiveTab('group-permissions')}
+              className={`flex-1 px-6 py-4 font-semibold transition-all ${
+                activeTab === 'group-permissions'
+                  ? 'text-ars-primary border-b-2 border-ars-primary bg-blue-50'
+                  : 'text-ars-body hover:text-ars-heading hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <Shield className="w-5 h-5" />
+                Group Permissions
+              </div>
+            </button>
+            <button
               onClick={() => setActiveTab('imports')}
               className={`flex-1 px-6 py-4 font-semibold transition-all ${
                 activeTab === 'imports'
@@ -1763,6 +1859,180 @@ alert((response as any).message || 'User invited successfully');
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Group Permissions Tab */}
+        {activeTab === 'group-permissions' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Shield className="w-6 h-6 text-ars-primary" />
+                <div>
+                  <h3 className="text-lg font-bold text-ars-heading">Group Permissions</h3>
+                  <p className="text-sm text-ars-body">Select a group (role) and apply permissions to all users in that group at once. Individual user permissions can still be modified afterwards.</p>
+                </div>
+              </div>
+
+              {/* Role/Group Selector */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-ars-body mb-2">Select Group</label>
+                <select
+                  value={selectedGroupRole?._id || ''}
+                  onChange={(e) => handleSelectGroupRole(e.target.value)}
+                  className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-ars-primary text-sm"
+                >
+                  <option value="">— Choose a group —</option>
+                  {roles
+                    .filter(r => r.isActive && r.name !== 'super_admin')
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map(role => (
+                      <option key={role._id} value={role._id}>
+                        {role.name.charAt(0).toUpperCase() + role.name.slice(1)} ({users.filter(u => u.role?.name === role.name && u.isActive).length} active users)
+                      </option>
+                    ))
+                  }
+                </select>
+              </div>
+
+              {/* Group Permissions Editor - shown when a group is selected */}
+              {selectedGroupRole && (
+                <div className="space-y-4">
+                  {/* Group info banner */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+                    <Shield className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-blue-800">
+                        Editing permissions for: <span className="text-blue-900">{selectedGroupRole.name.charAt(0).toUpperCase() + selectedGroupRole.name.slice(1)}</span>
+                      </p>
+                      <p className="text-xs text-blue-700 mt-1">
+                        {users.filter(u => u.role?.name === selectedGroupRole.name && u.isActive).length} active user(s) in this group.
+                        Configure the permissions below, then click "Apply to Group" to update all users at once.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Users in this group */}
+                  <div className="border border-gray-200 rounded-lg p-3">
+                    <p className="text-xs font-bold text-ars-heading mb-2">Users in this group:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {users
+                        .filter(u => u.role?.name === selectedGroupRole.name && u.isActive)
+                        .map(u => (
+                          <span key={u._id} className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">
+                            <UserCheck className="w-3 h-3" />
+                            {u.firstName} {u.lastName}
+                          </span>
+                        ))
+                      }
+                      {users.filter(u => u.role?.name === selectedGroupRole.name && u.isActive).length === 0 && (
+                        <span className="text-xs text-ars-body italic">No active users in this group</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Global Toggle */}
+                  <div className="flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={handleToggleAllGroupPermissions}
+                      disabled={applyingGroupPermissions || allPermissionNames.length === 0}
+                      className="text-xs text-ars-primary hover:text-ars-primary/80 underline disabled:opacity-50"
+                    >
+                      {allPermissionNames.length > 0 && allPermissionNames.every(p => groupPermissions.includes(p))
+                        ? 'Clear All'
+                        : 'Select All'}
+                    </button>
+                    <span className="text-xs text-ars-body">
+                      {groupPermissions.length} of {allPermissionNames.length} permissions selected
+                    </span>
+                  </div>
+
+                  {/* Permission categories */}
+                  <div className="max-h-[500px] overflow-y-auto space-y-2">
+                    {Object.entries(groupedPermissions)
+                      .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+                      .map(([groupKey, perms]) => {
+                        const groupPermNames = perms.map(p => p.name);
+                        const groupAllSelected = groupPermNames.every(p => groupPermissions.includes(p));
+                        return (
+                          <div key={groupKey} className="border border-gray-200 rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-xs font-bold text-ars-heading">{groupKey}</p>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleGroupCategory(groupPermNames)}
+                                disabled={applyingGroupPermissions}
+                                className="text-[11px] text-ars-primary hover:text-ars-primary/80 underline disabled:opacity-50"
+                              >
+                                {groupAllSelected ? 'Clear All' : 'Select All'}
+                              </button>
+                            </div>
+                            <div className="space-y-1">
+                              {perms.map(perm => (
+                                <label key={perm._id} className="flex items-center gap-2 cursor-pointer group">
+                                  <input
+                                    type="checkbox"
+                                    checked={groupPermissions.includes(perm.name)}
+                                    disabled={applyingGroupPermissions}
+                                    onChange={() => handleToggleGroupPermission(perm.name)}
+                                    className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                  />
+                                  <span className="text-sm text-ars-body group-hover:text-ars-heading">
+                                    {perm.description || perm.name}
+                                  </span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+
+                  {/* Success/error message */}
+                  {groupPermissionsMessage && (
+                    <div className={`rounded-lg p-3 text-sm font-medium ${
+                      groupPermissionsMessage.startsWith('✓')
+                        ? 'bg-green-50 border border-green-200 text-green-800'
+                        : 'bg-red-50 border border-red-200 text-red-800'
+                    }`}>
+                      {groupPermissionsMessage}
+                    </div>
+                  )}
+
+                  {/* Apply button */}
+                  <div className="flex items-center gap-4 pt-2">
+                    <button
+                      onClick={handleApplyGroupPermissions}
+                      disabled={applyingGroupPermissions || allPermissionNames.length === 0}
+                      className="px-6 py-2.5 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 disabled:opacity-50 disabled:hover:scale-100"
+                    >
+                      {applyingGroupPermissions ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#383838]"></div>
+                          Applying...
+                        </>
+                      ) : (
+                        <>
+                          <Shield className="w-4 h-4" />
+                          APPLY TO GROUP
+                        </>
+                      )}
+                    </button>
+                    <p className="text-xs text-ars-body">
+                      This will set the selected permissions for all active users in the "{selectedGroupRole.name}" group.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {!selectedGroupRole && (
+                <div className="text-center py-12 text-ars-body">
+                  <Shield className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                  <p className="text-sm">Select a group above to manage its permissions</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

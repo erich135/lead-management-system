@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.21] - 2026-02-24
+
+### Added
+- **Group Permissions tab** in System Management — new "Group Permissions" tab (Shield icon) between User Management and Imports; allows super admin to select a role group (e.g., "Admins", "Reps", "Managers") and bulk-apply permissions to all active users in that group
+- Role/group dropdown shows all active roles (excluding super_admin) with a count of active users per group
+- Preview panel shows all users that belong to the selected group
+- Full permission editor with category grouping, per-category "Select All / Clear All" toggles, and a global "Select All / Clear All" toggle
+- "Apply to Group" button with confirmation dialog showing user count, followed by success/error feedback message
+- `applyGroupPermissions()` API function in `api.ts` — calls `PUT /api/roles/:id/apply-group-permissions`
+- Individual user permissions remain fully editable after a group apply
+
 ## [1.0.20] - 2026-02-22
 
 ### Added

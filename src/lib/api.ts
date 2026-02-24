@@ -1490,6 +1490,21 @@ export async function updateRolePermissions(id: string, permissions: string[]): 
 }
 
 /**
+ * Apply permissions to all users in a role group.
+ * Super admin only. Sets the same permissions on every active user with this role.
+ * Individual permissions can still be modified per user afterwards.
+ */
+export async function applyGroupPermissions(
+  roleId: string,
+  permissions: string[],
+): Promise<{ role: Role; usersUpdated: number; message: string }> {
+  return apiRequest(`/api/roles/${roleId}/apply-group-permissions`, {
+    method: 'PUT',
+    body: JSON.stringify({ permissions }),
+  });
+}
+
+/**
  * Gets all permissions (catalog).
  */
 export async function getPermissions(params?: {

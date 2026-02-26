@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.22] - 2026-02-26
+
+### Changed
+- **Sales Leads Kanban cards — appointment date/time** — cards with an upcoming appointment now show the appointment date and time (e.g., "Feb 28, 2026 at 10:00 AM") in orange with a calendar icon, replacing the generic "Created" date line
+- Cards without appointments fall back to showing the appointment count ("1 appointment") if any exist
+- "Created" date line removed from cards that have appointment info
+- `SalesLead` type extended with `nextAppointmentDate` and `nextAppointmentTime` optional fields
+
 ## [1.0.21] - 2026-02-24
 
 ### Added

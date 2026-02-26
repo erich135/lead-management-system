@@ -192,6 +192,8 @@ export interface SalesLead {
   createdAt: string;
   updatedAt: string;
   appointmentCount?: number;
+  nextAppointmentDate?: string | null;
+  nextAppointmentTime?: string | null;
 }
 
 export interface Appointment {

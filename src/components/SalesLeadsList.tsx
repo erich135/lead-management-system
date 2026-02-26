@@ -349,22 +349,23 @@ export function SalesLeadsList({ onCreateLead, onSelectLead, branches, repCodes,
                           </div>
                         )}
 
-                        {lead.appointmentCount && lead.appointmentCount > 0 && (
+                        {lead.nextAppointmentDate ? (
+                          <div className="mt-2 flex items-center gap-1 text-xs text-orange-600 font-medium">
+                            <Calendar className="w-3.5 h-3.5" />
+                            {formatDate(lead.nextAppointmentDate)}{lead.nextAppointmentTime ? ` at ${lead.nextAppointmentTime}` : ''}
+                          </div>
+                        ) : lead.appointmentCount && lead.appointmentCount > 0 ? (
                           <div className="mt-2 flex items-center gap-1 text-xs text-blue-600">
                             <Calendar className="w-3.5 h-3.5" />
                             {lead.appointmentCount} appointment{lead.appointmentCount > 1 ? 's' : ''}
                           </div>
-                        )}
+                        ) : null}
 
                         {lead.convertedJobNumber && (
                           <div className="mt-2 text-xs text-emerald-600 font-medium">
                             → Job: {lead.convertedJobNumber}
                           </div>
                         )}
-
-                        <div className="mt-2 text-xs text-gray-400">
-                          Created {formatDate(lead.createdAt)}
-                        </div>
                       </div>
                     ))}
                     {columnLeads.length === 0 && (

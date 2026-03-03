@@ -97,6 +97,7 @@ import { ChangelogViewer } from './ChangelogViewer';
 
 export function SystemManagement() {
   const [users, setUsers] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]); // All users for dropdowns (not paginated)
   const [roles, setRoles] = useState<Role[]>([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -219,6 +220,10 @@ export function SystemManagement() {
    */
   async function loadReferenceData() {
     try {
+      // Load all users for linking dropdowns (no pagination limit)
+      const allUsersResponse = await getUsers({ page: 1, limit: 1000 });
+      setAllUsers(allUsersResponse.users || []);
+
       // Load rep codes
       const repCodesResponse = await getRepCodes();
       setRepCodes(repCodesResponse.repCodes || []);
@@ -3311,7 +3316,7 @@ alert((response as any).message || 'User invited successfully');
                         className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                       >
                         <option value="">No user linked</option>
-                        {users.map((user) => (
+                        {allUsers.map((user) => (
                           <option key={user._id} value={user._id}>
                             {user.firstName} {user.lastName} ({user.email})
                           </option>
@@ -3516,7 +3521,7 @@ alert((response as any).message || 'User invited successfully');
                         className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                       >
                         <option value="">No user linked</option>
-                        {users.map((user) => (
+                        {allUsers.map((user) => (
                           <option key={user._id} value={user._id}>
                             {user.firstName} {user.lastName} ({user.email})
                           </option>

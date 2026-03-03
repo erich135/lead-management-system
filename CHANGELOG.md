@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.23] - 2026-03-03
+
+### Fixed
+- **Linked User dropdown showing only 20 users** — Admin Code and Technician "Linked User" dropdowns in System Management were using the paginated user list (limited to 20 per page), so only the first page of users appeared; added a separate `allUsers` fetch (limit 1000) loaded with reference data, ensuring all users are available in the linking dropdowns
+
 ## [1.0.22] - 2026-02-26
 
 ### Changed

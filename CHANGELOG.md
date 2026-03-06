@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.24] - 2026-03-06
+
+### Added
+- **Email Notifications tab** on Activities page — new "Email Notifications" tab (visible to super admins only) shows a log of all system emails: lead assignments, status changes, appointment notifications, appointment reminders, and daily reminder emails
+- **Email Type filter** — dropdown to filter by type: Lead Assigned, Status Changed, Appt. Created, Appt. Updated, Appt. Cancelled, Appt. Reminder, Daily Reminder
+- **Redesigned table columns** — Date & Time | Type (color-coded badge) | Subject / Details (shows email subject + lead number & company, or job count for daily reminders) | Recipient (name + email) | Status (Sent/Failed)
+- **Filters** — search by recipient email, filter by email type, filter by start/end date range
+- **Pagination** — paginated results with page navigation
+- **`getEmailLogs()`** API function updated with `emailType` filter parameter; `EmailLog` interface expanded with `subject`, `leadNumber`, `companyName` fields
+- **Lucide icons** — `Mail`, `CheckCircle`, `XCircle` imports for tab and status indicators
+
 ## [1.0.23] - 2026-03-03
 
 ### Fixed

@@ -3540,3 +3540,56 @@ export async function sendDailyReminderEmail(): Promise<{ sentTo: string[] }> {
   return apiRequest<{ sentTo: string[] }>('/api/reminders/send', { method: 'POST' });
 }
 
+// =============================================
+// Email Log API
+// =============================================
+
+export interface EmailLog {
+  _id: string;
+  recipientEmail: string;
+  recipientName: string;
+  sentAt: string;
+  subject?: string;
+  jobCount?: number;
+  adminCode?: string;
+  emailType: string;
+  leadNumber?: string;
+  companyName?: string;
+  status: 'sent' | 'failed';
+  errorMessage?: string;
+  createdAt: string;
+}
+
+export interface EmailLogsResponse {
+  emailLogs: EmailLog[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+/**
+ * Gets email logs with optional filtering. Super admin only.
+ */
+export async function getEmailLogs(params?: {
+  page?: number;
+  limit?: number;
+  startDate?: string;
+  endDate?: string;
+  recipientEmail?: string;
+  emailType?: string;
+}): Promise<EmailLogsResponse> {
+  const queryParams = new URLSearchParams();
+  if (params?.page) queryParams.append('page', params.page.toString());
+  if (params?.limit) queryParams.append('limit', params.limit.toString());
+  if (params?.startDate) queryParams.append('startDate', params.startDate);
+  if (params?.endDate) queryParams.append('endDate', params.endDate);
+  if (params?.recipientEmail) queryParams.append('recipientEmail', params.recipientEmail);
+  if (params?.emailType) queryParams.append('emailType', params.emailType);
+
+  const query = queryParams.toString();
+  return apiRequest<EmailLogsResponse>(`/api/email-logs${query ? `?${query}` : ''}`);
+}
+

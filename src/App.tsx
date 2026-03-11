@@ -10,7 +10,6 @@ import { AutoLocationTracker } from './components/AutoLocationTracker';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   
-  
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">

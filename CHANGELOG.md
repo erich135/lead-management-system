@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.0.25] - 2026-03-16
+
+### Fixed
+- **Rep code unlink bug** — unlinking admin or branch from a rep code now works correctly (previously the unlink was silently ignored)
+
+### Changed
+- **Rep codes support multiple admins and branches** — a single rep code can now be linked to multiple admin codes and multiple branches (previously limited to one of each)
+- **Multi-select UI for rep code linking** — admin codes and branches are shown as removable chips with an "add" dropdown; no more single-select limitation
+- **Smart job creation dropdowns** — when selecting a rep code during job creation, the Branch and Admin (ADM) dropdowns now show linked options first (marked with ★) with a separator before other options
+- **Auto-populate uses first linked entry** — first linked admin and first linked branch auto-fill when selecting a rep code
+
+### Added
+- **Migration script** — `npm run migrate:repcode-arrays` converts existing single-value `adminCode`/`branch` fields to the new array format; supports `--dry-run` preview mode
+
 ## [1.0.24] - 2026-03-06
 
 ### Added

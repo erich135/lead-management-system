@@ -635,11 +635,11 @@ export interface RepCode {
   _id: string;
   code: string;
   description?: string;
-  adminCode?: string; // Linked admin code (e.g., "AS", "ER")
-  branch?: {
+  adminCodes: string[]; // Linked admin codes (e.g., ["AS", "ER"])
+  branches: {
     _id: string;
     name: string;
-  };
+  }[];
   user?: {
     _id: string;
     firstName: string;
@@ -937,8 +937,8 @@ export async function getRepCodes(): Promise<{ repCodes: RepCode[] }> {
 export async function createRepCode(repCodeData: {
   code: string;
   description?: string;
-  adminCode?: string;
-  branch?: string;
+  adminCodes?: string[];
+  branches?: string[];
 }): Promise<{ repCode: RepCode }> {
   return apiRequest('/api/reference/rep-codes', {
     method: 'POST',

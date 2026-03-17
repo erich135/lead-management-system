@@ -819,18 +819,19 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
                   const selectedRepCodeId = e.target.value;
                   const selectedRepCode = repCodes.find(rc => rc._id === selectedRepCodeId);
                   
-                  // Auto-populate branch and admin code if rep has them linked
+                  // Auto-populate branch and admin code if rep has them linked (uses first entry)
                   if (selectedRepCode) {
                     const updates: any = { repCode: selectedRepCodeId };
                     
-                    if (selectedRepCode.adminCode) {
-                      updates.adm = selectedRepCode.adminCode;
+                    if (selectedRepCode.adminCodes && selectedRepCode.adminCodes.length > 0) {
+                      updates.adm = selectedRepCode.adminCodes[0];
                     }
                     
-                    if (selectedRepCode.branch) {
-                      const branchId = typeof selectedRepCode.branch === 'object' 
-                        ? selectedRepCode.branch._id 
-                        : selectedRepCode.branch;
+                    if (selectedRepCode.branches && selectedRepCode.branches.length > 0) {
+                      const firstBranch = selectedRepCode.branches[0];
+                      const branchId = typeof firstBranch === 'object' 
+                        ? firstBranch._id 
+                        : firstBranch;
                       updates.branch = branchId;
                     }
                     
@@ -868,15 +869,29 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
                 style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
               >
                 <option value="">Select Branch</option>
-                {branches && branches.length > 0 ? (
-                  branches.map((branch) => (
-                    <option key={branch._id} value={branch._id}>
-                      {branch.name}
-                    </option>
-                  ))
-                ) : (
-                  <option value="" disabled>No branches available</option>
-                )}
+                {(() => {
+                  const selectedRepCode = repCodes.find(rc => rc._id === formData.repCode);
+                  const linkedBranchIds = selectedRepCode?.branches?.map((b: any) => typeof b === 'object' ? b._id : b) || [];
+                  const linkedBranches = linkedBranchIds.length > 0 ? branches.filter(b => linkedBranchIds.includes(b._id)) : [];
+                  const otherBranches = linkedBranchIds.length > 0 ? branches.filter(b => !linkedBranchIds.includes(b._id)) : branches;
+                  return (
+                    <>
+                      {linkedBranches.map((branch) => (
+                        <option key={branch._id} value={branch._id}>
+                          ★ {branch.name}
+                        </option>
+                      ))}
+                      {linkedBranches.length > 0 && otherBranches.length > 0 && (
+                        <option disabled>── Other branches ──</option>
+                      )}
+                      {otherBranches.map((branch) => (
+                        <option key={branch._id} value={branch._id}>
+                          {branch.name}
+                        </option>
+                      ))}
+                    </>
+                  );
+                })()}
               </select>
             </div>
 
@@ -915,17 +930,30 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
                 style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
               >
                 <option value="">Select Admin</option>
-                {adminCodes && adminCodes.length > 0 ? (
-                  adminCodes
-                    .filter(ac => ac.isActive)
-                    .map((adminCode) => (
-                      <option key={adminCode._id} value={adminCode.code}>
-                        {adminCode.code} {adminCode.description ? `- ${adminCode.description}` : ''}
-                      </option>
-                    ))
-                ) : (
-                  <option value="" disabled>Loading admin codes...</option>
-                )}
+                {(() => {
+                  const selectedRepCode = repCodes.find(rc => rc._id === formData.repCode);
+                  const linkedAdminCodes = selectedRepCode?.adminCodes || [];
+                  const activeAdminCodes = (adminCodes || []).filter(ac => ac.isActive);
+                  const linked = linkedAdminCodes.length > 0 ? activeAdminCodes.filter(ac => linkedAdminCodes.includes(ac.code)) : [];
+                  const others = linkedAdminCodes.length > 0 ? activeAdminCodes.filter(ac => !linkedAdminCodes.includes(ac.code)) : activeAdminCodes;
+                  return (
+                    <>
+                      {linked.map((adminCode) => (
+                        <option key={adminCode._id} value={adminCode.code}>
+                          \u2605 {adminCode.code} {adminCode.description ? `- ${adminCode.description}` : ''}
+                        </option>
+                      ))}
+                      {linked.length > 0 && others.length > 0 && (
+                        <option disabled>\u2500\u2500 Other admins \u2500\u2500</option>
+                      )}
+                      {others.map((adminCode) => (
+                        <option key={adminCode._id} value={adminCode.code}>
+                          {adminCode.code} {adminCode.description ? `- ${adminCode.description}` : ''}
+                        </option>
+                      ))}
+                    </>
+                  );
+                })()}
               </select>
             </div>
 

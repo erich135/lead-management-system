@@ -2269,11 +2269,11 @@ alert((response as any).message || 'User invited successfully');
                     <li><strong>Service Type</strong> - Optional: "hours" or "date" (auto-detected by Make if not specified)</li>
                     <li><strong>Machine Hours</strong> - For hour-based machines (Generator, Genset, Compressors)</li>
                     <li><strong>Next Service Hours</strong> - For hour-based machines</li>
-                    <li><strong>Last Service Date</strong> - For date-based machines (Dryer, Blower, Vacuum pump)</li>
+                    <li><strong>Last Service Date</strong> - For date-based machines (Dryer, Blower, Vacuum pump, Air Receiver)</li>
                     <li><strong>Next Service Date</strong> - For date-based machines</li>
                   </ul>
                   <p className="text-xs text-ars-body mt-2 italic">
-                    Service type auto-detection: Dryer, Blower, and Vacuum pump machines use date-based service tracking. All others use hours.
+                    Service type auto-detection: Dryer, Blower, Vacuum pump, and Air Receiver machines use date-based service tracking. All others use hours.
                   </p>
                 </div>
                 <div className="space-y-4">

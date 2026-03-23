@@ -1104,7 +1104,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
                         const makeLC = (machine.make || '').toLowerCase();
                         const typeLC = (machine.machineType || '').toLowerCase();
                         const isDateBased = machine.serviceType === 'date' || 
-                          (!machine.serviceType && (typeLC.includes('dryer') || typeLC.includes('blower') || typeLC.includes('vacuum') || makeLC.includes('dryer') || makeLC.includes('blower') || makeLC.includes('vacuum')));
+                          (!machine.serviceType && (typeLC.includes('dryer') || typeLC.includes('blower') || typeLC.includes('vacuum') || typeLC.includes('air receiver') || makeLC.includes('dryer') || makeLC.includes('blower') || makeLC.includes('vacuum') || makeLC.includes('air receiver')));
                         const serviceInfo = isDateBased
                           ? `Next Service: ${machine.nextServiceDate ? new Date(machine.nextServiceDate).toLocaleDateString() : 'N/A'}`
                           : `Hours: ${machine.machineHours?.toLocaleString() || 0} • Next: ${machine.nextServiceHours?.toLocaleString() || 0}`;
@@ -1248,6 +1248,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
                             <option value="Dryer">Dryer</option>
                             <option value="Blower">Blower</option>
                             <option value="Vacuum pump">Vacuum pump</option>
+                            <option value="Air Receiver">Air Receiver</option>
                           </select>
                         </div>
                         <div>

@@ -10,6 +10,7 @@
 - **Validation** — a user can only be linked to one rep code at a time; backend enforces uniqueness
 - **User badge in rep codes list** — linked user shown as a green badge next to the rep code
 - **API updated** — `createRepCode` now accepts optional `user` parameter
+- **New machine type: Air Receiver** — added "Air Receiver" to machine type dropdowns (LeadDetails, LeadForm), auto-detection logic, and date-based service tracking arrays; Air Receiver uses date-based service tracking (Last Service Date / Next Service Date)
 
 ## [1.0.25] - 2026-03-16
 

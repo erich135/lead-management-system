@@ -77,7 +77,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   });
 
   // Machine types that use date-based service tracking
-  const dateBasedMachineTypes = ['Dryer', 'Blower', 'Vacuum pump'];
+  const dateBasedMachineTypes = ['Dryer', 'Blower', 'Vacuum pump', 'Air Receiver'];
   const isDateBasedMachine = dateBasedMachineTypes.includes(newMachine.machineType);
   const [creatingMachine, setCreatingMachine] = useState(false);
   const [repCodes, setRepCodes] = useState<RepCode[]>([]);
@@ -1952,6 +1952,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                                   else if (machineTypeFromMake.includes('dryer')) machineType = 'Dryer';
                                   else if (machineTypeFromMake.includes('blower')) machineType = 'Blower';
                                   else if (machineTypeFromMake.includes('vacuum')) machineType = 'Vacuum pump';
+                                  else if (machineTypeFromMake.includes('air receiver')) machineType = 'Air Receiver';
                                   else if (machineTypeFromMake.includes('compressor') && machineTypeFromMake.includes('oil free')) machineType = 'Compressor oil free';
                                   else if (machineTypeFromMake.includes('compressor') && machineTypeFromMake.includes('oil injection')) machineType = 'Compressor oil injection';
                                   else if (machineTypeFromMake.includes('diesel') && machineTypeFromMake.includes('compressor')) machineType = 'Diesel reciprocating compressor';
@@ -2068,6 +2069,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                             <option value="Dryer">Dryer</option>
                             <option value="Blower">Blower</option>
                             <option value="Vacuum pump">Vacuum pump</option>
+                            <option value="Air Receiver">Air Receiver</option>
                           </select>
                         </div>
                         <div>

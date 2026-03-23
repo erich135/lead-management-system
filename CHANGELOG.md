@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.26] - 2026-03-23
+
+### Fixed
+- **Rep scoping bug** — reps (e.g. AP001) could not see their assigned sales leads due to a field name mismatch in the backend query (`userId` vs `user`); fixed in backend
+
+### Added
+- **Rep Code ↔ User linking** — new "Linked User (Rep)" dropdown in the Rep Codes management form (Settings → Rep Codes) allows admins to link a user account to a rep code
+- **Validation** — a user can only be linked to one rep code at a time; backend enforces uniqueness
+- **User badge in rep codes list** — linked user shown as a green badge next to the rep code
+- **API updated** — `createRepCode` now accepts optional `user` parameter
+
 ## [1.0.25] - 2026-03-16
 
 ### Fixed

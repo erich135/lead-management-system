@@ -939,6 +939,7 @@ export async function createRepCode(repCodeData: {
   description?: string;
   adminCodes?: string[];
   branches?: string[];
+  user?: string | null;
 }): Promise<{ repCode: RepCode }> {
   return apiRequest('/api/reference/rep-codes', {
     method: 'POST',

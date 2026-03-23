@@ -141,7 +141,7 @@ export function SystemManagement() {
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [editingRepCode, setEditingRepCode] = useState<RepCode | null>(null);
   const [showRepCodeForm, setShowRepCodeForm] = useState(false);
-  const [newRepCode, setNewRepCode] = useState({ code: '', description: '', adminCodes: [] as string[], branches: [] as string[] });
+  const [newRepCode, setNewRepCode] = useState({ code: '', description: '', adminCodes: [] as string[], branches: [] as string[], user: '' });
   const [editingAdminCode, setEditingAdminCode] = useState<AdminCode | null>(null);
   const [showAdminCodeForm, setShowAdminCodeForm] = useState(false);
   const [newAdminCode, setNewAdminCode] = useState({ code: '', description: '', userId: '' });
@@ -733,9 +733,10 @@ alert((response as any).message || 'User invited successfully');
         description: newRepCode.description.trim() || undefined,
         adminCodes: newRepCode.adminCodes.length ? newRepCode.adminCodes : undefined,
         branches: newRepCode.branches.length ? newRepCode.branches : undefined,
+        user: newRepCode.user || null,
       });
       setRepCodes([...repCodes, response.repCode]);
-      setNewRepCode({ code: '', description: '', adminCodes: [], branches: [] });
+      setNewRepCode({ code: '', description: '', adminCodes: [], branches: [], user: '' });
       setShowRepCodeForm(false);
       alert('Rep code created successfully');
     } catch (err: any) {
@@ -761,6 +762,7 @@ alert((response as any).message || 'User invited successfully');
         isActive: editingRepCode.isActive,
         adminCodes: editingRepCode.adminCodes || [],
         branches: editingRepCode.branches?.map((b: any) => typeof b === 'object' ? b._id : b) || [],
+        user: (editingRepCode as any)._linkedUserId !== undefined ? (editingRepCode as any)._linkedUserId : (typeof editingRepCode.user === 'object' && editingRepCode.user ? editingRepCode.user._id : (editingRepCode.user || null)),
       } as any);
       setRepCodes(repCodes.map(rc => rc._id === editingRepCode._id ? response.repCode : rc));
       setEditingRepCode(null);
@@ -3007,7 +3009,7 @@ alert((response as any).message || 'User invited successfully');
                 <button
                   onClick={() => {
                     setEditingRepCode(null);
-                    setNewRepCode({ code: '', description: '', adminCodes: [], branches: [] });
+                    setNewRepCode({ code: '', description: '', adminCodes: [], branches: [], user: '' });
                     setShowRepCodeForm(true);
                   }}
                   className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
@@ -3026,7 +3028,7 @@ alert((response as any).message || 'User invited successfully');
                     <button
                       onClick={() => {
                         setEditingRepCode(null);
-                        setNewRepCode({ code: '', description: '', adminCodes: [], branches: [] });
+                        setNewRepCode({ code: '', description: '', adminCodes: [], branches: [], user: '' });
                         setShowRepCodeForm(false);
                       }}
                       className="p-1 hover:bg-gray-200 rounded transition-colors"
@@ -3066,6 +3068,33 @@ alert((response as any).message || 'User invited successfully');
                         className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                         placeholder="Optional description"
                       />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold text-ars-body mb-2">
+                        Linked User (Rep)
+                      </label>
+                      <select
+                        value={editingRepCode ? ((editingRepCode as any)._linkedUserId !== undefined ? (editingRepCode as any)._linkedUserId : (typeof editingRepCode.user === 'object' && editingRepCode.user ? editingRepCode.user._id : (editingRepCode.user || ''))) : newRepCode.user}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (editingRepCode) {
+                            setEditingRepCode({ ...editingRepCode, _linkedUserId: val } as any);
+                          } else {
+                            setNewRepCode({ ...newRepCode, user: val });
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                      >
+                        <option value="">-- No user linked --</option>
+                        {allUsers.filter(u => u.isActive).map((user) => (
+                          <option key={user._id} value={user._id}>
+                            {user.firstName} {user.lastName} ({user.email})
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Link a user account to this rep code. The user will only see their own assigned leads in Sales Leads.
+                      </p>
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-semibold text-ars-body mb-2">
@@ -3207,7 +3236,7 @@ alert((response as any).message || 'User invited successfully');
                     <button
                       onClick={() => {
                         setEditingRepCode(null);
-                        setNewRepCode({ code: '', description: '', adminCodes: [], branches: [] });
+                        setNewRepCode({ code: '', description: '', adminCodes: [], branches: [], user: '' });
                         setShowRepCodeForm(false);
                       }}
                       className="px-4 py-2.5 border border-gray-300 rounded-[8px] font-bold text-[14px] hover:bg-gray-50 transition-colors"
@@ -3230,6 +3259,11 @@ alert((response as any).message || 'User invited successfully');
                         <span className="font-semibold text-ars-heading">{repCode.code}</span>
                         {repCode.description && (
                           <span className="text-sm text-ars-body">- {repCode.description}</span>
+                        )}
+                        {repCode.user && typeof repCode.user === 'object' && (
+                          <span className="px-2 py-1 text-xs font-medium rounded-lg bg-green-100 text-green-700">
+                            User: {repCode.user.firstName} {repCode.user.lastName}
+                          </span>
                         )}
                         {repCode.adminCodes && repCode.adminCodes.length > 0 && repCode.adminCodes.map((ac: string, idx: number) => (
                           <span key={`admin-${idx}`} className="px-2 py-1 text-xs font-medium rounded-lg bg-purple-100 text-purple-700">

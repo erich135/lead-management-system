@@ -37,6 +37,16 @@ export interface FrontendUser {
     code: string;
     description?: string;
   };
+  repCodes?: {
+    id: string;
+    code: string;
+    description?: string;
+  }[];
+  adminCodes?: {
+    id: string;
+    code: string;
+    description?: string;
+  }[];
   technician?: {
     id: string;
     name: string;
@@ -116,6 +126,12 @@ function transformUser(backendUser: BackendUser): FrontendUser {
     lastLogin: backendUser.lastLogin,
     adminCode,
     repCode,
+    repCodes: backendUser.repCodes?.map(rc =>
+      typeof rc === 'object' ? { id: rc._id, code: rc.code, description: rc.description } : { id: rc, code: '', description: '' }
+    ),
+    adminCodes: backendUser.adminCodes?.map(ac =>
+      typeof ac === 'object' ? { id: ac._id, code: ac.code, description: ac.description } : { id: ac, code: '', description: '' }
+    ),
     technician,
     cellPhone: backendUser.cellPhone,
     locationTrackingEnabled: backendUser.locationTrackingEnabled ?? false,

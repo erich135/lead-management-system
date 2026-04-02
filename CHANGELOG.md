@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.29] - 2026-04-02
+
+### Changed – User-Centric Code Assignment (Rep Codes & Admin Codes)
+- **User Details panel** — replaced single admin code badge with checkbox sections for both Admin Codes and Rep Codes; ticking/unticking a checkbox auto-saves immediately
+- **User card list** — shows all linked admin codes (purple badges) and rep codes (green badges) from the new arrays
+- **Rep Code form** — replaced the user-linking dropdown with a read-only display of linked users; notes direct admins to manage links from User Management → User Details
+- **`handleCreateRepCode` / `handleUpdateRepCode`** — no longer send `users` to the backend; user linking is managed exclusively from the User Details panel
+- **`handleViewUser`** — now loads both admin codes and rep codes on demand (previously rep codes were only loaded on the Reference Data tab)
+
+### Updated – Frontend Types
+- **`api.ts`** — added `repCodes?` and `adminCodes?` arrays to `BackendUser`, `User`, and `RepCode` interfaces
+- **`AuthContext.tsx`** — added `repCodes?` and `adminCodes?` to `FrontendUser`; `transformUser` maps them from backend
+
 ## [1.0.26] - 2026-03-23
 
 ### Fixed

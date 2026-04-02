@@ -293,14 +293,18 @@ export function SystemManagement() {
    */
   async function handleViewUser(userId: string) {
     try {
-      // Ensure admin codes are loaded when viewing/editing a user
+      // Ensure admin codes and rep codes are loaded when viewing/editing a user
       if (adminCodes.length === 0) {
         console.log('[SystemManagement] Loading admin codes for user edit...');
         const adminCodesResponse = await getAdminCodes();
         console.log('[SystemManagement] Admin codes loaded:', adminCodesResponse.adminCodes?.length || 0, adminCodesResponse.adminCodes);
         setAdminCodes(adminCodesResponse.adminCodes || []);
-      } else {
-        console.log('[SystemManagement] Admin codes already loaded:', adminCodes.length);
+      }
+      if (repCodes.length === 0) {
+        console.log('[SystemManagement] Loading rep codes for user edit...');
+        const repCodesResponse = await getRepCodes();
+        console.log('[SystemManagement] Rep codes loaded:', repCodesResponse.repCodes?.length || 0);
+        setRepCodes(repCodesResponse.repCodes || []);
       }
       
       const response = await getUser(userId);
@@ -733,7 +737,6 @@ alert((response as any).message || 'User invited successfully');
         description: newRepCode.description.trim() || undefined,
         adminCodes: newRepCode.adminCodes.length ? newRepCode.adminCodes : undefined,
         branches: newRepCode.branches.length ? newRepCode.branches : undefined,
-        user: newRepCode.user || null,
       });
       setRepCodes([...repCodes, response.repCode]);
       setNewRepCode({ code: '', description: '', adminCodes: [], branches: [], user: '' });
@@ -762,7 +765,6 @@ alert((response as any).message || 'User invited successfully');
         isActive: editingRepCode.isActive,
         adminCodes: editingRepCode.adminCodes || [],
         branches: editingRepCode.branches?.map((b: any) => typeof b === 'object' ? b._id : b) || [],
-        user: (editingRepCode as any)._linkedUserId !== undefined ? (editingRepCode as any)._linkedUserId : (typeof editingRepCode.user === 'object' && editingRepCode.user ? editingRepCode.user._id : (editingRepCode.user || null)),
       } as any);
       setRepCodes(repCodes.map(rc => rc._id === editingRepCode._id ? response.repCode : rc));
       setEditingRepCode(null);
@@ -1408,6 +1410,20 @@ alert((response as any).message || 'User invited successfully');
                               {typeof user.adminCode === 'object' ? user.adminCode.code : user.adminCode}
                             </span>
                           )}
+                          {user.adminCodes && user.adminCodes.length > 1 && user.adminCodes.slice(1).map((ac: any, i: number) => (
+                            <span key={`ac-${i}`} className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-lg">
+                              {typeof ac === 'object' ? ac.code : ac}
+                            </span>
+                          ))}
+                          {user.repCodes && user.repCodes.length > 0 ? user.repCodes.map((rc: any, i: number) => (
+                            <span key={`rc-${i}`} className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-lg">
+                              {typeof rc === 'object' ? rc.code : rc}
+                            </span>
+                          )) : user.repCode && (
+                            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-lg">
+                              {typeof user.repCode === 'object' ? user.repCode.code : user.repCode}
+                            </span>
+                          )}
                           <span className="text-xs text-ars-body">
                             {user.permissions.length} permission{user.permissions.length !== 1 ? 's' : ''}
                           </span>
@@ -1654,14 +1670,76 @@ alert((response as any).message || 'User invited successfully');
                       </p>
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-1">Admin Code</label>
-                      {selectedUser.adminCode ? (
-                        <p className="px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg inline-block font-medium">
-                          {typeof selectedUser.adminCode === 'object' ? selectedUser.adminCode.code : selectedUser.adminCode}
-                        </p>
-                      ) : (
-                        <p className="text-ars-body italic">No admin code assigned</p>
-                      )}
+                      <label className="block text-sm font-semibold text-ars-body mb-1">Admin Codes</label>
+                      <p className="text-xs text-ars-body mb-2">Tick the admin codes this user is linked to.</p>
+                      <div className="max-h-40 overflow-y-auto space-y-1 border border-gray-200 rounded-lg p-2">
+                        {adminCodes.filter(ac => ac.isActive).length === 0 ? (
+                          <p className="text-xs text-ars-body italic">No admin codes available</p>
+                        ) : adminCodes.filter(ac => ac.isActive).map(ac => {
+                          const userAdminCodeIds = (selectedUser as any).adminCodes?.map((c: any) => typeof c === 'object' ? c._id : c) || [];
+                          const isChecked = userAdminCodeIds.includes(ac._id);
+                          return (
+                            <label key={ac._id} className="flex items-center gap-2 cursor-pointer group">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  const newIds = e.target.checked
+                                    ? [...userAdminCodeIds, ac._id]
+                                    : userAdminCodeIds.filter((id: string) => id !== ac._id);
+                                  setSelectedUser({ ...selectedUser, adminCodes: newIds.map((id: string) => {
+                                    const found = adminCodes.find(a => a._id === id);
+                                    return found ? { _id: found._id, code: found.code, description: found.description } : { _id: id, code: '', description: '' };
+                                  })} as any);
+                                  // Auto-save
+                                  updateUser(selectedUser._id, { adminCodeIds: newIds } as any).then(() => loadData());
+                                }}
+                                className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                              />
+                              <span className="text-sm text-ars-body group-hover:text-ars-heading">
+                                <span className="font-semibold">{ac.code}</span>
+                                {ac.description ? ` - ${ac.description}` : ''}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-1">Rep Codes</label>
+                      <p className="text-xs text-ars-body mb-2">Tick the rep codes this user is linked to.</p>
+                      <div className="max-h-40 overflow-y-auto space-y-1 border border-gray-200 rounded-lg p-2">
+                        {repCodes.filter(rc => rc.isActive).length === 0 ? (
+                          <p className="text-xs text-ars-body italic">No rep codes available</p>
+                        ) : repCodes.filter(rc => rc.isActive).map(rc => {
+                          const userRepCodeIds = (selectedUser as any).repCodes?.map((c: any) => typeof c === 'object' ? c._id : c) || [];
+                          const isChecked = userRepCodeIds.includes(rc._id);
+                          return (
+                            <label key={rc._id} className="flex items-center gap-2 cursor-pointer group">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  const newIds = e.target.checked
+                                    ? [...userRepCodeIds, rc._id]
+                                    : userRepCodeIds.filter((id: string) => id !== rc._id);
+                                  setSelectedUser({ ...selectedUser, repCodes: newIds.map((id: string) => {
+                                    const found = repCodes.find(r => r._id === id);
+                                    return found ? { _id: found._id, code: found.code, description: found.description } : { _id: id, code: '', description: '' };
+                                  })} as any);
+                                  // Auto-save
+                                  updateUser(selectedUser._id, { repCodeIds: newIds } as any).then(() => loadData());
+                                }}
+                                className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer"
+                              />
+                              <span className="text-sm text-ars-body group-hover:text-ars-heading">
+                                <span className="font-semibold">{rc.code}</span>
+                                {rc.description ? ` - ${rc.description}` : ''}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-ars-body mb-1">Status</label>
@@ -3071,30 +3149,24 @@ alert((response as any).message || 'User invited successfully');
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-semibold text-ars-body mb-2">
-                        Linked User (Rep)
+                        Linked Users
                       </label>
-                      <select
-                        value={editingRepCode ? ((editingRepCode as any)._linkedUserId !== undefined ? (editingRepCode as any)._linkedUserId : (typeof editingRepCode.user === 'object' && editingRepCode.user ? editingRepCode.user._id : (editingRepCode.user || ''))) : newRepCode.user}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (editingRepCode) {
-                            setEditingRepCode({ ...editingRepCode, _linkedUserId: val } as any);
-                          } else {
-                            setNewRepCode({ ...newRepCode, user: val });
-                          }
-                        }}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
-                      >
-                        <option value="">-- No user linked --</option>
-                        {allUsers.filter(u => u.isActive).map((user) => (
-                          <option key={user._id} value={user._id}>
-                            {user.firstName} {user.lastName} ({user.email})
-                          </option>
-                        ))}
-                      </select>
-                      <p className="mt-1 text-xs text-gray-500">
-                        Link a user account to this rep code. The user will only see their own assigned leads in Sales Leads.
-                      </p>
+                      {(() => {
+                        const linkedUsers = editingRepCode?.users || [];
+                        if (linkedUsers.length === 0) return (
+                          <p className="text-xs text-gray-500 italic">No users linked. Manage user links from the User Management tab → User Details.</p>
+                        );
+                        return (
+                          <div className="flex flex-wrap gap-2">
+                            {linkedUsers.map((u: any, idx: number) => (
+                              <span key={idx} className="px-2 py-1 text-xs font-medium rounded-lg bg-green-100 text-green-700">
+                                {typeof u === 'object' ? `${u.firstName} ${u.lastName}` : u}
+                              </span>
+                            ))}
+                            <p className="w-full text-xs text-gray-500 mt-1">Manage user links from User Management → User Details.</p>
+                          </div>
+                        );
+                      })()}
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-semibold text-ars-body mb-2">

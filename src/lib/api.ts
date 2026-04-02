@@ -71,6 +71,16 @@ export interface BackendUser {
     code: string;
     description?: string;
   } | string;
+  repCodes?: {
+    _id: string;
+    code: string;
+    description?: string;
+  }[];
+  adminCodes?: {
+    _id: string;
+    code: string;
+    description?: string;
+  }[];
   technician?: {
     _id: string;
     name: string;
@@ -1285,6 +1295,16 @@ export interface User {
     code: string;
     description?: string;
   } | string;
+  repCodes?: {
+    _id: string;
+    code: string;
+    description?: string;
+  }[];
+  adminCodes?: {
+    _id: string;
+    code: string;
+    description?: string;
+  }[];
   technician?: {
     _id: string;
     name: string;

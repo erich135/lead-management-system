@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.30] - 2026-04-16
+
+### Added – Smart Date Input (Sage-style quick entry)
+- **New `SmartDateInput` component** — replaces all native `<input type="date">` fields across the app with a text-based input that supports quick-entry shortcuts
+- **Quick entry shortcuts** — type just a day number (e.g. `16`) and press Tab to auto-fill current month/year (`2026/04/16`); type day/month (e.g. `16/05`) to auto-fill current year (`2026/05/16`); or type the full date
+- **Display format** — all date fields now display as `yyyy/mm/dd` instead of the browser's default date format
+- **Calendar fallback** — hidden native date picker accessible via calendar icon for click-based date selection
+- **Applied to all 50 date inputs** across 13 component files: LeadForm, LeadDetails, Activities, Diary, Dashboard, AppointmentScheduler, Machines, Reports, SalesLeadReports, SalesLeadMapsTab, DailyOverlapReport, LiveRepMap, RepDailyRouteView
+
 ## [1.0.29] - 2026-04-02
 
 ### Changed – User-Centric Code Assignment (Rep Codes & Admin Codes)

@@ -4,6 +4,7 @@ import { getJob, updateJob, getMachinesByCustomer, createMachine, updateMachine,
 import { X, Edit, Save, Clock, User, Trash2, FileText, Paperclip, Upload, Download, Plus, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 import { HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
+import { SmartDateInput } from './SmartDateInput';
 
 interface LeadDetailsProps {
   lead: Job;
@@ -1478,8 +1479,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                             ))}
                           </select>
                           <label className="text-xs text-gray-600 flex-shrink-0">From:</label>
-                          <input
-                            type="date"
+                          <SmartDateInput
                             value={booking.startDate ? booking.startDate.split('T')[0] : ''}
                             onChange={e => {
                               const updated = [...(job.bookings || [])];
@@ -1489,8 +1489,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                             style={{ fontSize: '15px' }} className="px-3 py-2 border border-gray-300 rounded-[8px]"
                           />
                           <label className="text-xs text-gray-600 flex-shrink-0">To:</label>
-                          <input
-                            type="date"
+                          <SmartDateInput
                             value={booking.endDate ? booking.endDate.split('T')[0] : ''}
                             onChange={e => {
                               const updated = [...(job.bookings || [])];
@@ -1552,8 +1551,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                 <div>
                   <label className="block text-[14px] font-semibold text-slate-900 mb-2">Start Date</label>
                   {isEditing ? (
-                    <input
-                      type="date"
+                    <SmartDateInput
                       value={job.startDate ? (typeof job.startDate === 'string' ? job.startDate.split('T')[0] : new Date(job.startDate).toISOString().split('T')[0]) : ''}
                       onChange={(e) => setJob({ ...job, startDate: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
                       style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
@@ -1568,8 +1566,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                 <div>
                   <label className="block text-[14px] font-semibold text-slate-900 mb-2">Date Quoted</label>
                   {isEditing ? (
-                    <input
-                      type="date"
+                    <SmartDateInput
                       value={job.dateQuoted ? (typeof job.dateQuoted === 'string' ? job.dateQuoted.split('T')[0] : new Date(job.dateQuoted).toISOString().split('T')[0]) : ''}
                       onChange={(e) => setJob({ ...job, dateQuoted: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
                       style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
@@ -1584,8 +1581,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                 <div>
                   <label className="block text-[14px] font-semibold text-slate-900 mb-2">Register Date</label>
                   {isEditing ? (
-                    <input
-                      type="date"
+                    <SmartDateInput
                       value={job.registerDate ? (typeof job.registerDate === 'string' ? job.registerDate.split('T')[0] : new Date(job.registerDate).toISOString().split('T')[0]) : ''}
                       onChange={(e) => setJob({ ...job, registerDate: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
                       style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
@@ -1600,8 +1596,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                 <div>
                   <label className="block text-[14px] font-semibold text-slate-900 mb-2">Date Booked</label>
                   {isEditing ? (
-                    <input
-                      type="date"
+                    <SmartDateInput
                       value={job.dateBooked ? (typeof job.dateBooked === 'string' ? job.dateBooked.split('T')[0] : new Date(job.dateBooked).toISOString().split('T')[0]) : ''}
                       onChange={(e) => setJob({ ...job, dateBooked: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
                       style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
@@ -1616,8 +1611,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                 <div>
                   <label className="block text-[14px] font-semibold text-slate-900 mb-2">PO Date</label>
                   {isEditing ? (
-                    <input
-                      type="date"
+                    <SmartDateInput
                       value={job.poDate ? (typeof job.poDate === 'string' ? job.poDate.split('T')[0] : new Date(job.poDate).toISOString().split('T')[0]) : ''}
                       onChange={(e) => setJob({ ...job, poDate: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
                       style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
@@ -1632,8 +1626,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                 <div>
                   <label className="block text-[14px] font-semibold text-slate-900 mb-2">Invoice Date</label>
                   {isEditing ? (
-                    <input
-                      type="date"
+                    <SmartDateInput
                       value={job.invoiceDate ? (typeof job.invoiceDate === 'string' ? job.invoiceDate.split('T')[0] : new Date(job.invoiceDate).toISOString().split('T')[0]) : ''}
                       onChange={(e) => setJob({ ...job, invoiceDate: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
                       style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
@@ -1763,8 +1756,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                         style={{ fontSize: '15px' }} className="flex-1 px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                         placeholder="Store Pack"
                       />
-                      <input
-                        type="date"
+                      <SmartDateInput
                         value={job.storePackDate ? new Date(job.storePackDate).toISOString().split('T')[0] : ''}
                         onChange={(e) => setJob({ ...job, storePackDate: e.target.value || undefined })}
                         style={{ fontSize: '15px' }} className="w-40 px-3 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
@@ -2133,8 +2125,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                           <>
                             <div>
                               <label className="block text-[14px] font-semibold text-slate-900 mb-1">Last Service Date</label>
-                              <input
-                                type="date"
+                              <SmartDateInput
                                 value={newMachine.lastServiceDate}
                                 onChange={(e) => setNewMachine({ ...newMachine, lastServiceDate: e.target.value })}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
@@ -2142,8 +2133,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                             </div>
                             <div>
                               <label className="block text-[14px] font-semibold text-slate-900 mb-1">Next Service Date</label>
-                              <input
-                                type="date"
+                              <SmartDateInput
                                 value={newMachine.nextServiceDate}
                                 onChange={(e) => setNewMachine({ ...newMachine, nextServiceDate: e.target.value })}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"

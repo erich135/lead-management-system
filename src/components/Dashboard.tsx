@@ -53,6 +53,7 @@ import { Diary } from './Diary';
 import { Activities } from './Activities';
 import { Machines } from './Machines';
 import { MobileNavigation } from './MobileNavigation';
+import { SmartDateInput } from './SmartDateInput';
 import { SupportTicketButton } from './SupportTicketWidget';
 import { NotificationBell } from './NotificationBell';
 import { NotificationPanel } from './NotificationPanel';
@@ -1482,8 +1483,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                       
                       <div>
                         <label className="block text-[11px] font-medium text-gray-600 mb-1">Start Date From</label>
-                        <input
-                          type="date"
+                        <SmartDateInput
                           className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-[13px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                           value={filters.startDateFrom}
                           onChange={(e) => setFilters({...filters, startDateFrom: e.target.value})}
@@ -1492,8 +1492,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                       
                       <div>
                         <label className="block text-[11px] font-medium text-gray-600 mb-1">Start Date To</label>
-                        <input
-                          type="date"
+                        <SmartDateInput
                           className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-[13px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                           value={filters.startDateTo}
                           onChange={(e) => setFilters({...filters, startDateTo: e.target.value})}

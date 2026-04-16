@@ -65,6 +65,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
+import { SmartDateInput } from './SmartDateInput';
 
 interface ReportsProps {
   statuses: any[];
@@ -2280,8 +2281,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                   <>
                     <div>
                       <label className="block text-[11px] font-medium text-gray-600 mb-1">From Date</label>
-                      <input
-                        type="date"
+                      <SmartDateInput
                         value={customDateFrom}
                         onChange={(e) => setCustomDateFrom(e.target.value)}
                         className="w-full pl-2 pr-2 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
@@ -2289,8 +2289,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     </div>
                     <div>
                       <label className="block text-[11px] font-medium text-gray-600 mb-1">To Date</label>
-                      <input
-                        type="date"
+                      <SmartDateInput
                         value={customDateTo}
                         onChange={(e) => setCustomDateTo(e.target.value)}
                         className="w-full pl-2 pr-2 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
@@ -2545,8 +2544,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Status Changed From</label>
-                      <input
-                        type="date"
+                      <SmartDateInput
                         value={overdueStatusChangedFrom}
                         onChange={(e) => setOverdueStatusChangedFrom(e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
@@ -2554,8 +2552,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Status Changed To</label>
-                      <input
-                        type="date"
+                      <SmartDateInput
                         value={overdueStatusChangedTo}
                         onChange={(e) => setOverdueStatusChangedTo(e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
@@ -2881,8 +2878,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Status Changed From</label>
-                      <input
-                        type="date"
+                      <SmartDateInput
                         value={jobsStatusChangedFrom}
                         onChange={(e) => setJobsStatusChangedFrom(e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
@@ -2890,8 +2886,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Status Changed To</label>
-                      <input
-                        type="date"
+                      <SmartDateInput
                         value={jobsStatusChangedTo}
                         onChange={(e) => setJobsStatusChangedTo(e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
@@ -3156,8 +3151,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Date From</label>
-                      <input
-                        type="date"
+                      <SmartDateInput
                         value={conversionDateFrom}
                         onChange={(e) => setConversionDateFrom(e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
@@ -3165,8 +3159,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Date To</label>
-                      <input
-                        type="date"
+                      <SmartDateInput
                         value={conversionDateTo}
                         onChange={(e) => setConversionDateTo(e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
@@ -3634,8 +3627,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                   <>
                     <div>
                       <label className="block text-[11px] font-medium text-gray-600 mb-1">From Date</label>
-                      <input
-                        type="date"
+                      <SmartDateInput
                         value={customDateFrom}
                         onChange={(e) => setCustomDateFrom(e.target.value)}
                         className="w-full pl-2 pr-2 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
@@ -3643,8 +3635,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     </div>
                     <div>
                       <label className="block text-[11px] font-medium text-gray-600 mb-1">To Date</label>
-                      <input
-                        type="date"
+                      <SmartDateInput
                         value={customDateTo}
                         onChange={(e) => setCustomDateTo(e.target.value)}
                         className="w-full pl-2 pr-2 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"

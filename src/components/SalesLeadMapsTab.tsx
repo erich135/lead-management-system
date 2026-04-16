@@ -30,6 +30,7 @@ import {
   type Branch,
   type RepCode,
 } from '../lib/api';
+import { SmartDateInput } from './SmartDateInput';
 
 type MapSubView = 'live' | 'appointments' | 'routes' | 'overlaps';
 
@@ -187,8 +188,7 @@ function AppointmentsMapView({ branches, repCodes }: { branches: Branch[]; repCo
         <div className="flex flex-wrap items-end gap-3">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
-            <input
-              type="date"
+            <SmartDateInput
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               className="border rounded-md px-3 py-1.5 text-sm"
@@ -196,8 +196,7 @@ function AppointmentsMapView({ branches, repCodes }: { branches: Branch[]; repCo
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">End Date</label>
-            <input
-              type="date"
+            <SmartDateInput
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
               className="border rounded-md px-3 py-1.5 text-sm"
@@ -358,8 +357,7 @@ function RoutesExplorerView({ repCodes }: { repCodes: RepCode[] }) {
         <div className="p-4 border-b border-gray-200 space-y-3">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Date</label>
-            <input
-              type="date"
+            <SmartDateInput
               value={date}
               onChange={(e) => setDate(e.target.value)}
               className="border rounded-md px-3 py-1.5 text-sm w-full"

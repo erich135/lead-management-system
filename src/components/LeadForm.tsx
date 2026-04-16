@@ -3,6 +3,7 @@ import { createJob, getJobs, getStatuses, getBranches, getCustomers, createCusto
 import { X, Plus, Wrench } from 'lucide-react';
 import { HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
+import { SmartDateInput } from './SmartDateInput';
 
 interface LeadFormProps {
   statuses: Status[];
@@ -1053,12 +1054,10 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
                   size="sm"
                 />
               </label>
-              <input
-                type="date"
+              <SmartDateInput
                 value={formData.startDate || getTodayDate()}
                 onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                 style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                placeholder="YYYY/MM/DD"
               />
             </div>
 
@@ -1070,12 +1069,10 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
                   size="sm"
                 />
               </label>
-              <input
-                type="date"
+              <SmartDateInput
                 value={formData.dateQuoted || ''}
                 onChange={(e) => setFormData({ ...formData, dateQuoted: e.target.value })}
                 style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
-                placeholder="yyyy/mm/dd"
               />
             </div>
 
@@ -1322,8 +1319,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
               <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 Register Date
               </label>
-              <input
-                type="date"
+              <SmartDateInput
                 value={formData.registerDate}
                 onChange={(e) => setFormData({ ...formData, registerDate: e.target.value })}
                 style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
@@ -1347,8 +1343,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
               <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 PO Date
               </label>
-              <input
-                type="date"
+              <SmartDateInput
                 value={formData.poDate}
                 onChange={(e) => setFormData({ ...formData, poDate: e.target.value })}
                 style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
@@ -1385,8 +1380,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
               <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 Store Pack
               </label>
-              <input
-                type="date"
+              <SmartDateInput
                 value={formData.storePack}
                 onChange={(e) => setFormData({ ...formData, storePack: e.target.value })}
                 style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
@@ -1397,8 +1391,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
               <label className="block text-[14px] font-semibold text-slate-900 mb-2">
                 Invoice Date
               </label>
-              <input
-                type="date"
+              <SmartDateInput
                 value={formData.invoiceDate}
                 onChange={(e) => setFormData({ ...formData, invoiceDate: e.target.value })}
                 style={{ fontSize: '15px' }} className="w-full px-4 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
@@ -1450,8 +1443,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
                         <option key={tech._id} value={tech._id}>{tech.name}</option>
                       ))}
                     </select>
-                    <input
-                      type="date"
+                    <SmartDateInput
                       value={booking.date}
                       onChange={e => {
                         const newBookings = [...formData.bookings];

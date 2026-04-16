@@ -10,6 +10,7 @@
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { MapPin, Route, Clock, Navigation, Calendar, Loader2 } from 'lucide-react';
+import { SmartDateInput } from '../SmartDateInput';
 import { MapComponent, MapRoute, MapCircle, MARKER_COLORS } from '../map';
 import {
   getRepDailyRoute,
@@ -89,8 +90,7 @@ export default function RepDailyRouteView({ userId, initialDate }: RepDailyRoute
         </h3>
         <div className="flex items-center gap-2">
           <Calendar size={14} className="text-gray-400" />
-          <input
-            type="date"
+          <SmartDateInput
             value={date}
             onChange={(e) => setDate(e.target.value)}
             max={todayISO()}

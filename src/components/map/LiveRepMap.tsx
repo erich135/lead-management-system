@@ -16,6 +16,7 @@ import {
   ChevronRight, X, Calendar, Navigation, Battery, Zap
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { SmartDateInput } from '../SmartDateInput';
 import { MapComponent, MapMarker, MapCircle, MapRoute, MARKER_COLORS, createCustomIcon } from '../map';
 import {
   useManagerLocationSocket,
@@ -229,8 +230,7 @@ export default function LiveRepMap({ enabled = true }: LiveRepMapProps) {
             {/* Date picker */}
             <div className="flex items-center gap-2">
               <Calendar size={14} className="text-gray-400" />
-              <input
-                type="date"
+              <SmartDateInput
                 value={routeDate}
                 onChange={(e) => {
                   setRouteDate(e.target.value);

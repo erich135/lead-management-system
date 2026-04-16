@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, Users, Target, Calendar, MapPin, Banknote, Download, AlertCircle, Loader2 } from 'lucide-react';
 import { getSalesLeadAnalytics } from '../lib/api';
+import { SmartDateInput } from './SmartDateInput';
 
 type ReportCategory = 'overview' | 'performance' | 'sources' | 'reps' | 'appointments' | 'branches' | 'canvassing';
 
@@ -222,15 +223,13 @@ const SalesLeadReports: React.FC = () => {
             {/* Custom Date Range */}
             {dateRange === 'custom' && (
               <>
-                <input
-                  type="date"
+                <SmartDateInput
                   value={customStartDate}
                   onChange={(e) => setCustomStartDate(e.target.value)}
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                   placeholder="Start Date"
                 />
-                <input
-                  type="date"
+                <SmartDateInput
                   value={customEndDate}
                   onChange={(e) => setCustomEndDate(e.target.value)}
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"

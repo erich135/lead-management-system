@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Save, Loader2, Calendar, Clock, User, MapPin, FileText } from 'lucide-react';
 import { createAppointment, type RepCode } from '../lib/api';
 import { AddressAutocomplete } from './AddressAutocomplete';
+import { SmartDateInput } from './SmartDateInput';
 
 interface AppointmentSchedulerProps {
   leadId: string;
@@ -105,8 +106,7 @@ export function AppointmentScheduler({ leadId, leadCompanyName, repCodes, onClos
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Date <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="date"
+                <SmartDateInput
                   required
                   min={today}
                   value={formData.scheduledDate}

@@ -8,6 +8,7 @@ import { useState, useEffect, useRef } from 'react';
 import { getActivities, getUsers, getEmailLogs, Activity, User, EmailLog } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Clock, User as UserIcon, Filter, Search, RefreshCw, ChevronLeft, ChevronRight, Mail, CheckCircle, XCircle } from 'lucide-react';
+import { SmartDateInput } from './SmartDateInput';
 import { formatDateTime } from '../utils/dateFormat';
 
 export function Activities() {
@@ -345,8 +346,7 @@ export function Activities() {
                 </div>
                 <div>
                   <label className="text-[11px] font-medium text-gray-600 mb-1 block">Start Date</label>
-                  <input
-                    type="date"
+                  <SmartDateInput
                     value={emailLogsStartDate}
                     onChange={(e) => { setEmailLogsStartDate(e.target.value); setEmailLogsPage(1); }}
                     className="w-full pl-2 pr-2 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[13px] h-[38px]"
@@ -354,8 +354,7 @@ export function Activities() {
                 </div>
                 <div>
                   <label className="text-[11px] font-medium text-gray-600 mb-1 block">End Date</label>
-                  <input
-                    type="date"
+                  <SmartDateInput
                     value={emailLogsEndDate}
                     onChange={(e) => { setEmailLogsEndDate(e.target.value); setEmailLogsPage(1); }}
                     className="w-full pl-2 pr-2 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white text-[13px] h-[38px]"
@@ -629,8 +628,7 @@ export function Activities() {
             {/* Start Date Filter */}
             <div>
               <label className="text-[11px] font-medium text-gray-600 mb-1 block">Start Date</label>
-              <input
-                type="date"
+              <SmartDateInput
                 value={filterStartDate}
                 onChange={(e) => {
                   setFilterStartDate(e.target.value);
@@ -643,8 +641,7 @@ export function Activities() {
             {/* End Date Filter */}
             <div>
               <label className="text-[11px] font-medium text-gray-600 mb-1 block">End Date</label>
-              <input
-                type="date"
+              <SmartDateInput
                 value={filterEndDate}
                 onChange={(e) => {
                   setFilterEndDate(e.target.value);

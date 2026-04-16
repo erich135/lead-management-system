@@ -10,6 +10,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   AlertTriangle, Calendar, MapPin, Users, TrendingDown, Loader2, RefreshCw
 } from 'lucide-react';
+import { SmartDateInput } from '../SmartDateInput';
 import { MapComponent, MapMarker, MapCircle, MARKER_COLORS, createCustomIcon } from '../map';
 import {
   getDailyOverlaps,
@@ -101,8 +102,7 @@ export default function DailyOverlapReport({ initialDate }: DailyOverlapReportPr
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1">
             <Calendar size={14} className="text-gray-400" />
-            <input
-              type="date"
+            <SmartDateInput
               value={date}
               onChange={(e) => setDate(e.target.value)}
               className="text-sm border border-gray-300 rounded px-2 py-1"

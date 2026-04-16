@@ -39,6 +39,7 @@ import {
   Save,
   FileSpreadsheet,
 } from 'lucide-react';
+import { SmartDateInput } from './SmartDateInput';
 
 export function Machines() {
   const { isSuperAdmin } = useAuth();
@@ -673,8 +674,7 @@ export function Machines() {
                                 <>
                                   <div>
                                     <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Last Service Date</label>
-                                    <input
-                                      type="date"
+                                    <SmartDateInput
                                       value={editForm.lastServiceDate || ''}
                                       onChange={(e) => setEditForm({ ...editForm, lastServiceDate: e.target.value })}
                                       className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -682,8 +682,7 @@ export function Machines() {
                                   </div>
                                   <div>
                                     <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Next Service Date</label>
-                                    <input
-                                      type="date"
+                                    <SmartDateInput
                                       value={editForm.nextServiceDate || ''}
                                       onChange={(e) => setEditForm({ ...editForm, nextServiceDate: e.target.value })}
                                       className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -894,7 +893,7 @@ export function Machines() {
               {/* Date on RSR */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Date on RSR <span className="text-red-500">*</span></label>
-                <input type="date" value={uploadWorkDate} onChange={(e) => setUploadWorkDate(e.target.value)}
+                <SmartDateInput value={uploadWorkDate} onChange={(e) => setUploadWorkDate(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" />
                 <p className="text-xs text-slate-400 mt-1">The date the work was actually done</p>
               </div>
@@ -919,7 +918,7 @@ export function Machines() {
                 /* Date-based machine: Next Service Date */
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Next Service Date <span className="text-red-500">*</span></label>
-                  <input type="date" value={uploadNextServiceDate} onChange={(e) => setUploadNextServiceDate(e.target.value)}
+                  <SmartDateInput value={uploadNextServiceDate} onChange={(e) => setUploadNextServiceDate(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" />
                 </div>
               )}

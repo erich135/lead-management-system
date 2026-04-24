@@ -23,3 +23,6 @@ dist-ssr
 .env
 
 .vercel
+
+read_excel.js
+*.xlsx

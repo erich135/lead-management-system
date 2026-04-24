@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.0.31] - 2026-04-24
+
+### Added – Machine Import Wizard (XLSX)
+- **New `MachineImportWizard` component** — 4-step Super Admin wizard (Upload → Preview → Confirm → Done) for bulk-importing customer machines from the Excel file "MASTER CUSTOMER UNIT DETAILS FULL.xlsx"
+- **Step 1 – Upload** — select any `.xlsx` file; sheet picker auto-defaults to the latest month sheet (e.g. "DESEMBER 2025")
+- **Step 2 – Preview** — parses headers automatically (Client, Type, Make, Model, S/N, Service Type, hours, dates); resolves customers by name with exact then case-insensitive matching; displays match/unmatched/skipped counts; per-row customer reassignment dropdown for unmatched rows; per-row **Ownership toggle** (Customer's Own Machine / ARS Rental Unit); per-row Skip/Include toggle; row-level search filter
+- **Step 3 – Confirm** — summary of rows to import with duplicate-handling notice
+- **Step 4 – Done** — shows created/updated/error counts
+- **`api.ts`** — added `ImportableMachineRow` interface and `importCustomerMachines()` function posting JSON to `POST /api/import/customer-machines`
+
+### Added – Machine Type & Ownership Fields
+- **`Machine` interface** (`api.ts`) — added `machineType?: string` and `ownershipType?: 'customer' | 'ars_rental'`
+- **Machines detail view** — shows Machine Type (when present) and Ownership badge ("Customer's Own" / "ARS Rental Unit")
+- **Machines edit form** — added "Machine Type" text input and "Unit Ownership" dropdown
+
+### Added – Import Machines Button
+- **`Machines.tsx`** — "Import Machines" button added to page header; visible to Super Admins only; opens the import wizard; triggers a list refresh on completion
+
 ## [1.0.30] - 2026-04-16
 
 ### Added – Smart Date Input (Sage-style quick entry)

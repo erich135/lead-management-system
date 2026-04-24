@@ -702,6 +702,7 @@ export interface Machine {
   _id: string;
   make: string;
   model: string;
+  machineType?: string;
   serialNumber: string;
   assetNumber?: string;
   customer?: {
@@ -710,6 +711,7 @@ export interface Machine {
   } | string;
   cashCustomer?: string;
   isRental?: boolean;
+  ownershipType?: 'customer' | 'ars_rental';
   serviceType?: 'hours' | 'date';
   machineHours: number;
   nextServiceHours: number;
@@ -720,6 +722,22 @@ export interface Machine {
   rsrDocuments?: MachineRSR[];
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface ImportableMachineRow {
+  clientName: string;
+  customerId?: string;
+  machineType?: string;
+  make: string;
+  model: string;
+  serialNumber: string;
+  serviceType: 'hours' | 'date';
+  machineHours?: number;
+  nextServiceHours?: number;
+  lastServiceDate?: string;
+  nextServiceDate?: string;
+  ownershipType: 'customer' | 'ars_rental';
+  isRental: boolean;
 }
 
 export interface Technician {
@@ -1687,6 +1705,30 @@ export async function importRentalMachines(file: File, clearExisting: boolean): 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: { message: 'Failed to import rental machines' } }));
     throw new Error(error.error?.message || 'Failed to import rental machines');
+  }
+
+  return response.json();
+}
+
+/**
+ * Imports customer machines from the XLSX wizard (JSON payload).
+ */
+export async function importCustomerMachines(machines: ImportableMachineRow[]): Promise<{ message: string; data: { imported: number; updated: number; errors: string[] } }> {
+  const token = getAuthToken();
+  if (!token) throw new Error('No authentication token found');
+
+  const response = await fetch(`${API_BASE_URL}/api/import/customer-machines`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ machines }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Failed to import machines' } }));
+    throw new Error(error.error?.message || 'Failed to import machines');
   }
 
   return response.json();

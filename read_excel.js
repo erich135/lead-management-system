@@ -1,0 +1,10 @@
+﻿import * as XLSX from "xlsx";
+import * as fs from "fs";
+const workbook = XLSX.read(fs.readFileSync("MASTER CUSTOMER UNIT DETAILS FULL.xlsx"));
+const sheetName = "DESEMBER 2025";
+const worksheet = workbook.Sheets[sheetName];
+const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+console.log("Full Column Headers (DESEMBER 2025):");
+console.log(JSON.stringify(data[0], null, 2));
+console.log("\nFirst 5 Data Rows:");
+console.log(JSON.stringify(data.slice(1, 6), null, 2));

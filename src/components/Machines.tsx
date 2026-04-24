@@ -16,6 +16,7 @@ import {
   type CustomerWithMachines,
 } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { MachineImportWizard } from './MachineImportWizard';
 import {
   Search,
   Building2,
@@ -77,6 +78,9 @@ export function Machines() {
   const [reportCustomers, setReportCustomers] = useState<CustomerWithMachines[]>([]);
   const [reportCustomerId, setReportCustomerId] = useState('');
   const [generatingReport, setGeneratingReport] = useState(false);
+
+  // Import wizard state
+  const [showImportWizard, setShowImportWizard] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [loadingReportCustomers, setLoadingReportCustomers] = useState(false);
 
@@ -165,13 +169,15 @@ export function Machines() {
       model: machine.model,
       serialNumber: machine.serialNumber,
       assetNumber: machine.assetNumber || '',
+      machineType: machine.machineType || '',
+      ownershipType: machine.ownershipType || 'customer',
       serviceType: machine.serviceType || 'hours',
       machineHours: machine.machineHours || 0,
       nextServiceHours: machine.nextServiceHours || 0,
       lastServiceDate: machine.lastServiceDate ? machine.lastServiceDate.split('T')[0] : '',
       nextServiceDate: machine.nextServiceDate ? machine.nextServiceDate.split('T')[0] : '',
       cashCustomer: machine.cashCustomer || '',
-    });
+    } as any);
   };
 
   const handleSave = async () => {
@@ -181,6 +187,7 @@ export function Machines() {
       const payload: any = { ...editForm };
       // Clean empty strings
       if (!payload.assetNumber) delete payload.assetNumber;
+      if (!payload.machineType) delete payload.machineType;
       if (!payload.lastServiceDate) delete payload.lastServiceDate;
       if (!payload.nextServiceDate) delete payload.nextServiceDate;
       if (!payload.cashCustomer) delete payload.cashCustomer;
@@ -381,13 +388,24 @@ export function Machines() {
               View, manage, and edit all machines. Click a row to view details and RSR documents.
             </p>
           </div>
-          <button
-            onClick={handleOpenReportModal}
-            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 shadow-sm transition-all text-sm font-medium"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            Generate Machine Report
-          </button>
+          <div className="flex items-center gap-2">
+            {isSuperAdmin && (
+              <button
+                onClick={() => setShowImportWizard(true)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 shadow-sm transition-all text-sm font-medium"
+              >
+                <Upload className="w-4 h-4" />
+                Import Machines
+              </button>
+            )}
+            <button
+              onClick={handleOpenReportModal}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 shadow-sm transition-all text-sm font-medium"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Generate Machine Report
+            </button>
+          </div>
         </div>
       </div>
 
@@ -629,6 +647,27 @@ export function Machines() {
                                 />
                               </div>
                               <div>
+                                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Machine Type</label>
+                                <input
+                                  type="text"
+                                  value={(editForm as any).machineType || ''}
+                                  onChange={(e) => setEditForm({ ...editForm, machineType: e.target.value } as any)}
+                                  placeholder="e.g. Compressor, Generator"
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Unit Ownership</label>
+                                <select
+                                  value={(editForm as any).ownershipType || 'customer'}
+                                  onChange={(e) => setEditForm({ ...editForm, ownershipType: e.target.value as 'customer' | 'ars_rental' } as any)}
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                                >
+                                  <option value="customer">Customer's Own Machine</option>
+                                  <option value="ars_rental">ARS Rental Unit</option>
+                                </select>
+                              </div>
+                              <div>
                                 <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Cash Customer</label>
                                 <input
                                   type="text"
@@ -710,9 +749,25 @@ export function Machines() {
                                 <div className="text-xs font-semibold text-slate-400 uppercase">Asset Number</div>
                                 <div className="text-sm font-medium text-slate-800 mt-0.5">{machine.assetNumber || '—'}</div>
                               </div>
+                              {machine.machineType && (
+                                <div>
+                                  <div className="text-xs font-semibold text-slate-400 uppercase">Machine Type</div>
+                                  <div className="text-sm font-medium text-slate-800 mt-0.5">{machine.machineType}</div>
+                                </div>
+                              )}
                               <div>
                                 <div className="text-xs font-semibold text-slate-400 uppercase">Customer</div>
                                 <div className="text-sm font-medium text-slate-800 mt-0.5">{getCustomerName(machine)}</div>
+                              </div>
+                              <div>
+                                <div className="text-xs font-semibold text-slate-400 uppercase">Ownership</div>
+                                <div className="text-sm mt-0.5">
+                                  {machine.ownershipType === 'ars_rental' ? (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">ARS Rental Unit</span>
+                                  ) : (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">Customer's Own</span>
+                                  )}
+                                </div>
                               </div>
                               <div>
                                 <div className="text-xs font-semibold text-slate-400 uppercase">Service Type</div>
@@ -740,16 +795,6 @@ export function Machines() {
                                     <div className="text-sm font-medium text-slate-800 mt-0.5">{machine.nextServiceHours || 0}</div>
                                   </div>
                                 </>
-                              )}
-                              {machine.isRental && (
-                                <div>
-                                  <div className="text-xs font-semibold text-slate-400 uppercase">Type</div>
-                                  <div className="text-sm mt-0.5">
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
-                                      Rental
-                                    </span>
-                                  </div>
-                                </div>
                               )}
                             </div>
                           )}
@@ -1076,6 +1121,15 @@ export function Machines() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Import Wizard */}
+      {showImportWizard && (
+        <MachineImportWizard
+          customers={customers}
+          onClose={() => setShowImportWizard(false)}
+          onImportComplete={() => loadMachines(1)}
+        />
       )}
     </div>
   );

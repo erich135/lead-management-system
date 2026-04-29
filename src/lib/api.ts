@@ -717,6 +717,9 @@ export interface Machine {
   nextServiceHours: number;
   lastServiceDate?: string;
   nextServiceDate?: string;
+  lastOilSampleDate?: string;
+  oilSampleComment?: string;
+  currentLocation?: string;
   isActive: boolean;
   dbStatus?: string;
   rsrDocuments?: MachineRSR[];

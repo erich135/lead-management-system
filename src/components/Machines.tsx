@@ -176,7 +176,10 @@ export function Machines() {
       nextServiceHours: machine.nextServiceHours || 0,
       lastServiceDate: machine.lastServiceDate ? machine.lastServiceDate.split('T')[0] : '',
       nextServiceDate: machine.nextServiceDate ? machine.nextServiceDate.split('T')[0] : '',
+      lastOilSampleDate: machine.lastOilSampleDate ? machine.lastOilSampleDate.split('T')[0] : '',
+      oilSampleComment: machine.oilSampleComment || '',
       cashCustomer: machine.cashCustomer || '',
+      currentLocation: machine.currentLocation || '',
     } as any);
   };
 
@@ -190,7 +193,10 @@ export function Machines() {
       if (!payload.machineType) delete payload.machineType;
       if (!payload.lastServiceDate) delete payload.lastServiceDate;
       if (!payload.nextServiceDate) delete payload.nextServiceDate;
+      if (!payload.lastOilSampleDate) delete payload.lastOilSampleDate;
+      if (!payload.oilSampleComment) delete payload.oilSampleComment;
       if (!payload.cashCustomer) delete payload.cashCustomer;
+      if (!payload.currentLocation) delete payload.currentLocation;
 
       const response = await updateMachine(editingMachine._id, payload);
       // Update local state
@@ -504,6 +510,9 @@ export function Machines() {
                         {machine.assetNumber && (
                           <div className="text-xs text-slate-400">Asset: {machine.assetNumber}</div>
                         )}
+                        {machine.currentLocation && (
+                          <div className="text-xs text-slate-400">Loc: {machine.currentLocation}</div>
+                        )}
                       </div>
                     </div>
 
@@ -647,6 +656,16 @@ export function Machines() {
                                 />
                               </div>
                               <div>
+                                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Current Location</label>
+                                <input
+                                  type="text"
+                                  value={(editForm as any).currentLocation || ''}
+                                  onChange={(e) => setEditForm({ ...editForm, currentLocation: e.target.value } as any)}
+                                  placeholder="e.g. Site A, Workshop, Client premises"
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                              </div>
+                              <div>
                                 <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Machine Type</label>
                                 <input
                                   type="text"
@@ -729,6 +748,24 @@ export function Machines() {
                                   </div>
                                 </>
                               )}
+                              <div>
+                                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Last Oil Sample Date</label>
+                                <SmartDateInput
+                                  value={editForm.lastOilSampleDate || ''}
+                                  onChange={(e) => setEditForm({ ...editForm, lastOilSampleDate: e.target.value })}
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                              </div>
+                              <div className="md:col-span-3">
+                                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Oil Sample Comment</label>
+                                <input
+                                  type="text"
+                                  value={editForm.oilSampleComment || ''}
+                                  onChange={(e) => setEditForm({ ...editForm, oilSampleComment: e.target.value })}
+                                  placeholder="Feedback on oil sample result..."
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                              </div>
                             </div>
                           ) : (
                             /* Read-Only Details */
@@ -748,6 +785,10 @@ export function Machines() {
                               <div>
                                 <div className="text-xs font-semibold text-slate-400 uppercase">Asset Number</div>
                                 <div className="text-sm font-medium text-slate-800 mt-0.5">{machine.assetNumber || '—'}</div>
+                              </div>
+                              <div>
+                                <div className="text-xs font-semibold text-slate-400 uppercase">Current Location</div>
+                                <div className="text-sm font-medium text-slate-800 mt-0.5">{machine.currentLocation || '—'}</div>
                               </div>
                               {machine.machineType && (
                                 <div>
@@ -796,6 +837,14 @@ export function Machines() {
                                   </div>
                                 </>
                               )}
+                              <div>
+                                <div className="text-xs font-semibold text-slate-400 uppercase">Last Oil Sample Date</div>
+                                <div className="text-sm font-medium text-slate-800 mt-0.5">{machine.lastOilSampleDate ? formatDate(machine.lastOilSampleDate) : '—'}</div>
+                              </div>
+                              <div className="md:col-span-3">
+                                <div className="text-xs font-semibold text-slate-400 uppercase">Oil Sample Comment</div>
+                                <div className="text-sm font-medium text-slate-800 mt-0.5">{machine.oilSampleComment || '—'}</div>
+                              </div>
                             </div>
                           )}
                         </div>

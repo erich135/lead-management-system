@@ -33,6 +33,11 @@ interface ParsedRow {
   nextServiceHours: number | null;
   lastServiceDate: string | null;
   nextServiceDate: string | null;
+  assetNumber: string;
+  currentLocation: string;
+  cashCustomer: string;
+  lastOilSampleDate: string | null;
+  oilSampleComment: string;
   // resolved during preview step
   resolvedCustomerId?: string;
   matchStatus: 'matched' | 'unmatched' | 'skipped';
@@ -98,7 +103,7 @@ export function MachineImportWizard({ customers, onClose, onImportComplete }: Pr
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ imported: number; updated: number; errors: string[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -179,6 +184,12 @@ export function MachineImportWizard({ customers, onClose, onImportComplete }: Pr
         const nextSvcHoursCol = col(['next service', 'next service hours', 'nextservicehours', 'next service (hours)']);
         const lastSvcDateCol = col(['last service date', 'lastservicedate', 'last service']);
         const nextSvcDateCol = col(['next service date', 'nextservicedate']);
+        const assetCol = col(['asset number', 'assetnumber', 'asset', 'asset #']);
+        const currentLocationCol = col(['current location', 'currentlocation', 'location']);
+        const cashCustomerCol = col(['cash customer', 'cashcustomer']);
+        const lastOilSampleDateCol = col(['last oil sample date', 'lastoilsampledate', 'oil sample date']);
+        const oilSampleCommentCol = col(['oil sample comment', 'oilsamplecomment', 'oil comment']);
+        const ownershipCol = col(['unit ownership', 'ownership', 'ownershiptype']);
 
         if (makeCol === -1 || modelCol === -1 || serialCol === -1) {
           setParseError('Could not find required columns (Make, Model, S/N). Check that you selected the correct sheet.');
@@ -200,6 +211,16 @@ export function MachineImportWizard({ customers, onClose, onImportComplete }: Pr
           const machineHoursVal = lastHourCol !== -1 ? parseNumber(row[lastHourCol]) : null;
           const nextServiceHoursVal = nextSvcHoursCol !== -1 ? parseNumber(row[nextSvcHoursCol]) : null;
 
+          const assetNumber = assetCol !== -1 ? String(row[assetCol] ?? '').trim() : '';
+          const currentLocation = currentLocationCol !== -1 ? String(row[currentLocationCol] ?? '').trim() : '';
+          const cashCustomer = cashCustomerCol !== -1 ? String(row[cashCustomerCol] ?? '').trim() : '';
+          const lastOilSampleDate = lastOilSampleDateCol !== -1 ? excelDateToISO(row[lastOilSampleDateCol]) : null;
+          const oilSampleComment = oilSampleCommentCol !== -1 ? String(row[oilSampleCommentCol] ?? '').trim() : '';
+          const ownershipRaw = ownershipCol !== -1 ? String(row[ownershipCol] ?? '').trim().toLowerCase() : '';
+          const ownershipType: 'customer' | 'ars_rental' =
+            ownershipRaw === 'ars_rental' || ownershipRaw === 'ars rental' || ownershipRaw === 'rental'
+              ? 'ars_rental' : 'customer';
+
           // Resolve customer
           const matched = clientName ? customerIndex.get(normalise(clientName)) : undefined;
 
@@ -215,9 +236,14 @@ export function MachineImportWizard({ customers, onClose, onImportComplete }: Pr
             nextServiceHours: serviceTypeIsDate ? null : nextServiceHoursVal,
             lastServiceDate: serviceTypeIsDate ? excelDateToISO(lastSvcDateCol !== -1 ? row[lastSvcDateCol] : null) : null,
             nextServiceDate: excelDateToISO(nextSvcDateCol !== -1 ? row[nextSvcDateCol] : null),
+            assetNumber,
+            currentLocation,
+            cashCustomer,
+            lastOilSampleDate,
+            oilSampleComment,
             resolvedCustomerId: matched?._id,
             matchStatus: matched ? 'matched' : clientName ? 'unmatched' : 'skipped',
-            ownershipType: 'customer',
+            ownershipType,
           });
         }
 
@@ -302,6 +328,11 @@ export function MachineImportWizard({ customers, onClose, onImportComplete }: Pr
         nextServiceDate: r.nextServiceDate ?? undefined,
         ownershipType: r.ownershipType,
         isRental: r.ownershipType === 'ars_rental',
+        assetNumber: r.assetNumber || undefined,
+        currentLocation: r.currentLocation || undefined,
+        cashCustomer: r.cashCustomer || undefined,
+        lastOilSampleDate: r.lastOilSampleDate ?? undefined,
+        oilSampleComment: r.oilSampleComment || undefined,
       }));
 
       const result = await importCustomerMachines(payload);
@@ -589,8 +620,8 @@ export function MachineImportWizard({ customers, onClose, onImportComplete }: Pr
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800 flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <span>
-                  If a machine with the same serial number already exists for the same customer, it will be <strong>updated</strong> — not duplicated.
-                  New machines will be created.
+                  If a machine with the same serial number already exists for the same customer, it will be <strong>skipped</strong> — existing data will not be changed.
+                  Only new machines will be created.
                 </span>
               </div>
 
@@ -616,9 +647,9 @@ export function MachineImportWizard({ customers, onClose, onImportComplete }: Pr
                   <div className="text-2xl font-bold text-green-700">{importResult.imported}</div>
                   <div className="text-xs text-green-600">Created</div>
                 </div>
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
-                  <div className="text-2xl font-bold text-blue-700">{importResult.updated}</div>
-                  <div className="text-xs text-blue-600">Updated</div>
+                <div className="bg-slate-100 border border-slate-200 rounded-xl p-3">
+                  <div className="text-2xl font-bold text-slate-600">{importResult.skipped}</div>
+                  <div className="text-xs text-slate-500">Skipped (duplicates)</div>
                 </div>
                 <div className="bg-red-50 border border-red-200 rounded-xl p-3">
                   <div className="text-2xl font-bold text-red-700">{importResult.errors.length}</div>

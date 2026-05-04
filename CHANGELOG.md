@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.0.33] - 2026-05-04
+
+### Changed – Machine Import: Skip Duplicates
+- **`MachineImportWizard.tsx`** — confirm step warning updated to state that duplicates are skipped, not updated; done step now shows "Skipped (duplicates)" count in grey instead of "Updated" in blue
+- **`SystemManagement.tsx`** — rental machine import result panel now shows "Skipped (duplicates)" count for the `rental-machines` import type
+- **`api.ts`** — `ImportResult` interface gains `skipped?: number`; `importCustomerMachines` return type updated to `skipped` instead of `updated`
+
+### Added – Additional Fields to Machine CSV & XLSX Import
+- **`MachineImportWizard.tsx`** — XLSX wizard now parses seven new optional columns: `Asset Number`, `Current Location`, `Unit Ownership` (read from sheet instead of always defaulting to `customer`), `Cash Customer`, `Last Oil Sample Date`, `Oil Sample Comment`; all values passed through to the import payload
+- **`api.ts`** — `ImportableMachineRow` interface extended with `assetNumber?`, `currentLocation?`, `cashCustomer?`, `lastOilSampleDate?`, `oilSampleComment?`
+- **`SystemManagement.tsx`** — rental machines CSV column documentation updated to list all 16 supported columns including the five new ones
+
+## [1.0.32] - 2026-04-29
+
+### Added – Current Location Field on Machines
+- **`api.ts`** — added `currentLocation?: string` to the `Machine` interface
+- **`Machines.tsx`** — machine list row now shows `Loc: ...` subtitle under the asset number when a location is set; expanded detail panel displays a "Current Location" read-only field; edit form includes a free-text "Current Location" input
+- **`SystemManagement.tsx`** — rental machines CSV import help card lists `Current Location` as an optional column with a description
+
 ## [1.0.31] - 2026-04-24
 
 ### Added – Machine Import Wizard (XLSX)

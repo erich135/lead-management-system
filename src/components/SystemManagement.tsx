@@ -124,7 +124,7 @@ export function SystemManagement() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [clearExisting, setClearExisting] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState<string>(''); // Branch ID or code
-  const [importResult, setImportResult] = useState<{ imported?: number; updated: number; errors: string[]; notFound?: number } | null>(null);
+  const [importResult, setImportResult] = useState<{ imported?: number; updated: number; skipped?: number; errors: string[]; notFound?: number } | null>(null);
   
   // Branches state
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -2343,12 +2343,18 @@ alert((response as any).message || 'User invited successfully');
                     <li><strong>Model</strong> - <span className="text-red-600">Required</span></li>
                     <li><strong>Serial Number</strong> - <span className="text-red-600">Required</span></li>
                     <li><strong>Asset Number</strong> - Optional, for internal tracking</li>
+                    <li><strong>Machine Type</strong> - Optional (e.g., Compressor, Generator)</li>
                     <li><strong>Customer</strong> - Optional: customer name to link the machine to. If empty, machine is created as a rental fleet machine. If the customer doesn't exist, it will be auto-created.</li>
+                    <li><strong>Cash Customer</strong> - Optional: cash customer name (used instead of Customer for cash accounts)</li>
+                    <li><strong>Unit Ownership</strong> - Optional: <em>customer</em> (default) or <em>ars_rental</em></li>
                     <li><strong>Service Type</strong> - Optional: "hours" or "date" (auto-detected by Make if not specified)</li>
                     <li><strong>Machine Hours</strong> - For hour-based machines (Generator, Genset, Compressors)</li>
                     <li><strong>Next Service Hours</strong> - For hour-based machines</li>
                     <li><strong>Last Service Date</strong> - For date-based machines (Dryer, Blower, Vacuum pump, Air Receiver)</li>
                     <li><strong>Next Service Date</strong> - For date-based machines</li>
+                    <li><strong>Current Location</strong> - Optional: where the machine is currently deployed or stored (e.g., "Site A", "Workshop", "Client premises")</li>
+                    <li><strong>Last Oil Sample Date</strong> - Optional: date of last oil sample taken</li>
+                    <li><strong>Oil Sample Comment</strong> - Optional: feedback or notes on oil sample result</li>
                   </ul>
                   <p className="text-xs text-ars-body mt-2 italic">
                     Service type auto-detection: Dryer, Blower, Vacuum pump, and Air Receiver machines use date-based service tracking. All others use hours.
@@ -2599,11 +2605,20 @@ alert((response as any).message || 'User invited successfully');
                           <p className="text-sm text-green-600">Imported</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-                        <CheckCircle2 className="w-6 h-6 text-blue-600" />
+                      <div className={`flex items-center gap-3 p-3 rounded-lg ${importType === 'rental-machines' ? 'bg-slate-100' : 'bg-blue-50'}`}>
+                        <CheckCircle2 className={`w-6 h-6 ${importType === 'rental-machines' ? 'text-slate-500' : 'text-blue-600'}`} />
                         <div>
-                          <p className="text-2xl font-bold text-blue-700">{importResult.updated || 0}</p>
-                          <p className="text-sm text-blue-600">Updated</p>
+                          {importType === 'rental-machines' ? (
+                            <>
+                              <p className="text-2xl font-bold text-slate-600">{importResult.skipped || 0}</p>
+                              <p className="text-sm text-slate-500">Skipped (duplicates)</p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-2xl font-bold text-blue-700">{importResult.updated || 0}</p>
+                              <p className="text-sm text-blue-600">Updated</p>
+                            </>
+                          )}
                         </div>
                       </div>
                     </>

@@ -741,6 +741,11 @@ export interface ImportableMachineRow {
   nextServiceDate?: string;
   ownershipType: 'customer' | 'ars_rental';
   isRental: boolean;
+  assetNumber?: string;
+  currentLocation?: string;
+  cashCustomer?: string;
+  lastOilSampleDate?: string;
+  oilSampleComment?: string;
 }
 
 export interface Technician {
@@ -1570,6 +1575,7 @@ export async function getPermissions(params?: {
 export interface ImportResult {
   imported: number;
   updated: number;
+  skipped?: number;
   errors: string[];
 }
 
@@ -1716,7 +1722,7 @@ export async function importRentalMachines(file: File, clearExisting: boolean): 
 /**
  * Imports customer machines from the XLSX wizard (JSON payload).
  */
-export async function importCustomerMachines(machines: ImportableMachineRow[]): Promise<{ message: string; data: { imported: number; updated: number; errors: string[] } }> {
+export async function importCustomerMachines(machines: ImportableMachineRow[]): Promise<{ message: string; data: { imported: number; skipped: number; errors: string[] } }> {
   const token = getAuthToken();
   if (!token) throw new Error('No authentication token found');
 

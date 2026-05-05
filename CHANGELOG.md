@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.0.34] - 2026-05-05
+
+### Added – Admin Activity Report
+- **New `AdminActivityReport.tsx` component** — dedicated report showing how many jobs (= quotations) each admin created per day / week / month / YTD with colour-coded heat-map cells, trend badges, and avg-per-working-day column
+- **Filter bar** — reference date picker, multi-select admin code filter, branch toggle chips, and Load/Refresh button
+- **Export to Excel** — two-sheet workbook: `Admin Activity` (styled table with header freeze, auto-filter, totals row) and `YTD Distribution` (data for manual pie chart creation in Excel)
+- **Export to PDF** — landscape PDF via jsPDF/autoTable with a pie chart (drawn on hidden canvas) and colour legend embedded after the table
+- **Schedule Daily Report modal** — toggle (active/inactive), SAST send-time picker, recipient management:
+  - **User-picker dropdown** — searches all active system users by name or email; click to add as chip; users already added are hidden from the list
+  - **Manual email fallback** — type any external email address in the picker footer
+  - **Last-run status** — shows last sent timestamp and success/failure inline
+  - **Send Now (test)** button — sends yesterday's report immediately to all configured recipients
+- **`api.ts`** — added `getAdminActivitySummary()`, `AdminActivityData`, `AdminActivityRow`, `AdminActivityMeta`; added `getAdminActivityScheduleConfig()`, `updateAdminActivityScheduleConfig()`, `sendAdminActivityNow()`, and `AdminActivityScheduleConfig` interface
+- **`Reports.tsx`** — Admin Activity Report tab wired in
+- **`SystemManagement.tsx`** — Schedule Daily Report entry added
+
+### Fixed – Admin Activity date label (timezone)
+- Daily label now formatted directly from the `YYYY-MM-DD` string (not from UTC Date), preventing the UTC midnight offset from showing the previous day
+
 ## [1.0.33] - 2026-05-04
 
 ### Changed – Machine Import: Skip Duplicates

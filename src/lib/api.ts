@@ -1009,6 +1009,77 @@ export async function getAdminCodes(): Promise<{ adminCodes: AdminCode[] }> {
   return apiRequest('/api/reference/admin-codes');
 }
 
+// ── Admin Activity Summary Report ──────────────────────────────────────────
+
+export interface AdminActivityRow {
+  adminCode: string;
+  daily: number;
+  weekly: number;
+  monthly: number;
+  ytd: number;
+  avgPerDay: number;
+}
+
+export interface AdminActivityMeta {
+  dailyLabel: string;    // e.g. "05/05/2026"
+  weeklyLabel: string;   // e.g. "04/05/2026 – 10/05/2026"
+  monthlyLabel: string;  // e.g. "May 2026"
+  ytdLabel: string;      // e.g. "2026 YTD"
+  workingDays: number;
+}
+
+export interface AdminActivityData {
+  rows: AdminActivityRow[];
+  meta: AdminActivityMeta;
+}
+
+export async function getAdminActivitySummary(params: {
+  date?: string;
+  adminCodes?: string[];
+  branches?: string[];
+}): Promise<AdminActivityData> {
+  const qs = new URLSearchParams();
+  if (params.date) qs.set('date', params.date);
+  if (params.adminCodes?.length) qs.set('adminCodes', params.adminCodes.join(','));
+  if (params.branches?.length) qs.set('branches', params.branches.join(','));
+  return apiRequest<AdminActivityData>(
+    `/api/jobs/admin-activity-summary?${qs.toString()}`
+  );
+}
+
+// ─── Admin Activity Schedule ──────────────────────────────────────────────────
+
+export interface AdminActivityScheduleConfig {
+  _id?: string;
+  isActive: boolean;
+  sendTime: string;       // "HH:MM" SAST
+  recipients: string[];
+  lastRunDate?: string;
+  lastRunAt?: string;
+  lastRunStatus?: 'success' | 'failed';
+  lastRunError?: string;
+}
+
+export async function getAdminActivityScheduleConfig(): Promise<AdminActivityScheduleConfig> {
+  return apiRequest<AdminActivityScheduleConfig>('/api/jobs/admin-activity-schedule');
+}
+
+export async function updateAdminActivityScheduleConfig(
+  data: Partial<Pick<AdminActivityScheduleConfig, 'isActive' | 'sendTime' | 'recipients'>>,
+): Promise<AdminActivityScheduleConfig> {
+  return apiRequest<AdminActivityScheduleConfig>('/api/jobs/admin-activity-schedule', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function sendAdminActivityNow(recipients?: string[]): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>('/api/jobs/admin-activity-schedule/send-now', {
+    method: 'POST',
+    body: JSON.stringify({ recipients }),
+  });
+}
+
 /**
  * Creates a new admin code.
  */
@@ -3316,6 +3387,140 @@ export async function getNearbyAppointments(params: {
 export async function getDailyOverlaps(date: string, radius?: number): Promise<DailyOverlapGroup[]> {
   const params = radius ? `?radius=${radius}` : '';
   return apiRequest<DailyOverlapGroup[]>(`/api/overlap/daily/${date}${params}`);
+}
+
+// ============================================================
+// Scheduled Reports API (super admin)
+// ============================================================
+
+export type ScheduledReportDateRange =
+  | 'yesterday'
+  | 'last7days'
+  | 'last30days'
+  | 'thisMonth'
+  | 'lastMonth'
+  | 'thisQuarter'
+  | 'thisYear'
+  | 'last12months';
+
+export type ScheduledReportFrequency = 'daily' | 'weekly' | 'monthly';
+
+export interface ScheduledReportSections {
+  overview: boolean;
+  leadPerformance: boolean;
+  repPerformance: boolean;
+  sourceAnalysis: boolean;
+  appointmentAnalytics: boolean;
+  branchPerformance: boolean;
+  leadAging: boolean;
+  lostReasons: boolean;
+  quotesPerDayPerAdmin: boolean;
+}
+
+export interface ScheduledReportFilters {
+  branches: string[];
+  assignedReps: string[];
+  leadSources: string[];
+  statuses: string[];
+  dateRangeType: ScheduledReportDateRange;
+}
+
+export interface ScheduledReport {
+  _id: string;
+  name: string;
+  description?: string;
+  sections: ScheduledReportSections;
+  filters: ScheduledReportFilters & {
+    branches: Array<{ _id: string; name: string } | string>;
+    assignedReps: Array<{ _id: string; code: string; description?: string } | string>;
+  };
+  frequency: ScheduledReportFrequency;
+  dayOfWeek?: number;
+  dayOfMonth?: number;
+  sendTime: string;
+  recipients: Array<{ _id: string; firstName: string; lastName: string; email: string } | string>;
+  isActive: boolean;
+  nextRunAt: string;
+  lastRunAt?: string;
+  lastRunStatus?: 'success' | 'failed';
+  lastRunError?: string;
+  createdBy: { _id: string; firstName: string; lastName: string; email: string } | string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ScheduledReportPayload {
+  name: string;
+  description?: string;
+  sections: ScheduledReportSections;
+  filters: {
+    branches: string[];
+    assignedReps: string[];
+    leadSources: string[];
+    statuses: string[];
+    dateRangeType: ScheduledReportDateRange;
+  };
+  frequency: ScheduledReportFrequency;
+  dayOfWeek?: number;
+  dayOfMonth?: number;
+  sendTime: string;
+  recipients: string[];
+  isActive?: boolean;
+}
+
+export async function getScheduledReports(): Promise<{ reports: ScheduledReport[] }> {
+  return apiRequest<{ reports: ScheduledReport[] }>('/api/scheduled-reports');
+}
+
+export async function getScheduledReport(id: string): Promise<{ report: ScheduledReport }> {
+  return apiRequest<{ report: ScheduledReport }>(`/api/scheduled-reports/${id}`);
+}
+
+export async function createScheduledReport(data: ScheduledReportPayload): Promise<{ report: ScheduledReport }> {
+  return apiRequest<{ report: ScheduledReport }>('/api/scheduled-reports', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateScheduledReport(id: string, data: Partial<ScheduledReportPayload>): Promise<{ report: ScheduledReport }> {
+  return apiRequest<{ report: ScheduledReport }>(`/api/scheduled-reports/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function toggleScheduledReport(id: string): Promise<{ report: Partial<ScheduledReport> }> {
+  return apiRequest<{ report: Partial<ScheduledReport> }>(`/api/scheduled-reports/${id}/toggle`, {
+    method: 'PATCH',
+  });
+}
+
+export async function deleteScheduledReport(id: string): Promise<void> {
+  await apiRequest(`/api/scheduled-reports/${id}`, { method: 'DELETE' });
+}
+
+export async function sendScheduledReportNow(id: string): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>(`/api/scheduled-reports/${id}/send-now`, {
+    method: 'POST',
+  });
+}
+
+export async function previewScheduledReport(data: ScheduledReportPayload): Promise<string> {
+  const token = getAuthToken();
+  const response = await fetch(`${API_BASE_URL}/api/scheduled-reports/preview`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Preview failed (${response.status})`);
+  }
+  return response.text();
 }
 
 export default {

@@ -57,9 +57,11 @@ import {
   Send,
   X,
   FileSpreadsheet,
-  File
+  File,
+  BarChart3
 } from 'lucide-react';
 import { LeadDetails } from './LeadDetails';
+import { AdminActivityReport } from './AdminActivityReport';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -72,7 +74,7 @@ interface ReportsProps {
   branches: any[];
 }
 
-type ReportTab = 'user-performance' | 'customer' | 'machine';
+type ReportTab = 'user-performance' | 'customer' | 'machine' | 'admin-activity';
 
 type UserRole = 'admin' | 'rep' | 'technician';
 
@@ -516,20 +518,14 @@ export function Reports({ statuses, branches }: ReportsProps) {
       setLoading(true);
       setError(null);
 
-      // Build job filters - only use date filters for API call
+      // Build job filters — fetch all jobs, then filter client-side
+      // Date filtering is done client-side (using createdAt) to handle
+      // jobs that may not have startDate set
       const jobFilters: any = {
         allTime: 'true',
         limit: 10000, // Get all jobs
         includeHidden: showHiddenConversion ? true : undefined,
       };
-
-      // Add date filters if specified
-      if (conversionDateFrom) {
-        jobFilters.startDate = conversionDateFrom;
-      }
-      if (conversionDateTo) {
-        jobFilters.endDate = conversionDateTo;
-      }
 
       // Load jobs
       const jobsResponse = await getJobs(jobFilters);
@@ -540,6 +536,19 @@ export function Reports({ statuses, branches }: ReportsProps) {
       
       // Apply frontend filters
       let filteredJobs = [...allJobs];
+
+      // Date filter: use startDate if available, fall back to createdAt
+      if (conversionDateFrom || conversionDateTo) {
+        const from = conversionDateFrom ? new Date(conversionDateFrom + 'T00:00:00') : null;
+        const to = conversionDateTo ? new Date(conversionDateTo + 'T23:59:59') : null;
+        filteredJobs = filteredJobs.filter(job => {
+          const ref = job.startDate ? new Date(job.startDate) : job.createdAt ? new Date(job.createdAt) : null;
+          if (!ref) return false;
+          if (from && ref < from) return false;
+          if (to && ref > to) return false;
+          return true;
+        });
+      }
       
       // Filter by admin on frontend if specified
       if (conversionAdminFilter) {
@@ -2128,6 +2137,17 @@ export function Reports({ statuses, branches }: ReportsProps) {
           >
             <Wrench className="w-4 h-4 inline mr-2" />
             Machine Reports
+          </button>
+          <button
+            onClick={() => setActiveTab('admin-activity')}
+            className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+              activeTab === 'admin-activity'
+                ? 'border-ars-primary text-ars-primary'
+                : 'border-transparent text-ars-body hover:text-ars-heading'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4 inline mr-2" />
+            Admin Activity
           </button>
         </div>
 
@@ -4755,6 +4775,12 @@ export function Reports({ statuses, branches }: ReportsProps) {
           </div>
         </div>
       )}
+
+      {/* Admin Activity Report */}
+      {activeTab === 'admin-activity' && (
+        <AdminActivityReport branches={branches} />
+      )}
+
       </div>
     </div>
   );

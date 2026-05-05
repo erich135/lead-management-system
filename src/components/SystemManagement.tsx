@@ -94,6 +94,7 @@ import {
   Banknote
 } from 'lucide-react';
 import { ChangelogViewer } from './ChangelogViewer';
+import { ScheduledReports } from './ScheduledReports';
 
 export function SystemManagement() {
   const [users, setUsers] = useState<User[]>([]);
@@ -105,7 +106,7 @@ export function SystemManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditingUser, setIsEditingUser] = useState(false);
-  const [activeTab, setActiveTab] = useState<'users' | 'imports' | 'reference' | 'changelog' | 'group-permissions'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'imports' | 'reference' | 'changelog' | 'group-permissions' | 'scheduled-reports'>('users');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 20;
@@ -186,7 +187,7 @@ export function SystemManagement() {
     loadData();
     loadImportHistory();
     loadBranches();
-    if (activeTab === 'reference' || showInviteForm) {
+    if (activeTab === 'reference' || activeTab === 'scheduled-reports' || showInviteForm) {
       loadReferenceData();
     }
   }, [currentPage, searchTerm, activeTab, showInviteForm]);
@@ -1302,6 +1303,19 @@ alert((response as any).message || 'User invited successfully');
               <div className="flex items-center justify-center gap-2">
                 <History className="w-5 h-5" />
                 Changelog
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('scheduled-reports')}
+              className={`flex-1 px-6 py-4 font-semibold transition-all ${
+                activeTab === 'scheduled-reports'
+                  ? 'text-ars-primary border-b-2 border-ars-primary bg-blue-50'
+                  : 'text-ars-body hover:text-ars-heading hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <Calendar className="w-5 h-5" />
+                Scheduled Reports
               </div>
             </button>
           </div>
@@ -4149,6 +4163,13 @@ alert((response as any).message || 'User invited successfully');
         {activeTab === 'changelog' && (
           <div className="space-y-6">
             <ChangelogViewer />
+          </div>
+        )}
+
+        {/* Scheduled Reports Tab */}
+        {activeTab === 'scheduled-reports' && (
+          <div className="space-y-6">
+            <ScheduledReports allUsers={allUsers} />
           </div>
         )}
       </div>

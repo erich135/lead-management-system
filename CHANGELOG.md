@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.0.34] - 2026-05-05
+## [1.0.34] - 2026-05-06
 
 ### Added – Admin Activity Report
 - **New `AdminActivityReport.tsx` component** — dedicated report showing how many jobs (= quotations) each admin created per day / week / month / YTD with colour-coded heat-map cells, trend badges, and avg-per-working-day column

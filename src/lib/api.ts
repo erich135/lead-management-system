@@ -960,6 +960,37 @@ export async function deleteJobSource(id: string): Promise<{ message: string }> 
   });
 }
 
+export interface MachineType {
+  _id: string;
+  name: string;
+  serviceType: 'hours' | 'date';
+  isActive?: boolean;
+}
+
+export async function getMachineTypes(): Promise<{ machineTypes: MachineType[] }> {
+  return apiRequest('/api/reference/machine-types');
+}
+
+export async function createMachineType(data: { name: string; serviceType: 'hours' | 'date' }): Promise<{ machineType: MachineType }> {
+  return apiRequest('/api/reference/machine-types', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateMachineType(id: string, data: Partial<MachineType>): Promise<{ machineType: MachineType }> {
+  return apiRequest(`/api/reference/machine-types/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteMachineType(id: string): Promise<{ message: string }> {
+  return apiRequest(`/api/reference/machine-types/${id}`, {
+    method: 'DELETE',
+  });
+}
+
 /**
  * Gets all rep codes.
  */
@@ -3552,6 +3583,10 @@ export default {
   createJobSource,
   updateJobSource,
   deleteJobSource,
+  getMachineTypes,
+  createMachineType,
+  updateMachineType,
+  deleteMachineType,
   getRepCodes,
   createRepCode,
   updateRepCode,

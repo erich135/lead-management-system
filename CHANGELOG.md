@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.35] - 2026-05-10
+
+### Added – Machine Types Reference Data Management
+- **`api.ts`** — added `MachineType` interface and `getMachineTypes()`, `createMachineType()`, `updateMachineType()`, `deleteMachineType()` API functions calling `/api/reference/machine-types`
+- **`SystemManagement.tsx`** — new **Machine Types** section under the Reference Data tab; lists all types with name, service type badge (Hours Based / Date Based), and active status; supports add, edit (with active toggle), and delete
+- **`Machines.tsx`** — Machine Type field in the machine edit form changed from a free-text input to a dropdown; dropdown options now load dynamically from the API (falls back to hardcoded list while loading)
+- **`LeadDetails.tsx`** — Machine Type dropdown in the add/edit machine form now loads dynamically from the API; `serviceType` (`hours`/`date`) determination now uses the fetched machine type's `serviceType` field instead of a hardcoded list
+- **`LeadForm.tsx`** — Machine Type dropdown in the new machine form now loads dynamically from the API
+
+### Changed – Import Machines label
+- **`SystemManagement.tsx`** — renamed "Import Rental Machines" section to "Import Machines" (heading, description, checkbox label, and button text)
+
 ## [1.0.34] - 2026-05-06
 
 ### Added – Admin Activity Report

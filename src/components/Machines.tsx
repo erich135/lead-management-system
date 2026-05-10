@@ -10,10 +10,12 @@ import {
   getCustomers,
   getCustomersWithMachines,
   downloadMachinePlannerReport,
+  getMachineTypes,
   type Machine,
   type MachineRSR,
   type Customer,
   type CustomerWithMachines,
+  type MachineType,
 } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { MachineImportWizard } from './MachineImportWizard';
@@ -51,6 +53,7 @@ export function Machines() {
   const [searchQuery, setSearchQuery] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [machineTypes, setMachineTypes] = useState<MachineType[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 0 });
 
   // Selected / expanded machine
@@ -127,6 +130,19 @@ export function Machines() {
       }
     };
     loadCustomers();
+  }, []);
+
+  // Load machine types for dropdown
+  useEffect(() => {
+    const loadMachineTypes = async () => {
+      try {
+        const response = await getMachineTypes();
+        setMachineTypes(response.machineTypes || []);
+      } catch (error) {
+        console.error('Error loading machine types:', error);
+      }
+    };
+    loadMachineTypes();
   }, []);
 
   // Load RSRs when a machine is expanded
@@ -667,13 +683,31 @@ export function Machines() {
                               </div>
                               <div>
                                 <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Machine Type</label>
-                                <input
-                                  type="text"
+                                <select
                                   value={(editForm as any).machineType || ''}
                                   onChange={(e) => setEditForm({ ...editForm, machineType: e.target.value } as any)}
-                                  placeholder="e.g. Compressor, Generator"
                                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
+                                >
+                                  <option value="">Select type</option>
+                                  {machineTypes.length > 0
+                                    ? machineTypes.map(mt => (
+                                        <option key={mt._id} value={mt.name}>{mt.name}</option>
+                                      ))
+                                    : (
+                                      <>
+                                        <option value="Generator">Generator</option>
+                                        <option value="Genset">Genset</option>
+                                        <option value="Compressor oil free">Compressor oil free</option>
+                                        <option value="Compressor oil injection">Compressor oil injection</option>
+                                        <option value="Diesel reciprocating compressor">Diesel reciprocating compressor</option>
+                                        <option value="Dryer">Dryer</option>
+                                        <option value="Blower">Blower</option>
+                                        <option value="Vacuum pump">Vacuum pump</option>
+                                        <option value="Air Receiver">Air Receiver</option>
+                                      </>
+                                    )
+                                  }
+                                </select>
                               </div>
                               <div>
                                 <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Unit Ownership</label>

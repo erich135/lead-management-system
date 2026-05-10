@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getJob, updateJob, getMachinesByCustomer, createMachine, updateMachine, getTechnicians, getRepCodes, getCustomers, getActivities, getServiceDescriptions, getJobSources, deleteJob, uploadRSRDocument, getRSRDocuments, getRSRDocumentUrl, deleteRSRDocument, createJobNote, getJobNotes, uploadJobNoteAttachment, getJobNoteAttachmentUrl, deleteJobNote, type Job, type Status, type Branch, type Machine, type Technician, type RepCode, type Customer, type Activity, type ServiceDescription, type JobSource, type OverdueJob, type JobRSRDocument, type JobNote, type JobNoteAttachment } from '../lib/api';
+import { getJob, updateJob, getMachinesByCustomer, createMachine, updateMachine, getTechnicians, getRepCodes, getCustomers, getActivities, getServiceDescriptions, getJobSources, getMachineTypes, deleteJob, uploadRSRDocument, getRSRDocuments, getRSRDocumentUrl, deleteRSRDocument, createJobNote, getJobNotes, uploadJobNoteAttachment, getJobNoteAttachmentUrl, deleteJobNote, type Job, type Status, type Branch, type Machine, type Technician, type RepCode, type Customer, type Activity, type ServiceDescription, type JobSource, type MachineType, type OverdueJob, type JobRSRDocument, type JobNote, type JobNoteAttachment } from '../lib/api';
 import { X, Edit, Save, Clock, User, Trash2, FileText, Paperclip, Upload, Download, Plus, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 import { HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
@@ -78,13 +78,22 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   });
 
   // Machine types that use date-based service tracking
-  const dateBasedMachineTypes = ['Dryer', 'Blower', 'Vacuum pump', 'Air Receiver'];
-  const isDateBasedMachine = dateBasedMachineTypes.includes(newMachine.machineType);
+  const getServiceTypeForMachineType = (name: string): 'hours' | 'date' => {
+    if (machineTypes.length > 0) {
+      const found = machineTypes.find(mt => mt.name === name);
+      if (found) return found.serviceType;
+    }
+    // Fallback for when machine types haven't loaded yet
+    const dateBased = ['Dryer', 'Blower', 'Vacuum pump', 'Air Receiver'];
+    return dateBased.includes(name) ? 'date' : 'hours';
+  };
+  const isDateBasedMachine = getServiceTypeForMachineType(newMachine.machineType) === 'date';
   const [creatingMachine, setCreatingMachine] = useState(false);
   const [repCodes, setRepCodes] = useState<RepCode[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [serviceDescriptions, setServiceDescriptions] = useState<ServiceDescription[]>([]);
   const [jobSources, setJobSources] = useState<JobSource[]>([]);
+  const [machineTypes, setMachineTypes] = useState<MachineType[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [showActivityHistory, setShowActivityHistory] = useState(false);
@@ -122,6 +131,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     loadCustomers();
     loadServiceDescriptions();
     loadJobSources();
+    loadMachineTypes();
     loadActivityHistory();
     loadRSRDocuments();
     loadNotes();
@@ -245,6 +255,15 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     } catch (err) {
       console.error('Error loading job sources:', err);
       setJobSources([]);
+    }
+  }
+
+  async function loadMachineTypes() {
+    try {
+      const response = await getMachineTypes();
+      setMachineTypes(response.machineTypes || []);
+    } catch (err) {
+      console.error('Error loading machine types:', err);
     }
   }
 
@@ -612,7 +631,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     setError('');
     try {
       // Determine service type based on machine type
-      const serviceType = dateBasedMachineTypes.includes(newMachine.machineType) ? 'date' : 'hours';
+      const serviceType = getServiceTypeForMachineType(newMachine.machineType);
 
       if (editingMachine) {
         // Update existing machine
@@ -2053,15 +2072,24 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                           >
                             <option value="">Select type</option>
-                            <option value="Generator">Generator</option>
-                            <option value="Genset">Genset</option>
-                            <option value="Compressor oil free">Compressor oil free</option>
-                            <option value="Compressor oil injection">Compressor oil injection</option>
-                            <option value="Diesel reciprocating compressor">Diesel reciprocating compressor</option>
-                            <option value="Dryer">Dryer</option>
-                            <option value="Blower">Blower</option>
-                            <option value="Vacuum pump">Vacuum pump</option>
-                            <option value="Air Receiver">Air Receiver</option>
+                            {machineTypes.length > 0
+                              ? machineTypes.map(mt => (
+                                  <option key={mt._id} value={mt.name}>{mt.name}</option>
+                                ))
+                              : (
+                                <>
+                                  <option value="Generator">Generator</option>
+                                  <option value="Genset">Genset</option>
+                                  <option value="Compressor oil free">Compressor oil free</option>
+                                  <option value="Compressor oil injection">Compressor oil injection</option>
+                                  <option value="Diesel reciprocating compressor">Diesel reciprocating compressor</option>
+                                  <option value="Dryer">Dryer</option>
+                                  <option value="Blower">Blower</option>
+                                  <option value="Vacuum pump">Vacuum pump</option>
+                                  <option value="Air Receiver">Air Receiver</option>
+                                </>
+                              )
+                            }
                           </select>
                         </div>
                         <div>

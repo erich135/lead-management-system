@@ -1,5 +1,5 @@
 import { useState, FormEvent, useEffect, useRef } from 'react';
-import { createJob, getJobs, getStatuses, getBranches, getCustomers, createCustomer, getTechnicians, getServiceDescriptions, getJobSources, getRepCodes, getAdminCodes, getMachinesByCustomer, getRentalMachines, createMachine, type Status, type Branch, type Customer, type Technician, type ServiceDescription, type JobSource, type RepCode, type AdminCode, type Machine, type Job } from '../lib/api';
+import { createJob, getJobs, getStatuses, getBranches, getCustomers, createCustomer, getTechnicians, getServiceDescriptions, getJobSources, getRepCodes, getAdminCodes, getMachinesByCustomer, getRentalMachines, createMachine, getMachineTypes, type Status, type Branch, type Customer, type Technician, type ServiceDescription, type JobSource, type RepCode, type AdminCode, type Machine, type MachineType, type Job } from '../lib/api';
 import { X, Plus, Wrench } from 'lucide-react';
 import { HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
@@ -24,6 +24,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [serviceDescriptions, setServiceDescriptions] = useState<ServiceDescription[]>([]);
   const [jobSources, setJobSources] = useState<JobSource[]>([]);
+  const [machineTypes, setMachineTypes] = useState<MachineType[]>([]);
   const [repCodes, setRepCodes] = useState<RepCode[]>([]);
   const [adminCodes, setAdminCodes] = useState<AdminCode[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
@@ -116,13 +117,14 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
   useEffect(() => {
     async function loadReferenceData() {
       try {
-        const [techsData, descsData, jobSourcesData, repCodesData, adminCodesData, customersData] = await Promise.all([
+        const [techsData, descsData, jobSourcesData, repCodesData, adminCodesData, customersData, machineTypesData] = await Promise.all([
           getTechnicians().catch(err => { console.error('getTechnicians failed:', err); return { technicians: [] }; }),
           getServiceDescriptions().catch(err => { console.error('getServiceDescriptions failed:', err); return { descriptions: [] }; }),
           getJobSources().catch(err => { console.error('getJobSources failed:', err); return { sources: [] }; }),
           getRepCodes().catch(err => { console.error('getRepCodes failed:', err); return { repCodes: [] }; }),
           getAdminCodes().catch(err => { console.error('getAdminCodes failed:', err); return { adminCodes: [] }; }),
           getCustomers({ limit: 10000 }).catch(err => { console.error('getCustomers failed:', err); return { customers: [] }; }),
+          getMachineTypes().catch(err => { console.error('getMachineTypes failed:', err); return { machineTypes: [] }; }),
         ]);
         setTechnicians(techsData.technicians || []);
         setServiceDescriptions(descsData.descriptions || []);
@@ -130,6 +132,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
         setRepCodes(repCodesData.repCodes || []);
         setAdminCodes(adminCodesData.adminCodes || []);
         setAllCustomers(customersData.customers || []);
+        setMachineTypes(machineTypesData.machineTypes || []);
         console.log('Reference data loaded:', { 
           technicians: techsData.technicians?.length, 
           descriptions: descsData.descriptions?.length,
@@ -1237,15 +1240,24 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent text-sm"
                           >
                             <option value="">Select type</option>
-                            <option value="Generator">Generator</option>
-                            <option value="Genset">Genset</option>
-                            <option value="Compressor oil free">Compressor oil free</option>
-                            <option value="Compressor oil injection">Compressor oil injection</option>
-                            <option value="Diesel reciprocating compressor">Diesel reciprocating compressor</option>
-                            <option value="Dryer">Dryer</option>
-                            <option value="Blower">Blower</option>
-                            <option value="Vacuum pump">Vacuum pump</option>
-                            <option value="Air Receiver">Air Receiver</option>
+                            {machineTypes.length > 0
+                              ? machineTypes.map(mt => (
+                                  <option key={mt._id} value={mt.name}>{mt.name}</option>
+                                ))
+                              : (
+                                <>
+                                  <option value="Generator">Generator</option>
+                                  <option value="Genset">Genset</option>
+                                  <option value="Compressor oil free">Compressor oil free</option>
+                                  <option value="Compressor oil injection">Compressor oil injection</option>
+                                  <option value="Diesel reciprocating compressor">Diesel reciprocating compressor</option>
+                                  <option value="Dryer">Dryer</option>
+                                  <option value="Blower">Blower</option>
+                                  <option value="Vacuum pump">Vacuum pump</option>
+                                  <option value="Air Receiver">Air Receiver</option>
+                                </>
+                              )
+                            }
                           </select>
                         </div>
                         <div>

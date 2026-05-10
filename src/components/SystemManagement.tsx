@@ -60,7 +60,12 @@ import {
   ServiceDescription,
   JobSource,
   Branch,
-  Status
+  Status,
+  MachineType,
+  getMachineTypes,
+  createMachineType,
+  updateMachineType,
+  deleteMachineType,
 } from '../lib/api';
 import { 
   Users, 
@@ -165,6 +170,13 @@ export function SystemManagement() {
   const [isAdminCodesExpanded, setIsAdminCodesExpanded] = useState(false);
   const [isTechniciansExpanded, setIsTechniciansExpanded] = useState(false);
   const [isDescriptionsExpanded, setIsDescriptionsExpanded] = useState(false);
+
+  // Machine Types state
+  const [machineTypes, setMachineTypes] = useState<MachineType[]>([]);
+  const [editingMachineType, setEditingMachineType] = useState<MachineType | null>(null);
+  const [showMachineTypeForm, setShowMachineTypeForm] = useState(false);
+  const [newMachineType, setNewMachineType] = useState({ name: '', serviceType: 'hours' as 'hours' | 'date' });
+  const [isMachineTypesExpanded, setIsMachineTypesExpanded] = useState(false);
   
   // Invite user state
   const [showInviteForm, setShowInviteForm] = useState(false);
@@ -244,7 +256,9 @@ export function SystemManagement() {
       // Load job sources
       const jobSourcesResponse = await getJobSources();
       setJobSources(jobSourcesResponse.sources || []);
-
+      // Load machine types
+      const machineTypesResponse = await getMachineTypes();
+      setMachineTypes(machineTypesResponse.machineTypes || []);
       // Load statuses
       const statusesResponse = await getStatuses();
       setStatuses(statusesResponse.statuses || []);
@@ -1214,6 +1228,55 @@ alert((response as any).message || 'User invited successfully');
       setJobSources(jobSources.filter(s => s._id !== id));
     } catch (err: any) {
       setError(err.message || 'Failed to delete job source');
+    }
+  }
+
+  async function handleCreateMachineType() {
+    if (!newMachineType.name.trim()) {
+      setError('Machine type name is required');
+      return;
+    }
+    try {
+      setError(null);
+      const response = await createMachineType({
+        name: newMachineType.name.trim(),
+        serviceType: newMachineType.serviceType,
+      });
+      setMachineTypes([...machineTypes, response.machineType].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewMachineType({ name: '', serviceType: 'hours' });
+      setShowMachineTypeForm(false);
+    } catch (err: any) {
+      setError(err.message || 'Failed to create machine type');
+    }
+  }
+
+  async function handleUpdateMachineType() {
+    if (!editingMachineType) return;
+    try {
+      setError(null);
+      const response = await updateMachineType(editingMachineType._id, {
+        name: editingMachineType.name,
+        serviceType: editingMachineType.serviceType,
+        isActive: editingMachineType.isActive,
+      });
+      setMachineTypes(
+        machineTypes
+          .map(t => t._id === editingMachineType._id ? response.machineType : t)
+          .sort((a, b) => a.name.localeCompare(b.name))
+      );
+      setEditingMachineType(null);
+    } catch (err: any) {
+      setError(err.message || 'Failed to update machine type');
+    }
+  }
+
+  async function handleDeleteMachineType(id: string) {
+    if (!confirm('Are you sure you want to delete this machine type?')) return;
+    try {
+      await deleteMachineType(id);
+      setMachineTypes(machineTypes.filter(t => t._id !== id));
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete machine type');
     }
   }
 
@@ -2332,12 +2395,12 @@ alert((response as any).message || 'User invited successfully');
                 </div>
               </div>
 
-              {/* Import Rental Machines */}
+              {/* Import Machines */}
               <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-bold text-ars-heading flex items-center gap-2">
                     <Cog className="w-5 h-5 text-amber-600" />
-                    Import Rental Machines
+                    Import Machines
                   </h3>
                   <button
                     onClick={() => downloadExampleCSV('rental-machines').catch(err => alert('Failed to download: ' + err.message))}
@@ -2348,7 +2411,7 @@ alert((response as any).message || 'User invited successfully');
                   </button>
                 </div>
                 <p className="text-sm text-ars-body mb-4">
-                  Import rental fleet machines from a CSV file. These machines can be assigned to rental jobs.
+                  Import machines from a CSV file. These machines can be assigned to jobs.
                 </p>
                 <div className="mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
                   <p className="text-xs font-semibold text-ars-heading mb-2">CSV Column Names:</p>
@@ -2404,7 +2467,7 @@ alert((response as any).message || 'User invited successfully');
                       className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary"
                     />
                     <label htmlFor="clear-rental-machines" className="text-sm text-ars-body cursor-pointer">
-                      Clear existing rental machines before importing
+                      Clear existing machines before importing
                     </label>
                   </div>
                   <button
@@ -2420,7 +2483,7 @@ alert((response as any).message || 'User invited successfully');
                     ) : (
                       <>
                         <Upload className="w-4 h-4" />
-                        IMPORT RENTAL MACHINES
+                        IMPORT MACHINES
                       </>
                     )}
                   </button>
@@ -4153,6 +4216,183 @@ alert((response as any).message || 'User invited successfully');
                   <p className="text-center text-ars-body py-8">No job sources found. Click "Add Job Source" to create one.</p>
                 )}
               </div>
+                </>
+              )}
+            </div>
+
+            {/* Machine Types Section */}
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <button
+                onClick={() => setIsMachineTypesExpanded(!isMachineTypesExpanded)}
+                className="w-full flex items-center gap-2 text-xl font-bold text-ars-heading hover:text-ars-primary transition-colors"
+              >
+                {isMachineTypesExpanded ? <ChevronUp className="w-6 h-6 text-ars-primary" /> : <ChevronDown className="w-6 h-6 text-ars-primary" />}
+                <Cog className="w-6 h-6 text-ars-primary" />
+                Machine Types
+              </button>
+
+              {isMachineTypesExpanded && (
+                <>
+                  <p className="mt-5 text-sm text-ars-body mb-4">
+                    Manage machine types and their default service schedule type (hours-based or date-based).
+                  </p>
+
+                  <div className="mb-4">
+                    <button
+                      onClick={() => {
+                        setEditingMachineType(null);
+                        setNewMachineType({ name: '', serviceType: 'hours' });
+                        setShowMachineTypeForm(!showMachineTypeForm);
+                      }}
+                      className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      ADD MACHINE TYPE
+                    </button>
+                  </div>
+
+                  {/* Machine Type Form */}
+                  {(showMachineTypeForm || editingMachineType) && (
+                    <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="font-semibold text-ars-heading">
+                          {editingMachineType ? 'Edit Machine Type' : 'New Machine Type'}
+                        </h4>
+                        <button
+                          onClick={() => {
+                            setEditingMachineType(null);
+                            setNewMachineType({ name: '', serviceType: 'hours' });
+                            setShowMachineTypeForm(false);
+                          }}
+                          className="p-1 hover:bg-gray-200 rounded transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-ars-body mb-2">
+                            Name <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={editingMachineType ? editingMachineType.name : newMachineType.name}
+                            onChange={(e) => {
+                              if (editingMachineType) {
+                                setEditingMachineType({ ...editingMachineType, name: e.target.value });
+                              } else {
+                                setNewMachineType({ ...newMachineType, name: e.target.value });
+                              }
+                            }}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                            placeholder="e.g., Generator, Compressor oil free"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-ars-body mb-2">
+                            Service Type <span className="text-red-500">*</span>
+                          </label>
+                          <select
+                            value={editingMachineType ? editingMachineType.serviceType : newMachineType.serviceType}
+                            onChange={(e) => {
+                              const val = e.target.value as 'hours' | 'date';
+                              if (editingMachineType) {
+                                setEditingMachineType({ ...editingMachineType, serviceType: val });
+                              } else {
+                                setNewMachineType({ ...newMachineType, serviceType: val });
+                              }
+                            }}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                          >
+                            <option value="hours">Hours Based</option>
+                            <option value="date">Date Based</option>
+                          </select>
+                        </div>
+                      </div>
+                      {editingMachineType && (
+                        <div className="mt-4 flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="machinetype-active"
+                            checked={editingMachineType.isActive ?? true}
+                            onChange={(e) => setEditingMachineType({ ...editingMachineType, isActive: e.target.checked })}
+                            className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary"
+                          />
+                          <label htmlFor="machinetype-active" className="text-sm text-ars-body cursor-pointer">Active</label>
+                        </div>
+                      )}
+                      <div className="flex gap-3 mt-4">
+                        <button
+                          onClick={editingMachineType ? handleUpdateMachineType : handleCreateMachineType}
+                          disabled={loading}
+                          className="px-4 py-2.5 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 disabled:opacity-50"
+                        >
+                          <Save className="w-4 h-4" />
+                          {editingMachineType ? 'UPDATE' : 'CREATE'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingMachineType(null);
+                            setNewMachineType({ name: '', serviceType: 'hours' });
+                            setShowMachineTypeForm(false);
+                          }}
+                          className="px-4 py-2.5 border border-gray-300 rounded-[8px] font-bold text-[14px] hover:bg-gray-50 transition-colors"
+                        >
+                          CANCEL
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Machine Types List */}
+                  <div className="space-y-2">
+                    {machineTypes.map((mt) => (
+                      <div
+                        key={mt._id}
+                        className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="font-semibold text-ars-heading">{mt.name}</span>
+                          <span className={`px-2 py-1 text-xs font-medium rounded-lg ${
+                            mt.serviceType === 'hours'
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-purple-100 text-purple-700'
+                          }`}>
+                            {mt.serviceType === 'hours' ? 'Hours Based' : 'Date Based'}
+                          </span>
+                          <span className={`px-2 py-1 text-xs font-medium rounded-lg ${
+                            mt.isActive !== false
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-red-100 text-red-700'
+                          }`}>
+                            {mt.isActive !== false ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingMachineType(mt);
+                              setShowMachineTypeForm(false);
+                            }}
+                            className="p-2 text-ars-primary hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Edit machine type"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteMachineType(mt._id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete machine type"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {machineTypes.length === 0 && (
+                      <p className="text-center text-ars-body py-8">No machine types found. Click "Add Machine Type" to create one.</p>
+                    )}
+                  </div>
                 </>
               )}
             </div>

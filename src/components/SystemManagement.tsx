@@ -3,6 +3,7 @@
  * Provides user management, role/permission assignment, and import functionality.
  */
 import { useState, useEffect, useMemo } from 'react';
+import * as XLSX from 'xlsx';
 import { BranchPermissionsSection } from './BranchPermissionsSection';
 import { 
   getUsers, 
@@ -130,7 +131,7 @@ export function SystemManagement() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [clearExisting, setClearExisting] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState<string>(''); // Branch ID or code
-  const [importResult, setImportResult] = useState<{ imported?: number; updated: number; skipped?: number; errors: string[]; notFound?: number } | null>(null);
+  const [importResult, setImportResult] = useState<{ imported?: number; updated: number; skipped?: number; errors: string[]; notFound?: number; duplicates?: { row: number; serialNumber: string; make: string; model: string }[] } | null>(null);
   
   // Branches state
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -2711,6 +2712,43 @@ alert((response as any).message || 'User invited successfully');
                         <div key={index} className="flex items-start gap-2 p-2 bg-red-50 rounded text-sm text-red-700">
                           <XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                           <span>{error}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {importType === 'rental-machines' && importResult.duplicates && importResult.duplicates.length > 0 && (
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-semibold text-ars-heading">
+                        Skipped Duplicates ({importResult.duplicates.length}):
+                      </p>
+                      <button
+                        onClick={() => {
+                          const ws = XLSX.utils.aoa_to_sheet([
+                            ['Row', 'Serial Number', 'Make', 'Model'],
+                            ...importResult.duplicates!.map(d => [d.row, d.serialNumber, d.make, d.model]),
+                          ]);
+                          const wb = XLSX.utils.book_new();
+                          XLSX.utils.book_append_sheet(wb, ws, 'Duplicates');
+                          XLSX.writeFile(wb, 'skipped_duplicates.xlsx');
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Export to Excel
+                      </button>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto space-y-1">
+                      <div className="grid grid-cols-4 gap-2 px-2 py-1 text-xs font-semibold text-slate-500 uppercase">
+                        <span>Row</span><span>Serial Number</span><span>Make</span><span>Model</span>
+                      </div>
+                      {importResult.duplicates.map((dup, index) => (
+                        <div key={index} className="grid grid-cols-4 gap-2 p-2 bg-slate-50 rounded text-sm text-slate-700">
+                          <span className="text-slate-400">{dup.row}</span>
+                          <span className="font-mono">{dup.serialNumber}</span>
+                          <span>{dup.make}</span>
+                          <span>{dup.model}</span>
                         </div>
                       ))}
                     </div>

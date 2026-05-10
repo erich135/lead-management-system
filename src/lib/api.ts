@@ -1679,6 +1679,7 @@ export interface ImportResult {
   updated: number;
   skipped?: number;
   errors: string[];
+  duplicates?: { row: number; serialNumber: string; make: string; model: string }[];
 }
 
 export interface ImportHistory {

@@ -18,7 +18,7 @@ import {
   type MachineType,
 } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
-import { MachineImportWizard } from './MachineImportWizard';
+import { UnifiedMachineImport } from './UnifiedMachineImport';
 import {
   Search,
   Building2,
@@ -1208,8 +1208,7 @@ export function Machines() {
 
       {/* Import Wizard */}
       {showImportWizard && (
-        <MachineImportWizard
-          customers={customers}
+        <UnifiedMachineImport
           onClose={() => setShowImportWizard(false)}
           onImportComplete={() => loadMachines(1)}
         />

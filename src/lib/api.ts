@@ -748,6 +748,57 @@ export interface ImportableMachineRow {
   oilSampleComment?: string;
 }
 
+// ─── Unified Machine Import types ────────────────────────────────────────────
+
+export interface ValidatedMachineRow {
+  rowIndex: number;
+  make: string;
+  model: string;
+  serialNumber: string;
+  assetNumber?: string;
+  machineType?: string;
+  ownershipType: 'customer' | 'ars_rental';
+  serviceType: 'hours' | 'date';
+  machineHours: number;
+  nextServiceHours: number;
+  lastServiceDate?: string;
+  nextServiceDate?: string;
+  currentLocation?: string;
+  lastOilSampleDate?: string;
+  oilSampleComment?: string;
+  isRental: boolean;
+  customerId?: string;
+  customerName?: string;
+  cashCustomer?: string;
+  skip?: boolean;
+}
+
+export interface ErrorMachineRow {
+  rowIndex: number;
+  make: string;
+  model: string;
+  serialNumber: string;
+  assetNumber?: string;
+  machineType?: string;
+  ownershipType: 'customer' | 'ars_rental';
+  serviceType: 'hours' | 'date';
+  machineHours: number;
+  nextServiceHours: number;
+  lastServiceDate?: string;
+  nextServiceDate?: string;
+  currentLocation?: string;
+  lastOilSampleDate?: string;
+  oilSampleComment?: string;
+  cashCustomer?: string;
+  errorType: 'customer_not_found' | 'missing_field';
+  errorMessage: string;
+  customerName?: string;
+  suggestions: { id: string; name: string }[];
+  // user corrections
+  resolvedCustomerId?: string;
+  skip?: boolean;
+}
+
 export interface Technician {
   _id: string;
   name: string;
@@ -1843,6 +1894,60 @@ export async function importCustomerMachines(machines: ImportableMachineRow[]): 
     throw new Error(error.error?.message || 'Failed to import machines');
   }
 
+  return response.json();
+}
+
+/**
+ * Unified machine import — Phase 1: validate CSV.
+ * Returns valid rows and error rows without writing to DB.
+ */
+export async function validateMachinesCSV(file: File): Promise<{
+  data: {
+    totalRows: number;
+    validRows: ValidatedMachineRow[];
+    errorRows: ErrorMachineRow[];
+    summary: { valid: number; errors: number };
+  };
+}> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const token = getAuthToken();
+  if (!token) throw new Error('No authentication token found');
+  const response = await fetch(`${API_BASE_URL}/api/import/machines/validate`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: formData,
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Validation failed' } }));
+    throw new Error(error.error?.message || 'Validation failed');
+  }
+  return response.json();
+}
+
+/**
+ * Unified machine import — Phase 2: confirm (smart upsert).
+ * Takes validated + user-corrected rows and writes to DB.
+ */
+export async function confirmMachinesImport(
+  rows: (ValidatedMachineRow | ErrorMachineRow)[],
+): Promise<{
+  data: { imported: number; updated: number; skipped: number; errors: string[] };
+}> {
+  const token = getAuthToken();
+  if (!token) throw new Error('No authentication token found');
+  const response = await fetch(`${API_BASE_URL}/api/import/machines/confirm`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ rows }),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Import failed' } }));
+    throw new Error(error.error?.message || 'Import failed');
+  }
   return response.json();
 }
 

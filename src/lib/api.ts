@@ -1203,12 +1203,16 @@ export async function getMachines(params?: {
   search?: string;
   page?: number;
   limit?: number;
+  sortField?: 'make' | 'serialNumber' | 'customer' | 'machineHours';
+  sortDir?: 'asc' | 'desc';
 }): Promise<{ machines: Machine[]; pagination: any }> {
   const queryParams = new URLSearchParams();
   if (params?.customerId) queryParams.append('customerId', params.customerId);
   if (params?.search) queryParams.append('search', params.search);
   if (params?.page) queryParams.append('page', params.page.toString());
   if (params?.limit) queryParams.append('limit', params.limit.toString());
+  if (params?.sortField) queryParams.append('sortField', params.sortField);
+  if (params?.sortDir) queryParams.append('sortDir', params.sortDir);
   
   const query = queryParams.toString();
   return apiRequest(`/api/machines${query ? `?${query}` : ''}`);

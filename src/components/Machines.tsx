@@ -134,6 +134,10 @@ export function Machines() {
       const params: any = { page, limit: 50 };
       if (searchQuery.trim()) params.search = searchQuery.trim();
       if (customerFilter) params.customerId = customerFilter;
+      if (sortField) {
+        params.sortField = sortField;
+        params.sortDir = sortDir;
+      }
       const response = await getMachines(params);
       setMachines(response.machines || []);
       setPagination(response.pagination || { page: 1, limit: 50, total: 0, pages: 0 });
@@ -142,7 +146,7 @@ export function Machines() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, customerFilter]);
+  }, [searchQuery, customerFilter, sortField, sortDir]);
 
   useEffect(() => {
     const debounce = setTimeout(() => loadMachines(1), 300);
@@ -556,23 +560,6 @@ export function Machines() {
     }
   };
 
-  const sortedMachines = sortField
-    ? [...machines].sort((a: any, b: any) => {
-        let aVal = a[sortField] ?? '';
-        let bVal = b[sortField] ?? '';
-        if (sortField === 'customer') {
-          aVal = getCustomerName(a);
-          bVal = getCustomerName(b);
-        }
-        if (typeof aVal === 'number' && typeof bVal === 'number') {
-          return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
-        }
-        return sortDir === 'asc'
-          ? String(aVal).localeCompare(String(bVal))
-          : String(bVal).localeCompare(String(aVal));
-      })
-    : machines;
-
   const handleOpenReportModal = async () => {
     setShowReportModal(true);
     setReportError(null);
@@ -742,7 +729,7 @@ export function Machines() {
             </div>
 
             {/* Table Body */}
-            {sortedMachines.map((machine) => {
+            {machines.map((machine) => {
               const isExpanded = expandedMachineId === machine._id;
               const isEditing = editingMachine?._id === machine._id;
               const custType = getCustomerType(machine);

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   getMachines,
+  createMachine,
   updateMachine,
   getMachineRSRs,
   uploadMachineRSR,
@@ -41,11 +42,12 @@ import {
   Clock,
   Save,
   FileSpreadsheet,
+  Plus,
 } from 'lucide-react';
 import { SmartDateInput } from './SmartDateInput';
 
 export function Machines() {
-  const { isSuperAdmin } = useAuth();
+  const { isSuperAdmin, hasPermission } = useAuth();
 
   // Machine list state
   const [machines, setMachines] = useState<Machine[]>([]);
@@ -86,6 +88,19 @@ export function Machines() {
   const [showImportWizard, setShowImportWizard] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [loadingReportCustomers, setLoadingReportCustomers] = useState(false);
+
+  // Create machine state
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createForm, setCreateForm] = useState<any>({
+    make: '', model: '', serialNumber: '', assetNumber: '', machineType: '',
+    ownershipType: 'customer', serviceType: 'hours',
+    machineHours: 0, nextServiceHours: 0,
+    lastServiceDate: '', nextServiceDate: '',
+    currentLocation: '', lastOilSampleDate: '', oilSampleComment: '',
+    customerId: '', cashCustomer: '', isRental: false,
+  });
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   // Upload form state
   const [uploadTitle, setUploadTitle] = useState('');
@@ -196,6 +211,7 @@ export function Machines() {
       oilSampleComment: machine.oilSampleComment || '',
       cashCustomer: machine.cashCustomer || '',
       currentLocation: machine.currentLocation || '',
+      customerId: machine.customer && typeof machine.customer === 'object' ? (machine.customer as any)._id || '' : machine.customer || '',
     } as any);
   };
 
@@ -204,6 +220,14 @@ export function Machines() {
     setSaving(true);
     try {
       const payload: any = { ...editForm };
+      // Promote customerId → customer field
+      if (payload.customerId) {
+        payload.customer = payload.customerId;
+        delete payload.cashCustomer; // customer takes precedence
+      } else {
+        delete payload.customer;
+      }
+      delete payload.customerId;
       // Clean empty strings
       if (!payload.assetNumber) delete payload.assetNumber;
       if (!payload.machineType) delete payload.machineType;
@@ -229,6 +253,55 @@ export function Machines() {
   const handleCancelEdit = () => {
     setEditingMachine(null);
     setEditForm({});
+  };
+
+  const handleCreate = async () => {
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const payload: any = {
+        make: createForm.make.trim(),
+        model: createForm.model.trim(),
+        serialNumber: createForm.serialNumber.trim(),
+        ownershipType: createForm.ownershipType,
+        serviceType: createForm.serviceType,
+        isRental: createForm.ownershipType === 'ars_rental',
+      };
+      if (createForm.assetNumber.trim()) payload.assetNumber = createForm.assetNumber.trim();
+      if (createForm.machineType) payload.machineType = createForm.machineType;
+      if (createForm.currentLocation.trim()) payload.currentLocation = createForm.currentLocation.trim();
+      if (createForm.oilSampleComment.trim()) payload.oilSampleComment = createForm.oilSampleComment.trim();
+      if (createForm.serviceType === 'hours') {
+        payload.machineHours = Number(createForm.machineHours) || 0;
+        payload.nextServiceHours = Number(createForm.nextServiceHours) || 0;
+      } else {
+        if (createForm.lastServiceDate) payload.lastServiceDate = createForm.lastServiceDate;
+        if (createForm.nextServiceDate) payload.nextServiceDate = createForm.nextServiceDate;
+      }
+      if (createForm.lastOilSampleDate) payload.lastOilSampleDate = createForm.lastOilSampleDate;
+      // Customer assignment
+      if (createForm.customerId) {
+        payload.customer = createForm.customerId;
+      } else if (createForm.cashCustomer.trim()) {
+        payload.cashCustomer = createForm.cashCustomer.trim();
+      }
+      // For rental machines, customer is not required
+      await createMachine(payload);
+      setShowCreateModal(false);
+      setCreateForm({
+        make: '', model: '', serialNumber: '', assetNumber: '', machineType: '',
+        ownershipType: 'customer', serviceType: 'hours',
+        machineHours: 0, nextServiceHours: 0,
+        lastServiceDate: '', nextServiceDate: '',
+        currentLocation: '', lastOilSampleDate: '', oilSampleComment: '',
+        customerId: '', cashCustomer: '', isRental: false,
+      });
+      await loadMachines(1);
+    } catch (error: any) {
+      setCreateError(error.message || 'Failed to create machine');
+    } finally {
+      setCreating(false);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -411,7 +484,16 @@ export function Machines() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {isSuperAdmin && (
+            {(isSuperAdmin || hasPermission('machines.manage')) && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-lg hover:from-amber-600 hover:to-amber-700 shadow-sm transition-all text-sm font-medium"
+              >
+                <Plus className="w-4 h-4" />
+                Add Machine
+              </button>
+            )}
+            {(isSuperAdmin || hasPermission('machines.manage')) && (
               <button
                 onClick={() => setShowImportWizard(true)}
                 className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 shadow-sm transition-all text-sm font-medium"
@@ -721,11 +803,26 @@ export function Machines() {
                                 </select>
                               </div>
                               <div>
+                                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Linked Customer</label>
+                                <select
+                                  value={(editForm as any).customerId || ''}
+                                  onChange={(e) => setEditForm({ ...editForm, customerId: e.target.value, cashCustomer: '' } as any)}
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                                >
+                                  <option value="">— No linked customer —</option>
+                                  {customers.map(c => (
+                                    <option key={c._id} value={c._id}>{c.name}</option>
+                                  ))}
+                                </select>
+                                <p className="text-xs text-slate-400 mt-0.5">Selecting a customer clears the Cash Customer field</p>
+                              </div>
+                              <div>
                                 <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Cash Customer</label>
                                 <input
                                   type="text"
                                   value={editForm.cashCustomer || ''}
-                                  onChange={(e) => setEditForm({ ...editForm, cashCustomer: e.target.value })}
+                                  onChange={(e) => setEditForm({ ...editForm, cashCustomer: e.target.value, customerId: '' } as any)}
+                                  placeholder="Only if not a linked customer"
                                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                               </div>
@@ -1212,6 +1309,131 @@ export function Machines() {
           onClose={() => setShowImportWizard(false)}
           onImportComplete={() => loadMachines(1)}
         />
+      )}
+
+      {/* Create Machine Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center">
+                  <Plus className="w-5 h-5 text-amber-600" />
+                </div>
+                <h2 className="text-lg font-bold text-slate-800">Add New Machine</h2>
+              </div>
+              <button onClick={() => setShowCreateModal(false)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Make <span className="text-red-500">*</span></label>
+                  <input type="text" value={createForm.make} onChange={e => setCreateForm({ ...createForm, make: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Model <span className="text-red-500">*</span></label>
+                  <input type="text" value={createForm.model} onChange={e => setCreateForm({ ...createForm, model: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Serial Number <span className="text-red-500">*</span></label>
+                  <input type="text" value={createForm.serialNumber} onChange={e => setCreateForm({ ...createForm, serialNumber: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Asset Number</label>
+                  <input type="text" value={createForm.assetNumber} onChange={e => setCreateForm({ ...createForm, assetNumber: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Machine Type</label>
+                  <select value={createForm.machineType} onChange={e => setCreateForm({ ...createForm, machineType: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white">
+                    <option value="">Select type</option>
+                    {machineTypes.length > 0
+                      ? machineTypes.map(mt => <option key={mt._id} value={mt.name}>{mt.name}</option>)
+                      : (<>
+                          <option value="Generator">Generator</option>
+                          <option value="Genset">Genset</option>
+                          <option value="Compressor oil free">Compressor oil free</option>
+                          <option value="Compressor oil injection">Compressor oil injection</option>
+                          <option value="Diesel reciprocating compressor">Diesel reciprocating compressor</option>
+                          <option value="Dryer">Dryer</option>
+                          <option value="Blower">Blower</option>
+                          <option value="Vacuum pump">Vacuum pump</option>
+                          <option value="Air Receiver">Air Receiver</option>
+                        </>)
+                    }
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Unit Ownership</label>
+                  <select value={createForm.ownershipType} onChange={e => setCreateForm({ ...createForm, ownershipType: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white">
+                    <option value="customer">Customer's Own Machine</option>
+                    <option value="ars_rental">ARS Rental Unit</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Linked Customer</label>
+                  <select value={createForm.customerId} onChange={e => setCreateForm({ ...createForm, customerId: e.target.value, cashCustomer: '' })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white">
+                    <option value="">— No linked customer —</option>
+                    {customers.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Cash Customer</label>
+                  <input type="text" value={createForm.cashCustomer} onChange={e => setCreateForm({ ...createForm, cashCustomer: e.target.value, customerId: '' })} placeholder="Only if not a linked customer" className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Service Type</label>
+                  <select value={createForm.serviceType} onChange={e => setCreateForm({ ...createForm, serviceType: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white">
+                    <option value="hours">Hours Based</option>
+                    <option value="date">Date Based</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Current Location</label>
+                  <input type="text" value={createForm.currentLocation} onChange={e => setCreateForm({ ...createForm, currentLocation: e.target.value })} placeholder="e.g. Site A, Workshop" className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent" />
+                </div>
+                {createForm.serviceType !== 'date' && (<>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Machine Hours</label>
+                    <input type="number" value={createForm.machineHours} onChange={e => setCreateForm({ ...createForm, machineHours: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Next Service Hours</label>
+                    <input type="number" value={createForm.nextServiceHours} onChange={e => setCreateForm({ ...createForm, nextServiceHours: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent" />
+                  </div>
+                </>)}
+                {createForm.serviceType === 'date' && (<>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Last Service Date</label>
+                    <SmartDateInput value={createForm.lastServiceDate} onChange={e => setCreateForm({ ...createForm, lastServiceDate: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Next Service Date</label>
+                    <SmartDateInput value={createForm.nextServiceDate} onChange={e => setCreateForm({ ...createForm, nextServiceDate: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent" />
+                  </div>
+                </>)}
+              </div>
+              {createError && (
+                <div className="mt-4 flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  {createError}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl">
+              <button onClick={() => setShowCreateModal(false)} className="px-4 py-2 text-slate-600 hover:text-slate-800 font-medium transition-colors">Cancel</button>
+              <button
+                onClick={handleCreate}
+                disabled={creating || !createForm.make.trim() || !createForm.model.trim() || !createForm.serialNumber.trim()}
+                className="flex items-center gap-2 px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                {creating ? 'Saving…' : 'Add Machine'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

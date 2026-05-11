@@ -817,7 +817,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                   <Clock className={`w-4 h-4 transition-transform ${view === 'activities' ? 'scale-110' : ''}`} />
                   <span>Activities</span>
                 </Link>
-                {isSuperAdmin && (
+                {(isSuperAdmin || hasPermission('machines.read')) && (
                   <Link
                     to="/machines"
                     className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
@@ -1980,7 +1980,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           <Diary />
         )}
 
-        {view === 'machines' && isSuperAdmin && (
+        {view === 'machines' && (isSuperAdmin || hasPermission('machines.read')) && (
           <Machines />
         )}
 

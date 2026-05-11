@@ -2162,25 +2162,19 @@ alert((response as any).message || 'User invited successfully');
                   )}
 
                   {/* Include inactive users checkbox */}
-                  {(() => {
-                    const inactiveCount = users.filter(u => u.role?.name === selectedGroupRole.name && !u.isActive).length;
-                    return inactiveCount > 0 && (
-                      <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                        <input
-                          type="checkbox"
-                          id="includeInactiveUsers"
-                          checked={includeInactiveUsers}
-                          onChange={(e) => setIncludeInactiveUsers(e.target.checked)}
-                          disabled={applyingGroupPermissions}
-                          className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary cursor-pointer"
-                        />
-                        <label htmlFor="includeInactiveUsers" className="text-sm text-amber-900 cursor-pointer flex items-center gap-2">
-                          <span>Apply permissions to inactive users as well</span>
-                          <span className="text-xs text-amber-700">({inactiveCount} inactive user{inactiveCount !== 1 ? 's' : ''})</span>
-                        </label>
-                      </div>
-                    );
-                  })()}
+                  <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <input
+                      type="checkbox"
+                      id="includeInactiveUsers"
+                      checked={includeInactiveUsers}
+                      onChange={(e) => setIncludeInactiveUsers(e.target.checked)}
+                      disabled={applyingGroupPermissions}
+                      className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary cursor-pointer"
+                    />
+                    <label htmlFor="includeInactiveUsers" className="text-sm text-amber-900 cursor-pointer">
+                      Also apply to inactive users in this group
+                    </label>
+                  </div>
 
                   {/* Apply button */}
                   <div className="flex items-center gap-4 pt-2">

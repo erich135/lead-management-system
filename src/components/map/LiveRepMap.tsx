@@ -17,7 +17,9 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { SmartDateInput } from '../SmartDateInput';
-import { MapComponent, MapMarker, MapCircle, MapRoute, MARKER_COLORS, createCustomIcon } from '../map';
+import MapComponent from './MapComponent';
+import type { MapMarker, MapCircle, MapRoute } from './MapComponent';
+import { MARKER_COLORS, createCustomIcon } from './MapComponent';
 import {
   useManagerLocationSocket,
   RepLocationUpdate,

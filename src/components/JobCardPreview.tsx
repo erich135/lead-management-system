@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { X, Download, Printer, FileImage } from 'lucide-react';
 import jsPDF from 'jspdf';
 import type { JobCardTemplate } from '../lib/api';
-import type { TemplateGroup, TableColumn, TableDefinition, TableRow, HeaderConfig, FooterConfig, GridCell } from './JobCardFormBuilder';
-import { JOB_FIELD_KEYS, MACHINE_FIELD_KEYS } from './JobCardFormBuilder';
+import type { TemplateGroup, TableColumn, TableDefinition, TableRow, HeaderConfig, FooterConfig, GridCell } from './jobCardTypes';
+import { JOB_FIELD_KEYS, MACHINE_FIELD_KEYS } from './jobCardTypes';
 import { getGlobalHeaderConfig, getGlobalFooterConfig } from '../utils/jobCardConfig';
 import { formatDate } from '../utils/dateFormat';
 

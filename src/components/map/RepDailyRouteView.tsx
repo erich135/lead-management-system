@@ -11,7 +11,9 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { MapPin, Route, Clock, Navigation, Calendar, Loader2 } from 'lucide-react';
 import { SmartDateInput } from '../SmartDateInput';
-import { MapComponent, MapRoute, MapCircle, MARKER_COLORS } from '../map';
+import MapComponent from './MapComponent';
+import type { MapRoute, MapCircle } from './MapComponent';
+import { MARKER_COLORS } from './MapComponent';
 import {
   getRepDailyRoute,
   getRepStopsAndTrips,

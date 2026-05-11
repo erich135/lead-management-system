@@ -3,7 +3,7 @@
  * Stored in localStorage and shared across all templates.
  */
 
-import type { HeaderConfig, FooterConfig } from '../components/JobCardFormBuilder';
+import type { HeaderConfig, FooterConfig } from '../components/jobCardTypes';
 
 const HEADER_CONFIG_KEY = 'jobCardHeaderConfig';
 const FOOTER_CONFIG_KEY = 'jobCardFooterConfig';

@@ -11,7 +11,9 @@ import {
   AlertTriangle, Calendar, MapPin, Users, TrendingDown, Loader2, RefreshCw
 } from 'lucide-react';
 import { SmartDateInput } from '../SmartDateInput';
-import { MapComponent, MapMarker, MapCircle, MARKER_COLORS, createCustomIcon } from '../map';
+import MapComponent from './MapComponent';
+import type { MapMarker, MapCircle } from './MapComponent';
+import { MARKER_COLORS, createCustomIcon } from './MapComponent';
 import {
   getDailyOverlaps,
   DailyOverlapGroup,

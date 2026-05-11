@@ -57,6 +57,8 @@ export function Machines() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [machineTypes, setMachineTypes] = useState<MachineType[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 0 });
+  const [sortField, setSortField] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   // Selected / expanded machine
   const [expandedMachineId, setExpandedMachineId] = useState<string | null>(null);
@@ -112,6 +114,15 @@ export function Machines() {
   const [uploadNextServiceDate, setUploadNextServiceDate] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
 
   // Load all machines on mount and when filters change
   const loadMachines = useCallback(async (page = 1) => {
@@ -527,6 +538,23 @@ export function Machines() {
     return 'unknown';
   };
 
+  const sortedMachines = sortField
+    ? [...machines].sort((a: any, b: any) => {
+        let aVal = a[sortField] ?? '';
+        let bVal = b[sortField] ?? '';
+        if (sortField === 'customer') {
+          aVal = getCustomerName(a);
+          bVal = getCustomerName(b);
+        }
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+          return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
+        }
+        return sortDir === 'asc'
+          ? String(aVal).localeCompare(String(bVal))
+          : String(bVal).localeCompare(String(aVal));
+      })
+    : machines;
+
   const handleOpenReportModal = async () => {
     setShowReportModal(true);
     setReportError(null);
@@ -673,16 +701,30 @@ export function Machines() {
           <>
             {/* Table Header */}
             <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              <div className="col-span-3">Machine</div>
-              <div className="col-span-2">Serial Number</div>
-              <div className="col-span-3">Customer</div>
-              <div className="col-span-2">Service Info</div>
+              {(['make', 'serialNumber', 'customer', 'machineHours'] as const).map((field, i) => {
+                const labels: Record<string, string> = { make: 'Machine', serialNumber: 'Serial Number', customer: 'Customer', machineHours: 'Service Info' };
+                const spans = [3, 2, 3, 2];
+                const isActive = sortField === field;
+                return (
+                  <div
+                    key={field}
+                    className={`col-span-${spans[i]} flex items-center gap-1 cursor-pointer select-none hover:text-slate-800 transition-colors ${isActive ? 'text-amber-600' : ''}`}
+                    onClick={() => handleSort(field)}
+                  >
+                    {labels[field]}
+                    <span className="inline-flex flex-col leading-none">
+                      <ChevronUp className={`w-2.5 h-2.5 -mb-0.5 ${isActive && sortDir === 'asc' ? 'text-amber-600' : 'text-slate-300'}`} />
+                      <ChevronDown className={`w-2.5 h-2.5 ${isActive && sortDir === 'desc' ? 'text-amber-600' : 'text-slate-300'}`} />
+                    </span>
+                  </div>
+                );
+              })}
               <div className="col-span-1">RSRs</div>
               <div className="col-span-1"></div>
             </div>
 
             {/* Table Body */}
-            {machines.map((machine) => {
+            {sortedMachines.map((machine) => {
               const isExpanded = expandedMachineId === machine._id;
               const isEditing = editingMachine?._id === machine._id;
               const custType = getCustomerType(machine);

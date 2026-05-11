@@ -291,10 +291,8 @@ export function SystemManagement() {
         setRoles(rolesResponse.roles || []);
       }
 
-      if (permissions.length === 0) {
-        const permsResponse = await getPermissions({ isActive: true });
-        setPermissions(permsResponse.permissions || []);
-      }
+      const permsResponse = await getPermissions({ isActive: true });
+      setPermissions(permsResponse.permissions || []);
     } catch (err: any) {
       console.error('Error loading system data:', err);
       setError(err.message || 'Failed to load system data');
@@ -1747,78 +1745,6 @@ alert((response as any).message || 'User invited successfully');
                       </p>
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-1">Admin Codes</label>
-                      <p className="text-xs text-ars-body mb-2">Tick the admin codes this user is linked to.</p>
-                      <div className="max-h-40 overflow-y-auto space-y-1 border border-gray-200 rounded-lg p-2">
-                        {adminCodes.filter(ac => ac.isActive).length === 0 ? (
-                          <p className="text-xs text-ars-body italic">No admin codes available</p>
-                        ) : adminCodes.filter(ac => ac.isActive).map(ac => {
-                          const userAdminCodeIds = (selectedUser as any).adminCodes?.map((c: any) => typeof c === 'object' ? c._id : c) || [];
-                          const isChecked = userAdminCodeIds.includes(ac._id);
-                          return (
-                            <label key={ac._id} className="flex items-center gap-2 cursor-pointer group">
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={(e) => {
-                                  const newIds = e.target.checked
-                                    ? [...userAdminCodeIds, ac._id]
-                                    : userAdminCodeIds.filter((id: string) => id !== ac._id);
-                                  setSelectedUser({ ...selectedUser, adminCodes: newIds.map((id: string) => {
-                                    const found = adminCodes.find(a => a._id === id);
-                                    return found ? { _id: found._id, code: found.code, description: found.description } : { _id: id, code: '', description: '' };
-                                  })} as any);
-                                  // Auto-save
-                                  updateUser(selectedUser._id, { adminCodeIds: newIds } as any).then(() => loadData());
-                                }}
-                                className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
-                              />
-                              <span className="text-sm text-ars-body group-hover:text-ars-heading">
-                                <span className="font-semibold">{ac.code}</span>
-                                {ac.description ? ` - ${ac.description}` : ''}
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-ars-body mb-1">Rep Codes</label>
-                      <p className="text-xs text-ars-body mb-2">Tick the rep codes this user is linked to.</p>
-                      <div className="max-h-40 overflow-y-auto space-y-1 border border-gray-200 rounded-lg p-2">
-                        {repCodes.filter(rc => rc.isActive).length === 0 ? (
-                          <p className="text-xs text-ars-body italic">No rep codes available</p>
-                        ) : repCodes.filter(rc => rc.isActive).map(rc => {
-                          const userRepCodeIds = (selectedUser as any).repCodes?.map((c: any) => typeof c === 'object' ? c._id : c) || [];
-                          const isChecked = userRepCodeIds.includes(rc._id);
-                          return (
-                            <label key={rc._id} className="flex items-center gap-2 cursor-pointer group">
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={(e) => {
-                                  const newIds = e.target.checked
-                                    ? [...userRepCodeIds, rc._id]
-                                    : userRepCodeIds.filter((id: string) => id !== rc._id);
-                                  setSelectedUser({ ...selectedUser, repCodes: newIds.map((id: string) => {
-                                    const found = repCodes.find(r => r._id === id);
-                                    return found ? { _id: found._id, code: found.code, description: found.description } : { _id: id, code: '', description: '' };
-                                  })} as any);
-                                  // Auto-save
-                                  updateUser(selectedUser._id, { repCodeIds: newIds } as any).then(() => loadData());
-                                }}
-                                className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer"
-                              />
-                              <span className="text-sm text-ars-body group-hover:text-ars-heading">
-                                <span className="font-semibold">{rc.code}</span>
-                                {rc.description ? ` - ${rc.description}` : ''}
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <div>
                       <label className="block text-sm font-semibold text-ars-body mb-1">Status</label>
                       <div className="flex items-center gap-2">
                         <p className={`px-3 py-1.5 rounded-lg inline-block font-medium ${
@@ -1909,7 +1835,6 @@ alert((response as any).message || 'User invited successfully');
                     )}
                     <div>
                       <label className="block text-sm font-semibold text-ars-body mb-2">Permissions</label>
-                      <p className="text-xs text-ars-body mb-2">Grant access to Job Card Templates, Submissions, Reports, etc.</p>
                       <div className="flex items-center justify-between mb-3">
                         <button
                           type="button"
@@ -1925,9 +1850,11 @@ alert((response as any).message || 'User invited successfully');
                             : `${selectedUser?.permissions?.filter((perm) => allPermissionNames.includes(perm)).length || 0} selected`}
                         </span>
                       </div>
-                      <div className="max-h-80 overflow-y-auto space-y-2">
+                      <div className="max-h-[32rem] overflow-y-auto space-y-2">
+
+                        {/* Permission groups sorted A→Z */}
                         {Object.entries(groupedPermissions)
-                          .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+                          .sort(([a], [b]) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
                           .map(([groupKey, perms]) => (
                           <div key={groupKey} className="border border-gray-200 rounded-lg p-3">
                             <div className="flex items-center justify-between mb-2">
@@ -1941,73 +1868,129 @@ alert((response as any).message || 'User invited successfully');
                                     selectedUser.permissions.includes(permName),
                                   );
                                   const newPerms = groupAllSelected
-                                    ? selectedUser.permissions.filter(
-                                        (perm) => !groupPermissionNames.includes(perm),
-                                      )
-                                    : Array.from(
-                                        new Set([
-                                          ...selectedUser.permissions,
-                                          ...groupPermissionNames,
-                                        ]),
-                                      );
+                                    ? selectedUser.permissions.filter((perm) => !groupPermissionNames.includes(perm))
+                                    : Array.from(new Set([...selectedUser.permissions, ...groupPermissionNames]));
                                   handleUpdatePermissions(selectedUser._id, newPerms);
                                 }}
                                 disabled={updatingPermissions}
                                 className="text-[11px] text-ars-primary hover:text-ars-primary/80 underline disabled:opacity-50"
                               >
-                                {selectedUser && perms.length > 0 &&
-                                perms.every((perm) =>
-                                  selectedUser.permissions.includes(perm.name),
-                                )
-                                  ? 'Clear All'
-                                  : 'Select All'}
+                                {selectedUser && perms.every((perm) => selectedUser.permissions.includes(perm.name))
+                                  ? 'Clear All' : 'Select All'}
                               </button>
                             </div>
                             <div className="space-y-1">
-                              {perms.map((perm) => {
-                                const hasPermission = selectedUser.permissions.includes(perm.name);
-                                return (
-                                  <label
-                                    key={perm._id}
-                                    className="flex items-center gap-2 cursor-pointer group"
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={hasPermission}
-                                      disabled={updatingPermissions}
-                                      onChange={(e) => {
-                                        const newPerms = e.target.checked
-                                          ? [...selectedUser.permissions, perm.name]
-                                          : selectedUser.permissions.filter(p => p !== perm.name);
-                                        handleUpdatePermissions(selectedUser._id, newPerms);
-                                      }}
-                                      className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                    />
-                                    <span className="text-sm text-ars-body group-hover:text-ars-heading">
-                                      {perm.description || perm.name}
-                                    </span>
-                                  </label>
-                                );
-                              })}
+                              {perms.map((perm) => (
+                                <label key={perm._id} className="flex items-center gap-2 cursor-pointer group">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedUser.permissions.includes(perm.name)}
+                                    disabled={updatingPermissions}
+                                    onChange={(e) => {
+                                      const newPerms = e.target.checked
+                                        ? [...selectedUser.permissions, perm.name]
+                                        : selectedUser.permissions.filter(p => p !== perm.name);
+                                      handleUpdatePermissions(selectedUser._id, newPerms);
+                                    }}
+                                    className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                  />
+                                  <span className="text-sm text-ars-body group-hover:text-ars-heading">
+                                    {perm.description || perm.name}
+                                  </span>
+                                </label>
+                              ))}
                             </div>
                           </div>
                         ))}
+
+                        {/* Admin Codes */}
+                        <div className="border border-gray-200 rounded-lg p-3">
+                          <p className="text-xs font-bold text-ars-heading mb-2">Admin Codes</p>
+                          <div className="space-y-1">
+                            {adminCodes.filter(ac => ac.isActive).length === 0 ? (
+                              <p className="text-xs text-ars-body italic">No admin codes available</p>
+                            ) : adminCodes.filter(ac => ac.isActive).map(ac => {
+                              const userAdminCodeIds = (selectedUser as any).adminCodes?.map((c: any) => typeof c === 'object' ? c._id : c) || [];
+                              const isChecked = userAdminCodeIds.includes(ac._id);
+                              return (
+                                <label key={ac._id} className="flex items-center gap-2 cursor-pointer group">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={(e) => {
+                                      const newIds = e.target.checked
+                                        ? [...userAdminCodeIds, ac._id]
+                                        : userAdminCodeIds.filter((id: string) => id !== ac._id);
+                                      setSelectedUser({ ...selectedUser, adminCodes: newIds.map((id: string) => {
+                                        const found = adminCodes.find(a => a._id === id);
+                                        return found ? { _id: found._id, code: found.code, description: found.description } : { _id: id, code: '', description: '' };
+                                      })} as any);
+                                      updateUser(selectedUser._id, { adminCodeIds: newIds } as any).then(() => loadData());
+                                    }}
+                                    className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                                  />
+                                  <span className="text-sm text-ars-body group-hover:text-ars-heading">
+                                    <span className="font-semibold">{ac.code}</span>
+                                    {ac.description ? ` - ${ac.description}` : ''}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Rep Codes */}
+                        <div className="border border-gray-200 rounded-lg p-3">
+                          <p className="text-xs font-bold text-ars-heading mb-2">Rep Codes</p>
+                          <div className="space-y-1">
+                            {repCodes.filter(rc => rc.isActive).length === 0 ? (
+                              <p className="text-xs text-ars-body italic">No rep codes available</p>
+                            ) : repCodes.filter(rc => rc.isActive).map(rc => {
+                              const userRepCodeIds = (selectedUser as any).repCodes?.map((c: any) => typeof c === 'object' ? c._id : c) || [];
+                              const isChecked = userRepCodeIds.includes(rc._id);
+                              return (
+                                <label key={rc._id} className="flex items-center gap-2 cursor-pointer group">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={(e) => {
+                                      const newIds = e.target.checked
+                                        ? [...userRepCodeIds, rc._id]
+                                        : userRepCodeIds.filter((id: string) => id !== rc._id);
+                                      setSelectedUser({ ...selectedUser, repCodes: newIds.map((id: string) => {
+                                        const found = repCodes.find(r => r._id === id);
+                                        return found ? { _id: found._id, code: found.code, description: found.description } : { _id: id, code: '', description: '' };
+                                      })} as any);
+                                      updateUser(selectedUser._id, { repCodeIds: newIds } as any).then(() => loadData());
+                                    }}
+                                    className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer"
+                                  />
+                                  <span className="text-sm text-ars-body group-hover:text-ars-heading">
+                                    <span className="font-semibold">{rc.code}</span>
+                                    {rc.description ? ` - ${rc.description}` : ''}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Branch Access */}
+                        <div className="border border-gray-200 rounded-lg p-3">
+                          <p className="text-xs font-bold text-ars-heading mb-2">Branch Access</p>
+                          <p className="text-xs text-ars-body mb-3">
+                            Leave empty for unrestricted access to all branches.
+                          </p>
+                          <BranchPermissionsSection
+                            branches={branches}
+                            selectedBranches={selectedUser.branches ? selectedUser.branches.map((b: any) => typeof b === 'string' ? b : b._id) : []}
+                            onChange={(newBranches) => handleUpdateBranches(selectedUser._id, newBranches)}
+                            isLoading={updatingPermissions}
+                            disabled={updatingPermissions}
+                          />
+                        </div>
+
                       </div>
-                    </div>
-                    
-                    {/* Branch Permissions */}
-                    <div className="pt-4 border-t border-gray-200">
-                      <label className="block text-sm font-semibold text-ars-body mb-2">Branch Access</label>
-                      <p className="text-xs text-ars-body mb-3">
-                        Control which branches this user can view and manage data for. Leave empty for unrestricted access to all branches.
-                      </p>
-                      <BranchPermissionsSection
-                        branches={branches}
-                        selectedBranches={selectedUser.branches ? selectedUser.branches.map((b: any) => typeof b === 'string' ? b : b._id) : []}
-                        onChange={(newBranches) => handleUpdateBranches(selectedUser._id, newBranches)}
-                        isLoading={updatingPermissions}
-                        disabled={updatingPermissions}
-                      />
                     </div>
                     
                     <button

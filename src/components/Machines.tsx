@@ -304,6 +304,65 @@ export function Machines() {
     }
   };
 
+  const handleExportCSV = async () => {
+    try {
+      const params: any = { page: 1, limit: 99999 };
+      if (searchQuery.trim()) params.search = searchQuery.trim();
+      if (customerFilter) params.customerId = customerFilter;
+      const response = await getMachines(params);
+      const rows = response.machines || [];
+
+      const headers = [
+        'Make', 'Model', 'Serial Number', 'Asset Number', 'Machine Type',
+        'Customer', 'Cash Customer', 'Ownership Type', 'Is Rental', 'Service Type',
+        'Machine Hours', 'Next Service Hours',
+        'Last Service Date', 'Next Service Date',
+        'Current Location', 'Last Oil Sample Date', 'Oil Sample Comment',
+      ];
+
+      const escape = (v: unknown) => {
+        const s = v == null ? '' : String(v);
+        return s.includes(',') || s.includes('"') || s.includes('\n')
+          ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+
+      const csvLines = [
+        headers.join(','),
+        ...rows.map((m) => [
+          m.make,
+          m.model,
+          m.serialNumber,
+          m.assetNumber ?? '',
+          m.machineType ?? '',
+          typeof m.customer === 'object' && m.customer !== null ? m.customer.name : (m.customer ?? ''),
+          m.cashCustomer ?? '',
+          m.ownershipType ?? '',
+          m.isRental ? 'Yes' : 'No',
+          m.serviceType ?? '',
+          m.machineHours ?? '',
+          m.nextServiceHours ?? '',
+          m.lastServiceDate ? new Date(m.lastServiceDate).toLocaleDateString('en-ZA') : '',
+          m.nextServiceDate ? new Date(m.nextServiceDate).toLocaleDateString('en-ZA') : '',
+          m.currentLocation ?? '',
+          m.lastOilSampleDate ? new Date(m.lastOilSampleDate).toLocaleDateString('en-ZA') : '',
+          m.oilSampleComment ?? '',
+        ].map(escape).join(',')),
+      ];
+
+      const blob = new Blob([csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `machines_export_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      a.remove();
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -508,6 +567,13 @@ export function Machines() {
             >
               <FileSpreadsheet className="w-4 h-4" />
               Generate Machine Report
+            </button>
+            <button
+              onClick={handleExportCSV}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-lg hover:from-teal-700 hover:to-teal-800 shadow-sm transition-all text-sm font-medium"
+            >
+              <Download className="w-4 h-4" />
+              Export Machine List
             </button>
           </div>
         </div>

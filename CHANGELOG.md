@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.36] - 2026-05-11
+
+### Added – Export Machine List
+- **`Machines.tsx`** — new **Export Machine List** teal button in the Machines tab header; fetches all machines matching the current search query and customer filter (up to 99,999 rows), builds a 17-column CSV (Serial Number, Make, Model, Machine Type, Asset Number, Customer, Cash Customer, Ownership, Current Location, Service Type, Hours Interval, Date Interval, Last Service Hours, Last Service Date, Next Service Hours, Next Service Date, Last Oil Sample Date), and triggers a browser download named `machines_export_YYYY-MM-DD.csv`
+
+### Changed – System Management: unified Permissions panel
+- **`SystemManagement.tsx`** — user view/edit panel now consolidates all access controls into a single scrollable **Permissions** container (`max-h-[32rem]`); permission groups (A→Z), **Admin Codes**, **Rep Codes**, and **Branch Access** all appear as bordered card groups inside the one scroll area instead of as separate standalone sections
+- **`SystemManagement.tsx`** — removed the old standalone Admin Codes and Rep Codes sections that previously appeared between Role and Status; they are now only rendered inside the unified Permissions scroll container
+- **`SystemManagement.tsx`** — permissions catalog is now always re-fetched on every `loadData()` call (removed the `if (permissions.length === 0)` cache guard that prevented newly-seeded permissions from appearing without a hard refresh)
+
 ## [1.0.35] - 2026-05-10
 
 ### Added – Machine Types Reference Data Management

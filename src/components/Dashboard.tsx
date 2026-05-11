@@ -10,7 +10,6 @@ import {
   getRepCodes,
   getTechnicians,
   getAdminCodes,
-  logViewActivity,
   type JobStats,
   type OverdueJob,
   type Status,
@@ -179,29 +178,6 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
   // Scroll to top when view changes
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [view]);
-
-  // Log page view activities
-  useEffect(() => {
-    if (view === 'dashboard') {
-      logViewActivity('view', 'Page', 'Viewed dashboard page');
-    } else if (view === 'leads') {
-      logViewActivity('view', 'Page', 'Viewed jobs page');
-    } else if (view === 'reports') {
-      logViewActivity('view', 'Page', 'Viewed reports page');
-    } else if (view === 'diary') {
-      logViewActivity('view', 'Page', 'Viewed diary page');
-    } else if (view === 'activities') {
-      logViewActivity('view', 'Page', 'Viewed activities page');
-    } else if (view === 'admin') {
-      logViewActivity('view', 'Page', 'Viewed system admin page');
-    } else if (view === 'jobCardTemplates') {
-      logViewActivity('view', 'Page', 'Viewed job card templates page');
-    } else if (view === 'jobCardSubmissions') {
-      logViewActivity('view', 'Page', 'Viewed job card submissions page');
-    } else if (view === 'partsReady') {
-      logViewActivity('view', 'Page', 'Viewed Parts Ready (Job Cards) page');
-    }
   }, [view]);
 
   async function loadInitialData() {

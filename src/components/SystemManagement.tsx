@@ -120,6 +120,7 @@ export function SystemManagement() {
   // Group permissions state
   const [selectedGroupRole, setSelectedGroupRole] = useState<Role | null>(null);
   const [groupPermissions, setGroupPermissions] = useState<string[]>([]);
+  const [includeInactiveUsers, setIncludeInactiveUsers] = useState(false);
   const [applyingGroupPermissions, setApplyingGroupPermissions] = useState(false);
   const [groupPermissionsMessage, setGroupPermissionsMessage] = useState<string | null>(null);
   
@@ -578,19 +579,27 @@ export function SystemManagement() {
   /**
    * Apply the configured group permissions to all users in the selected role.
    * Super admin only. After applying, individual user permissions can still be edited.
+   * Can optionally include inactive users if includeInactiveUsers is true.
    */
   async function handleApplyGroupPermissions() {
     if (!selectedGroupRole) return;
 
-    const usersInGroup = users.filter(u => u.role?.name === selectedGroupRole.name && u.isActive);
-    const confirmMessage = `This will apply ${groupPermissions.length} permission(s) to ALL active users in the "${selectedGroupRole.name}" group (${usersInGroup.length} user(s)).\n\nIndividual user permissions can still be modified afterwards.\n\nContinue?`;
+    const activeUsersInGroup = users.filter(u => u.role?.name === selectedGroupRole.name && u.isActive);
+    const allUsersInGroup = users.filter(u => u.role?.name === selectedGroupRole.name);
+    const inactiveCount = allUsersInGroup.length - activeUsersInGroup.length;
+    
+    const userScope = includeInactiveUsers && inactiveCount > 0 
+      ? `${activeUsersInGroup.length} active + ${inactiveCount} inactive` 
+      : activeUsersInGroup.length;
+    
+    const confirmMessage = `This will apply ${groupPermissions.length} permission(s) to ${userScope} user(s) in the "${selectedGroupRole.name}" group.\n\nIndividual user permissions can still be modified afterwards.\n\nContinue?`;
 
     if (!confirm(confirmMessage)) return;
 
     try {
       setApplyingGroupPermissions(true);
       setGroupPermissionsMessage(null);
-      const response = await applyGroupPermissions(selectedGroupRole._id, groupPermissions);
+      const response = await applyGroupPermissions(selectedGroupRole._id, groupPermissions, includeInactiveUsers);
       setGroupPermissionsMessage(`✓ ${response.message || `Permissions applied to ${response.usersUpdated} user(s)`}`);
       // Refresh data to reflect changes
       setSelectedGroupRole({ ...selectedGroupRole, permissions: groupPermissions });
@@ -2051,8 +2060,15 @@ alert((response as any).message || 'User invited successfully');
                         Editing permissions for: <span className="text-blue-900">{selectedGroupRole.name.charAt(0).toUpperCase() + selectedGroupRole.name.slice(1)}</span>
                       </p>
                       <p className="text-xs text-blue-700 mt-1">
-                        {users.filter(u => u.role?.name === selectedGroupRole.name && u.isActive).length} active user(s) in this group.
-                        Configure the permissions below, then click "Apply to Group" to update all users at once.
+                        {(() => {
+                          const activeCount = users.filter(u => u.role?.name === selectedGroupRole.name && u.isActive).length;
+                          const totalCount = users.filter(u => u.role?.name === selectedGroupRole.name).length;
+                          const inactiveCount = totalCount - activeCount;
+                          return inactiveCount > 0 
+                            ? `${activeCount} active user(s), ${inactiveCount} inactive user(s) in this group (${totalCount} total).`
+                            : `${activeCount} active user(s) in this group.`;
+                        })()}
+                        {' '}Configure the permissions below, then click "Apply to Group" to update all users at once.
                       </p>
                     </div>
                   </div>
@@ -2144,6 +2160,27 @@ alert((response as any).message || 'User invited successfully');
                       {groupPermissionsMessage}
                     </div>
                   )}
+
+                  {/* Include inactive users checkbox */}
+                  {(() => {
+                    const inactiveCount = users.filter(u => u.role?.name === selectedGroupRole.name && !u.isActive).length;
+                    return inactiveCount > 0 && (
+                      <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <input
+                          type="checkbox"
+                          id="includeInactiveUsers"
+                          checked={includeInactiveUsers}
+                          onChange={(e) => setIncludeInactiveUsers(e.target.checked)}
+                          disabled={applyingGroupPermissions}
+                          className="w-4 h-4 rounded border-gray-300 text-ars-primary focus:ring-ars-primary cursor-pointer"
+                        />
+                        <label htmlFor="includeInactiveUsers" className="text-sm text-amber-900 cursor-pointer flex items-center gap-2">
+                          <span>Apply permissions to inactive users as well</span>
+                          <span className="text-xs text-amber-700">({inactiveCount} inactive user{inactiveCount !== 1 ? 's' : ''})</span>
+                        </label>
+                      </div>
+                    );
+                  })()}
 
                   {/* Apply button */}
                   <div className="flex items-center gap-4 pt-2">

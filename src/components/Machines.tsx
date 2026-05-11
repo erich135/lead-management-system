@@ -110,6 +110,7 @@ export function Machines() {
   const [uploadCurrentHours, setUploadCurrentHours] = useState('');
   const [uploadNextServiceHours, setUploadNextServiceHours] = useState('');
   const [uploadNextServiceDate, setUploadNextServiceDate] = useState('');
+  const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load all machines on mount and when filters change
@@ -363,22 +364,51 @@ export function Machines() {
     }
   };
 
+  const validateAndSetFile = (file: File) => {
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+    if (!allowedTypes.includes(file.type)) {
+      setUploadError('Only PDF, JPEG, and PNG files are allowed');
+      return false;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError('File size must be less than 10MB');
+      return false;
+    }
+    setUploadFile(file);
+    setUploadError(null);
+    return true;
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
-      if (!allowedTypes.includes(file.type)) {
-        setUploadError('Only PDF, JPEG, and PNG files are allowed');
-        return;
-      }
-      if (file.size > 10 * 1024 * 1024) {
-        setUploadError('File size must be less than 10MB');
-        return;
-      }
-      setUploadFile(file);
-      setUploadError(null);
+      validateAndSetFile(file);
     }
   };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      validateAndSetFile(file);
+    }
+  }
 
   const handleUploadRSR = async () => {
     if (!expandedMachineId || !uploadFile || !uploadTitle.trim()) {
@@ -1222,8 +1252,12 @@ export function Machines() {
               {/* File Upload */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">File <span className="text-red-500">*</span></label>
-                <div onClick={() => fileInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${uploadFile ? 'border-green-300 bg-green-50' : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'}`}>
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-all ${isDragOver ? 'border-blue-400 bg-blue-50 scale-105' : uploadFile ? 'border-green-300 bg-green-50' : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'}`}>
                   {uploadFile ? (
                     <div className="flex items-center justify-center gap-2 text-green-700">
                       <CheckCircle2 className="w-5 h-5" />
@@ -1232,8 +1266,8 @@ export function Machines() {
                     </div>
                   ) : (
                     <div className="text-slate-500">
-                      <Upload className="w-8 h-8 mx-auto mb-2" />
-                      <p>Click to select file</p>
+                      <Upload className={`w-8 h-8 mx-auto mb-2 transition-colors ${isDragOver ? 'text-blue-500' : ''}`} />
+                      <p>{isDragOver ? 'Drop your file here' : 'Click to select or drag and drop'}</p>
                       <p className="text-xs text-slate-400 mt-1">PDF, JPEG, PNG • Max 10MB</p>
                     </div>
                   )}

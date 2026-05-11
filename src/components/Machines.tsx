@@ -3,6 +3,7 @@ import {
   getMachines,
   createMachine,
   updateMachine,
+  deleteMachine,
   getMachineRSRs,
   uploadMachineRSR,
   getMachineRSRUrl,
@@ -66,6 +67,8 @@ export function Machines() {
 
   // Edit state
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
+  const [machineToDelete, setMachineToDelete] = useState<Machine | null>(null);
+  const [deletingMachine, setDeletingMachine] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Machine>>({});
   const [saving, setSaving] = useState(false);
 
@@ -538,6 +541,21 @@ export function Machines() {
     return 'unknown';
   };
 
+  const handleDeleteMachine = async () => {
+    if (!machineToDelete) return;
+    setDeletingMachine(true);
+    try {
+      await deleteMachine(machineToDelete._id);
+      setMachineToDelete(null);
+      setExpandedMachineId(null);
+      await loadMachines(pagination.page);
+    } catch (err: any) {
+      console.error('Failed to delete machine:', err);
+    } finally {
+      setDeletingMachine(false);
+    }
+  };
+
   const sortedMachines = sortField
     ? [...machines].sort((a: any, b: any) => {
         let aVal = a[sortField] ?? '';
@@ -822,6 +840,7 @@ export function Machines() {
                           </h3>
                           <div className="flex items-center gap-2">
                             {!isEditing ? (
+                              <>
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleEdit(machine); }}
                                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -829,6 +848,16 @@ export function Machines() {
                                 <Edit3 className="w-3.5 h-3.5" />
                                 Edit
                               </button>
+                              {isSuperAdmin && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setMachineToDelete(machine); }}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  Delete
+                                </button>
+                              )}
+                              </>
                             ) : (
                               <>
                                 <button
@@ -1451,6 +1480,74 @@ export function Machines() {
           onClose={() => setShowImportWizard(false)}
           onImportComplete={() => loadMachines(1)}
         />
+      )}
+
+      {/* Delete Machine Confirmation Modal */}
+      {machineToDelete && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60]" onClick={() => !deletingMachine && setMachineToDelete(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Trash2 className="w-7 h-7 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Delete Machine</h3>
+                  <p className="text-sm text-gray-500">This action cannot be undone</p>
+                </div>
+              </div>
+
+              {/* Machine Info */}
+              <div className="mb-5 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <p className="font-semibold text-slate-800">{machineToDelete.make} {machineToDelete.model}</p>
+                <p className="text-sm text-slate-500 font-mono mt-0.5">S/N: {machineToDelete.serialNumber}</p>
+                {machineToDelete.assetNumber && <p className="text-sm text-slate-500">Asset: {machineToDelete.assetNumber}</p>}
+              </div>
+
+              {/* Big Warning Banner */}
+              <div className="mb-6 bg-red-50 border-2 border-red-400 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-red-800 text-base mb-1">⚠ PERMANENT DELETION WARNING</p>
+                    <p className="text-sm text-red-700 mb-2">
+                      You are about to <strong>permanently delete</strong> this machine record. This will:
+                    </p>
+                    <ul className="text-sm text-red-700 space-y-1 list-none">
+                      <li>• Remove the machine from the system entirely</li>
+                      <li>• Delete all linked RSR documents</li>
+                      <li>• Break historical job references to this machine</li>
+                    </ul>
+                    <p className="text-sm font-bold text-red-800 mt-3">This cannot be reversed. Are you absolutely sure?</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-3 justify-end">
+                <button
+                  onClick={() => setMachineToDelete(null)}
+                  disabled={deletingMachine}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 disabled:opacity-50 font-bold text-[14px] uppercase"
+                >
+                  CANCEL
+                </button>
+                <button
+                  onClick={handleDeleteMachine}
+                  disabled={deletingMachine}
+                  className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-[14px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {deletingMachine ? (
+                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />DELETING...</>
+                  ) : (
+                    <><Trash2 className="w-4 h-4" />YES, DELETE MACHINE</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Create Machine Modal */}

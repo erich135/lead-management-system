@@ -3,7 +3,6 @@
  * Provides user management, role/permission assignment, and import functionality.
  */
 import { useState, useEffect, useMemo } from 'react';
-import * as XLSX from 'xlsx';
 import { BranchPermissionsSection } from './BranchPermissionsSection';
 import { 
   getUsers, 
@@ -2724,7 +2723,8 @@ alert((response as any).message || 'User invited successfully');
                         Skipped Duplicates ({importResult.duplicates.length}):
                       </p>
                       <button
-                        onClick={() => {
+                        onClick={async () => {
+                          const XLSX = await import('xlsx');
                           const ws = XLSX.utils.aoa_to_sheet([
                             ['Row', 'Serial Number', 'Make', 'Model'],
                             ...importResult.duplicates!.map(d => [d.row, d.serialNumber, d.make, d.model]),

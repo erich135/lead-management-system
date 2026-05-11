@@ -53,6 +53,34 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
   const isLoadingAllJobsRef = useRef(false); // Ref to track if we're loading all jobs (prevents race conditions)
   const isAllJobsModeRef = useRef(false); // Ref to track if we're in "all jobs" mode (prevents overdue requests from overwriting)
   const preservePageRef = useRef<number | null>(null); // Ref to preserve page number during job updates
+
+  /**
+   * Returns a job rep code string value when available.
+   */
+  const getJobRepCodeValue = (job: Job): string | null => {
+    if (!job.repCode) return null;
+    if (typeof job.repCode === 'string') return job.repCode;
+
+    const rawCode = (job.repCode as unknown as { code?: unknown }).code;
+    if (typeof rawCode === 'string') return rawCode;
+
+    return null;
+  };
+
+  /**
+   * Matches selected rep filter against legacy and current rep storage formats.
+   */
+  const matchesRepFilter = (job: Job, selectedRepId: string): boolean => {
+    const selectedRep = repCodes.find(rc => rc._id === selectedRepId);
+    const jobRepId = getJobRepCodeId(job);
+    const jobRepCode = getJobRepCodeValue(job);
+
+    if (jobRepId === selectedRepId) return true;
+    if (selectedRep && jobRepId === selectedRep.code) return true;
+    if (selectedRep && jobRepCode === selectedRep.code) return true;
+
+    return false;
+  };
   
   // Machines visibility state - load from localStorage
   const [showMachinesGlobal, setShowMachinesGlobal] = useState<boolean>(() => {
@@ -85,6 +113,83 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       // Sort descending (highest first)
       return numB - numA;
     });
+  };
+
+  /**
+   * Returns a job branch id regardless of whether branch is populated object or raw id.
+   */
+  const getJobBranchId = (job: Job): string | null => {
+    if (!job.branch) return null;
+    if (typeof job.branch === 'string') return job.branch;
+
+    const rawId = (job.branch as unknown as { _id?: unknown })._id;
+    if (typeof rawId === 'string') return rawId;
+    if (rawId && typeof rawId === 'object' && 'toString' in rawId) {
+      return String(rawId);
+    }
+
+    return null;
+  };
+
+  /**
+   * Returns a branch display name when available.
+   */
+  const getJobBranchName = (job: Job): string => {
+    if (!job.branch) return '';
+    if (typeof job.branch === 'object' && job.branch.name) return job.branch.name;
+    return '';
+  };
+
+  /**
+   * Returns a rep code id regardless of whether repCode is populated object or raw id.
+   */
+  const getJobRepCodeId = (job: Job): string | null => {
+    if (!job.repCode) return null;
+    if (typeof job.repCode === 'string') return job.repCode;
+
+    const rawId = (job.repCode as unknown as { _id?: unknown })._id;
+    if (typeof rawId === 'string') return rawId;
+    if (rawId && typeof rawId === 'object' && 'toString' in rawId) {
+      return String(rawId);
+    }
+
+    return null;
+  };
+
+  /**
+   * Returns the technician id for filtering, preferring active booking data.
+   */
+  const getJobTechnicianId = (job: Job): string | null => {
+    if (job.bookings && job.bookings.length > 0 && job.bookings[0].technicianId) {
+      return job.bookings[0].technicianId;
+    }
+
+    if (!job.techBooked) return null;
+    if (typeof job.techBooked === 'string') return job.techBooked;
+
+    const rawId = (job.techBooked as unknown as { _id?: unknown })._id;
+    if (typeof rawId === 'string') return rawId;
+    if (rawId && typeof rawId === 'object' && 'toString' in rawId) {
+      return String(rawId);
+    }
+
+    return null;
+  };
+
+  /**
+   * Returns a job source id regardless of whether source is populated object or raw id.
+   */
+  const getJobSourceId = (job: Job): string | null => {
+    if (!job.jobSource) return null;
+    if (typeof job.jobSource === 'string') return job.jobSource;
+
+    const rawId = (job.jobSource as unknown as { _id?: unknown })._id;
+    if (typeof rawId === 'string') return rawId;
+    if (rawId && typeof rawId === 'object' && 'toString' in rawId) {
+      return String(rawId);
+    }
+
+    return null;
   };
 
   // Get admin code codes for filter dropdown
@@ -133,23 +238,44 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
 
   // Auto-set rep code filter for rep users
   useEffect(() => {
-    if (user?.role?.name === 'rep' && !user?.isSuperAdmin && user?.repCode?.code) {
-      // Find the rep code ID from the repCodes list
-      const userRepCode = repCodes.find(rc => rc.code === user.repCode?.code);
-      if (userRepCode && repCodeFilter === 'all') {
-        setRepCodeFilter(userRepCode._id);
+    if (user?.role?.name === 'rep' && !user?.isSuperAdmin && repCodeFilter === 'all') {
+      // repCode can be either an ID string or populated object
+      if (typeof user.repCode === 'string' && user.repCode) {
+        const userRepCode = repCodes.find(rc => rc._id === user.repCode || rc.code === user.repCode);
+        setRepCodeFilter(userRepCode?._id || user.repCode);
+        return;
+      }
+
+      if (user.repCode && typeof user.repCode === 'object') {
+        if (user.repCode._id) {
+          setRepCodeFilter(user.repCode._id);
+          return;
+        }
+
+        if (user.repCode.code) {
+          const userRepCode = repCodes.find(rc => rc.code === user.repCode?.code);
+          if (userRepCode) {
+            setRepCodeFilter(userRepCode._id);
+          }
+        }
       }
     }
   }, [user, repCodes]);
 
   // Auto-set technician filter for technician users
   useEffect(() => {
-    if (user?.role?.name === 'technician' && !user?.isSuperAdmin && user?.technician?.id) {
-      if (technicianFilter === 'all') {
-        setTechnicianFilter(user.technician.id);
+    if (user?.role?.name === 'technician' && !user?.isSuperAdmin && technicianFilter === 'all') {
+      // technician can be either an ID string or populated object
+      if (typeof user.technician === 'string' && user.technician) {
+        setTechnicianFilter(user.technician);
+        return;
+      }
+
+      if (user.technician && typeof user.technician === 'object' && user.technician._id) {
+        setTechnicianFilter(user.technician._id);
       }
     }
-  }, [user, technicians]);
+  }, [user, technicianFilter]);
 
   // Restore page after job update
   useEffect(() => {
@@ -191,7 +317,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
             job.customer?.name?.toLowerCase().includes(searchLower) ||
             job.cashCustomer?.toLowerCase().includes(searchLower) ||
             job.adm?.toLowerCase().includes(searchLower) ||
-            job.branch?.name?.toLowerCase().includes(searchLower) ||
+            getJobBranchName(job).toLowerCase().includes(searchLower) ||
             repCode?.code?.toLowerCase().includes(searchLower)
           );
         });
@@ -204,7 +330,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       
       // Apply branch filter
       if (branchFilter !== 'all') {
-        filtered = filtered.filter(job => job.branch?._id === branchFilter);
+        filtered = filtered.filter(job => getJobBranchId(job) === branchFilter);
       }
       
       // Apply admin filter
@@ -214,44 +340,17 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       
       // Apply rep code filter
       if (repCodeFilter !== 'all') {
-        filtered = filtered.filter(job => {
-          // Handle both string ID and object formats
-          if (typeof job.repCode === 'string') {
-            return job.repCode === repCodeFilter;
-          }
-          if (typeof job.repCode === 'object' && job.repCode?._id) {
-            return job.repCode._id === repCodeFilter;
-          }
-          return false;
-        });
+        filtered = filtered.filter(job => matchesRepFilter(job, repCodeFilter));
       }
       
       // Apply technician filter
       if (technicianFilter !== 'all') {
-        filtered = filtered.filter(job => {
-          // Handle both string ID and object formats
-          if (typeof job.techBooked === 'string') {
-            return job.techBooked === technicianFilter;
-          }
-          if (typeof job.techBooked === 'object' && job.techBooked?._id) {
-            return job.techBooked._id === technicianFilter;
-          }
-          return false;
-        });
+        filtered = filtered.filter(job => getJobTechnicianId(job) === technicianFilter);
       }
       
       // Apply job source filter
       if (jobSourceFilter !== 'all') {
-        filtered = filtered.filter(job => {
-          // Handle both string ID and object formats
-          if (typeof job.jobSource === 'string') {
-            return job.jobSource === jobSourceFilter;
-          }
-          if (typeof job.jobSource === 'object' && job.jobSource?._id) {
-            return job.jobSource._id === jobSourceFilter;
-          }
-          return false;
-        });
+        filtered = filtered.filter(job => getJobSourceId(job) === jobSourceFilter);
       }
       
       // Sort by job number (numeric part) descending when in "All Jobs" mode
@@ -329,7 +428,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
             job.customer?.name?.toLowerCase().includes(searchLower) ||
             job.cashCustomer?.toLowerCase().includes(searchLower) ||
             job.adm?.toLowerCase().includes(searchLower) ||
-            job.branch?.name?.toLowerCase().includes(searchLower) ||
+            getJobBranchName(job).toLowerCase().includes(searchLower) ||
             repCode?.code?.toLowerCase().includes(searchLower)
           );
         });
@@ -342,7 +441,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       
       // Apply branch filter
       if (branchFilter !== 'all') {
-        filtered = filtered.filter(job => job.branch?._id === branchFilter);
+        filtered = filtered.filter(job => getJobBranchId(job) === branchFilter);
       }
       
       // Apply admin filter
@@ -352,30 +451,17 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       
       // Apply rep code filter
       if (repCodeFilter !== 'all') {
-        filtered = filtered.filter(job => {
-          // Handle both string ID and object formats
-          if (typeof job.repCode === 'string') {
-            return job.repCode === repCodeFilter;
-          }
-          if (typeof job.repCode === 'object' && job.repCode?._id) {
-            return job.repCode._id === repCodeFilter;
-          }
-          return false;
-        });
+        filtered = filtered.filter(job => matchesRepFilter(job, repCodeFilter));
       }
       
       // Apply technician filter
       if (technicianFilter !== 'all') {
-        filtered = filtered.filter(job => {
-          // Handle both string ID and object formats
-          if (typeof job.techBooked === 'string') {
-            return job.techBooked === technicianFilter;
-          }
-          if (typeof job.techBooked === 'object' && job.techBooked?._id) {
-            return job.techBooked._id === technicianFilter;
-          }
-          return false;
-        });
+        filtered = filtered.filter(job => getJobTechnicianId(job) === technicianFilter);
+      }
+
+      // Apply job source filter
+      if (jobSourceFilter !== 'all') {
+        filtered = filtered.filter(job => getJobSourceId(job) === jobSourceFilter);
       }
       
       // Sort by job number (numeric part) descending (highest to lowest)
@@ -467,7 +553,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
             job.customer?.name?.toLowerCase().includes(searchLower) ||
             job.cashCustomer?.toLowerCase().includes(searchLower) ||
             job.adm?.toLowerCase().includes(searchLower) ||
-            job.branch?.name?.toLowerCase().includes(searchLower) ||
+            getJobBranchName(job).toLowerCase().includes(searchLower) ||
             repCode?.code?.toLowerCase().includes(searchLower)
           );
         });
@@ -480,7 +566,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       
       // Apply branch filter
       if (branchFilter !== 'all') {
-        filtered = filtered.filter(job => job.branch?._id === branchFilter);
+        filtered = filtered.filter(job => getJobBranchId(job) === branchFilter);
       }
       
       // Apply admin filter
@@ -490,30 +576,17 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       
       // Apply rep code filter
       if (repCodeFilter !== 'all') {
-        filtered = filtered.filter(job => {
-          // Handle both string ID and object formats
-          if (typeof job.repCode === 'string') {
-            return job.repCode === repCodeFilter;
-          }
-          if (typeof job.repCode === 'object' && job.repCode?._id) {
-            return job.repCode._id === repCodeFilter;
-          }
-          return false;
-        });
+        filtered = filtered.filter(job => matchesRepFilter(job, repCodeFilter));
       }
       
       // Apply technician filter
       if (technicianFilter !== 'all') {
-        filtered = filtered.filter(job => {
-          // Handle both string ID and object formats
-          if (typeof job.techBooked === 'string') {
-            return job.techBooked === technicianFilter;
-          }
-          if (typeof job.techBooked === 'object' && job.techBooked?._id) {
-            return job.techBooked._id === technicianFilter;
-          }
-          return false;
-        });
+        filtered = filtered.filter(job => getJobTechnicianId(job) === technicianFilter);
+      }
+
+      // Apply job source filter
+      if (jobSourceFilter !== 'all') {
+        filtered = filtered.filter(job => getJobSourceId(job) === jobSourceFilter);
       }
       
       // Sort by date descending (newest first) for overdue/approaching/open filters
@@ -648,7 +721,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
           job.customer?.name?.toLowerCase().includes(searchLower) ||
           job.cashCustomer?.toLowerCase().includes(searchLower) ||
           job.adm?.toLowerCase().includes(searchLower) ||
-          job.branch?.name?.toLowerCase().includes(searchLower) ||
+          getJobBranchName(job).toLowerCase().includes(searchLower) ||
           repCode?.code?.toLowerCase().includes(searchLower)
         );
       });
@@ -661,7 +734,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
 
     // Apply branch filter
     if (branchFilter !== 'all') {
-      filtered = filtered.filter(job => job.branch?._id === branchFilter);
+      filtered = filtered.filter(job => getJobBranchId(job) === branchFilter);
     }
 
     // Apply admin filter
@@ -671,30 +744,17 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
 
     // Apply rep code filter
     if (repCodeFilter !== 'all') {
-      filtered = filtered.filter(job => {
-        // Handle both string ID and object formats
-        if (typeof job.repCode === 'string') {
-          return job.repCode === repCodeFilter;
-        }
-        if (typeof job.repCode === 'object' && job.repCode?._id) {
-          return job.repCode._id === repCodeFilter;
-        }
-        return false;
-      });
+      filtered = filtered.filter(job => matchesRepFilter(job, repCodeFilter));
+    }
+
+    // Apply technician filter
+    if (technicianFilter !== 'all') {
+      filtered = filtered.filter(job => getJobTechnicianId(job) === technicianFilter);
     }
 
     // Apply job source filter
     if (jobSourceFilter !== 'all') {
-      filtered = filtered.filter(job => {
-        // Handle both string ID and object formats
-        if (typeof job.jobSource === 'string') {
-          return job.jobSource === jobSourceFilter;
-        }
-        if (typeof job.jobSource === 'object' && job.jobSource?._id) {
-          return job.jobSource._id === jobSourceFilter;
-        }
-        return false;
-      });
+      filtered = filtered.filter(job => getJobSourceId(job) === jobSourceFilter);
     }
 
     // Sort by job number (numeric part) descending when in "All Jobs" mode
@@ -786,20 +846,19 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
    * Gets the rep code object from a job's repCode field (which can be a string ID or an object)
    */
   function getRepCodeFromJob(job: Job): RepCode | null {
-    if (!job.repCode) return null;
-    
-    // If repCode is already an object with _id, use it
-    if (typeof job.repCode === 'object' && '_id' in job.repCode) {
-      const repCodeObj = job.repCode as { _id: string; code: string; description?: string };
-      return repCodes.find(rc => rc._id === repCodeObj._id) || null;
+    const repCodeId = getJobRepCodeId(job);
+    const repCodeValue = getJobRepCodeValue(job);
+
+    if (repCodeId) {
+      const byId = repCodes.find(rc => rc._id === repCodeId);
+      if (byId) return byId;
     }
-    
-    // If repCode is a string ID, look it up
-    if (typeof job.repCode === 'string') {
-      const repCodeId = job.repCode;
-      return repCodes.find(rc => rc._id === repCodeId) || null;
+
+    if (repCodeValue) {
+      const byCode = repCodes.find(rc => rc.code === repCodeValue);
+      if (byCode) return byCode;
     }
-    
+
     return null;
   }
 

@@ -76,6 +76,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     lastServiceDate: '',
     nextServiceDate: '',
   });
+  const [machineTypes, setMachineTypes] = useState<MachineType[]>([]);
 
   // Machine types that use date-based service tracking
   const getServiceTypeForMachineType = (name: string): 'hours' | 'date' => {
@@ -93,7 +94,6 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [serviceDescriptions, setServiceDescriptions] = useState<ServiceDescription[]>([]);
   const [jobSources, setJobSources] = useState<JobSource[]>([]);
-  const [machineTypes, setMachineTypes] = useState<MachineType[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [showActivityHistory, setShowActivityHistory] = useState(false);

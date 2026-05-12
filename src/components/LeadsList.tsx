@@ -927,7 +927,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                   <input
                     type="checkbox"
                     checked={priorityFilter.overdue}
-                    onChange={(e) => setPriorityFilter({ ...priorityFilter, overdue: e.target.checked, all: false })}
+                    onChange={(e) => { const v = e.target.checked; const noneLeft = !v && !priorityFilter.approaching && !priorityFilter.open; setPriorityFilter({ ...priorityFilter, overdue: v, all: noneLeft }); }}
                     className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer"
                   />
                   <div className="flex items-center gap-1.5 flex-1">
@@ -939,7 +939,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                   <input
                     type="checkbox"
                     checked={priorityFilter.approaching}
-                    onChange={(e) => setPriorityFilter({ ...priorityFilter, approaching: e.target.checked, all: false })}
+                    onChange={(e) => { const v = e.target.checked; const noneLeft = !v && !priorityFilter.overdue && !priorityFilter.open; setPriorityFilter({ ...priorityFilter, approaching: v, all: noneLeft }); }}
                     className="w-4 h-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
                   />
                   <div className="flex items-center gap-1.5 flex-1">
@@ -951,7 +951,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                   <input
                     type="checkbox"
                     checked={priorityFilter.open}
-                    onChange={(e) => setPriorityFilter({ ...priorityFilter, open: e.target.checked, all: false })}
+                    onChange={(e) => { const v = e.target.checked; const noneLeft = !v && !priorityFilter.overdue && !priorityFilter.approaching; setPriorityFilter({ ...priorityFilter, open: v, all: noneLeft }); }}
                     className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                   />
                   <div className="flex items-center gap-1.5 flex-1">

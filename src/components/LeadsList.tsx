@@ -192,6 +192,20 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
     return null;
   };
 
+  /**
+   * Returns a job status id regardless of whether status is populated object or raw id string.
+   */
+  const getJobStatusId = (job: Job): string | null => {
+    if (!job.status) return null;
+    if (typeof job.status === 'string') return job.status;
+    if (typeof job.status === 'object') {
+      const rawId = (job.status as unknown as { _id?: unknown })._id;
+      if (typeof rawId === 'string') return rawId;
+      if (rawId && typeof rawId === 'object' && 'toString' in rawId) return String(rawId);
+    }
+    return null;
+  };
+
   // Get admin code codes for filter dropdown
   const adminCodeOptions = adminCodes
     .filter(ac => ac.isActive)
@@ -325,7 +339,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       
       // Apply status filter
       if (statusFilter.length > 0) {
-        filtered = filtered.filter(job => job.status?._id && statusFilter.includes(job.status._id));
+        filtered = filtered.filter(job => { const sid = getJobStatusId(job); return sid !== null && statusFilter.includes(sid); });
       }
       
       // Apply branch filter
@@ -347,7 +361,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       if (technicianFilter !== 'all') {
         filtered = filtered.filter(job => getJobTechnicianId(job) === technicianFilter);
       }
-      
+
       // Apply job source filter
       if (jobSourceFilter !== 'all') {
         filtered = filtered.filter(job => getJobSourceId(job) === jobSourceFilter);
@@ -436,7 +450,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       
       // Apply status filter
       if (statusFilter.length > 0) {
-        filtered = filtered.filter(job => job.status?._id && statusFilter.includes(job.status._id));
+        filtered = filtered.filter(job => { const sid = getJobStatusId(job); return sid !== null && statusFilter.includes(sid); });
       }
       
       // Apply branch filter
@@ -561,7 +575,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       
       // Apply status filter
       if (statusFilter.length > 0) {
-        filtered = filtered.filter(job => job.status?._id && statusFilter.includes(job.status._id));
+        filtered = filtered.filter(job => { const sid = getJobStatusId(job); return sid !== null && statusFilter.includes(sid); });
       }
       
       // Apply branch filter
@@ -729,7 +743,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
 
     // Apply status filter
     if (statusFilter.length > 0) {
-      filtered = filtered.filter(job => job.status?._id && statusFilter.includes(job.status._id));
+      filtered = filtered.filter(job => { const sid = getJobStatusId(job); return sid !== null && statusFilter.includes(sid); });
     }
 
     // Apply branch filter

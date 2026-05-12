@@ -149,21 +149,19 @@ export function MobileNavigation({
                   <span className="font-medium">Activities</span>
                 </Link>
 
-                {/* Machines (if super admin) */}
-                {user?.isSuperAdmin ? (
-                  <Link
-                    to="/machines"
-                    onClick={() => setShowMenu(false)}
-                    className={`w-full flex items-center gap-4 p-4 rounded-[8px] transition-all ${
-                      activeView === 'machines'
-                        ? 'bg-ars-secondary/20 text-ars-heading'
-                        : 'bg-gray-50 text-ars-heading hover:bg-gray-100'
-                    }`}
-                  >
-                    <Cog className="w-5 h-5" />
-                    <span className="font-medium">Machines</span>
-                  </Link>
-                ) : null}
+                {/* Machines - visible to all users */}
+                <Link
+                  to="/machines"
+                  onClick={() => setShowMenu(false)}
+                  className={`w-full flex items-center gap-4 p-4 rounded-[8px] transition-all ${
+                    activeView === 'machines'
+                      ? 'bg-ars-secondary/20 text-ars-heading'
+                      : 'bg-gray-50 text-ars-heading hover:bg-gray-100'
+                  }`}
+                >
+                  <Cog className="w-5 h-5" />
+                  <span className="font-medium">Machines</span>
+                </Link>
 
                 {/* System Admin (if super admin) */}
                 {user?.isSuperAdmin ? (

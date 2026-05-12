@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import {
   validateMachinesCSV,
   confirmMachinesImport,
@@ -29,20 +30,38 @@ export function UnifiedMachineImport({ onClose, onImportComplete }: Props) {
   const [validating, setValidating] = useState(false);
   const [validRows, setValidRows] = useState<ValidatedMachineRow[]>([]);
   const [errorRows, setErrorRows] = useState<ErrorMachineRow[]>([]);
+  const [duplicateRows, setDuplicateRows] = useState<ErrorMachineRow[]>([]);
+  const [globalDuplicateAction, setGlobalDuplicateAction] = useState<'use_new' | 'keep_existing'>('use_new');
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<{ imported: number; updated: number; skipped: number; errors: string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Step 1: Validate ──────────────────────────────────────────────────────
 
+  const toCSVFile = async (f: File): Promise<File> => {
+    const ext = f.name.split('.').pop()?.toLowerCase();
+    if (ext === 'xlsx' || ext === 'xls') {
+      const buffer = await f.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
+      const csv = XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]]);
+      return new File([csv], f.name.replace(/\.[^.]+$/, '.csv'), { type: 'text/csv' });
+    }
+    return f;
+  };
+
   const handleValidate = async () => {
     if (!file) return;
     setValidating(true);
     setGlobalError(null);
     try {
-      const result = await validateMachinesCSV(file);
+      const csvFile = await toCSVFile(file);
+      const result = await validateMachinesCSV(csvFile);
+      const dupRows = result.data.errorRows.filter(r => r.errorType === 'duplicate_serial');
+      const otherErrors = result.data.errorRows.filter(r => r.errorType !== 'duplicate_serial');
       setValidRows(result.data.validRows);
-      setErrorRows(result.data.errorRows.map(r => ({ ...r, resolvedCustomerId: undefined, skip: false })));
+      setErrorRows(otherErrors.map(r => ({ ...r, resolvedCustomerId: undefined, skip: false })));
+      setDuplicateRows(dupRows);
+      setGlobalDuplicateAction('use_new');
       setStep('review');
     } catch (err: any) {
       setGlobalError(err.message || 'Validation failed');
@@ -98,7 +117,12 @@ export function UnifiedMachineImport({ onClose, onImportComplete }: Props) {
         return { ...r, skip: true };
       });
 
-      const allRows = [...validRows, ...correctedErrors];
+      const resolvedDuplicates: (ValidatedMachineRow | ErrorMachineRow)[] = duplicateRows.map(r => {
+        const useNew = r.keepExisting !== undefined ? !r.keepExisting : globalDuplicateAction === 'use_new';
+        return { ...r, skip: !useNew };
+      });
+
+      const allRows = [...validRows, ...correctedErrors, ...resolvedDuplicates];
       const result = await confirmMachinesImport(allRows);
       setImportResult(result.data);
       setStep('done');
@@ -114,7 +138,12 @@ export function UnifiedMachineImport({ onClose, onImportComplete }: Props) {
   const resolvedCount = errorRows.filter(r => r.resolvedCustomerId && !r.skip).length;
   const skippedCount  = errorRows.filter(r => r.skip).length;
   const unresolvedCount = errorRows.filter(r => !r.resolvedCustomerId && !r.skip).length;
-  const willImport = validRows.length + resolvedCount;
+  const duplicatesUseNew = duplicateRows.filter(r => {
+    if (r.keepExisting !== undefined) return !r.keepExisting;
+    return globalDuplicateAction === 'use_new';
+  }).length;
+  const duplicatesKeepExisting = duplicateRows.length - duplicatesUseNew;
+  const willImport = validRows.length + resolvedCount + duplicatesUseNew;
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -131,7 +160,7 @@ export function UnifiedMachineImport({ onClose, onImportComplete }: Props) {
             <div>
               <h2 className="text-lg font-bold text-slate-800">Import Machines</h2>
               <p className="text-xs text-slate-500">
-                {step === 'upload'    && 'Upload your master sheet CSV'}
+                {step === 'upload'    && 'Upload your master sheet (Excel or CSV)'}
                 {step === 'review'    && 'Review and fix any issues before importing'}
                 {step === 'importing' && 'Importing machines…'}
                 {step === 'done'      && 'Import complete'}
@@ -166,14 +195,14 @@ export function UnifiedMachineImport({ onClose, onImportComplete }: Props) {
                   </div>
                 ) : (
                   <div>
-                    <p className="font-semibold text-slate-600">Click to select your CSV file</p>
+                    <p className="font-semibold text-slate-600">Click to select your Excel or CSV file</p>
                     <p className="text-sm text-slate-400 mt-1">Must have Make, Model, Serial Number columns</p>
                   </div>
                 )}
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv"
+                  accept=".xlsx,.xls,.csv"
                   className="hidden"
                   onChange={e => { const f = e.target.files?.[0]; if (f) setFile(f); }}
                 />
@@ -210,7 +239,7 @@ export function UnifiedMachineImport({ onClose, onImportComplete }: Props) {
           {step === 'review' && (
             <div className="space-y-4">
               {/* Summary bar */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-4 gap-3">
                 <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
                   <p className="text-2xl font-bold text-green-700">{validRows.length}</p>
                   <p className="text-xs text-green-600 mt-0.5">Ready to import</p>
@@ -223,8 +252,12 @@ export function UnifiedMachineImport({ onClose, onImportComplete }: Props) {
                     Need attention
                   </p>
                 </div>
+                <div className={`border rounded-xl p-3 text-center ${duplicateRows.length > 0 ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'}`}>
+                  <p className={`text-2xl font-bold ${duplicateRows.length > 0 ? 'text-blue-700' : 'text-slate-400'}`}>{duplicateRows.length}</p>
+                  <p className={`text-xs mt-0.5 ${duplicateRows.length > 0 ? 'text-blue-600' : 'text-slate-400'}`}>Duplicates</p>
+                </div>
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
-                  <p className="text-2xl font-bold text-slate-600">{skippedCount}</p>
+                  <p className="text-2xl font-bold text-slate-600">{skippedCount + duplicatesKeepExisting}</p>
                   <p className="text-xs text-slate-500 mt-0.5">Marked to skip</p>
                 </div>
               </div>
@@ -270,6 +303,80 @@ export function UnifiedMachineImport({ onClose, onImportComplete }: Props) {
                 <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
                   {globalError}
+                </div>
+              )}
+
+              {/* Duplicate rows section */}
+              {duplicateRows.length > 0 && (
+                <div>
+                  <p className="text-sm font-semibold text-slate-700 mb-2">
+                    Duplicate serial numbers ({duplicateRows.length})
+                    <span className="ml-2 text-xs font-normal text-slate-500">
+                      — choose whether to keep the existing DB record or overwrite with CSV data
+                    </span>
+                  </p>
+                  {/* Global action buttons */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-xs text-slate-500">Apply to all:</span>
+                    <button
+                      onClick={() => setGlobalDuplicateAction('keep_existing')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${globalDuplicateAction === 'keep_existing' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400'}`}
+                    >
+                      Keep all existing DB records
+                    </button>
+                    <button
+                      onClick={() => setGlobalDuplicateAction('use_new')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${globalDuplicateAction === 'use_new' ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-slate-600 border-slate-300 hover:border-amber-400'}`}
+                    >
+                      Overwrite all with CSV data
+                    </button>
+                  </div>
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+                      {duplicateRows.map(row => {
+                        const useNew = row.keepExisting !== undefined ? !row.keepExisting : globalDuplicateAction === 'use_new';
+                        return (
+                          <div key={row.rowIndex} className="p-3 bg-white">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-semibold text-slate-600">Row {row.rowIndex} — Serial: <span className="font-mono">{row.serialNumber}</span></span>
+                              <div className="flex gap-1.5">
+                                <button
+                                  onClick={() => {
+                                    setDuplicateRows(prev => prev.map(r => r.rowIndex === row.rowIndex ? { ...r, keepExisting: false } : r));
+                                  }}
+                                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${useNew ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-amber-100'}`}
+                                >
+                                  Use CSV
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setDuplicateRows(prev => prev.map(r => r.rowIndex === row.rowIndex ? { ...r, keepExisting: true } : r));
+                                  }}
+                                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${!useNew ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-blue-100'}`}
+                                >
+                                  Keep DB
+                                </button>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div className={`rounded-lg p-2 border ${useNew ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
+                                <p className="font-semibold text-slate-600 mb-1">CSV data</p>
+                                <p className="text-slate-700">{row.make} {row.model}</p>
+                                {row.customerName && <p className="text-slate-500">{row.customerName}</p>}
+                              </div>
+                              {row.existingMachine && (
+                                <div className={`rounded-lg p-2 border ${!useNew ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'}`}>
+                                  <p className="font-semibold text-slate-600 mb-1">Existing DB</p>
+                                  <p className="text-slate-700">{row.existingMachine.make} {row.existingMachine.model}</p>
+                                  {row.existingMachine.customerName && <p className="text-slate-500">{row.existingMachine.customerName}</p>}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

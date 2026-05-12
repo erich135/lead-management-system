@@ -1428,6 +1428,10 @@ export function Reports({ statuses, branches }: ReportsProps) {
    * Gets unique branches from overdue jobs.
    */
   function getUniqueOverdueBranches(): string[] {
+    if (branches && branches.length > 0) {
+      return branches.map(b => b.name).sort();
+    }
+    // Fallback: derive from loaded overdue jobs
     const branchSet = new Set<string>();
     userOverdueJobs.forEach(oj => {
       const branch = typeof oj.job?.branch === 'object' ? oj.job.branch?.name : null;

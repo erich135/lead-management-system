@@ -13,6 +13,8 @@ import {
   getCustomersWithMachines,
   downloadMachinePlannerReport,
   getMachineTypes,
+  previewDedupMachines,
+  confirmDedupMachines,
   type Machine,
   type MachineRSR,
   type Customer,
@@ -44,6 +46,7 @@ import {
   Save,
   FileSpreadsheet,
   Plus,
+  ShieldAlert,
 } from 'lucide-react';
 import { SmartDateInput } from './SmartDateInput';
 
@@ -93,6 +96,15 @@ export function Machines() {
   const [showImportWizard, setShowImportWizard] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [loadingReportCustomers, setLoadingReportCustomers] = useState(false);
+
+  // Dedup state
+  type DedupGroup = { serialNumber: string; count: number; masterId: string; duplicateIds: string[]; totalRSRDocs: number };
+  const [showDedupModal, setShowDedupModal] = useState(false);
+  const [dedupPreview, setDedupPreview] = useState<{ totalMachines: number; duplicateGroups: number; duplicateRecords: number; groups: DedupGroup[] } | null>(null);
+  const [dedupLoading, setDedupLoading] = useState(false);
+  const [dedupConfirming, setDedupConfirming] = useState(false);
+  const [dedupResult, setDedupResult] = useState<{ merged: number; jobsRelinked: number } | null>(null);
+  const [dedupError, setDedupError] = useState<string | null>(null);
 
   // Create machine state
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -606,7 +618,7 @@ export function Machines() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {(isSuperAdmin || hasPermission('machines.manage')) && (
+            {isSuperAdmin && (
               <button
                 onClick={() => setShowCreateModal(true)}
                 className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-lg hover:from-amber-600 hover:to-amber-700 shadow-sm transition-all text-sm font-medium"
@@ -615,13 +627,36 @@ export function Machines() {
                 Add Machine
               </button>
             )}
-            {(isSuperAdmin || hasPermission('machines.manage')) && (
+            {isSuperAdmin && (
               <button
                 onClick={() => setShowImportWizard(true)}
                 className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 shadow-sm transition-all text-sm font-medium"
               >
                 <Upload className="w-4 h-4" />
                 Import Machines
+              </button>
+            )}
+            {isSuperAdmin && (
+              <button
+                onClick={async () => {
+                  setShowDedupModal(true);
+                  setDedupPreview(null);
+                  setDedupResult(null);
+                  setDedupError(null);
+                  setDedupLoading(true);
+                  try {
+                    const res = await previewDedupMachines();
+                    setDedupPreview(res.data);
+                  } catch (err: any) {
+                    setDedupError(err.message || 'Failed to load dedup preview');
+                  } finally {
+                    setDedupLoading(false);
+                  }
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg hover:from-orange-600 hover:to-orange-700 shadow-sm transition-all text-sm font-medium"
+              >
+                <ShieldAlert className="w-4 h-4" />
+                Deduplicate
               </button>
             )}
             <button
@@ -1657,6 +1692,112 @@ export function Machines() {
                 {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 {creating ? 'Saving…' : 'Add Machine'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Deduplicate Machines Modal */}
+      {showDedupModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-orange-500" />
+                Deduplicate Machines
+              </h2>
+              <button onClick={() => setShowDedupModal(false)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              {dedupLoading && (
+                <div className="flex items-center gap-3 text-slate-500">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Scanning for duplicates...
+                </div>
+              )}
+              {dedupError && (
+                <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                  {dedupError}
+                </div>
+              )}
+              {dedupResult && (
+                <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg p-4">
+                  <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium">Deduplication complete!</p>
+                    <p className="text-sm">{dedupResult.merged} duplicate record{dedupResult.merged !== 1 ? 's' : ''} merged · {dedupResult.jobsRelinked} job{dedupResult.jobsRelinked !== 1 ? 's' : ''} re-linked</p>
+                  </div>
+                </div>
+              )}
+              {!dedupLoading && !dedupResult && dedupPreview && (
+                <>
+                  {dedupPreview.duplicateGroups === 0 ? (
+                    <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg p-4">
+                      <CheckCircle2 className="w-5 h-5" />
+                      No duplicate serial numbers found. Your database is clean!
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="bg-slate-50 rounded-lg p-3 text-center">
+                          <p className="text-2xl font-bold text-slate-800">{dedupPreview.duplicateGroups}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">Duplicate groups</p>
+                        </div>
+                        <div className="bg-orange-50 rounded-lg p-3 text-center">
+                          <p className="text-2xl font-bold text-orange-600">{dedupPreview.duplicateRecords}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">Records to remove</p>
+                        </div>
+                        <div className="bg-blue-50 rounded-lg p-3 text-center">
+                          <p className="text-2xl font-bold text-blue-600">{dedupPreview.totalMachines}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">Total machines</p>
+                        </div>
+                      </div>
+                      <p className="text-sm text-slate-600">
+                        The system will pick the master record (most RSR documents wins, then oldest record), merge all RSR documents from duplicates into the master, re-link any jobs, and soft-delete the duplicates.
+                      </p>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {dedupPreview.groups.map(g => (
+                          <div key={g.serialNumber} className="flex items-center justify-between text-sm bg-slate-50 rounded-lg px-3 py-2">
+                            <span className="font-mono text-slate-700">{g.serialNumber}</span>
+                            <span className="text-slate-500">{g.count} records · {g.totalRSRDocs} RSR doc{g.totalRSRDocs !== 1 ? 's' : ''}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl">
+              <button onClick={() => setShowDedupModal(false)} className="px-4 py-2 text-slate-600 hover:text-slate-800 font-medium transition-colors">
+                {dedupResult ? 'Close' : 'Cancel'}
+              </button>
+              {!dedupResult && dedupPreview && dedupPreview.duplicateGroups > 0 && (
+                <button
+                  onClick={async () => {
+                    setDedupConfirming(true);
+                    setDedupError(null);
+                    try {
+                      const res = await confirmDedupMachines();
+                      setDedupResult(res.data);
+                      // Reload machines list after dedup
+                      loadMachines(1);
+                    } catch (err: any) {
+                      setDedupError(err.message || 'Deduplication failed');
+                    } finally {
+                      setDedupConfirming(false);
+                    }
+                  }}
+                  disabled={dedupConfirming}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {dedupConfirming ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldAlert className="w-4 h-4" />}
+                  {dedupConfirming ? 'Merging...' : 'Merge Duplicates'}
+                </button>
+              )}
             </div>
           </div>
         </div>

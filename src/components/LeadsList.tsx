@@ -53,6 +53,10 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
   const isLoadingAllJobsRef = useRef(false); // Ref to track if we're loading all jobs (prevents race conditions)
   const isAllJobsModeRef = useRef(false); // Ref to track if we're in "all jobs" mode (prevents overdue requests from overwriting)
   const preservePageRef = useRef<number | null>(null); // Ref to preserve page number during job updates
+  const [serverPage, setServerPage] = useState(1); // Current page loaded from the server (for Load More)
+  const [totalJobs, setTotalJobs] = useState(0); // Total job count returned by the server
+  const isInitializedRef = useRef(false); // True after first fetch — lets filter-change effects know they can trigger refetches
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null); // Debounce timer for search input
 
   /**
    * Returns a job rep code string value when available.
@@ -296,201 +300,94 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
     }
   }, [jobs, searchTerm, statusFilter, branchFilter, admFilter, repCodeFilter, technicianFilter, jobSourceFilter, priorityFilter, overdueJobs, loading, isLoadingJobs]);
 
-  // Handle filter changes when in "All Jobs" mode (re-filter existing jobs without re-fetching)
-  // This only runs when filters change, NOT when jobs are initially loaded (loadAllJobs handles that)
+  // Handle filter changes in "All Jobs" mode — trigger a server-side refetch
+  // Guard: isInitializedRef.current ensures we don't fire before the initial load completes
   useEffect(() => {
-    // Only re-filter if:
-    // 1. Not loading
-    // 2. In "all" mode
-    // 3. We have jobs loaded
-    // 4. We're not in the middle of loading all jobs (prevents race condition)
-    if (!loading && !isLoadingJobs && !isLoadingAllJobsRef.current && priorityFilter.all && jobs.length > 0) {
-      let filtered = [...jobs];
-      
-      // Apply search filter
-      if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
-        filtered = filtered.filter(job => {
-          const repCode = getRepCodeFromJob(job);
-          return (
-            job.jobNumber?.toLowerCase().includes(searchLower) ||
-            job.customer?.name?.toLowerCase().includes(searchLower) ||
-            job.cashCustomer?.toLowerCase().includes(searchLower) ||
-            job.adm?.toLowerCase().includes(searchLower) ||
-            getJobBranchName(job).toLowerCase().includes(searchLower) ||
-            repCode?.code?.toLowerCase().includes(searchLower)
-          );
-        });
-      }
-      
-      // Apply status filter
-      if (statusFilter.length > 0) {
-        filtered = filtered.filter(job => job.status?._id && statusFilter.includes(job.status._id));
-      }
-      
-      // Apply branch filter
-      if (branchFilter !== 'all') {
-        filtered = filtered.filter(job => getJobBranchId(job) === branchFilter);
-      }
-      
-      // Apply admin filter
-      if (admFilter !== 'all') {
-        filtered = filtered.filter(job => job.adm === admFilter);
-      }
-      
-      // Apply rep code filter
-      if (repCodeFilter !== 'all') {
-        filtered = filtered.filter(job => matchesRepFilter(job, repCodeFilter));
-      }
-      
-      // Apply technician filter
-      if (technicianFilter !== 'all') {
-        filtered = filtered.filter(job => getJobTechnicianId(job) === technicianFilter);
-      }
-      
-      // Apply job source filter
-      if (jobSourceFilter !== 'all') {
-        filtered = filtered.filter(job => getJobSourceId(job) === jobSourceFilter);
-      }
-      
-      // Sort by job number (numeric part) descending when in "All Jobs" mode
-      // Otherwise, sort by date descending for overdue/approaching/open filters
-      if (priorityFilter.all) {
-        filtered = sortJobsByJobNumber(filtered);
-      } else {
-        filtered.sort((a, b) => {
-          const dateA = a.startDate ? new Date(a.startDate).getTime() : 0;
-          const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
-          return dateB - dateA;
-        });
-      }
-      
-      setFilteredJobs(filtered);
-      setCurrentPage(1);
-    }
-  }, [searchTerm, statusFilter, branchFilter, admFilter, repCodeFilter, technicianFilter, jobSourceFilter, priorityFilter.all]);
+    if (!priorityFilter.all || !isInitializedRef.current) return;
+    fetchJobsPage(1, true);
+  }, [statusFilter, branchFilter, admFilter, repCodeFilter, technicianFilter, jobSourceFilter]);
 
-  async function loadAllJobs() {
+  // Debounce search term changes so we don't spam the API on every keystroke
+  useEffect(() => {
+    if (!priorityFilter.all || !isInitializedRef.current) return;
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      fetchJobsPage(1, true);
+    }, 400);
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, [searchTerm]);
+
+  /**
+   * Fetches a page of jobs from the server using all currently active filters.
+   * @param page  - Which page number to request (1-based)
+   * @param reset - true = replace existing jobs (filter change / initial load)
+   *                false = append to existing jobs (Load More)
+   */
+  async function fetchJobsPage(page: number, reset: boolean) {
     try {
-      setLoading(true);
-      setIsLoadingJobs(true); // Prevent applyFilters from running
-      isLoadingAllJobsRef.current = true; // Prevent filter-change effect from running
-      isAllJobsModeRef.current = true; // Mark that we're in "all jobs" mode (prevents overdue requests from overwriting)
-      
-      // Clear existing jobs immediately to show loading state
-      setJobs([]);
-      setFilteredJobs([]);
-      
-      // Load all jobs without date restrictions
-      // We'll need to paginate through multiple pages to get all jobs
-      let allJobs: Job[] = [];
-      let currentPage = 1;
-      let hasMore = true;
-      const pageSize = 1000; // Large page size to minimize requests
-      
-      while (hasMore) {
-        const data = await getJobs({
-          sortBy: 'startDate',
-          sortOrder: 'desc',
-          page: currentPage,
-          limit: pageSize,
-          allTime: 'true', // Get ALL jobs, not just last 3 months
-          includeHidden: showHiddenJobs ? true : undefined, // If true, show only hidden jobs. If false/undefined, exclude hidden jobs.
-        });
-        
-        const jobsList = data.jobs || [];
-        allJobs = [...allJobs, ...jobsList];
-        
-        // Check if there are more pages
-        const totalPages = data.pagination?.pages || 1;
-        hasMore = currentPage < totalPages && jobsList.length === pageSize;
-        currentPage++;
-        
-        // Safety limit: don't fetch more than 10 pages (10,000 jobs)
-        if (currentPage > 10) break;
+      if (reset) {
+        setLoading(true);
+      } else {
+        setIsLoadingJobs(true);
       }
-      
-      // Sort by job number (numeric part) descending (highest to lowest)
-      // This ensures J1568 appears before CE1989, and CE1990 appears before CE1989
-      allJobs = sortJobsByJobNumber(allJobs);
-      
-      // Apply filters with the new jobs data immediately
-      // We need to apply all filters (search, status, branch, admin) to the new jobs
-      let filtered = [...allJobs];
-      
-      // Apply search filter
-      if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
-        filtered = filtered.filter(job => {
-          const repCode = getRepCodeFromJob(job);
-          return (
-            job.jobNumber?.toLowerCase().includes(searchLower) ||
-            job.customer?.name?.toLowerCase().includes(searchLower) ||
-            job.cashCustomer?.toLowerCase().includes(searchLower) ||
-            job.adm?.toLowerCase().includes(searchLower) ||
-            getJobBranchName(job).toLowerCase().includes(searchLower) ||
-            repCode?.code?.toLowerCase().includes(searchLower)
-          );
-        });
-      }
-      
-      // Apply status filter
-      if (statusFilter.length > 0) {
-        filtered = filtered.filter(job => job.status?._id && statusFilter.includes(job.status._id));
-      }
-      
-      // Apply branch filter
-      if (branchFilter !== 'all') {
-        filtered = filtered.filter(job => getJobBranchId(job) === branchFilter);
-      }
-      
-      // Apply admin filter
-      if (admFilter !== 'all') {
-        filtered = filtered.filter(job => job.adm === admFilter);
-      }
-      
-      // Apply rep code filter
-      if (repCodeFilter !== 'all') {
-        filtered = filtered.filter(job => matchesRepFilter(job, repCodeFilter));
-      }
-      
-      // Apply technician filter
-      if (technicianFilter !== 'all') {
-        filtered = filtered.filter(job => getJobTechnicianId(job) === technicianFilter);
+      isLoadingAllJobsRef.current = true;
+      isAllJobsModeRef.current = true;
+
+      const statusParam = statusFilter.length > 0 ? statusFilter.join(',') : undefined;
+
+      const data = await getJobs({
+        page,
+        limit: 50,
+        allTime: 'true',
+        search: searchTerm || undefined,
+        adm: admFilter !== 'all' ? admFilter : undefined,
+        branch: branchFilter !== 'all' ? branchFilter : undefined,
+        repCode: repCodeFilter !== 'all' ? repCodeFilter : undefined,
+        technician: technicianFilter !== 'all' ? technicianFilter : undefined,
+        jobSource: jobSourceFilter !== 'all' ? jobSourceFilter : undefined,
+        status: statusParam,
+        includeHidden: showHiddenJobs ? true : undefined,
+      });
+
+      const newJobs = data.jobs || [];
+      const total = data.pagination?.total ?? 0;
+
+      if (reset) {
+        setJobs(newJobs);
+        setFilteredJobs(newJobs);
+        setCurrentPage(1);
+      } else {
+        setJobs(prev => [...prev, ...newJobs]);
+        setFilteredJobs(prev => [...prev, ...newJobs]);
       }
 
-      // Apply job source filter
-      if (jobSourceFilter !== 'all') {
-        filtered = filtered.filter(job => getJobSourceId(job) === jobSourceFilter);
-      }
-      
-      // Sort by job number (numeric part) descending (highest to lowest)
-      filtered = sortJobsByJobNumber(filtered);
-      
-      // Set both jobs and filteredJobs in the same batch
-      // Use React's batching to ensure both updates happen together
-      setJobs(allJobs);
-      setFilteredJobs(filtered);
-      // Only reset page if we're not preserving it (i.e., not during a job update)
-      if (preservePageRef.current === null) {
-        setCurrentPage(1);
-      }
-      
-      // Set loading states - use setTimeout to ensure state updates are batched
-      // This prevents the useEffect from running before jobs and filteredJobs are set
-      setTimeout(() => {
+      setServerPage(page);
+      setTotalJobs(total);
+      isInitializedRef.current = true;
+      isLoadingAllJobsRef.current = false;
+
+      if (reset) {
         setLoading(false);
-        setIsLoadingJobs(false); // Now allow applyFilters to run
-        isLoadingAllJobsRef.current = false; // Now allow filter-change effect to run
-      }, 0);
+      } else {
+        setIsLoadingJobs(false);
+      }
     } catch (error) {
       console.error('Error loading jobs:', error);
-      setJobs([]);
-      setFilteredJobs([]);
-      setLoading(false);
-      setIsLoadingJobs(false);
+      if (reset) {
+        setJobs([]);
+        setFilteredJobs([]);
+        setLoading(false);
+      } else {
+        setIsLoadingJobs(false);
+      }
       isLoadingAllJobsRef.current = false;
     }
+  }
+
+  function loadAllJobs() {
+    fetchJobsPage(1, true);
   }
 
   async function loadOverdueJobsList() {
@@ -1252,7 +1149,11 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
             {/* Results Count */}
             <div className="pt-4 border-t border-gray-200 space-y-2">
               <p className="text-sm text-ars-body">
-                <span className="font-semibold text-ars-heading">{filteredJobs.length}</span> jobs found
+                {priorityFilter.all ? (
+                  <><span className="font-semibold text-ars-heading">{filteredJobs.length}</span> of <span className="font-semibold text-ars-heading">{totalJobs}</span> jobs loaded</>
+                ) : (
+                  <><span className="font-semibold text-ars-heading">{filteredJobs.length}</span> jobs found</>
+                )}
               </p>
             </div>
           </div>
@@ -1282,45 +1183,47 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                 {/* Pagination Info */}
                 <div className="mb-4 flex items-center justify-between flex-wrap gap-4">
                   <div>
-                    <p className="text-sm text-ars-body">
-                      Showing <span className="font-semibold text-ars-heading">
-                        {((currentPage - 1) * itemsPerPage) + 1}
-                      </span> to <span className="font-semibold text-ars-heading">
-                        {Math.min(currentPage * itemsPerPage, filteredJobs.length)}
-                      </span> of <span className="font-semibold text-ars-heading">
-                        {filteredJobs.length}
-                      </span> jobs
-                    </p>
-                    {priorityFilter.all && jobs.length > 0 && (
-                      <p className="text-xs text-ars-body mt-1">
-                        Total jobs loaded: <span className="font-medium">{jobs.length}</span>
+                    {priorityFilter.all ? (
+                      <p className="text-sm text-ars-body">
+                        <span className="font-semibold text-ars-heading">{filteredJobs.length}</span> of <span className="font-semibold text-ars-heading">{totalJobs}</span> jobs loaded
+                      </p>
+                    ) : (
+                      <p className="text-sm text-ars-body">
+                        Showing <span className="font-semibold text-ars-heading">
+                          {((currentPage - 1) * itemsPerPage) + 1}
+                        </span> to <span className="font-semibold text-ars-heading">
+                          {Math.min(currentPage * itemsPerPage, filteredJobs.length)}
+                        </span> of <span className="font-semibold text-ars-heading">
+                          {filteredJobs.length}
+                        </span> jobs
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
-                      className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
-                    >
-                      Previous
-                    </button>
-                    <span className="px-4 py-2 text-sm text-ars-body">
-                      Page {currentPage} of {Math.ceil(filteredJobs.length / itemsPerPage) || 1}
-                    </span>
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredJobs.length / itemsPerPage), prev + 1))}
-                      disabled={currentPage >= Math.ceil(filteredJobs.length / itemsPerPage)}
-                      className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
-                    >
-                      Next
-                    </button>
-                  </div>
+                  {!priorityFilter.all && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
+                      >
+                        Previous
+                      </button>
+                      <span className="px-4 py-2 text-sm text-ars-body">
+                        Page {currentPage} of {Math.ceil(filteredJobs.length / itemsPerPage) || 1}
+                      </span>
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredJobs.length / itemsPerPage), prev + 1))}
+                        disabled={currentPage >= Math.ceil(filteredJobs.length / itemsPerPage)}
+                        className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredJobs
-                    .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                  {(priorityFilter.all ? filteredJobs : filteredJobs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage))
                     .map((job, index) => {
                   const overdueInfo = getOverdueInfo(job._id);
                   const serviceDescription = (() => {
@@ -1590,65 +1493,81 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
                 </div>
 
                 {/* Pagination Controls Bottom */}
-                {filteredJobs.length > itemsPerPage && (
-                  <div className="mt-6 flex items-center justify-center gap-2">
-                    <button
-                      onClick={() => setCurrentPage(1)}
-                      disabled={currentPage === 1}
-                      className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
-                    >
-                      First
-                    </button>
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
-                      className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
-                    >
-                      Previous
-                    </button>
-                    <div className="flex items-center gap-2">
-                      {Array.from({ length: Math.min(5, Math.ceil(filteredJobs.length / itemsPerPage)) }, (_, i) => {
-                        const totalPages = Math.ceil(filteredJobs.length / itemsPerPage);
-                        let pageNum;
-                        if (totalPages <= 5) {
-                          pageNum = i + 1;
-                        } else if (currentPage <= 3) {
-                          pageNum = i + 1;
-                        } else if (currentPage >= totalPages - 2) {
-                          pageNum = totalPages - 4 + i;
-                        } else {
-                          pageNum = currentPage - 2 + i;
-                        }
-                        return (
-                          <button
-                            key={pageNum}
-                            onClick={() => setCurrentPage(pageNum)}
-                            className={`px-4 py-2 border rounded-[8px] font-bold text-[14px] transition-colors ${
-                              currentPage === pageNum
-                                ? 'bg-ars-primary border-ars-primary text-white'
-                                : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                            }`}
-                          >
-                            {pageNum}
-                          </button>
-                        );
-                      })}
+                {priorityFilter.all ? (
+                  /* Load More button for All Jobs server-side pagination */
+                  filteredJobs.length < totalJobs && (
+                    <div className="mt-6 flex justify-center">
+                      <button
+                        onClick={() => fetchJobsPage(serverPage + 1, false)}
+                        disabled={isLoadingJobs}
+                        className="px-8 py-3 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow hover:shadow-md transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isLoadingJobs ? 'Loading...' : `Load More (${filteredJobs.length} of ${totalJobs})`}
+                      </button>
                     </div>
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredJobs.length / itemsPerPage), prev + 1))}
-                      disabled={currentPage >= Math.ceil(filteredJobs.length / itemsPerPage)}
-                      className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
-                    >
-                      Next
-                    </button>
-                    <button
-                      onClick={() => setCurrentPage(Math.ceil(filteredJobs.length / itemsPerPage))}
-                      disabled={currentPage >= Math.ceil(filteredJobs.length / itemsPerPage)}
-                      className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
-                    >
-                      Last
-                    </button>
-                  </div>
+                  )
+                ) : (
+                  /* Standard page controls for overdue/approaching/open mode */
+                  filteredJobs.length > itemsPerPage && (
+                    <div className="mt-6 flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => setCurrentPage(1)}
+                        disabled={currentPage === 1}
+                        className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
+                      >
+                        First
+                      </button>
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
+                      >
+                        Previous
+                      </button>
+                      <div className="flex items-center gap-2">
+                        {Array.from({ length: Math.min(5, Math.ceil(filteredJobs.length / itemsPerPage)) }, (_, i) => {
+                          const totalPages = Math.ceil(filteredJobs.length / itemsPerPage);
+                          let pageNum;
+                          if (totalPages <= 5) {
+                            pageNum = i + 1;
+                          } else if (currentPage <= 3) {
+                            pageNum = i + 1;
+                          } else if (currentPage >= totalPages - 2) {
+                            pageNum = totalPages - 4 + i;
+                          } else {
+                            pageNum = currentPage - 2 + i;
+                          }
+                          return (
+                            <button
+                              key={pageNum}
+                              onClick={() => setCurrentPage(pageNum)}
+                              className={`px-4 py-2 border rounded-[8px] font-bold text-[14px] transition-colors ${
+                                currentPage === pageNum
+                                  ? 'bg-ars-primary border-ars-primary text-white'
+                                  : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                              }`}
+                            >
+                              {pageNum}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredJobs.length / itemsPerPage), prev + 1))}
+                        disabled={currentPage >= Math.ceil(filteredJobs.length / itemsPerPage)}
+                        className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
+                      >
+                        Next
+                      </button>
+                      <button
+                        onClick={() => setCurrentPage(Math.ceil(filteredJobs.length / itemsPerPage))}
+                        disabled={currentPage >= Math.ceil(filteredJobs.length / itemsPerPage)}
+                        className="px-4 py-2 border border-gray-300 rounded-[8px] bg-white font-bold text-[14px] text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
+                      >
+                        Last
+                      </button>
+                    </div>
+                  )
                 )}
               </>
             )}

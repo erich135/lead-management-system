@@ -514,7 +514,11 @@ export async function getJobs(params?: {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   allTime?: string;
-  includeHidden?: boolean; // If true, show only hidden jobs. If false/undefined, exclude hidden jobs.
+  includeHidden?: boolean;
+  adm?: string;
+  repCode?: string;
+  technician?: string;
+  jobSource?: string;
 }): Promise<{ jobs: Job[]; pagination: { page: number; limit: number; total: number; pages: number } }> {
   const queryParams = new URLSearchParams();
   if (params?.status) queryParams.append('status', params.status);
@@ -529,6 +533,10 @@ export async function getJobs(params?: {
   if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
   if (params?.allTime) queryParams.append('allTime', params.allTime);
   if (params?.includeHidden !== undefined) queryParams.append('includeHidden', params.includeHidden.toString());
+  if (params?.adm) queryParams.append('adm', params.adm);
+  if (params?.repCode) queryParams.append('repCode', params.repCode);
+  if (params?.technician) queryParams.append('technician', params.technician);
+  if (params?.jobSource) queryParams.append('jobSource', params.jobSource);
   
   const query = queryParams.toString();
   return apiRequest(`/api/jobs${query ? `?${query}` : ''}`);
@@ -790,12 +798,24 @@ export interface ErrorMachineRow {
   lastOilSampleDate?: string;
   oilSampleComment?: string;
   cashCustomer?: string;
-  errorType: 'customer_not_found' | 'missing_field';
+  errorType: 'customer_not_found' | 'missing_field' | 'duplicate_serial';
   errorMessage: string;
   customerName?: string;
   suggestions: { id: string; name: string }[];
+  existingMachine?: {
+    make: string;
+    model: string;
+    serialNumber: string;
+    assetNumber?: string;
+    machineType?: string;
+    machineHours: number;
+    nextServiceHours: number;
+    currentLocation?: string;
+    customerName?: string;
+  };
   // user corrections
   resolvedCustomerId?: string;
+  keepExisting?: boolean; // duplicate_serial: true = keep DB record, false = overwrite with CSV
   skip?: boolean;
 }
 
@@ -1951,6 +1971,49 @@ export async function confirmMachinesImport(
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: { message: 'Import failed' } }));
     throw new Error(error.error?.message || 'Import failed');
+  }
+  return response.json();
+}
+
+export async function previewDedupMachines(): Promise<{
+  data: {
+    totalMachines: number;
+    duplicateGroups: number;
+    duplicateRecords: number;
+    groups: Array<{
+      serialNumber: string;
+      count: number;
+      masterId: string;
+      duplicateIds: string[];
+      totalRSRDocs: number;
+    }>;
+  };
+}> {
+  const token = getAuthToken();
+  if (!token) throw new Error('No authentication token found');
+  const response = await fetch(`${API_BASE_URL}/api/machines/dedup/preview`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Preview failed' } }));
+    throw new Error(error.error?.message || 'Preview failed');
+  }
+  return response.json();
+}
+
+export async function confirmDedupMachines(): Promise<{
+  data: { merged: number; jobsRelinked: number };
+  message: string;
+}> {
+  const token = getAuthToken();
+  if (!token) throw new Error('No authentication token found');
+  const response = await fetch(`${API_BASE_URL}/api/machines/dedup/confirm`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Dedup failed' } }));
+    throw new Error(error.error?.message || 'Dedup failed');
   }
   return response.json();
 }

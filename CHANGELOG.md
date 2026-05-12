@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.0.37] - 2026-05-12
+
+### Added – Machines: Excel Import + Duplicate Detection
+- **`UnifiedMachineImport.tsx`** — file input now accepts `.xlsx`, `.xls`, and `.csv`; Excel files are converted to CSV client-side via SheetJS before upload
+- **`UnifiedMachineImport.tsx`** — review step now splits error rows into a **Duplicate serial numbers** section; global **Keep all existing DB records** / **Overwrite all with CSV data** toggle applies to all duplicates at once; individual rows have **Use CSV** / **Keep DB** buttons with a side-by-side CSV vs DB comparison card
+- **`api.ts`** — `ErrorMachineRow` interface extended with `errorType: 'duplicate_serial'`, `existingMachine` (make/model/customer/hours fields), and `keepExisting` flag
+
+### Added – Machines: Deduplicate Tool
+- **`Machines.tsx`** — new orange **Deduplicate** button (super admin only) opens a modal that previews duplicate groups (count, serial numbers, RSR doc totals), then on confirm merges RSR documents into the master record, re-links jobs, and soft-deletes the duplicates
+- **`api.ts`** — added `previewDedupMachines()` and `confirmDedupMachines()` API functions
+
+### Added – Jobs: Server-Side Pagination with Load More
+- **`LeadsList.tsx`** — replaced full client-side load with server-side pagination (50 jobs per page); filter/search changes reset to page 1; **Load More** button appends next 50 when more jobs exist; sidebar shows "X of Y jobs loaded"
+- **`api.ts`** — `getJobs()` extended with `adm`, `repCode`, `technician`, `jobSource` filter params
+
+### Changed – Machines: Permission Restrictions
+- **`Machines.tsx`** — **Add Machine**, **Import Machines**, and **Deduplicate** buttons now require `isSuperAdmin` only (previously `isSuperAdmin || machines.manage`); Delete was already super-admin only
+- **`Dashboard.tsx`**, **`MobileNavigation.tsx`** — Machines nav link now visible to all authenticated users (no permission gate)
+
+### Fixed – Reports: Overdue Jobs Branch Filter
+- **`Reports.tsx`** — Branch dropdown in Overdue Jobs filter now lists all active system branches instead of only branches present in current overdue jobs
+
 ## [1.0.36] - 2026-05-11
 
 ### Added – Export Machine List

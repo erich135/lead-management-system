@@ -1440,6 +1440,38 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                 </div>
 
                 <div>
+                  <label className="block text-[14px] font-semibold text-slate-900 mb-2">Assisting Admin (ADM)</label>
+                  {isEditing ? (
+                    adminCodes.length > 0 ? (
+                      <select
+                        value={job.assistingAdm || ''}
+                        onChange={(e) => setJob({ ...job, assistingAdm: e.target.value })}
+                        style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      >
+                        <option value="">Select Admin</option>
+                        {adminCodes.map((code) => (
+                          <option key={code} value={code}>
+                            {code}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        value={job.assistingAdm || ''}
+                        onChange={(e) => setJob({ ...job, assistingAdm: e.target.value })}
+                        style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                        placeholder="Enter assisting admin code"
+                      />
+                    )
+                  ) : (
+                    <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
+                      <span className="text-ars-heading text-[15px]">{job.assistingAdm || '-'}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div>
                   <label className="block text-[14px] font-semibold text-slate-900 mb-2">Value (ex VAT)</label>
                   {isEditing ? (
                     <input

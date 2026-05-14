@@ -704,6 +704,9 @@ export interface MachineRSR {
     lastName: string;
   } | string;
   uploadedAt: string;
+  /** 'job' when this RSR was uploaded via a job; 'machine' (or absent) for direct machine uploads */
+  source?: 'machine' | 'job';
+  jobId?: string;
 }
 
 export interface Machine {
@@ -2565,12 +2568,30 @@ export async function uploadMachineRSR(
 
 /**
  * Get RSR documents for a machine.
+ * Returns both machine-level RSRs and job-level RSRs from jobs linked to this machine.
  */
 export async function getMachineRSRs(machineId: string): Promise<MachineRSR[]> {
-  const response = await apiRequest<{ rsrDocuments: MachineRSR[] }>(
+  const response = await apiRequest<{ rsrDocuments: MachineRSR[], jobRSRDocuments?: JobRSRDocument[] }>(
     `/api/machines/${machineId}/rsr`
   );
-  return response.rsrDocuments || [];
+
+  const machineRSRs = (response.rsrDocuments || []).map(r => ({ ...r, source: 'machine' as const }));
+
+  // Transform job RSR documents into MachineRSR shape for unified display
+  const jobRSRs: MachineRSR[] = (response.jobRSRDocuments || []).map(doc => ({
+    _id: doc._id,
+    title: doc.title,
+    fileName: doc.originalName,
+    fileUrl: doc._id, // serves as document ID for URL construction
+    fileSize: doc.size,
+    mimeType: doc.mimeType,
+    uploadedBy: doc.uploadedBy,
+    uploadedAt: doc.createdAt,
+    source: 'job' as const,
+    jobId: doc.jobId,
+  }));
+
+  return [...machineRSRs, ...jobRSRs];
 }
 
 /**

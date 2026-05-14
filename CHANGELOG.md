@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.38] - 2026-05-14
+
+### Fixed – Jobs: RSR Documents now visible in Machines tab
+- **`api.ts`** — `getMachineRSRs()` now merges job-level RSR documents (uploaded via the job window) with machine-level RSR documents so both appear in the Machines tab; job RSRs are tagged with `source: 'job'` and use the correct `/api/rsr-documents/:id` download endpoint
+- **`Machines.tsx`** — RSRs sourced from a job show a **"From Job"** badge; delete button hidden for job-sourced RSRs (must be deleted via the job); imported `getRSRDocumentUrl` for correct URL routing
+- **`machine.controller.ts`** (backend) — `getMachineRSRs` now also queries jobs linked to the machine and fetches their `JobRSRDocument` records, filtered by visibility
+
+### Fixed – Jobs: Search debounce replaced with explicit submit
+- **`LeadsList.tsx`** — removed auto-search on keystroke; search now only fires when user presses **Enter** or clicks the blue search button; clear (X) button appears when a search is active; prevents partial-query API calls while typing job numbers
+
 ## [1.0.37] - 2026-05-12
 
 ### Added – Machines: Excel Import + Duplicate Detection

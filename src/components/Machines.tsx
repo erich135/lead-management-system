@@ -7,6 +7,7 @@ import {
   getMachineRSRs,
   uploadMachineRSR,
   getMachineRSRUrl,
+  getRSRDocumentUrl,
   deleteMachineRSR,
   getAuthToken,
   getCustomers,
@@ -496,7 +497,9 @@ export function Machines() {
   const handleDownloadRSR = (rsr: MachineRSR) => {
     if (!expandedMachineId) return;
     const token = getAuthToken();
-    const url = getMachineRSRUrl(expandedMachineId, rsr._id);
+    const url = rsr.source === 'job'
+      ? getRSRDocumentUrl(rsr._id)
+      : getMachineRSRUrl(expandedMachineId, rsr._id);
     const link = document.createElement('a');
     link.href = `${url}?token=${token}`;
     link.download = rsr.fileName;
@@ -514,7 +517,10 @@ export function Machines() {
   const getPreviewUrl = (rsr: MachineRSR) => {
     if (!expandedMachineId) return '';
     const token = getAuthToken();
-    return `${getMachineRSRUrl(expandedMachineId, rsr._id)}?token=${token}`;
+    const url = rsr.source === 'job'
+      ? getRSRDocumentUrl(rsr._id)
+      : getMachineRSRUrl(expandedMachineId, rsr._id);
+    return `${url}?token=${token}`;
   };
 
   const isImageFile = (mimeType: string) => mimeType.startsWith('image/');
@@ -1211,6 +1217,9 @@ export function Machines() {
                                     <div className="flex items-center gap-3 text-xs text-slate-400">
                                       <span>{formatDate(rsr.uploadedAt)}</span>
                                       <span>{formatFileSize(rsr.fileSize)}</span>
+                                      {rsr.source === 'job' && (
+                                        <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded text-xs">From Job</span>
+                                      )}
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-1">
@@ -1220,7 +1229,7 @@ export function Machines() {
                                     <button onClick={(e) => { e.stopPropagation(); handleDownloadRSR(rsr); }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" title="Download">
                                       <Download className="w-4 h-4" />
                                     </button>
-                                    {isSuperAdmin && (
+                                    {isSuperAdmin && rsr.source !== 'job' && (
                                       <button onClick={(e) => { e.stopPropagation(); handleDeleteRSR(rsr); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg" title="Delete">
                                         <Trash2 className="w-4 h-4" />
                                       </button>

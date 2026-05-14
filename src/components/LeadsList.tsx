@@ -21,6 +21,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
   const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
   const [overdueJobs, setOverdueJobs] = useState<OverdueJob[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [committedSearch, setCommittedSearch] = useState(''); // Only triggers API call when user submits
   const [statusFilter, setStatusFilter] = useState<string[]>([]); // Array of selected status IDs
   const [branchFilter, setBranchFilter] = useState<string>('all');
   const [admFilter, setAdmFilter] = useState<string>('all');
@@ -56,7 +57,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
   const [serverPage, setServerPage] = useState(1); // Current page loaded from the server (for Load More)
   const [totalJobs, setTotalJobs] = useState(0); // Total job count returned by the server
   const isInitializedRef = useRef(false); // True after first fetch — lets filter-change effects know they can trigger refetches
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null); // Debounce timer for search input
+  
 
   /**
    * Returns a job rep code string value when available.
@@ -307,17 +308,11 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
     fetchJobsPage(1, true);
   }, [statusFilter, branchFilter, admFilter, repCodeFilter, technicianFilter, jobSourceFilter]);
 
-  // Debounce search term changes so we don't spam the API on every keystroke
+  // Trigger fetch when committedSearch changes (user pressed Enter or clicked search icon)
   useEffect(() => {
-    if (!priorityFilter.all || !isInitializedRef.current) return;
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    searchDebounceRef.current = setTimeout(() => {
-      fetchJobsPage(1, true);
-    }, 400);
-    return () => {
-      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    };
-  }, [searchTerm]);
+    if (!isInitializedRef.current) return;
+    fetchJobsPage(1, true);
+  }, [committedSearch]);
 
   /**
    * Fetches a page of jobs from the server using all currently active filters.
@@ -341,7 +336,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
         page,
         limit: 50,
         allTime: 'true',
-        search: searchTerm || undefined,
+        search: committedSearch || undefined,
         adm: admFilter !== 'all' ? admFilter : undefined,
         branch: branchFilter !== 'all' ? branchFilter : undefined,
         repCode: repCodeFilter !== 'all' ? repCodeFilter : undefined,
@@ -441,8 +436,8 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
       });
       
       // Apply search filter
-      if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
+      if (committedSearch) {
+        const searchLower = committedSearch.toLowerCase();
         filtered = filtered.filter(job => {
           const repCode = getRepCodeFromJob(job);
           return (
@@ -609,8 +604,8 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
     }
 
     // Apply search filter
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
+    if (committedSearch) {
+      const searchLower = committedSearch.toLowerCase();
       filtered = filtered.filter(job => {
         const repCode = getRepCodeFromJob(job);
         return (
@@ -895,15 +890,31 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
             {/* Search */}
             <div className="mb-4">
               <label className="block text-[11px] font-medium text-gray-600 mb-1">Search</label>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <div className="relative flex gap-1">
                 <input
                   type="text"
                   placeholder="Job #, customer, admin..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
+                  onKeyDown={(e) => { if (e.key === 'Enter') setCommittedSearch(searchTerm); }}
+                  className="w-full pl-3 pr-3 py-1.5 text-[13px] border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent bg-white"
                 />
+                <button
+                  onClick={() => setCommittedSearch(searchTerm)}
+                  className="flex-shrink-0 p-1.5 bg-ars-primary text-white rounded-[8px] hover:bg-ars-primary/90 transition-colors"
+                  title="Search"
+                >
+                  <Search className="w-4 h-4" />
+                </button>
+                {committedSearch && (
+                  <button
+                    onClick={() => { setSearchTerm(''); setCommittedSearch(''); }}
+                    className="flex-shrink-0 p-1.5 text-gray-400 hover:text-gray-600 border border-gray-300 rounded-[8px] transition-colors"
+                    title="Clear search"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
 

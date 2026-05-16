@@ -170,7 +170,7 @@ export function Machines() {
   useEffect(() => {
     const loadCustomers = async () => {
       try {
-        const response = await getCustomers({ limit: 500 });
+        const response = await getCustomers({ limit: 10000 });
         setCustomers(response.customers || []);
       } catch (error) {
         console.error('Error loading customers:', error);

@@ -90,7 +90,7 @@ export function Activities() {
 
     try {
       setLoadingUsers(true);
-      const response = await getUsers({ page: 1, limit: 1000 });
+      const response = await getUsers({ page: 1, limit: 10000 });
       // apiRequest already extracts data, so response is { users, pagination }
       setUsers(response.users || []);
     } catch (err) {

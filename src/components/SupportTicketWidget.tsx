@@ -405,7 +405,7 @@ const CreateTicketModal: React.FC<CreateTicketModalProps> = ({ isOpen, onClose, 
 
   const loadUsers = async () => {
     try {
-      const data = await getUsers({ limit: 100 });
+      const data = await getUsers({ limit: 10000 });
       // Map API users to dropdown users (convert role object to string)
       const mappedUsers: DropdownUser[] = (data.users || []).map(u => ({
         _id: u._id,

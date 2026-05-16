@@ -235,7 +235,7 @@ export function SystemManagement() {
   async function loadReferenceData() {
     try {
       // Load all users for linking dropdowns (no pagination limit)
-      const allUsersResponse = await getUsers({ page: 1, limit: 1000 });
+      const allUsersResponse = await getUsers({ page: 1, limit: 10000 });
       setAllUsers(allUsersResponse.users || []);
 
       // Load rep codes

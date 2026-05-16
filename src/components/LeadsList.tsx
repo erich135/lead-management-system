@@ -516,7 +516,8 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
 
   async function loadCustomers() {
     try {
-      const data = await getCustomers();
+      // Load all customers for dropdown (override backend default of 100)
+      const data = await getCustomers({ limit: 10000 });
       setCustomers(data.customers || []);
     } catch (error) {
       console.error('Error loading customers:', error);

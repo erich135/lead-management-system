@@ -254,7 +254,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
 
   async function loadCustomers() {
     try {
-      const data = await getCustomers({ limit: 1000 });
+      const data = await getCustomers({ limit: 10000 });
       setCustomers(data.customers);
     } catch (error) {
       console.error('Error loading customers:', error);

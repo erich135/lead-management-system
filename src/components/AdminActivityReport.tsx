@@ -365,7 +365,7 @@ export function AdminActivityReport({ branches }: Props) {
     try {
       const [cfg, usersResp] = await Promise.all([
         getAdminActivityScheduleConfig(),
-        getUsers({ limit: 200 }),
+        getUsers({ limit: 10000 }),
       ]);
       setSchedConfig(cfg);
       setUserList((usersResp.users ?? []).filter((u) => u.isActive && u.email));

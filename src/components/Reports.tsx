@@ -283,7 +283,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
       
       // Load users (for super admin)
       if (currentUser?.isSuperAdmin) {
-        const usersResponse = await getUsers({ limit: 1000 });
+        const usersResponse = await getUsers({ limit: 10000 });
         setUsers(usersResponse.users || []);
       } else {
         // For non-super admin, set current user
@@ -318,7 +318,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
       setTechnicians(techniciansResponse.technicians || []);
 
       // Load customers
-      const customersResponse = await getCustomers({ limit: 1000 });
+      const customersResponse = await getCustomers({ limit: 10000 });
       setCustomers(customersResponse.customers || []);
 
       // Load service descriptions
@@ -627,7 +627,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
       setCustomerJobs(jobsResponse.jobs || []);
 
       // Load customer machines
-      const machinesResponse = await getMachines({ customerId: selectedCustomerId });
+      const machinesResponse = await getMachines({ customerId: selectedCustomerId, limit: 10000 });
       setCustomerMachines(machinesResponse.machines || []);
 
       // Load activities related to customer jobs (optional - may fail if user doesn't have permission)

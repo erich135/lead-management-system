@@ -224,7 +224,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
    */
   async function loadCustomers() {
     try {
-      const response = await getCustomers({ limit: 1000 });
+      const response = await getCustomers({ limit: 10000 });
       setCustomers(response.customers || []);
     } catch (err) {
       console.error('Error loading customers:', err);

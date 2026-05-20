@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.39] - 2026-05-20
+
+### Added – Machine QR Reading & Verification
+- **`MachineQrPanel.tsx`** (NEW) — renders a QR code (via `qrcode.react`) pointing to the public scan URL plus a **Print QR Label** button that opens a 60×60 mm print window with machine details under the QR
+- **`MachineScanPage.tsx`** (NEW) — public, unauthenticated mobile-friendly capture page at `/scan/machine/:token`; collects hours + photo (mobile camera via `capture="environment"`), optional fault description, optional submitter name/phone; shows confirmation with `ARS-xxxxxx` reference. Deliberately hides Ownership and Last Oil Sample Date
+- **`PendingMachineReadings.tsx`** (NEW) — verifier queue with Pending / Approved / Rejected tabs, photo thumbnail + full-size modal, previous/submitted/delta metrics, fault flag, inline **Edit hours** for verifier corrections, and Approve / Reject (mandatory reason via `prompt`). Gated by `machines.verifyReadings` permission
+- **`MachineReadingHistory.tsx`** (NEW) — per-machine audit trail table (date, hours + delta, submitter, status, verifier, photo viewer) shown in the expanded machine row
+- **`Machines.tsx`** — top-level tabs **Machines** / **Verify Readings** (verify tab only shown to super admin or `machines.verifyReadings` holders); QR panel + reading history now visible in the expanded read-only machine view (no need to enter edit mode)
+- **`App.tsx`** — added public route `/scan/machine/:token` (outside `ProtectedRoute`) and kept `/pending-machine-readings` route for bookmarks
+- **`Dashboard.tsx`** — added `pendingReadings` view to the View union/router (consumed by the bookmarked URL); no separate sidebar link since the queue lives inside Machines
+- **`api.ts`** — new types `PublicMachineForScan`, `MachineReadingSubmission`, `MachineReadingSubmissionStatus`; new functions `getMachineQrToken`, `getMachineReadingHistory`, `getPublicMachineForScan`, `submitPublicMachineReading` (multipart), `listMachineReadingSubmissions`, `getMachineReadingPhotoUrl` (appends `?token=` for auth on `<img>` requests), `approveMachineReadingSubmission`, `rejectMachineReadingSubmission`
+- **`package.json`** — added dependency `qrcode.react@^3.1.0`
+
 ## [1.0.38] - 2026-05-14
 
 ### Fixed – Jobs: RSR Documents now visible in Machines tab

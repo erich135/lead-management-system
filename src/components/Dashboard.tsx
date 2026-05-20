@@ -59,11 +59,12 @@ import { NotificationPanel } from './NotificationPanel';
 import { JobCardTemplates } from './JobCardTemplates';
 import { JobCardSubmissions } from './JobCardSubmissions';
 import { PartsReadyJobCards } from './PartsReadyJobCards';
+import { PendingMachineReadings } from './PendingMachineReadings';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { Tooltip, HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
 
-type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady';
+type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady' | 'pendingReadings';
 
 interface DashboardProps {
   view?: View;
@@ -87,6 +88,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
     if (path === '/job-card-templates') return 'jobCardTemplates';
     if (path === '/job-card-submissions') return 'jobCardSubmissions';
     if (path === '/parts-ready') return 'partsReady';
+    if (path === '/pending-machine-readings') return 'pendingReadings';
     return 'dashboard';
   };
   
@@ -107,6 +109,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
       jobCardTemplates: '/job-card-templates',
       jobCardSubmissions: '/job-card-submissions',
       partsReady: '/parts-ready',
+      pendingReadings: '/pending-machine-readings',
     };
     navigate(routes[newView]);
   };
@@ -1997,6 +2000,10 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
 
         {view === 'activities' && (
           <Activities />
+        )}
+
+        {view === 'pendingReadings' && (
+          <PendingMachineReadings />
         )}
       </main>
 

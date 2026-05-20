@@ -6,6 +6,7 @@ import { ResetPasswordPage } from './components/ResetPasswordPage';
 import { Dashboard } from './components/Dashboard';
 import { ChatWidget } from './components/ChatWidget';
 import { AutoLocationTracker } from './components/AutoLocationTracker';
+import { MachineScanPage } from './components/MachineScanPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -136,6 +137,13 @@ function AppContent() {
             <Dashboard view="partsReady" />
           </ProtectedRoute>
         } />
+        <Route path="/pending-machine-readings" element={
+          <ProtectedRoute>
+            <Dashboard view="pendingReadings" />
+          </ProtectedRoute>
+        } />
+        {/* Public QR scan landing — NO auth, NO PublicRoute redirect. */}
+        <Route path="/scan/machine/:token" element={<MachineScanPage />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

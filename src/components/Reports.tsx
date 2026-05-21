@@ -1025,7 +1025,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
       filename = `Overdue-Jobs-${startDate}-to-${endDate}.xlsx`;
     } else if (activeSection === 'jobs') {
       const filteredData = getFilteredJobs();
-      const headers = ['Job Number', 'Status', 'Customer', 'Cash Customer', 'Start Date', 'Date Quoted', 'Value ex VAT', 'Admin', 'Assisting Admin', 'Rep Code', 'Branch', 'Description', 'Notes', 'Feedback', 'Invoice Number', 'Invoice Date', 'Job Source', 'Tech', 'Tech Booked Date', 'Store Pack', 'Store Pack Date'];
+      const headers = ['Job Number', 'Status', 'Customer', 'Cash Customer', 'Start Date', 'Date Quoted', 'Value ex VAT', 'Admin', 'Assisting Admin', 'Rep Code', 'Branch', 'Description', 'Notes', 'Feedback', 'PO Number', 'Invoice Number', 'Invoice Date', 'Job Source', 'Tech', 'Tech Booked Date', 'Store Pack', 'Store Pack Date'];
       const rows = filteredData.map(job => {
         // Get tech name from bookings array only (not legacy techBooked field which may be stale)
         const techName = job.bookings && job.bookings.length > 0 
@@ -1051,6 +1051,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
           typeof job.description === 'object' ? (job.description as any)?.name || '' : '',
           job.notes || '',
           job.feedback || '',
+          job.poNumber || '',
           job.invNumber || '',
           formatDate(job.invoiceDate),
           typeof job.jobSource === 'object' ? (job.jobSource as any)?.name || '' : '',

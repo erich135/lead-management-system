@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.41] - 2026-05-21
+
+### Added – Reports: PO Number column in All Jobs export
+- **`Reports.tsx`** — the All Jobs Excel export now also includes a `PO Number` column (sourced from `job.poNumber`), inserted between `Feedback` and `Invoice Number`
+
 ## [1.0.40] - 2026-05-21
 
 ### Added – Reports: PO Number column in Overdue Jobs export

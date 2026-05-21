@@ -3049,13 +3049,13 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
             <div className="flex-1 overflow-auto p-4 bg-slate-100">
               {previewRSR.mimeType?.startsWith('image/') ? (
                 <img
-                  src={getRSRDocumentUrl(previewRSR._id)}
+                  src={`${getRSRDocumentUrl(previewRSR._id)}&inline=1`}
                   alt={previewRSR.title}
                   className="max-w-full h-auto mx-auto rounded-lg shadow-lg"
                 />
               ) : (
                 <iframe
-                  src={getRSRDocumentUrl(previewRSR._id)}
+                  src={`${getRSRDocumentUrl(previewRSR._id)}&inline=1`}
                   className="w-full h-full min-h-[70vh] rounded-lg bg-white"
                   title={previewRSR.title}
                 />

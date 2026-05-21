@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.0.39] - 2026-05-21
+
+### Fixed – RSR Document Preview now renders inline
+- **`LeadDetails.tsx`** — RSR preview iframe/img URLs now append `&inline=1` so the backend serves the PDF/image with `Content-Disposition: inline` instead of `attachment`; previously the preview pane stayed blank because browsers refused to render attachment-disposition responses
+- **`Machines.tsx`** — `getPreviewUrl()` rewritten to handle job-sourced vs machine-native RSRs separately and append `&inline=1`; fixed a bug where job-sourced RSR URLs received a duplicate `?token=` query string (causing **"Unauthorized – Invalid or expired token"** when trying to preview a "From Job" RSR from the Machines tab)
+- **`Machines.tsx`** — `handleDownloadRSR()` cleaned up to avoid the same duplicate-token issue for the download icon
+
+### Fixed – Machines: RSR badge now counts job-sourced documents
+- **`Machines.tsx`** — red RSR badge now sums machine-native `rsrDocuments.length` and the new `jobRSRDocumentsCount` field returned by the backend, so machines that only have "From Job" RSRs no longer show "—"
+- **`api.ts`** — `Machine` interface gained `jobRSRDocumentsCount?: number`
+
+### Added – Machines: Delete is now available for "From Job" RSRs
+- **`Machines.tsx`** — super admin trash icon is shown on every RSR row regardless of source; deleting a job-sourced RSR routes to `/api/rsr-documents/:id` and warns the user that the document will also be removed from the originating job
+
+### Improved – Reports: "+N more jobs" link is now expandable
+- **`Reports.tsx`** — the recent-jobs section in Customer Reports machine cards now toggles between the first three jobs and the full list; clicking the "+N more jobs" text expands it, and a "Show less" link collapses it again
+
 ## [1.0.38] - 2026-05-14
 
 ### Fixed – Jobs: RSR Documents now visible in Machines tab

@@ -9,6 +9,7 @@ import {
   getMachineRSRUrl,
   getRSRDocumentUrl,
   deleteMachineRSR,
+  deleteRSRDocument,
   getAuthToken,
   getCustomers,
   getCustomersWithMachines,
@@ -497,11 +498,11 @@ export function Machines() {
   const handleDownloadRSR = (rsr: MachineRSR) => {
     if (!expandedMachineId) return;
     const token = getAuthToken();
-    const url = rsr.source === 'job'
-      ? getRSRDocumentUrl(rsr._id)
-      : getMachineRSRUrl(expandedMachineId, rsr._id);
+    const href = rsr.source === 'job'
+      ? getRSRDocumentUrl(rsr._id) // already contains ?token=
+      : `${getMachineRSRUrl(expandedMachineId, rsr._id)}?token=${token}`;
     const link = document.createElement('a');
-    link.href = `${url}?token=${token}`;
+    link.href = href;
     link.download = rsr.fileName;
     link.target = '_blank';
     document.body.appendChild(link);
@@ -517,19 +518,28 @@ export function Machines() {
   const getPreviewUrl = (rsr: MachineRSR) => {
     if (!expandedMachineId) return '';
     const token = getAuthToken();
-    const url = rsr.source === 'job'
-      ? getRSRDocumentUrl(rsr._id)
-      : getMachineRSRUrl(expandedMachineId, rsr._id);
-    return `${url}?token=${token}`;
+    if (rsr.source === 'job') {
+      // getRSRDocumentUrl already includes ?token=...; append inline flag
+      return `${getRSRDocumentUrl(rsr._id)}&inline=1`;
+    }
+    const url = getMachineRSRUrl(expandedMachineId, rsr._id);
+    return `${url}?token=${token}&inline=1`;
   };
 
   const isImageFile = (mimeType: string) => mimeType.startsWith('image/');
 
   const handleDeleteRSR = async (rsr: MachineRSR) => {
     if (!expandedMachineId) return;
-    if (!confirm(`Are you sure you want to delete "${rsr.title}"?`)) return;
+    const confirmMsg = rsr.source === 'job'
+      ? `Are you sure you want to delete "${rsr.title}"? This RSR was uploaded via a job and will be removed from that job as well.`
+      : `Are you sure you want to delete "${rsr.title}"?`;
+    if (!confirm(confirmMsg)) return;
     try {
-      await deleteMachineRSR(expandedMachineId, rsr._id);
+      if (rsr.source === 'job') {
+        await deleteRSRDocument(rsr._id);
+      } else {
+        await deleteMachineRSR(expandedMachineId, rsr._id);
+      }
       setMachineRSRs(prev => prev.filter(r => r._id !== rsr._id));
     } catch (error: any) {
       alert(error.message || 'Failed to delete RSR');
@@ -835,14 +845,19 @@ export function Machines() {
 
                     {/* RSR Count */}
                     <div className="col-span-1">
-                      {machine.rsrDocuments && machine.rsrDocuments.length > 0 ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
-                          <FileText className="w-3 h-3" />
-                          {machine.rsrDocuments.length}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-slate-400">—</span>
-                      )}
+                      {(() => {
+                        const total =
+                          (machine.rsrDocuments?.length || 0) +
+                          (machine.jobRSRDocumentsCount || 0);
+                        return total > 0 ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                            <FileText className="w-3 h-3" />
+                            {total}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
+                        );
+                      })()}
                     </div>
 
                     {/* Expand Arrow */}
@@ -1229,7 +1244,7 @@ export function Machines() {
                                     <button onClick={(e) => { e.stopPropagation(); handleDownloadRSR(rsr); }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" title="Download">
                                       <Download className="w-4 h-4" />
                                     </button>
-                                    {isSuperAdmin && rsr.source !== 'job' && (
+                                    {isSuperAdmin && (
                                       <button onClick={(e) => { e.stopPropagation(); handleDeleteRSR(rsr); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg" title="Delete">
                                         <Trash2 className="w-4 h-4" />
                                       </button>

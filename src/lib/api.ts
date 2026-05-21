@@ -734,6 +734,8 @@ export interface Machine {
   isActive: boolean;
   dbStatus?: string;
   rsrDocuments?: MachineRSR[];
+  /** Count of RSR documents attached via a job referencing this machine. */
+  jobRSRDocumentsCount?: number;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -125,6 +125,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
   const [reportRSRPreview, setReportRSRPreview] = useState<{ machineId: string; rsr: MachineRSR } | null>(null);
   const [showReportRSRPreview, setShowReportRSRPreview] = useState(false);
   const [expandedMachineRSRs, setExpandedMachineRSRs] = useState<Set<string>>(new Set());
+  const [expandedMachineJobs, setExpandedMachineJobs] = useState<Set<string>>(new Set());
   
   // Overdue Jobs Filters
   const [overdueStatusFilter, setOverdueStatusFilter] = useState<string[]>([]);
@@ -3950,28 +3951,45 @@ export function Reports({ statuses, branches }: ReportsProps) {
                                 <p className="font-semibold text-green-600">R{machineValue.toLocaleString()}</p>
                               </div>
                             </div>
-                            {machineJobsList.length > 0 && (
-                              <div className="mt-3 pt-3 border-t border-gray-200">
-                                <p className="text-xs font-medium text-ars-body mb-2">Recent Jobs:</p>
-                                <div className="space-y-1">
-                                  {machineJobsList.slice(0, 3).map(job => (
-                                    <div key={job._id} className="flex justify-between text-xs">
-                                      <span className="text-ars-heading">{job.jobNumber}</span>
-                                      <span className={`px-1.5 py-0.5 rounded ${
-                                        job.status?.name === 'Job Done' ? 'bg-green-100 text-green-700' :
-                                        job.status?.name === 'Invoiced' ? 'bg-blue-100 text-blue-700' :
-                                        'bg-gray-100 text-gray-700'
-                                      }`}>
-                                        {job.status?.name || 'No Status'}
-                                      </span>
-                                    </div>
-                                  ))}
-                                  {machineJobsList.length > 3 && (
-                                    <p className="text-xs text-ars-primary">+{machineJobsList.length - 3} more jobs</p>
-                                  )}
+                            {machineJobsList.length > 0 && (() => {
+                              const isJobsExpanded = expandedMachineJobs.has(machine._id);
+                              const visibleJobs = isJobsExpanded ? machineJobsList : machineJobsList.slice(0, 3);
+                              return (
+                                <div className="mt-3 pt-3 border-t border-gray-200">
+                                  <p className="text-xs font-medium text-ars-body mb-2">Recent Jobs:</p>
+                                  <div className="space-y-1">
+                                    {visibleJobs.map(job => (
+                                      <div key={job._id} className="flex justify-between text-xs">
+                                        <span className="text-ars-heading">{job.jobNumber}</span>
+                                        <span className={`px-1.5 py-0.5 rounded ${
+                                          job.status?.name === 'Job Done' ? 'bg-green-100 text-green-700' :
+                                          job.status?.name === 'Invoiced' ? 'bg-blue-100 text-blue-700' :
+                                          'bg-gray-100 text-gray-700'
+                                        }`}>
+                                          {job.status?.name || 'No Status'}
+                                        </span>
+                                      </div>
+                                    ))}
+                                    {machineJobsList.length > 3 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const next = new Set(expandedMachineJobs);
+                                          if (next.has(machine._id)) next.delete(machine._id);
+                                          else next.add(machine._id);
+                                          setExpandedMachineJobs(next);
+                                        }}
+                                        className="text-xs text-ars-primary hover:underline cursor-pointer"
+                                      >
+                                        {isJobsExpanded
+                                          ? 'Show less'
+                                          : `+${machineJobsList.length - 3} more job${machineJobsList.length - 3 === 1 ? '' : 's'}`}
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
+                              );
+                            })()}
                           </div>
                         );
                       })}

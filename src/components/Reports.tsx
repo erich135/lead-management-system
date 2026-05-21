@@ -1007,7 +1007,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
     if (activeSection === 'overdue') {
       const filteredData = getFilteredOverdueJobs();
-      const headers = ['Job Number', 'Status', 'Days Overdue', 'Customer', 'Admin', 'Assisting Admin', 'Rep Code', 'Branch', 'Current Status', 'Expected Next Status'];
+      const headers = ['Job Number', 'Status', 'Days Overdue', 'Customer', 'Admin', 'Assisting Admin', 'Rep Code', 'Branch', 'PO Number', 'Current Status', 'Expected Next Status'];
       const rows = filteredData.map(oj => [
         oj.jobNumber || '',
         oj.job?.status?.name || '',
@@ -1017,6 +1017,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
         oj.job?.assistingAdm || '',
         typeof oj.job?.repCode === 'object' ? (oj.job.repCode as any)?.code || '' : '',
         typeof oj.job?.branch === 'object' ? oj.job.branch?.name || '' : '',
+        oj.job?.poNumber || '',
         oj.currentStatus || '',
         oj.expectedNextStatus || '',
       ]);

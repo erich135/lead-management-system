@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.40] - 2026-05-21
+
+### Added – Reports: PO Number column in Overdue Jobs export
+- **`Reports.tsx`** — the Overdue Jobs Excel export now includes a `PO Number` column (sourced from `job.poNumber`), inserted between `Branch` and `Current Status`
+
 ## [1.0.39] - 2026-05-21
 
 ### Fixed – RSR Document Preview now renders inline

@@ -4404,3 +4404,43 @@ export async function listRoiTariffs(authority?: string): Promise<TariffRef[]> {
 export async function listRoiLoadProfiles(): Promise<LoadProfileRef[]> {
   return apiRequest<LoadProfileRef[]>('/api/roi/reference/load-profiles');
 }
+export interface CreateRoiAuditPayload {
+  customer: string;
+  mode: 'MEASURED' | 'ESTIMATED';
+  existingMachine: {
+    make?: string;
+    model?: string;
+    ratedKW?: number;
+    fadM3PerMin?: number;
+    isVSD?: boolean;
+  };
+  estimated?: {
+    loadProfile: string;
+    loadFactorOverride?: number;
+    runHoursPerDayOverride?: number;
+  };
+  scheduleOverride?: {
+    workingDaysPerYear: number;
+    saturdayDaysPerYear: number;
+    sundayDaysPerYear: number;
+  };
+  proposedModel?: string;
+  proposedPriceExVatOverride?: number;
+  tariff?: string;
+  supplyAuthority?: string;
+}
+
+export async function createRoiAudit(
+  payload: CreateRoiAuditPayload,
+): Promise<RoiAuditSummary> {
+  return apiRequest<RoiAuditSummary>('/api/roi/audits', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function computeRoiAudit(id: string): Promise<RoiAuditSummary> {
+  return apiRequest<RoiAuditSummary>(`/api/roi/audits/${id}/compute`, {
+    method: 'POST',
+  });
+}

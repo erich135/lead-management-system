@@ -7,6 +7,8 @@ import {
   X,
   Plus,
   CheckCircle2,
+  Download,
+  Save,
 } from 'lucide-react';
 import {
   listRoiAudits,
@@ -17,6 +19,9 @@ import {
   createRoiAudit,
   computeRoiAudit,
   uploadRoiAuditCsv,
+  updateRoiAudit,
+  downloadRoiAuditReport,
+  getRoiAudit,
   getCustomers,
   type RoiAuditSummary,
   type CompressorModelRef,
@@ -24,6 +29,7 @@ import {
   type SupplyAuthorityRef,
   type TariffRef,
   type CreateRoiAuditPayload,
+  type UpdateRoiAuditPayload,
 } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -45,6 +51,7 @@ export function RoiAudits(): JSX.Element {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showWizard, setShowWizard] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
 
   const loadAudits = async (): Promise<void> => {
     setLoading(true);
@@ -128,11 +135,16 @@ export function RoiAudits(): JSX.Element {
                 <th className="px-3 py-3 text-right">Payback</th>
                 <th className="px-3 py-3 text-right">5yr ROI</th>
                 <th className="px-3 py-3 text-left">Status</th>
+                <th className="px-3 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {audits.map((a) => (
-                <tr key={a._id} className="hover:bg-slate-50">
+                <tr
+                  key={a._id}
+                  className="hover:bg-amber-50 cursor-pointer"
+                  onClick={() => setEditId(a._id)}
+                >
                   <td className="px-3 py-3 text-slate-800">
                     {typeof a.customer === 'string' ? a.customer : a.customer.name}
                   </td>
@@ -173,6 +185,22 @@ export function RoiAudits(): JSX.Element {
                       {a.status}
                     </span>
                   </td>
+                  <td className="px-3 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void downloadRoiAuditReport(a._id).catch((err) =>
+                          setError((err as Error).message || 'Download failed'),
+                        );
+                      }}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs text-amber-700 hover:bg-amber-100 rounded"
+                      title="Download PDF report"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      PDF
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -185,6 +213,17 @@ export function RoiAudits(): JSX.Element {
           onClose={() => setShowWizard(false)}
           onCreated={async () => {
             setShowWizard(false);
+            await loadAudits();
+          }}
+        />
+      )}
+
+      {editId && (
+        <EditRoiAuditModal
+          auditId={editId}
+          canManage={canManage}
+          onClose={() => setEditId(null)}
+          onSaved={async () => {
             await loadAudits();
           }}
         />
@@ -762,3 +801,383 @@ function Metric({
 }
 
 export default RoiAudits;
+
+// ===========================================================================
+// Edit ROI Audit Modal — pricing/markup + PDF download
+// ===========================================================================
+
+interface EditRoiAuditModalProps {
+  auditId: string;
+  canManage: boolean;
+  onClose: () => void;
+  onSaved: () => void | Promise<void>;
+}
+
+function EditRoiAuditModal({
+  auditId,
+  canManage,
+  onClose,
+  onSaved,
+}: EditRoiAuditModalProps): JSX.Element {
+  const [audit, setAudit] = useState<RoiAuditSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Pricing form state
+  const [costExVat, setCostExVat] = useState('');
+  const [markupPercent, setMarkupPercent] = useState('');
+  const [quotedPriceExVat, setQuotedPriceExVat] = useState('');
+  const [quoteNumber, setQuoteNumber] = useState('');
+  const [quoteDate, setQuoteDate] = useState('');
+  const [quoteValidUntil, setQuoteValidUntil] = useState('');
+  const [preparedBy, setPreparedBy] = useState('');
+  const [notes, setNotes] = useState('');
+  const [quotedPriceTouched, setQuotedPriceTouched] = useState(false);
+
+  const [saving, setSaving] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const data = await getRoiAudit(auditId);
+        if (cancelled) return;
+        setAudit(data);
+        const p = data.pricing;
+        if (p) {
+          if (typeof p.costExVat === 'number') setCostExVat(String(p.costExVat));
+          if (typeof p.markupPercent === 'number') setMarkupPercent(String(p.markupPercent));
+          if (typeof p.quotedPriceExVat === 'number')
+            setQuotedPriceExVat(String(p.quotedPriceExVat));
+          if (p.quoteNumber) setQuoteNumber(p.quoteNumber);
+          if (p.quoteDate) setQuoteDate(p.quoteDate.slice(0, 10));
+          if (p.quoteValidUntil) setQuoteValidUntil(p.quoteValidUntil.slice(0, 10));
+          if (p.preparedBy) setPreparedBy(p.preparedBy);
+          if (p.notes) setNotes(p.notes);
+        }
+      } catch (err) {
+        if (!cancelled) setLoadError((err as Error).message || 'Failed to load audit');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [auditId]);
+
+  // Auto-derive quoted price from cost + markup unless user has typed in the
+  // quoted-price field manually.
+  useEffect(() => {
+    if (quotedPriceTouched) return;
+    const c = Number(costExVat);
+    const m = Number(markupPercent);
+    if (costExVat && markupPercent && !Number.isNaN(c) && !Number.isNaN(m)) {
+      setQuotedPriceExVat((c * (1 + m / 100)).toFixed(2));
+    }
+  }, [costExVat, markupPercent, quotedPriceTouched]);
+
+  const fmtZAR = (n?: number): string =>
+    typeof n === 'number'
+      ? new Intl.NumberFormat('en-ZA', {
+          style: 'currency',
+          currency: 'ZAR',
+          maximumFractionDigits: 0,
+        }).format(n)
+      : '—';
+
+  const handleSave = async (recompute: boolean): Promise<void> => {
+    setSaveError(null);
+    setSaveSuccess(false);
+    setSaving(true);
+    try {
+      const payload: UpdateRoiAuditPayload = {
+        pricing: {
+          costExVat: costExVat ? Number(costExVat) : undefined,
+          markupPercent: markupPercent ? Number(markupPercent) : undefined,
+          quotedPriceExVat: quotedPriceExVat ? Number(quotedPriceExVat) : undefined,
+          quoteNumber: quoteNumber || undefined,
+          quoteDate: quoteDate || undefined,
+          quoteValidUntil: quoteValidUntil || undefined,
+          preparedBy: preparedBy || undefined,
+          notes: notes || undefined,
+        },
+      };
+      const updated = await updateRoiAudit(auditId, payload);
+      let fresh = updated;
+      if (recompute) {
+        fresh = await computeRoiAudit(auditId);
+      }
+      setAudit(fresh);
+      setSaveSuccess(true);
+      await onSaved();
+    } catch (err) {
+      setSaveError((err as Error).message || 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDownload = async (): Promise<void> => {
+    setDownloading(true);
+    setSaveError(null);
+    try {
+      await downloadRoiAuditReport(auditId);
+    } catch (err) {
+      setSaveError((err as Error).message || 'Download failed');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const customerName =
+    audit && typeof audit.customer === 'object' ? audit.customer.name : '';
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between z-10">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-800">
+              Edit ROI Audit
+            </h3>
+            {customerName && (
+              <p className="text-xs text-slate-500 mt-0.5">{customerName}</p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-8 h-8 text-slate-400 animate-spin" />
+          </div>
+        ) : loadError ? (
+          <div className="p-6 text-sm text-red-700 bg-red-50 m-6 rounded-lg flex items-center gap-2">
+            <AlertCircle className="w-4 h-4" />
+            {loadError}
+          </div>
+        ) : audit ? (
+          <div className="p-6 space-y-5">
+            {/* Read-only summary */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <SummaryCell label="Mode" value={audit.mode} />
+              <SummaryCell label="Status" value={audit.status} />
+              <SummaryCell
+                label="Annual Saving"
+                value={fmtZAR(audit.results?.annualCostSavingExVat)}
+              />
+              <SummaryCell
+                label="Payback"
+                value={
+                  audit.results?.paybackYears && audit.results.paybackYears > 0
+                    ? `${audit.results.paybackYears.toFixed(2)} yr`
+                    : '—'
+                }
+              />
+            </div>
+
+            {/* Pricing block */}
+            <fieldset className="border border-slate-200 rounded-lg p-4">
+              <legend className="text-sm font-medium text-slate-700 px-2">
+                Pricing & Quote
+              </legend>
+              <p className="text-xs text-slate-500 mb-3">
+                Admin: enter your <strong>cost</strong> and a <strong>markup %</strong>.
+                The quoted price auto-fills (you can override). The quoted price
+                replaces the catalogue price in the PDF and payback calc.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Field label="Cost (R, ex VAT)">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={costExVat}
+                    onChange={(e) => setCostExVat(e.target.value)}
+                    className="input"
+                    disabled={!canManage}
+                  />
+                </Field>
+                <Field label="Markup %">
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={markupPercent}
+                    onChange={(e) => setMarkupPercent(e.target.value)}
+                    className="input"
+                    disabled={!canManage}
+                  />
+                </Field>
+                <Field label="Quoted price (R, ex VAT)">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={quotedPriceExVat}
+                    onChange={(e) => {
+                      setQuotedPriceTouched(true);
+                      setQuotedPriceExVat(e.target.value);
+                    }}
+                    className="input"
+                    disabled={!canManage}
+                  />
+                </Field>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                <Field label="Quote number">
+                  <input
+                    type="text"
+                    value={quoteNumber}
+                    onChange={(e) => setQuoteNumber(e.target.value)}
+                    className="input"
+                    placeholder="e.g. Q-2025-001"
+                    disabled={!canManage}
+                  />
+                </Field>
+                <Field label="Quote date">
+                  <input
+                    type="date"
+                    value={quoteDate}
+                    onChange={(e) => setQuoteDate(e.target.value)}
+                    className="input"
+                    disabled={!canManage}
+                  />
+                </Field>
+                <Field label="Valid until">
+                  <input
+                    type="date"
+                    value={quoteValidUntil}
+                    onChange={(e) => setQuoteValidUntil(e.target.value)}
+                    className="input"
+                    disabled={!canManage}
+                  />
+                </Field>
+              </div>
+              <div className="mt-3">
+                <Field label="Prepared by">
+                  <input
+                    type="text"
+                    value={preparedBy}
+                    onChange={(e) => setPreparedBy(e.target.value)}
+                    className="input"
+                    placeholder="Sales rep or admin name"
+                    disabled={!canManage}
+                  />
+                </Field>
+              </div>
+              <div className="mt-3">
+                <Field label="Notes / scope / exclusions">
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="input"
+                    rows={3}
+                    placeholder="Anything to call out in the quote (delivery, commissioning, exclusions, etc.)"
+                    disabled={!canManage}
+                  />
+                </Field>
+              </div>
+            </fieldset>
+
+            {saveError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-sm text-red-700">
+                <AlertCircle className="w-4 h-4" />
+                {saveError}
+              </div>
+            )}
+            {saveSuccess && !saveError && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-sm text-green-700">
+                <CheckCircle2 className="w-4 h-4" />
+                Saved.
+              </div>
+            )}
+
+            <div className="flex flex-wrap justify-end gap-2 pt-2 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg"
+                disabled={saving || downloading}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={handleDownload}
+                disabled={downloading}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-amber-700 border border-amber-600 hover:bg-amber-50 rounded-lg disabled:opacity-50"
+              >
+                {downloading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                Download PDF
+              </button>
+              {canManage && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleSave(false)}
+                    disabled={saving}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 hover:bg-slate-50 rounded-lg disabled:opacity-50"
+                  >
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSave(true)}
+                    disabled={saving}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300 text-white rounded-lg"
+                  >
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    Save & Recompute
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <style>{`
+        .input {
+          width: 100%;
+          padding: 0.5rem 0.75rem;
+          border: 1px solid rgb(203 213 225);
+          border-radius: 0.5rem;
+          font-size: 0.875rem;
+          background: white;
+        }
+        .input:focus {
+          outline: none;
+          border-color: rgb(217 119 6);
+          box-shadow: 0 0 0 2px rgb(254 215 170);
+        }
+        .input:disabled { background: rgb(241 245 249); cursor: not-allowed; }
+      `}</style>
+    </div>
+  );
+}
+
+function SummaryCell({ label, value }: { label: string; value: string }): JSX.Element {
+  return (
+    <div className="p-2 bg-slate-50 border border-slate-200 rounded">
+      <p className="text-[10px] uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="text-sm font-semibold text-slate-800 mt-0.5">{value}</p>
+    </div>
+  );
+}

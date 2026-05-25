@@ -4346,17 +4346,64 @@ export interface LoadProfileRef {
   isSystem: boolean;
 }
 
+export interface RoiAuditPricing {
+  costExVat?: number;
+  markupPercent?: number;
+  quotedPriceExVat?: number;
+  quoteNumber?: string;
+  quoteDate?: string;
+  quoteValidUntil?: string;
+  preparedBy?: string;
+  notes?: string;
+}
+
 export interface RoiAuditSummary {
   _id: string;
   customer: { _id: string; name: string } | string;
   machine?: { _id: string; make: string; model: string; serialNumber?: string };
   mode: RoiAuditMode;
   status: RoiAuditStatus;
-  proposedModel?: { _id: string; make: string; model: string; ratedKW: number };
+  existingMachine?: {
+    make?: string;
+    model?: string;
+    ratedKW?: number;
+    fadM3PerMin?: number;
+    isVSD?: boolean;
+  };
+  proposedModel?:
+    | { _id: string; make: string; model: string; ratedKW: number; listPriceExVat?: number }
+    | string;
+  proposedPriceExVatOverride?: number;
+  pricing?: RoiAuditPricing;
+  supplyAuthority?: { _id: string; name: string } | string;
+  tariff?: { _id: string; name: string } | string;
+  estimated?: {
+    loadProfile?: string;
+    loadFactorOverride?: number;
+    runHoursPerDayOverride?: number;
+  };
+  scheduleOverride?: {
+    workingDaysPerYear: number;
+    saturdayDaysPerYear: number;
+    sundayDaysPerYear: number;
+  };
+  measured?: {
+    csvFileName?: string;
+    csvUploadedAt?: string;
+    measuredAnnualKWh?: number;
+    sampleCount?: number;
+  };
   results?: {
+    baselineAnnualKWh: number;
+    baselineAnnualCostExVat: number;
+    proposedAnnualKWh: number;
+    proposedAnnualCostExVat: number;
+    annualEnergySavingKWh: number;
     annualCostSavingExVat: number;
+    investmentExVat: number;
     paybackYears: number;
     roiPercentFiveYear: number;
+    co2SavingTonsPerYear?: number;
   };
   createdAt: string;
   updatedAt: string;
@@ -4464,4 +4511,62 @@ export async function uploadRoiAuditCsv(
     throw new Error(json?.message || json?.error?.message || 'CSV upload failed');
   }
   return json.data;
+}
+
+export interface UpdateRoiAuditPayload {
+  existingMachine?: CreateRoiAuditPayload['existingMachine'];
+  estimated?: CreateRoiAuditPayload['estimated'];
+  scheduleOverride?: CreateRoiAuditPayload['scheduleOverride'];
+  proposedModel?: string;
+  proposedPriceExVatOverride?: number;
+  supplyAuthority?: string;
+  tariff?: string;
+  status?: RoiAuditStatus;
+  pricing?: RoiAuditPricing;
+}
+
+export async function updateRoiAudit(
+  id: string,
+  payload: UpdateRoiAuditPayload,
+): Promise<RoiAuditSummary> {
+  return apiRequest<RoiAuditSummary>(`/api/roi/audits/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * Streams the PDF report for an audit and triggers a browser download.
+ */
+export async function downloadRoiAuditReport(
+  id: string,
+  filename?: string,
+): Promise<void> {
+  const token = getAuthToken();
+  const res = await fetch(`${API_BASE_URL}/api/roi/audits/${id}/report`, {
+    method: 'GET',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (!res.ok) {
+    let msg = 'Failed to download report';
+    try {
+      const j = await res.json();
+      msg = j?.message || j?.error?.message || msg;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(msg);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  // Prefer server-supplied filename
+  const cd = res.headers.get('Content-Disposition') || '';
+  const match = cd.match(/filename="?([^";]+)"?/i);
+  a.download = match?.[1] || filename || `roi-audit-${id}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }

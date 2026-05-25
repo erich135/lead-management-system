@@ -39,6 +39,7 @@ export function MachineScanPage() {
   const [faultDescription, setFaultDescription] = useState('');
   const [submitterName, setSubmitterName] = useState('');
   const [submitterPhone, setSubmitterPhone] = useState('');
+  const [submitterEmail, setSubmitterEmail] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [reference, setReference] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -99,6 +100,11 @@ export function MachineScanPage() {
       setSubmitError('Please describe the fault.');
       return;
     }
+    const emailTrimmed = submitterEmail.trim();
+    if (emailTrimmed && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)) {
+      setSubmitError('Please enter a valid email address, or leave it blank.');
+      return;
+    }
 
     setPhase('submitting');
     try {
@@ -109,6 +115,7 @@ export function MachineScanPage() {
         faultDescription: faultDescription.trim() || undefined,
         submitterName: submitterName.trim() || undefined,
         submitterPhone: submitterPhone.trim() || undefined,
+        submitterEmail: emailTrimmed || undefined,
       });
       setReference(ref);
       setPhase('confirmed');
@@ -300,6 +307,9 @@ export function MachineScanPage() {
           <summary className="cursor-pointer text-sm font-semibold text-slate-700">
             Your contact details (optional)
           </summary>
+          <p className="mt-2 text-xs text-slate-500">
+            Add your email if you'd like an emailed confirmation of your reading and approval status.
+          </p>
           <div className="mt-3 space-y-2">
             <input
               type="text"
@@ -309,10 +319,19 @@ export function MachineScanPage() {
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
             />
             <input
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              value={submitterEmail}
+              onChange={(e) => setSubmitterEmail(e.target.value)}
+              placeholder="Your email (for confirmation)"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+            />
+            <input
               type="tel"
               value={submitterPhone}
               onChange={(e) => setSubmitterPhone(e.target.value)}
-              placeholder="Your phone (for updates)"
+              placeholder="Your phone"
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
             />
           </div>

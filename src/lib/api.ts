@@ -4213,6 +4213,7 @@ export async function submitPublicMachineReading(
     faultDescription?: string;
     submitterName?: string;
     submitterPhone?: string;
+    submitterEmail?: string;
   },
 ): Promise<{ reference: string; submissionId: string; status: string }> {
   const form = new FormData();
@@ -4222,6 +4223,7 @@ export async function submitPublicMachineReading(
   if (payload.faultDescription) form.append('faultDescription', payload.faultDescription);
   if (payload.submitterName) form.append('submitterName', payload.submitterName);
   if (payload.submitterPhone) form.append('submitterPhone', payload.submitterPhone);
+  if (payload.submitterEmail) form.append('submitterEmail', payload.submitterEmail);
 
   const url = `${API_BASE_URL}/api/public/machine-readings/${encodeURIComponent(token)}`;
   const response = await fetch(url, {

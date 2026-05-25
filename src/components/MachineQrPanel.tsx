@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Printer, RefreshCw, Loader2, AlertCircle } from 'lucide-react';
+import { Printer, Loader2, AlertCircle, Lock } from 'lucide-react';
 import { getMachineQrToken } from '../lib/api';
 
 interface MachineQrPanelProps {
@@ -101,14 +101,12 @@ export function MachineQrPanel({
     <div className="border border-slate-200 rounded-lg p-3 bg-slate-50">
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-semibold text-slate-500 uppercase">QR Label</span>
-        <button
-          type="button"
-          onClick={load}
-          className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1"
-          title="Reload QR"
+        <span
+          className="text-[10px] text-slate-500 flex items-center gap-1"
+          title="This QR is permanently bound to the machine — once printed and stuck on the unit it will never need to be re-issued."
         >
-          <RefreshCw className="w-3 h-3" /> Refresh
-        </button>
+          <Lock className="w-3 h-3" /> Permanent
+        </span>
       </div>
 
       {loading && (

@@ -4368,6 +4368,8 @@ export interface RoiAuditSummary {
     model?: string;
     ratedKW?: number;
     fadM3PerMin?: number;
+    ratedPressureBar?: number;
+    yearOfManufacture?: number;
     isVSD?: boolean;
   };
   proposedModel?:
@@ -4378,7 +4380,7 @@ export interface RoiAuditSummary {
   supplyAuthority?: { _id: string; name: string } | string;
   tariff?: { _id: string; name: string } | string;
   estimated?: {
-    loadProfile?: string;
+    loadProfile?: { _id: string; name: string } | string;
     loadFactorOverride?: number;
     runHoursPerDayOverride?: number;
   };
@@ -4393,6 +4395,8 @@ export interface RoiAuditSummary {
     measuredAnnualKWh?: number;
     sampleCount?: number;
   };
+  decisionNote?: string;
+  sharedWithEmail?: string;
   results?: {
     baselineAnnualKWh: number;
     baselineAnnualCostExVat: number;
@@ -4514,7 +4518,10 @@ export async function uploadRoiAuditCsv(
 }
 
 export interface UpdateRoiAuditPayload {
-  existingMachine?: CreateRoiAuditPayload['existingMachine'];
+  existingMachine?: CreateRoiAuditPayload['existingMachine'] & {
+    ratedPressureBar?: number;
+    yearOfManufacture?: number;
+  };
   estimated?: CreateRoiAuditPayload['estimated'];
   scheduleOverride?: CreateRoiAuditPayload['scheduleOverride'];
   proposedModel?: string;
@@ -4522,6 +4529,8 @@ export interface UpdateRoiAuditPayload {
   supplyAuthority?: string;
   tariff?: string;
   status?: RoiAuditStatus;
+  decisionNote?: string;
+  sharedWithEmail?: string;
   pricing?: RoiAuditPricing;
 }
 
@@ -4532,6 +4541,12 @@ export async function updateRoiAudit(
   return apiRequest<RoiAuditSummary>(`/api/roi/audits/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteRoiAudit(id: string): Promise<{ _id: string; deleted: true }> {
+  return apiRequest<{ _id: string; deleted: true }>(`/api/roi/audits/${id}`, {
+    method: 'DELETE',
   });
 }
 

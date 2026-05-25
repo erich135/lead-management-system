@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Download,
   Save,
+  Trash2,
 } from 'lucide-react';
 import {
   listRoiAudits,
@@ -21,6 +22,7 @@ import {
   uploadRoiAuditCsv,
   updateRoiAudit,
   downloadRoiAuditReport,
+  deleteRoiAudit,
   getRoiAudit,
   getCustomers,
   type RoiAuditSummary,
@@ -186,20 +188,45 @@ export function RoiAudits(): JSX.Element {
                     </span>
                   </td>
                   <td className="px-3 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void downloadRoiAuditReport(a._id).catch((err) =>
-                          setError((err as Error).message || 'Download failed'),
-                        );
-                      }}
-                      className="inline-flex items-center gap-1 px-2 py-1 text-xs text-amber-700 hover:bg-amber-100 rounded"
-                      title="Download PDF report"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      PDF
-                    </button>
+                    <div className="inline-flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void downloadRoiAuditReport(a._id).catch((err) =>
+                            setError((err as Error).message || 'Download failed'),
+                          );
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs text-amber-700 hover:bg-amber-100 rounded"
+                        title="Download PDF report"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        PDF
+                      </button>
+                      {canManage && (
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const name =
+                              typeof a.customer === 'string'
+                                ? a.customer
+                                : a.customer.name;
+                            if (!window.confirm(`Delete ROI audit for ${name}? This cannot be undone.`)) return;
+                            try {
+                              await deleteRoiAudit(a._id);
+                              await loadAudits();
+                            } catch (err) {
+                              setError((err as Error).message || 'Delete failed');
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs text-red-700 hover:bg-red-100 rounded"
+                          title="Delete audit"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -823,6 +850,35 @@ function EditRoiAuditModal({
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  // Reference data for selects
+  const [arsModels, setArsModels] = useState<CompressorModelRef[]>([]);
+  const [loadProfiles, setLoadProfiles] = useState<LoadProfileRef[]>([]);
+  const [authorities, setAuthorities] = useState<SupplyAuthorityRef[]>([]);
+  const [tariffs, setTariffs] = useState<TariffRef[]>([]);
+
+  // Existing-machine form state
+  const [existingMake, setExistingMake] = useState('');
+  const [existingModel, setExistingModel] = useState('');
+  const [existingKW, setExistingKW] = useState('');
+  const [existingFAD, setExistingFAD] = useState('');
+  const [existingPressure, setExistingPressure] = useState('');
+  const [existingYear, setExistingYear] = useState('');
+  const [existingIsVSD, setExistingIsVSD] = useState(false);
+
+  // Proposed + operating profile + schedule
+  const [proposedModelId, setProposedModelId] = useState('');
+  const [priceOverride, setPriceOverride] = useState('');
+  const [loadProfileId, setLoadProfileId] = useState('');
+  const [authorityId, setAuthorityId] = useState('');
+  const [tariffId, setTariffId] = useState('');
+  const [workingDays, setWorkingDays] = useState('');
+  const [saturdayDays, setSaturdayDays] = useState('');
+  const [sundayDays, setSundayDays] = useState('');
+
+  // Status + note
+  const [status, setStatus] = useState<'DRAFT' | 'COMPUTED' | 'SHARED' | 'WON' | 'LOST' | 'ARCHIVED'>('DRAFT');
+  const [decisionNote, setDecisionNote] = useState('');
+
   // Pricing form state
   const [costExVat, setCostExVat] = useState('');
   const [markupPercent, setMarkupPercent] = useState('');
@@ -836,6 +892,7 @@ function EditRoiAuditModal({
 
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -845,15 +902,77 @@ function EditRoiAuditModal({
       setLoading(true);
       setLoadError(null);
       try {
-        const data = await getRoiAudit(auditId);
+        const [data, models, profiles, auths] = await Promise.all([
+          getRoiAudit(auditId),
+          listRoiCompressorModels({ ownerType: 'ARS' }),
+          listRoiLoadProfiles(),
+          listRoiSupplyAuthorities(),
+        ]);
         if (cancelled) return;
         setAudit(data);
+        setArsModels(models);
+        setLoadProfiles(profiles);
+        setAuthorities(auths);
+
+        // Hydrate existing machine
+        const em = data.existingMachine;
+        if (em) {
+          setExistingMake(em.make || '');
+          setExistingModel(em.model || '');
+          setExistingKW(typeof em.ratedKW === 'number' ? String(em.ratedKW) : '');
+          setExistingFAD(
+            typeof em.fadM3PerMin === 'number' ? String(em.fadM3PerMin) : '',
+          );
+          setExistingPressure(
+            typeof em.ratedPressureBar === 'number' ? String(em.ratedPressureBar) : '',
+          );
+          setExistingYear(
+            typeof em.yearOfManufacture === 'number' ? String(em.yearOfManufacture) : '',
+          );
+          setExistingIsVSD(Boolean(em.isVSD));
+        }
+
+        // Hydrate proposed + tariff + schedule + status
+        const propId =
+          typeof data.proposedModel === 'string'
+            ? data.proposedModel
+            : data.proposedModel?._id || '';
+        setProposedModelId(propId);
+        if (typeof data.proposedPriceExVatOverride === 'number')
+          setPriceOverride(String(data.proposedPriceExVatOverride));
+
+        const lp = data.estimated?.loadProfile;
+        setLoadProfileId(typeof lp === 'string' ? lp : lp?._id || '');
+
+        const auth =
+          typeof data.supplyAuthority === 'string'
+            ? data.supplyAuthority
+            : data.supplyAuthority?._id || '';
+        setAuthorityId(auth);
+
+        const tar =
+          typeof data.tariff === 'string' ? data.tariff : data.tariff?._id || '';
+        // Tariffs list will be loaded by the authority effect; remember the
+        // selected id so the select can preselect it once tariffs arrive.
+        setTariffId(tar);
+
+        if (data.scheduleOverride) {
+          setWorkingDays(String(data.scheduleOverride.workingDaysPerYear));
+          setSaturdayDays(String(data.scheduleOverride.saturdayDaysPerYear));
+          setSundayDays(String(data.scheduleOverride.sundayDaysPerYear));
+        }
+
+        setStatus(data.status);
+        setDecisionNote(data.decisionNote || '');
+
         const p = data.pricing;
         if (p) {
           if (typeof p.costExVat === 'number') setCostExVat(String(p.costExVat));
           if (typeof p.markupPercent === 'number') setMarkupPercent(String(p.markupPercent));
-          if (typeof p.quotedPriceExVat === 'number')
+          if (typeof p.quotedPriceExVat === 'number') {
             setQuotedPriceExVat(String(p.quotedPriceExVat));
+            setQuotedPriceTouched(true);
+          }
           if (p.quoteNumber) setQuoteNumber(p.quoteNumber);
           if (p.quoteDate) setQuoteDate(p.quoteDate.slice(0, 10));
           if (p.quoteValidUntil) setQuoteValidUntil(p.quoteValidUntil.slice(0, 10));
@@ -870,6 +989,25 @@ function EditRoiAuditModal({
       cancelled = true;
     };
   }, [auditId]);
+
+  // Load tariffs when authority changes
+  useEffect(() => {
+    if (!authorityId) {
+      setTariffs([]);
+      return;
+    }
+    let cancelled = false;
+    listRoiTariffs(authorityId)
+      .then((data) => {
+        if (!cancelled) setTariffs(data);
+      })
+      .catch(() => {
+        if (!cancelled) setTariffs([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authorityId]);
 
   // Auto-derive quoted price from cost + markup unless user has typed in the
   // quoted-price field manually.
@@ -897,6 +1035,30 @@ function EditRoiAuditModal({
     setSaving(true);
     try {
       const payload: UpdateRoiAuditPayload = {
+        existingMachine: {
+          make: existingMake || undefined,
+          model: existingModel || undefined,
+          ratedKW: existingKW ? Number(existingKW) : undefined,
+          fadM3PerMin: existingFAD ? Number(existingFAD) : undefined,
+          ratedPressureBar: existingPressure ? Number(existingPressure) : undefined,
+          yearOfManufacture: existingYear ? Number(existingYear) : undefined,
+          isVSD: existingIsVSD,
+        },
+        proposedModel: proposedModelId || undefined,
+        proposedPriceExVatOverride: priceOverride ? Number(priceOverride) : undefined,
+        estimated: loadProfileId ? { loadProfile: loadProfileId } : undefined,
+        supplyAuthority: authorityId || undefined,
+        tariff: tariffId || undefined,
+        scheduleOverride:
+          workingDays || saturdayDays || sundayDays
+            ? {
+                workingDaysPerYear: Number(workingDays || 0),
+                saturdayDaysPerYear: Number(saturdayDays || 0),
+                sundayDaysPerYear: Number(sundayDays || 0),
+              }
+            : undefined,
+        status,
+        decisionNote: decisionNote || undefined,
         pricing: {
           costExVat: costExVat ? Number(costExVat) : undefined,
           markupPercent: markupPercent ? Number(markupPercent) : undefined,
@@ -920,6 +1082,20 @@ function EditRoiAuditModal({
       setSaveError((err as Error).message || 'Failed to save');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async (): Promise<void> => {
+    if (!window.confirm('Delete this ROI audit? This cannot be undone.')) return;
+    setDeleting(true);
+    setSaveError(null);
+    try {
+      await deleteRoiAudit(auditId);
+      await onSaved();
+      onClose();
+    } catch (err) {
+      setSaveError((err as Error).message || 'Delete failed');
+      setDeleting(false);
     }
   };
 
@@ -987,6 +1163,262 @@ function EditRoiAuditModal({
                 }
               />
             </div>
+
+            {/* Existing machine */}
+            <fieldset className="border border-slate-200 rounded-lg p-4">
+              <legend className="text-sm font-medium text-slate-700 px-2">
+                Existing Compressor
+              </legend>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Field label="Make">
+                  <input
+                    type="text"
+                    value={existingMake}
+                    onChange={(e) => setExistingMake(e.target.value)}
+                    className="input"
+                    disabled={!canManage}
+                  />
+                </Field>
+                <Field label="Model">
+                  <input
+                    type="text"
+                    value={existingModel}
+                    onChange={(e) => setExistingModel(e.target.value)}
+                    className="input"
+                    disabled={!canManage}
+                  />
+                </Field>
+                <Field label="Rated kW">
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={existingKW}
+                    onChange={(e) => setExistingKW(e.target.value)}
+                    className="input"
+                    disabled={!canManage}
+                  />
+                </Field>
+                <Field label="FAD (m³/min)">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={existingFAD}
+                    onChange={(e) => setExistingFAD(e.target.value)}
+                    className="input"
+                    disabled={!canManage}
+                  />
+                </Field>
+                <Field label="Rated pressure (bar)">
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={existingPressure}
+                    onChange={(e) => setExistingPressure(e.target.value)}
+                    className="input"
+                    disabled={!canManage}
+                  />
+                </Field>
+                <Field label="Year of manufacture">
+                  <input
+                    type="number"
+                    step="1"
+                    min="1900"
+                    max="2100"
+                    value={existingYear}
+                    onChange={(e) => setExistingYear(e.target.value)}
+                    className="input"
+                    disabled={!canManage}
+                  />
+                </Field>
+              </div>
+              <label className="inline-flex items-center gap-2 mt-3 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={existingIsVSD}
+                  onChange={(e) => setExistingIsVSD(e.target.checked)}
+                  disabled={!canManage}
+                />
+                Existing unit is VSD
+              </label>
+            </fieldset>
+
+            {/* Proposed replacement */}
+            <fieldset className="border border-slate-200 rounded-lg p-4">
+              <legend className="text-sm font-medium text-slate-700 px-2">
+                Proposed Replacement (Bouwa)
+              </legend>
+              <Field label="Compressor model">
+                <select
+                  value={proposedModelId}
+                  onChange={(e) => setProposedModelId(e.target.value)}
+                  className="input"
+                  disabled={!canManage}
+                >
+                  <option value="">Select model…</option>
+                  {arsModels.map((m) => (
+                    <option key={m._id} value={m._id}>
+                      {m.make} {m.model} — {m.ratedKW}kW{m.isVSD ? ' VSD' : ''}
+                      {m.listPriceExVat ? ` (${fmtZAR(m.listPriceExVat)})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <div className="mt-3">
+                <Field label="List-price override (R, ex VAT — overridden by Quoted price if set)">
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={priceOverride}
+                    onChange={(e) => setPriceOverride(e.target.value)}
+                    className="input"
+                    disabled={!canManage}
+                  />
+                </Field>
+              </div>
+            </fieldset>
+
+            {/* Operating profile & tariff */}
+            <fieldset className="border border-slate-200 rounded-lg p-4">
+              <legend className="text-sm font-medium text-slate-700 px-2">
+                Operating Profile & Tariff
+              </legend>
+              <Field label="Load profile (sets annual run hours)">
+                <select
+                  value={loadProfileId}
+                  onChange={(e) => setLoadProfileId(e.target.value)}
+                  className="input"
+                  disabled={!canManage}
+                >
+                  <option value="">Select profile…</option>
+                  {loadProfiles.map((p) => (
+                    <option key={p._id} value={p._id}>
+                      {p.name} — {p.runHoursPerDay}h × {p.workingDaysPerYear}d, load {(p.averageLoadFraction * 100).toFixed(0)}%
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                <Field label="Supply authority">
+                  <select
+                    value={authorityId}
+                    onChange={(e) => {
+                      setAuthorityId(e.target.value);
+                      setTariffId('');
+                    }}
+                    className="input"
+                    disabled={!canManage}
+                  >
+                    <option value="">Default R2.20/kWh</option>
+                    {authorities.map((a) => (
+                      <option key={a._id} value={a._id}>{a.name}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Tariff">
+                  <select
+                    value={tariffId}
+                    onChange={(e) => setTariffId(e.target.value)}
+                    className="input"
+                    disabled={!canManage || !authorityId}
+                  >
+                    <option value="">
+                      {authorityId
+                        ? tariffs.length
+                          ? 'Select tariff…'
+                          : 'None published'
+                        : 'Pick authority first'}
+                    </option>
+                    {tariffs.map((t) => (
+                      <option key={t._id} value={t._id}>{t.name}</option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                <Field label="Working days/yr override">
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    max="366"
+                    value={workingDays}
+                    onChange={(e) => setWorkingDays(e.target.value)}
+                    className="input"
+                    placeholder="from profile"
+                    disabled={!canManage}
+                  />
+                </Field>
+                <Field label="Saturday days/yr override">
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    max="53"
+                    value={saturdayDays}
+                    onChange={(e) => setSaturdayDays(e.target.value)}
+                    className="input"
+                    placeholder="from profile"
+                    disabled={!canManage}
+                  />
+                </Field>
+                <Field label="Sunday days/yr override">
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    max="53"
+                    value={sundayDays}
+                    onChange={(e) => setSundayDays(e.target.value)}
+                    className="input"
+                    placeholder="from profile"
+                    disabled={!canManage}
+                  />
+                </Field>
+              </div>
+            </fieldset>
+
+            {/* Status + decision note */}
+            <fieldset className="border border-slate-200 rounded-lg p-4">
+              <legend className="text-sm font-medium text-slate-700 px-2">
+                Status & Outcome
+              </legend>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Field label="Status">
+                  <select
+                    value={status}
+                    onChange={(e) =>
+                      setStatus(
+                        e.target.value as 'DRAFT' | 'COMPUTED' | 'SHARED' | 'WON' | 'LOST' | 'ARCHIVED',
+                      )
+                    }
+                    className="input"
+                    disabled={!canManage}
+                  >
+                    <option value="DRAFT">DRAFT</option>
+                    <option value="COMPUTED">COMPUTED</option>
+                    <option value="SHARED">SHARED</option>
+                    <option value="WON">WON</option>
+                    <option value="LOST">LOST</option>
+                    <option value="ARCHIVED">ARCHIVED</option>
+                  </select>
+                </Field>
+              </div>
+              <div className="mt-3">
+                <Field label="Decision note (won/lost reason)">
+                  <textarea
+                    value={decisionNote}
+                    onChange={(e) => setDecisionNote(e.target.value)}
+                    className="input"
+                    rows={2}
+                    disabled={!canManage}
+                  />
+                </Field>
+              </div>
+            </fieldset>
 
             {/* Pricing block */}
             <fieldset className="border border-slate-200 rounded-lg p-4">
@@ -1105,11 +1537,26 @@ function EditRoiAuditModal({
             )}
 
             <div className="flex flex-wrap justify-end gap-2 pt-2 border-t border-slate-200">
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleting || saving}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-700 border border-red-300 hover:bg-red-50 rounded-lg disabled:opacity-50 mr-auto"
+                >
+                  {deleting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                  Delete
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onClose}
                 className="px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg"
-                disabled={saving || downloading}
+                disabled={saving || downloading || deleting}
               >
                 Close
               </button>

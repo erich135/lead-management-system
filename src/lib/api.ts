@@ -4371,6 +4371,8 @@ export interface RoiAuditSummary {
     ratedPressureBar?: number;
     yearOfManufacture?: number;
     isVSD?: boolean;
+    airDemandM3h?: number;
+    quantityInstalled?: number;
   };
   proposedModel?:
     | { _id: string; make: string; model: string; ratedKW: number; listPriceExVat?: number }
@@ -4428,6 +4430,23 @@ export interface RoiAuditSummary {
       baselineRPerM3?: number;
       proposedRPerM3?: number;
     }>;
+    byDayType?: Array<{
+      season: 'HIGH' | 'LOW';
+      dayType: 'WEEKDAY' | 'SATURDAY' | 'SUNDAY';
+      days: number;
+      baselineDailyCost: number;
+      proposedDailyCost: number;
+      baselineAnnualCost: number;
+      proposedAnnualCost: number;
+    }>;
+    airDemandM3h?: number;
+    availableBaselineM3h?: number;
+    availableProposedM3h?: number;
+    machinesRequiredBaseline?: number;
+    machinesRequiredProposed?: number;
+    spareCapacityM3h?: number;
+    vsdBonusSavingKWh?: number;
+    vsdBonusSavingExVat?: number;
   };
   createdAt: string;
   updatedAt: string;
@@ -4484,6 +4503,8 @@ export interface CreateRoiAuditPayload {
     ratedKW?: number;
     fadM3PerMin?: number;
     isVSD?: boolean;
+    airDemandM3h?: number;
+    quantityInstalled?: number;
   };
   estimated?: {
     loadProfile: string;
@@ -4606,6 +4627,42 @@ export async function downloadRoiAuditReport(
   const cd = res.headers.get('Content-Disposition') || '';
   const match = cd.match(/filename="?([^";]+)"?/i);
   a.download = match?.[1] || filename || `roi-audit-${id}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Streams the Quincy-style one-page "Air Audit" summary PDF and triggers
+ * a browser download.
+ */
+export async function downloadRoiAuditAirReport(
+  id: string,
+  filename?: string,
+): Promise<void> {
+  const token = getAuthToken();
+  const res = await fetch(`${API_BASE_URL}/api/roi/audits/${id}/air-report`, {
+    method: 'GET',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (!res.ok) {
+    let msg = 'Failed to download air-audit report';
+    try {
+      const j = await res.json();
+      msg = j?.message || j?.error?.message || msg;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(msg);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const cd = res.headers.get('Content-Disposition') || '';
+  const match = cd.match(/filename="?([^";]+)"?/i);
+  a.download = match?.[1] || filename || `air-audit-${id}.pdf`;
   document.body.appendChild(a);
   a.click();
   a.remove();

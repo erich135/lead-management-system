@@ -22,6 +22,7 @@ import {
   uploadRoiAuditCsv,
   updateRoiAudit,
   downloadRoiAuditReport,
+  downloadRoiAuditAirReport,
   deleteRoiAudit,
   getRoiAudit,
   getCustomers,
@@ -198,10 +199,24 @@ export function RoiAudits(): JSX.Element {
                           );
                         }}
                         className="inline-flex items-center gap-1 px-2 py-1 text-xs text-amber-700 hover:bg-amber-100 rounded"
-                        title="Download PDF report"
+                        title="Download detailed PDF report"
                       >
                         <Download className="w-3.5 h-3.5" />
                         PDF
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void downloadRoiAuditAirReport(a._id).catch((err) =>
+                            setError((err as Error).message || 'Download failed'),
+                          );
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-100 rounded"
+                        title="Download one-page Air Audit summary"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Air Audit
                       </button>
                       {canManage && (
                         <button
@@ -1137,6 +1152,18 @@ function EditRoiAuditModal({
     }
   };
 
+  const handleDownloadAir = async (): Promise<void> => {
+    setDownloading(true);
+    setSaveError(null);
+    try {
+      await downloadRoiAuditAirReport(auditId);
+    } catch (err) {
+      setSaveError((err as Error).message || 'Download failed');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const customerName =
     audit && typeof audit.customer === 'object' ? audit.customer.name : '';
 
@@ -1714,6 +1741,20 @@ function EditRoiAuditModal({
                   <Download className="w-4 h-4" />
                 )}
                 Download PDF
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadAir}
+                disabled={downloading}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-emerald-700 border border-emerald-600 hover:bg-emerald-50 rounded-lg disabled:opacity-50"
+                title="One-page Quincy-style Air Audit summary (landscape)"
+              >
+                {downloading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                Air Audit (1-page)
               </button>
               {canManage && (
                 <>

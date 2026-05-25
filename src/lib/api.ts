@@ -4444,3 +4444,24 @@ export async function computeRoiAudit(id: string): Promise<RoiAuditSummary> {
     method: 'POST',
   });
 }
+export async function uploadRoiAuditCsv(
+  id: string,
+  file: File,
+): Promise<{ audit: RoiAuditSummary; summary: { sampleCount: number; loggerStart: string; loggerEnd: string; periodHours: number; avgLoadFraction: number; maxFlowM3Min: number; measuredAnnualKWh?: number } }> {
+  const token = getAuthToken();
+  const form = new FormData();
+  form.append('csv', file);
+  const res = await fetch(
+    `${API_BASE_URL}/api/roi/audits/${id}/csv`,
+    {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      body: form,
+    },
+  );
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json?.message || json?.error?.message || 'CSV upload failed');
+  }
+  return json.data;
+}

@@ -16,6 +16,7 @@ import {
   listRoiTariffs,
   createRoiAudit,
   computeRoiAudit,
+  uploadRoiAuditCsv,
   getCustomers,
   type RoiAuditSummary,
   type CompressorModelRef,
@@ -213,6 +214,8 @@ function NewAuditWizard({ onClose, onCreated }: NewAuditWizardProps): JSX.Elemen
 
   // Form state
   const [customerId, setCustomerId] = useState('');
+  const [mode, setMode] = useState<'ESTIMATED' | 'MEASURED'>('ESTIMATED');
+  const [csvFile, setCsvFile] = useState<File | null>(null);
   const [existingMake, setExistingMake] = useState('');
   const [existingModel, setExistingModel] = useState('');
   const [existingKW, setExistingKW] = useState('');
@@ -299,13 +302,17 @@ function NewAuditWizard({ onClose, onCreated }: NewAuditWizardProps): JSX.Elemen
       return;
     }
     if (!loadProfileId) {
-      setSubmitError('Please pick a load profile');
+      setSubmitError('Please pick a load profile (used for annual run hours)');
+      return;
+    }
+    if (mode === 'MEASURED' && !csvFile) {
+      setSubmitError('Please choose a CSV file or switch to Estimated mode');
       return;
     }
 
     const payload: CreateRoiAuditPayload = {
       customer: customerId,
-      mode: 'ESTIMATED',
+      mode: 'ESTIMATED', // always create as ESTIMATED; upload flips to MEASURED
       existingMachine: {
         make: existingMake || undefined,
         model: existingModel || undefined,
@@ -325,6 +332,9 @@ function NewAuditWizard({ onClose, onCreated }: NewAuditWizardProps): JSX.Elemen
     setSubmitting(true);
     try {
       const created = await createRoiAudit(payload);
+      if (mode === 'MEASURED' && csvFile) {
+        await uploadRoiAuditCsv(created._id, csvFile);
+      }
       const computed = await computeRoiAudit(created._id);
       setResultPreview(computed);
     } catch (err) {
@@ -379,10 +389,57 @@ function NewAuditWizard({ onClose, onCreated }: NewAuditWizardProps): JSX.Elemen
           />
         ) : (
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
-            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-3">
-              <strong>Estimated mode.</strong> Numbers below are projections from an
-              industry load profile, not from a data logger. The PDF will flag this.
-            </p>
+            {/* Mode toggle */}
+            <div className="flex gap-2 p-1 bg-slate-100 rounded-lg w-fit">
+              <button
+                type="button"
+                onClick={() => setMode('ESTIMATED')}
+                className={`px-4 py-1.5 text-sm font-medium rounded ${
+                  mode === 'ESTIMATED'
+                    ? 'bg-white text-amber-700 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-800'
+                }`}
+              >
+                Estimated
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('MEASURED')}
+                className={`px-4 py-1.5 text-sm font-medium rounded ${
+                  mode === 'MEASURED'
+                    ? 'bg-white text-green-700 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-800'
+                }`}
+              >
+                Measured (Logger CSV)
+              </button>
+            </div>
+
+            {mode === 'ESTIMATED' ? (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-3">
+                <strong>Estimated mode.</strong> Numbers are projections from an
+                industry load profile, not from a data logger. The PDF will flag this.
+              </p>
+            ) : (
+              <div className="text-xs text-green-700 bg-green-50 border border-green-200 rounded p-3 space-y-2">
+                <p>
+                  <strong>Measured mode.</strong> Upload a CS Instruments / similar logger CSV
+                  (semicolon delimited, columns: <code>timestamp;id;flow;consum;temp;pressure</code>).
+                  The load profile below is still used for the annual-hours projection.
+                </p>
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={(e) => setCsvFile(e.target.files?.[0] || null)}
+                  className="block text-xs"
+                />
+                {csvFile && (
+                  <p className="text-slate-700">
+                    Selected: <strong>{csvFile.name}</strong> ({(csvFile.size / 1024).toFixed(1)} KB)
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Customer */}
             <Field label="Customer *">
@@ -496,7 +553,7 @@ function NewAuditWizard({ onClose, onCreated }: NewAuditWizardProps): JSX.Elemen
               <legend className="text-sm font-medium text-slate-700 px-2">
                 Operating Profile & Tariff
               </legend>
-              <Field label="Load profile *">
+              <Field label="Load profile (sets annual run hours) *">
                 <select
                   value={loadProfileId}
                   onChange={(e) => setLoadProfileId(e.target.value)}

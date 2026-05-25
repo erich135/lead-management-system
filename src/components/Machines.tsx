@@ -26,6 +26,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { MachineQrPanel } from './MachineQrPanel';
 import { MachineReadingHistory } from './MachineReadingHistory';
 import { PendingMachineReadings } from './PendingMachineReadings';
+import { RoiAudits } from './RoiAudits';
 import { UnifiedMachineImport } from './UnifiedMachineImport';
 import {
   Search,
@@ -52,6 +53,7 @@ import {
   Plus,
   ShieldAlert,
   QrCode,
+  TrendingUp,
 } from 'lucide-react';
 import { SmartDateInput } from './SmartDateInput';
 
@@ -59,8 +61,9 @@ export function Machines() {
   const { isSuperAdmin, hasPermission } = useAuth();
 
   // Top-level tab inside the Machines page
-  const [activeTab, setActiveTab] = useState<'list' | 'verify'>('list');
+  const [activeTab, setActiveTab] = useState<'list' | 'verify' | 'roi'>('list');
   const canVerifyReadings = isSuperAdmin || hasPermission('machines.verifyReadings');
+  const canViewRoi = isSuperAdmin || hasPermission('roi.view');
 
   // Machine list state
   const [machines, setMachines] = useState<Machine[]>([]);
@@ -692,7 +695,7 @@ export function Machines() {
       </div>
 
       {/* Tabs */}
-      {canVerifyReadings && (
+      {(canVerifyReadings || canViewRoi) && (
         <div className="mb-6 border-b border-slate-200 flex gap-2">
           <button
             type="button"
@@ -706,23 +709,43 @@ export function Machines() {
             <Cog className="w-4 h-4" />
             Machines
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('verify')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 ${
-              activeTab === 'verify'
-                ? 'border-amber-500 text-amber-700'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <QrCode className="w-4 h-4" />
-            Verify Readings
-          </button>
+          {canVerifyReadings && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('verify')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 ${
+                activeTab === 'verify'
+                  ? 'border-amber-500 text-amber-700'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <QrCode className="w-4 h-4" />
+              Verify Readings
+            </button>
+          )}
+          {canViewRoi && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('roi')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 ${
+                activeTab === 'roi'
+                  ? 'border-amber-500 text-amber-700'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <TrendingUp className="w-4 h-4" />
+              ROI Audits
+            </button>
+          )}
         </div>
       )}
 
       {activeTab === 'verify' && canVerifyReadings && (
         <PendingMachineReadings />
+      )}
+
+      {activeTab === 'roi' && canViewRoi && (
+        <RoiAudits />
       )}
 
       <div className={activeTab === 'list' ? '' : 'hidden'}>

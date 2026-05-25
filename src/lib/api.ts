@@ -4292,3 +4292,115 @@ export async function rejectMachineReadingSubmission(
     },
   );
 }
+
+// ============================================================
+// ROI / Air Audit module
+// ============================================================
+
+// ============================================================
+// ROI / Air Audit module
+// ============================================================
+
+export type RoiAuditMode = 'MEASURED' | 'ESTIMATED';
+export type RoiAuditStatus = 'DRAFT' | 'COMPUTED' | 'SHARED' | 'WON' | 'LOST' | 'ARCHIVED';
+
+export interface CompressorModelRef {
+  _id: string;
+  ownerType: 'ARS' | 'CLIENT';
+  make: string;
+  model: string;
+  ratedKW: number;
+  fadM3PerMin: number;
+  ratedPressureBar: number;
+  specificPowerKWPerM3Min?: number;
+  isVSD: boolean;
+  technology: string;
+  listPriceExVat?: number;
+  isActive: boolean;
+}
+
+export interface SupplyAuthorityRef {
+  _id: string;
+  type: 'ESKOM' | 'MUNICIPALITY';
+  name: string;
+  shortCode: string;
+  region?: string;
+}
+
+export interface TariffRef {
+  _id: string;
+  authority: SupplyAuthorityRef | string;
+  name: string;
+  code: string;
+  structure: 'FLAT' | 'TOU';
+}
+
+export interface LoadProfileRef {
+  _id: string;
+  name: string;
+  sector?: string;
+  description?: string;
+  runHoursPerDay: number;
+  workingDaysPerYear: number;
+  averageLoadFraction: number;
+  isSystem: boolean;
+}
+
+export interface RoiAuditSummary {
+  _id: string;
+  customer: { _id: string; name: string } | string;
+  machine?: { _id: string; make: string; model: string; serialNumber?: string };
+  mode: RoiAuditMode;
+  status: RoiAuditStatus;
+  proposedModel?: { _id: string; make: string; model: string; ratedKW: number };
+  results?: {
+    annualCostSavingExVat: number;
+    paybackYears: number;
+    roiPercentFiveYear: number;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function listRoiAudits(params?: {
+  customer?: string;
+  machine?: string;
+  status?: RoiAuditStatus;
+}): Promise<RoiAuditSummary[]> {
+  const qs = new URLSearchParams();
+  if (params?.customer) qs.set('customer', params.customer);
+  if (params?.machine) qs.set('machine', params.machine);
+  if (params?.status) qs.set('status', params.status);
+  const query = qs.toString();
+  return apiRequest<RoiAuditSummary[]>(`/api/roi/audits${query ? `?${query}` : ''}`);
+}
+
+export async function getRoiAudit(id: string): Promise<RoiAuditSummary> {
+  return apiRequest<RoiAuditSummary>(`/api/roi/audits/${id}`);
+}
+
+export async function listRoiCompressorModels(params?: {
+  ownerType?: 'ARS' | 'CLIENT';
+  make?: string;
+}): Promise<CompressorModelRef[]> {
+  const qs = new URLSearchParams();
+  if (params?.ownerType) qs.set('ownerType', params.ownerType);
+  if (params?.make) qs.set('make', params.make);
+  const query = qs.toString();
+  return apiRequest<CompressorModelRef[]>(
+    `/api/roi/reference/compressor-models${query ? `?${query}` : ''}`,
+  );
+}
+
+export async function listRoiSupplyAuthorities(): Promise<SupplyAuthorityRef[]> {
+  return apiRequest<SupplyAuthorityRef[]>('/api/roi/reference/supply-authorities');
+}
+
+export async function listRoiTariffs(authority?: string): Promise<TariffRef[]> {
+  const qs = authority ? `?authority=${encodeURIComponent(authority)}` : '';
+  return apiRequest<TariffRef[]>(`/api/roi/reference/tariffs${qs}`);
+}
+
+export async function listRoiLoadProfiles(): Promise<LoadProfileRef[]> {
+  return apiRequest<LoadProfileRef[]>('/api/roi/reference/load-profiles');
+}

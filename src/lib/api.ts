@@ -4388,6 +4388,12 @@ export interface RoiAuditSummary {
     workingDaysPerYear: number;
     saturdayDaysPerYear: number;
     sundayDaysPerYear: number;
+    ldsWorkingDaysPerYear?: number;
+    ldsSaturdayDaysPerYear?: number;
+    ldsSundayDaysPerYear?: number;
+    hdsWorkingDaysPerYear?: number;
+    hdsSaturdayDaysPerYear?: number;
+    hdsSundayDaysPerYear?: number;
   };
   measured?: {
     csvFileName?: string;
@@ -4408,6 +4414,20 @@ export interface RoiAuditSummary {
     paybackYears: number;
     roiPercentFiveYear: number;
     co2SavingTonsPerYear?: number;
+    blendedRPerKWh?: number;
+    byPeriod?: Array<{
+      season: 'HIGH' | 'LOW';
+      dayType: 'WEEKDAY' | 'SATURDAY' | 'SUNDAY';
+      period: 'PEAK' | 'STANDARD' | 'OFF_PEAK';
+      annualHours: number;
+      rRPerKWh: number;
+      baselineKWh: number;
+      baselineCost: number;
+      proposedKWh: number;
+      proposedCost: number;
+      baselineRPerM3?: number;
+      proposedRPerM3?: number;
+    }>;
   };
   createdAt: string;
   updatedAt: string;
@@ -4474,6 +4494,12 @@ export interface CreateRoiAuditPayload {
     workingDaysPerYear: number;
     saturdayDaysPerYear: number;
     sundayDaysPerYear: number;
+    ldsWorkingDaysPerYear?: number;
+    ldsSaturdayDaysPerYear?: number;
+    ldsSundayDaysPerYear?: number;
+    hdsWorkingDaysPerYear?: number;
+    hdsSaturdayDaysPerYear?: number;
+    hdsSundayDaysPerYear?: number;
   };
   proposedModel?: string;
   proposedPriceExVatOverride?: number;

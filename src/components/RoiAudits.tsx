@@ -874,6 +874,14 @@ function EditRoiAuditModal({
   const [workingDays, setWorkingDays] = useState('');
   const [saturdayDays, setSaturdayDays] = useState('');
   const [sundayDays, setSundayDays] = useState('');
+  // Eskom LDS (Sep-May) / HDS (Jun-Aug) seasonal day-count split. When
+  // populated these take precedence over the totals above in the backend.
+  const [ldsWork, setLdsWork] = useState('');
+  const [ldsSat, setLdsSat] = useState('');
+  const [ldsSun, setLdsSun] = useState('');
+  const [hdsWork, setHdsWork] = useState('');
+  const [hdsSat, setHdsSat] = useState('');
+  const [hdsSun, setHdsSun] = useState('');
 
   // Status + note
   const [status, setStatus] = useState<'DRAFT' | 'COMPUTED' | 'SHARED' | 'WON' | 'LOST' | 'ARCHIVED'>('DRAFT');
@@ -960,6 +968,18 @@ function EditRoiAuditModal({
           setWorkingDays(String(data.scheduleOverride.workingDaysPerYear));
           setSaturdayDays(String(data.scheduleOverride.saturdayDaysPerYear));
           setSundayDays(String(data.scheduleOverride.sundayDaysPerYear));
+          if (data.scheduleOverride.ldsWorkingDaysPerYear !== undefined)
+            setLdsWork(String(data.scheduleOverride.ldsWorkingDaysPerYear));
+          if (data.scheduleOverride.ldsSaturdayDaysPerYear !== undefined)
+            setLdsSat(String(data.scheduleOverride.ldsSaturdayDaysPerYear));
+          if (data.scheduleOverride.ldsSundayDaysPerYear !== undefined)
+            setLdsSun(String(data.scheduleOverride.ldsSundayDaysPerYear));
+          if (data.scheduleOverride.hdsWorkingDaysPerYear !== undefined)
+            setHdsWork(String(data.scheduleOverride.hdsWorkingDaysPerYear));
+          if (data.scheduleOverride.hdsSaturdayDaysPerYear !== undefined)
+            setHdsSat(String(data.scheduleOverride.hdsSaturdayDaysPerYear));
+          if (data.scheduleOverride.hdsSundayDaysPerYear !== undefined)
+            setHdsSun(String(data.scheduleOverride.hdsSundayDaysPerYear));
         }
 
         setStatus(data.status);
@@ -1055,6 +1075,12 @@ function EditRoiAuditModal({
                 workingDaysPerYear: Number(workingDays || 0),
                 saturdayDaysPerYear: Number(saturdayDays || 0),
                 sundayDaysPerYear: Number(sundayDays || 0),
+                ...(ldsWork ? { ldsWorkingDaysPerYear: Number(ldsWork) } : {}),
+                ...(ldsSat ? { ldsSaturdayDaysPerYear: Number(ldsSat) } : {}),
+                ...(ldsSun ? { ldsSundayDaysPerYear: Number(ldsSun) } : {}),
+                ...(hdsWork ? { hdsWorkingDaysPerYear: Number(hdsWork) } : {}),
+                ...(hdsSat ? { hdsSaturdayDaysPerYear: Number(hdsSat) } : {}),
+                ...(hdsSun ? { hdsSundayDaysPerYear: Number(hdsSun) } : {}),
               }
             : undefined,
         status,
@@ -1163,6 +1189,76 @@ function EditRoiAuditModal({
                 }
               />
             </div>
+
+            {/* Per-TOU cost-per-m\u00b3 breakdown */}
+            {audit.results?.byPeriod && audit.results.byPeriod.length > 0 && (
+              <div className="border border-slate-200 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-sm font-medium text-slate-700">
+                    Cost per m\u00b3 of Compressed Air (TOU)
+                  </div>
+                  {typeof audit.results.blendedRPerKWh === 'number' && (
+                    <div className="text-xs text-slate-500">
+                      Blended: R {audit.results.blendedRPerKWh.toFixed(4)}/kWh
+                    </div>
+                  )}
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-xs">
+                    <thead className="text-slate-500">
+                      <tr className="border-b border-slate-200">
+                        <th className="text-left py-1 px-2">Season</th>
+                        <th className="text-left py-1 px-2">Day</th>
+                        <th className="text-left py-1 px-2">Period</th>
+                        <th className="text-right py-1 px-2">R/kWh</th>
+                        <th className="text-right py-1 px-2">Hours/yr</th>
+                        <th className="text-right py-1 px-2">Current R/m\u00b3</th>
+                        <th className="text-right py-1 px-2">Proposed R/m\u00b3</th>
+                        <th className="text-right py-1 px-2">Saving</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-slate-800">
+                      {[...audit.results.byPeriod]
+                        .sort((a, b) => {
+                          if (a.season !== b.season) return a.season === 'HIGH' ? -1 : 1;
+                          const dOrder = { WEEKDAY: 0, SATURDAY: 1, SUNDAY: 2 };
+                          if (a.dayType !== b.dayType) return dOrder[a.dayType] - dOrder[b.dayType];
+                          const pOrder = { PEAK: 0, STANDARD: 1, OFF_PEAK: 2 };
+                          return pOrder[a.period] - pOrder[b.period];
+                        })
+                        .map((r, i) => {
+                          const sav =
+                            r.baselineRPerM3 && r.proposedRPerM3 && r.baselineRPerM3 > 0
+                              ? ((r.baselineRPerM3 - r.proposedRPerM3) / r.baselineRPerM3) * 100
+                              : 0;
+                          return (
+                            <tr key={i} className="border-b border-slate-100">
+                              <td className="py-1 px-2">{r.season === 'HIGH' ? 'HDS' : 'LDS'}</td>
+                              <td className="py-1 px-2">
+                                {r.dayType === 'WEEKDAY' ? 'Weekday' : r.dayType === 'SATURDAY' ? 'Sat' : 'Sun'}
+                              </td>
+                              <td className="py-1 px-2">
+                                {r.period === 'PEAK' ? 'Peak' : r.period === 'STANDARD' ? 'Std' : 'Off'}
+                              </td>
+                              <td className="py-1 px-2 text-right">{r.rRPerKWh.toFixed(4)}</td>
+                              <td className="py-1 px-2 text-right">{r.annualHours.toFixed(0)}</td>
+                              <td className="py-1 px-2 text-right">
+                                {r.baselineRPerM3 ? `R ${r.baselineRPerM3.toFixed(4)}` : '\u2014'}
+                              </td>
+                              <td className="py-1 px-2 text-right">
+                                {r.proposedRPerM3 ? `R ${r.proposedRPerM3.toFixed(4)}` : '\u2014'}
+                              </td>
+                              <td className={`py-1 px-2 text-right ${sav > 0 ? 'text-emerald-600' : ''}`}>
+                                {sav > 0 ? `${sav.toFixed(1)}%` : '\u2014'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {/* Existing machine */}
             <fieldset className="border border-slate-200 rounded-lg p-4">
@@ -1378,6 +1474,52 @@ function EditRoiAuditModal({
                     disabled={!canManage}
                   />
                 </Field>
+              </div>
+
+              {/* Eskom LDS (Sep-May) / HDS (Jun-Aug) seasonal split.
+                  When supplied these take priority over the totals above. */}
+              <div className="mt-4 border-t border-slate-200 pt-3">
+                <div className="text-xs font-medium text-slate-600 mb-2">
+                  Optional: Eskom seasonal split (LDS Sep-May / HDS Jun-Aug)
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold text-slate-500 uppercase">LDS (Sep-May)</div>
+                    <Field label="Working days/yr">
+                      <input type="number" min="0" max="366" value={ldsWork}
+                        onChange={(e) => setLdsWork(e.target.value)}
+                        className="input" placeholder="auto 9/12" disabled={!canManage} />
+                    </Field>
+                    <Field label="Saturdays/yr">
+                      <input type="number" min="0" max="53" value={ldsSat}
+                        onChange={(e) => setLdsSat(e.target.value)}
+                        className="input" placeholder="auto" disabled={!canManage} />
+                    </Field>
+                    <Field label="Sundays/yr">
+                      <input type="number" min="0" max="53" value={ldsSun}
+                        onChange={(e) => setLdsSun(e.target.value)}
+                        className="input" placeholder="auto" disabled={!canManage} />
+                    </Field>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold text-slate-500 uppercase">HDS (Jun-Aug)</div>
+                    <Field label="Working days/yr">
+                      <input type="number" min="0" max="366" value={hdsWork}
+                        onChange={(e) => setHdsWork(e.target.value)}
+                        className="input" placeholder="auto 3/12" disabled={!canManage} />
+                    </Field>
+                    <Field label="Saturdays/yr">
+                      <input type="number" min="0" max="53" value={hdsSat}
+                        onChange={(e) => setHdsSat(e.target.value)}
+                        className="input" placeholder="auto" disabled={!canManage} />
+                    </Field>
+                    <Field label="Sundays/yr">
+                      <input type="number" min="0" max="53" value={hdsSun}
+                        onChange={(e) => setHdsSun(e.target.value)}
+                        className="input" placeholder="auto" disabled={!canManage} />
+                    </Field>
+                  </div>
+                </div>
               </div>
             </fieldset>
 

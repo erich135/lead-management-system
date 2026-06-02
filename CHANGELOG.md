@@ -1,31 +1,17 @@
 # Changelog
 
-## [1.0.41] - 2026-05-21
+## [1.0.39] - 2026-05-20
 
-### Added – Reports: PO Number column in All Jobs export
-- **`Reports.tsx`** — the All Jobs Excel export now also includes a `PO Number` column (sourced from `job.poNumber`), inserted between `Feedback` and `Invoice Number`
-
-## [1.0.40] - 2026-05-21
-
-### Added – Reports: PO Number column in Overdue Jobs export
-- **`Reports.tsx`** — the Overdue Jobs Excel export now includes a `PO Number` column (sourced from `job.poNumber`), inserted between `Branch` and `Current Status`
-
-## [1.0.39] - 2026-05-21
-
-### Fixed – RSR Document Preview now renders inline
-- **`LeadDetails.tsx`** — RSR preview iframe/img URLs now append `&inline=1` so the backend serves the PDF/image with `Content-Disposition: inline` instead of `attachment`; previously the preview pane stayed blank because browsers refused to render attachment-disposition responses
-- **`Machines.tsx`** — `getPreviewUrl()` rewritten to handle job-sourced vs machine-native RSRs separately and append `&inline=1`; fixed a bug where job-sourced RSR URLs received a duplicate `?token=` query string (causing **"Unauthorized – Invalid or expired token"** when trying to preview a "From Job" RSR from the Machines tab)
-- **`Machines.tsx`** — `handleDownloadRSR()` cleaned up to avoid the same duplicate-token issue for the download icon
-
-### Fixed – Machines: RSR badge now counts job-sourced documents
-- **`Machines.tsx`** — red RSR badge now sums machine-native `rsrDocuments.length` and the new `jobRSRDocumentsCount` field returned by the backend, so machines that only have "From Job" RSRs no longer show "—"
-- **`api.ts`** — `Machine` interface gained `jobRSRDocumentsCount?: number`
-
-### Added – Machines: Delete is now available for "From Job" RSRs
-- **`Machines.tsx`** — super admin trash icon is shown on every RSR row regardless of source; deleting a job-sourced RSR routes to `/api/rsr-documents/:id` and warns the user that the document will also be removed from the originating job
-
-### Improved – Reports: "+N more jobs" link is now expandable
-- **`Reports.tsx`** — the recent-jobs section in Customer Reports machine cards now toggles between the first three jobs and the full list; clicking the "+N more jobs" text expands it, and a "Show less" link collapses it again
+### Added – Machine QR Reading & Verification
+- **`MachineQrPanel.tsx`** (NEW) — renders a QR code (via `qrcode.react`) pointing to the public scan URL plus a **Print QR Label** button that opens a 60×60 mm print window with machine details under the QR
+- **`MachineScanPage.tsx`** (NEW) — public, unauthenticated mobile-friendly capture page at `/scan/machine/:token`; collects hours + photo (mobile camera via `capture="environment"`), optional fault description, optional submitter name/phone; shows confirmation with `ARS-xxxxxx` reference. Deliberately hides Ownership and Last Oil Sample Date
+- **`PendingMachineReadings.tsx`** (NEW) — verifier queue with Pending / Approved / Rejected tabs, photo thumbnail + full-size modal, previous/submitted/delta metrics, fault flag, inline **Edit hours** for verifier corrections, and Approve / Reject (mandatory reason via `prompt`). Gated by `machines.verifyReadings` permission
+- **`MachineReadingHistory.tsx`** (NEW) — per-machine audit trail table (date, hours + delta, submitter, status, verifier, photo viewer) shown in the expanded machine row
+- **`Machines.tsx`** — top-level tabs **Machines** / **Verify Readings** (verify tab only shown to super admin or `machines.verifyReadings` holders); QR panel + reading history now visible in the expanded read-only machine view (no need to enter edit mode)
+- **`App.tsx`** — added public route `/scan/machine/:token` (outside `ProtectedRoute`) and kept `/pending-machine-readings` route for bookmarks
+- **`Dashboard.tsx`** — added `pendingReadings` view to the View union/router (consumed by the bookmarked URL); no separate sidebar link since the queue lives inside Machines
+- **`api.ts`** — new types `PublicMachineForScan`, `MachineReadingSubmission`, `MachineReadingSubmissionStatus`; new functions `getMachineQrToken`, `getMachineReadingHistory`, `getPublicMachineForScan`, `submitPublicMachineReading` (multipart), `listMachineReadingSubmissions`, `getMachineReadingPhotoUrl` (appends `?token=` for auth on `<img>` requests), `approveMachineReadingSubmission`, `rejectMachineReadingSubmission`
+- **`package.json`** — added dependency `qrcode.react@^3.1.0`
 
 ## [1.0.38] - 2026-05-14
 

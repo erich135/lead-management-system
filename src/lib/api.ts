@@ -4101,3 +4101,196 @@ export async function getEmailLogs(params?: {
   return apiRequest<EmailLogsResponse>(`/api/email-logs${query ? `?${query}` : ''}`);
 }
 
+
+// ============================================================================
+// MACHINE QR READING WORKFLOW
+// ============================================================================
+
+/**
+ * Read-only machine summary returned to the public scan page.
+ * Deliberately omits ownership + oil-sample fields (we don't expose those to
+ * the customer scanning the QR).
+ */
+export interface PublicMachineForScan {
+  id: string;
+  make: string;
+  model: string;
+  machineType: string | null;
+  serialNumber: string;
+  assetNumber: string | null;
+  currentLocation: string | null;
+  customerName: string | null;
+  machineHours: number;
+  nextServiceHours: number;
+  serviceType: 'hours' | 'date';
+  serviceDue: boolean;
+}
+
+export type MachineReadingSubmissionStatus = 'pending' | 'approved' | 'rejected';
+
+export interface MachineReadingSubmission {
+  _id: string;
+  machine: {
+    _id: string;
+    make: string;
+    model: string;
+    serialNumber: string;
+    assetNumber?: string | null;
+    machineHours?: number;
+    nextServiceHours?: number;
+    currentLocation?: string | null;
+    customer?: { _id: string; name: string } | null;
+    cashCustomer?: string | null;
+  };
+  submittedHours: number;
+  faultReported: boolean;
+  faultDescription?: string;
+  submitterName?: string;
+  submitterPhone?: string;
+  photoFileName: string;
+  photoMimeType: string;
+  photoFileSize: number;
+  previousHours: number;
+  previousReadingAt?: string;
+  status: MachineReadingSubmissionStatus;
+  submittedAt: string;
+  verifiedBy?: { _id: string; firstName?: string; lastName?: string; email?: string } | null;
+  verifiedAt?: string;
+  verificationNote?: string;
+  rejectionReason?: string;
+  approvedHours?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Returns the signed QR token + the full scan URL for a machine.
+ * Requires machines.manage.
+ */
+export async function getMachineQrToken(
+  machineId: string,
+): Promise<{ token: string; scanUrl: string }> {
+  return apiRequest<{ token: string; scanUrl: string }>(
+    `/api/machines/${machineId}/qr-token`,
+  );
+}
+
+/**
+ * Fetches the audit trail of customer reading submissions for one machine.
+ */
+export async function getMachineReadingHistory(
+  machineId: string,
+): Promise<{ submissions: MachineReadingSubmission[] }> {
+  return apiRequest<{ submissions: MachineReadingSubmission[] }>(
+    `/api/machines/${machineId}/reading-submissions`,
+  );
+}
+
+/**
+ * Public, unauthenticated lookup used by the QR scan page.
+ */
+export async function getPublicMachineForScan(
+  token: string,
+): Promise<{ machine: PublicMachineForScan }> {
+  const url = `${API_BASE_URL}/api/public/machine-readings/${encodeURIComponent(token)}`;
+  const response = await fetch(url, {
+    headers: { Accept: 'application/json' },
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || !body?.success) {
+    throw new Error(body?.error?.message || body?.message || 'Failed to load machine');
+  }
+  return body.data;
+}
+
+/**
+ * Public, unauthenticated reading submission (multipart form data).
+ */
+export async function submitPublicMachineReading(
+  token: string,
+  payload: {
+    submittedHours: number;
+    photo: File;
+    faultReported?: boolean;
+    faultDescription?: string;
+    submitterName?: string;
+    submitterPhone?: string;
+    submitterEmail?: string;
+  },
+): Promise<{ reference: string; submissionId: string; status: string }> {
+  const form = new FormData();
+  form.append('submittedHours', String(payload.submittedHours));
+  form.append('photo', payload.photo);
+  if (payload.faultReported) form.append('faultReported', 'true');
+  if (payload.faultDescription) form.append('faultDescription', payload.faultDescription);
+  if (payload.submitterName) form.append('submitterName', payload.submitterName);
+  if (payload.submitterPhone) form.append('submitterPhone', payload.submitterPhone);
+  if (payload.submitterEmail) form.append('submitterEmail', payload.submitterEmail);
+
+  const url = `${API_BASE_URL}/api/public/machine-readings/${encodeURIComponent(token)}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    body: form,
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || !body?.success) {
+    throw new Error(body?.error?.message || body?.message || 'Failed to submit reading');
+  }
+  return body.data;
+}
+
+/**
+ * Lists submissions in the verification queue.
+ * Requires machines.verifyReadings.
+ */
+export async function listMachineReadingSubmissions(
+  status: 'pending' | 'approved' | 'rejected' | 'all' = 'pending',
+): Promise<{ submissions: MachineReadingSubmission[] }> {
+  return apiRequest<{ submissions: MachineReadingSubmission[] }>(
+    `/api/machine-reading-submissions?status=${status}`,
+  );
+}
+
+/**
+ * Returns a URL to the submission photo with the auth token embedded as a
+ * query string (the backend allows `?token=` for binary file responses).
+ */
+export function getMachineReadingPhotoUrl(submissionId: string): string {
+  const token = getAuthToken();
+  const base = `${API_BASE_URL}/api/machine-reading-submissions/${submissionId}/photo`;
+  return token ? `${base}?token=${encodeURIComponent(token)}` : base;
+}
+
+/**
+ * Approves a submission. Writes the supplied (or originally submitted) hours
+ * onto the machine. Requires machines.verifyReadings.
+ */
+export async function approveMachineReadingSubmission(
+  submissionId: string,
+  body: { approvedHours?: number; verificationNote?: string } = {},
+): Promise<{ submission: MachineReadingSubmission }> {
+  return apiRequest<{ submission: MachineReadingSubmission }>(
+    `/api/machine-reading-submissions/${submissionId}/approve`,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+/**
+ * Rejects a submission with a mandatory reason.
+ * Requires machines.verifyReadings.
+ */
+export async function rejectMachineReadingSubmission(
+  submissionId: string,
+  rejectionReason: string,
+): Promise<{ submission: MachineReadingSubmission }> {
+  return apiRequest<{ submission: MachineReadingSubmission }>(
+    `/api/machine-reading-submissions/${submissionId}/reject`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ rejectionReason }),
+    },
+  );
+}

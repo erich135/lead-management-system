@@ -24,6 +24,9 @@ import {
   type MachineType,
 } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { MachineQrPanel } from './MachineQrPanel';
+import { MachineReadingHistory } from './MachineReadingHistory';
+import { PendingMachineReadings } from './PendingMachineReadings';
 import { UnifiedMachineImport } from './UnifiedMachineImport';
 import {
   Search,
@@ -49,11 +52,16 @@ import {
   FileSpreadsheet,
   Plus,
   ShieldAlert,
+  QrCode,
 } from 'lucide-react';
 import { SmartDateInput } from './SmartDateInput';
 
 export function Machines() {
   const { isSuperAdmin, hasPermission } = useAuth();
+
+  // Top-level tab inside the Machines page
+  const [activeTab, setActiveTab] = useState<'list' | 'verify'>('list');
+  const canVerifyReadings = isSuperAdmin || hasPermission('machines.verifyReadings');
 
   // Machine list state
   const [machines, setMachines] = useState<Machine[]>([]);
@@ -693,6 +701,41 @@ export function Machines() {
         </div>
       </div>
 
+      {/* Tabs */}
+      {canVerifyReadings && (
+        <div className="mb-6 border-b border-slate-200 flex gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab('list')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 ${
+              activeTab === 'list'
+                ? 'border-amber-500 text-amber-700'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <Cog className="w-4 h-4" />
+            Machines
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('verify')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 ${
+              activeTab === 'verify'
+                ? 'border-amber-500 text-amber-700'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <QrCode className="w-4 h-4" />
+            Verify Readings
+          </button>
+        </div>
+      )}
+
+      {activeTab === 'verify' && canVerifyReadings && (
+        <PendingMachineReadings />
+      )}
+
+      <div className={activeTab === 'list' ? '' : 'hidden'}>
       {/* Filters Bar */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6">
         <div className="flex flex-col sm:flex-row gap-3">
@@ -963,6 +1006,17 @@ export function Machines() {
                                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                               </div>
+                              {editingMachine?._id && (
+                                <div className="md:col-span-2">
+                                  <MachineQrPanel
+                                    machineId={editingMachine._id}
+                                    make={editForm.make || editingMachine.make}
+                                    model={editForm.model || editingMachine.model}
+                                    serialNumber={editForm.serialNumber || editingMachine.serialNumber}
+                                    assetNumber={editForm.assetNumber || editingMachine.assetNumber}
+                                  />
+                                </div>
+                              )}
                               <div>
                                 <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Current Location</label>
                                 <input
@@ -1188,6 +1242,26 @@ export function Machines() {
                               </div>
                             </div>
                           )}
+
+                          {/* QR Code Panel (read-only view) */}
+                          {machine._id && (
+                            <div className="mt-4">
+                              <MachineQrPanel
+                                machineId={machine._id}
+                                make={machine.make}
+                                model={machine.model}
+                                serialNumber={machine.serialNumber}
+                                assetNumber={machine.assetNumber}
+                              />
+                            </div>
+                          )}
+
+                          {/* Reading History */}
+                          {machine._id && (
+                            <div className="mt-4">
+                              <MachineReadingHistory machineId={machine._id} />
+                            </div>
+                          )}
                         </div>
 
                         {/* RSR Documents Section */}
@@ -1292,6 +1366,7 @@ export function Machines() {
             </div>
           </div>
         )}
+      </div>
       </div>
 
       {/* Upload Modal */}

@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   CheckCircle2,
   Camera,
+  ImageIcon,
   Loader2,
   AlertTriangle,
   Wrench,
   Clock,
+  X,
 } from 'lucide-react';
 import {
   getPublicMachineForScan,
@@ -42,7 +44,64 @@ export function MachineScanPage() {
   const [submitterEmail, setSubmitterEmail] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [reference, setReference] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // In-browser camera state
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+
+  const stopStream = useCallback(() => {
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
+  }, []);
+
+  const openCamera = useCallback(async () => {
+    setCameraError(null);
+    setShowCamera(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+    } catch {
+      setCameraError('Camera access denied. Please allow camera permission or use the gallery.');
+      setShowCamera(false);
+    }
+  }, []);
+
+  const capturePhoto = useCallback(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d')!.drawImage(video, 0, 0);
+    canvas.toBlob(blob => {
+      if (!blob) return;
+      const file = new File([blob], `meter-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      setPhoto(file);
+      setPhotoPreview(canvas.toDataURL('image/jpeg'));
+      stopStream();
+      setShowCamera(false);
+    }, 'image/jpeg', 0.92);
+  }, [stopStream]);
+
+  const closeCamera = useCallback(() => {
+    stopStream();
+    setShowCamera(false);
+  }, [stopStream]);
+
+  // Clean up stream on unmount
+  useEffect(() => () => stopStream(), [stopStream]);
 
   useEffect(() => {
     let cancelled = false;
@@ -240,38 +299,86 @@ export function MachineScanPage() {
           <label className="block text-sm font-semibold text-slate-700 mb-1">
             Photo of the hour meter <span className="text-red-500">*</span>
           </label>
+
+          {/* Gallery input */}
           <input
-            ref={fileInputRef}
+            ref={galleryInputRef}
+            id="gallery-input"
             type="file"
             accept="image/*"
-            capture="environment"
             onChange={handlePhotoChange}
-            className="hidden"
+            className="sr-only"
           />
+
+          {/* In-browser camera viewfinder */}
+          {showCamera && (
+            <div className="fixed inset-0 z-50 bg-black flex flex-col">
+              <div className="flex items-center justify-between px-4 py-3">
+                <span className="text-white text-sm font-medium">Take a photo</span>
+                <button type="button" onClick={closeCamera} className="text-white p-1">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="flex-1 relative overflow-hidden">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+              </div>
+              <div className="flex justify-center py-6">
+                <button
+                  type="button"
+                  onClick={capturePhoto}
+                  className="w-16 h-16 rounded-full bg-white border-4 border-slate-300 flex items-center justify-center shadow-lg"
+                >
+                  <Camera className="w-7 h-7 text-slate-800" />
+                </button>
+              </div>
+              <canvas ref={canvasRef} className="hidden" />
+            </div>
+          )}
+
+          {cameraError && (
+            <p className="text-xs text-red-600 mb-2">{cameraError}</p>
+          )}
+
           {photoPreview ? (
-            <div className="relative">
+            <div>
               <img
                 src={photoPreview}
                 alt="Hour meter preview"
                 className="w-full rounded-lg border border-slate-300"
               />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="mt-2 text-sm text-blue-600 underline"
-              >
-                Retake photo
-              </button>
+              <div className="flex gap-3 mt-2">
+                <button type="button" onClick={openCamera} className="text-sm text-blue-600 underline">
+                  Retake photo
+                </button>
+                <label htmlFor="gallery-input" className="text-sm text-blue-600 underline cursor-pointer">
+                  Choose from gallery
+                </label>
+              </div>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed border-slate-300 rounded-lg text-slate-600 hover:border-blue-500 hover:text-blue-600 transition"
-            >
-              <Camera className="w-8 h-8" />
-              <span className="text-sm font-medium">Tap to take a photo</span>
-            </button>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={openCamera}
+                className="flex flex-col items-center justify-center gap-2 py-6 border-2 border-dashed border-slate-300 rounded-lg text-slate-600 hover:border-blue-500 hover:text-blue-600 transition"
+              >
+                <Camera className="w-7 h-7" />
+                <span className="text-xs font-medium">Take a photo</span>
+              </button>
+              <label
+                htmlFor="gallery-input"
+                className="flex flex-col items-center justify-center gap-2 py-6 border-2 border-dashed border-slate-300 rounded-lg text-slate-600 hover:border-blue-500 hover:text-blue-600 transition cursor-pointer"
+              >
+                <ImageIcon className="w-7 h-7" />
+                <span className="text-xs font-medium text-center">Choose from gallery</span>
+              </label>
+            </div>
           )}
         </div>
 

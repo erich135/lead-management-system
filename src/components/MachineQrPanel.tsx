@@ -49,13 +49,37 @@ export function MachineQrPanel({
   }, [machineId]);
 
   /**
-   * Opens a stripped-down print window with the QR code centred at the
-   * label's physical print size (50x50 mm). The two-up layout keeps things
-   * sensible if the user prints on a regular A4 label sheet — they can simply
-   * choose "fit to page" / "actual size" in the browser print dialog.
+   * Sends the QR label to the Zebra GK420t via Zebra Browser Print (ZPL).
+   * Label: 80 × 80 mm — GK420t is 203 dpi (8 dots/mm) → 640 × 640 dots.
+   * QR: 70 × 70 mm, 40-dot (5 mm) margin each side.
+   * ZPL: ^BQN,2,10 = QR model-2, magnification 10; ^FDLA = error-correction L, mode A.
+   *
+   * Falls back to a browser print popup if Zebra Browser Print is not running.
    */
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (!scanUrl) return;
+
+    // ── Zebra Browser Print (ZPL) ────────────────────────────────────────────
+    const zpl = `^XA^PW640^LL640^FO40,40^BQN,2,10^FDLA,${scanUrl}^FS^XZ`;
+
+    try {
+      const deviceResp = await fetch('http://localhost:9100/default?type=device', { mode: 'cors' });
+      if (deviceResp.ok) {
+        const device = await deviceResp.json();
+        if (device?.connection) {
+          const writeResp = await fetch(device.connection, {
+            method: 'POST',
+            body: zpl,
+            mode: 'cors',
+          });
+          if (writeResp.ok) return; // ZPL sent to Zebra GK420t via Browser Print
+        }
+      }
+    } catch {
+      // Zebra Browser Print not running — fall back to browser print window
+    }
+
+    // ── Browser print fallback ───────────────────────────────────────────────
     const svg = document.getElementById(`machine-qr-${machineId}`) as unknown as SVGSVGElement | null;
     if (!svg) return;
     const serialiser = new XMLSerializer();
@@ -63,19 +87,19 @@ export function MachineQrPanel({
     const html = `<!doctype html>
 <html><head><meta charset="utf-8"/><title>Machine QR Label</title>
 <style>
-  @page { size: 60mm 60mm; margin: 2mm; }
+  @page { size: 82mm 82mm; margin: 1mm; }
   body { font-family: Arial, sans-serif; margin: 0; padding: 0; color: #111; }
-  .label { width: 50mm; height: 50mm; display: flex; flex-direction: column;
-           align-items: center; justify-content: center; padding: 2mm;
+  .label { width: 80mm; height: 80mm; display: flex; flex-direction: column;
+           align-items: center; justify-content: center; padding: 5mm;
            border: 1px dashed #999; box-sizing: border-box; }
-  .label svg { width: 30mm; height: 30mm; }
+  .label svg { width: 70mm; height: 70mm; }
   .meta { font-size: 6pt; line-height: 1.15; margin-top: 1mm; text-align: center; }
   .meta strong { display: block; font-size: 7pt; }
   @media print { .label { border: none; } .instructions { display: none; } }
   .instructions { padding: 12px; font-size: 12px; color: #555; }
 </style></head>
 <body>
-  <div class="instructions">Press <strong>Ctrl/Cmd + P</strong> to print. Choose "Actual size" so the label prints at exactly 50&nbsp;&times;&nbsp;50&nbsp;mm.</div>
+  <div class="instructions">Press <strong>Ctrl/Cmd + P</strong> to print. Choose "Actual size" for an 80&nbsp;&times;&nbsp;80&nbsp;mm label.<br/>Install <em>Zebra Browser Print</em> for direct ZPL printing to the GK420t.</div>
   <div class="label">
     ${svgString}
     <div class="meta">
@@ -87,7 +111,7 @@ export function MachineQrPanel({
   <script>window.addEventListener('load', () => setTimeout(() => window.print(), 200));</script>
 </body></html>`;
 
-    const w = window.open('', '_blank', 'width=420,height=520');
+    const w = window.open('', '_blank', 'width=480,height=560');
     if (!w) {
       alert('Pop-up blocked. Please allow pop-ups for this site to print QR labels.');
       return;

@@ -614,6 +614,8 @@ export interface Status {
 export interface Customer {
   _id: string;
   name: string;
+  defaultContactPerson?: string;
+  defaultWhatsAppNumber?: string;
 }
 
 export interface CashCustomer {
@@ -736,6 +738,16 @@ export interface Machine {
   rsrDocuments?: MachineRSR[];
   /** Count of RSR documents attached via a job referencing this machine. */
   jobRSRDocumentsCount?: number;
+  /** Name of the person responsible for submitting hour readings at this machine's site */
+  contactPerson?: string;
+  /** WhatsApp number for reading reminders (overrides customer default) */
+  whatsAppNumber?: string;
+  /** How often (in days) to send a reading reminder. Default: 30 */
+  readingFrequencyDays?: number;
+  /** Stamped when an hour reading is approved */
+  lastReadingReceivedAt?: string;
+  /** Stamped when a WhatsApp reading reminder is sent */
+  lastReadingRequestSentAt?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -903,6 +915,37 @@ export async function createCustomer(name: string): Promise<{ customer: Customer
   return apiRequest('/api/reference/customers', {
     method: 'POST',
     body: JSON.stringify({ name }),
+  });
+}
+
+/**
+ * Updates a customer's name and/or WhatsApp defaults.
+ */
+export async function updateCustomer(id: string, data: { name?: string; defaultContactPerson?: string; defaultWhatsAppNumber?: string }): Promise<{ customer: Customer }> {
+  return apiRequest(`/api/reference/customers/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Sends a test WhatsApp message to a given number.
+ */
+export async function sendWhatsAppTest(to: string, message?: string): Promise<{ sid: string; to: string; message: string }> {
+  return apiRequest('/api/whatsapp/test', {
+    method: 'POST',
+    body: JSON.stringify({ to, message: message || 'ARS test message — WhatsApp is configured correctly for this machine.' }),
+  });
+}
+
+/**
+ * Sends the real production reading-reminder message for a specific machine.
+ * Uses the machine's configured WhatsApp number unless `to` is overridden.
+ */
+export async function sendMachineWhatsAppTest(machineId: string, to?: string): Promise<{ sid: string; to: string; message: string }> {
+  return apiRequest('/api/whatsapp/test-machine', {
+    method: 'POST',
+    body: JSON.stringify({ machineId, ...(to ? { to } : {}) }),
   });
 }
 
@@ -1123,6 +1166,8 @@ export interface AdminActivityRow {
   daily: number;
   weekly: number;
   monthly: number;
+  last3months: number;
+  last6months: number;
   ytd: number;
   avgPerDay: number;
 }
@@ -1131,6 +1176,8 @@ export interface AdminActivityMeta {
   dailyLabel: string;    // e.g. "05/05/2026"
   weeklyLabel: string;   // e.g. "04/05/2026 – 10/05/2026"
   monthlyLabel: string;  // e.g. "May 2026"
+  last3mLabel: string;   // e.g. "05/03/2026 – 05/06/2026"
+  last6mLabel: string;   // e.g. "05/12/2025 – 05/06/2026"
   ytdLabel: string;      // e.g. "2026 YTD"
   workingDays: number;
 }

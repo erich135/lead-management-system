@@ -171,16 +171,26 @@ export function AdminActivityReport({ branches }: Props) {
 
   // ── Team averages ─────────────────────────────────────────────────────────
   const teamAvg = data ? {
-    daily:   data.rows.reduce((s, r) => s + r.daily,   0) / (data.rows.length || 1),
-    weekly:  data.rows.reduce((s, r) => s + r.weekly,  0) / (data.rows.length || 1),
-    monthly: data.rows.reduce((s, r) => s + r.monthly, 0) / (data.rows.length || 1),
-    ytd:     data.rows.reduce((s, r) => s + r.ytd,     0) / (data.rows.length || 1),
-    avg:     data.rows.reduce((s, r) => s + r.avgPerDay, 0) / (data.rows.length || 1),
+    daily:      data.rows.reduce((s, r) => s + r.daily,       0) / (data.rows.length || 1),
+    weekly:     data.rows.reduce((s, r) => s + r.weekly,      0) / (data.rows.length || 1),
+    monthly:    data.rows.reduce((s, r) => s + r.monthly,     0) / (data.rows.length || 1),
+    last3months: data.rows.reduce((s, r) => s + r.last3months, 0) / (data.rows.length || 1),
+    last6months: data.rows.reduce((s, r) => s + r.last6months, 0) / (data.rows.length || 1),
+    ytd:        data.rows.reduce((s, r) => s + r.ytd,         0) / (data.rows.length || 1),
+    avg:        data.rows.reduce((s, r) => s + r.avgPerDay,   0) / (data.rows.length || 1),
   } : null;
 
   const totals = data ? data.rows.reduce(
-    (acc, r) => ({ daily: acc.daily+r.daily, weekly: acc.weekly+r.weekly, monthly: acc.monthly+r.monthly, ytd: acc.ytd+r.ytd, avgPerDay: 0 }),
-    { daily: 0, weekly: 0, monthly: 0, ytd: 0, avgPerDay: 0 },
+    (acc, r) => ({
+      daily:       acc.daily       + r.daily,
+      weekly:      acc.weekly      + r.weekly,
+      monthly:     acc.monthly     + r.monthly,
+      last3months: acc.last3months + r.last3months,
+      last6months: acc.last6months + r.last6months,
+      ytd:         acc.ytd         + r.ytd,
+      avgPerDay: 0,
+    }),
+    { daily: 0, weekly: 0, monthly: 0, last3months: 0, last6months: 0, ytd: 0, avgPerDay: 0 },
   ) : null;
 
   // ── Pie chart drawing ─────────────────────────────────────────────────────
@@ -239,9 +249,24 @@ export function AdminActivityReport({ branches }: Props) {
   const buildTableData = (): { head: string[]; rows: (string | number)[][] } => {
     if (!data) return { head: [], rows: [] };
     const { meta } = data;
-    const head = ['Admin', `Daily  ${meta.dailyLabel}`, `Weekly  ${meta.weeklyLabel}`, `Monthly  ${meta.monthlyLabel}`, meta.ytdLabel, 'Avg / Day'];
-    const rows: (string | number)[][] = data.rows.map((r) => [r.adminCode, r.daily, r.weekly, r.monthly, r.ytd, r.avgPerDay]);
-    if (totals) rows.push(['TOTAL / TEAM AVG', totals.daily, totals.weekly, totals.monthly, totals.ytd, teamAvg ? parseFloat(fmt1(teamAvg.avg)) : '']);
+    const head = [
+      'Admin',
+      `Daily  ${meta.dailyLabel}`,
+      `Weekly  ${meta.weeklyLabel}`,
+      `Monthly  ${meta.monthlyLabel}`,
+      `Last 3 Months  ${meta.last3mLabel}`,
+      `Last 6 Months  ${meta.last6mLabel}`,
+      meta.ytdLabel,
+      'Avg / Day',
+    ];
+    const rows: (string | number)[][] = data.rows.map((r) => [
+      r.adminCode, r.daily, r.weekly, r.monthly, r.last3months, r.last6months, r.ytd, r.avgPerDay,
+    ]);
+    if (totals) rows.push([
+      'TOTAL / TEAM AVG',
+      totals.daily, totals.weekly, totals.monthly, totals.last3months, totals.last6months, totals.ytd,
+      teamAvg ? parseFloat(fmt1(teamAvg.avg)) : '',
+    ]);
     return { head, rows };
   };
 
@@ -846,6 +871,8 @@ export function AdminActivityReport({ branches }: Props) {
                     <StatLine icon={<CalendarDays className="w-3.5 h-3.5" />} label="Today" value={row.daily} avg={teamAvg?.daily ?? 0} />
                     <StatLine icon={<Calendar className="w-3.5 h-3.5" />} label="This week" value={row.weekly} avg={teamAvg?.weekly ?? 0} />
                     <StatLine icon={<Calendar className="w-3.5 h-3.5" />} label="This month" value={row.monthly} avg={teamAvg?.monthly ?? 0} />
+                    <StatLine icon={<Calendar className="w-3.5 h-3.5" />} label="Last 3 months" value={row.last3months} avg={teamAvg?.last3months ?? 0} />
+                    <StatLine icon={<Calendar className="w-3.5 h-3.5" />} label="Last 6 months" value={row.last6months} avg={teamAvg?.last6months ?? 0} />
                     <div className="pt-2 border-t border-gray-100">
                       <StatLine icon={<TrendingUp className="w-3.5 h-3.5" />} label="YTD" value={row.ytd} avg={teamAvg?.ytd ?? 0} bold />
                       <div className="flex items-center justify-between mt-1.5">
@@ -922,6 +949,18 @@ export function AdminActivityReport({ branches }: Props) {
                         <div className="text-[11px] text-blue-200 font-normal mt-0.5">{data.meta.monthlyLabel}</div>
                       </th>
 
+                      {/* Last 3 months */}
+                      <th className="px-5 py-4 text-center min-w-[170px]">
+                        <div className="font-semibold text-xs uppercase tracking-widest">Last 3 Months</div>
+                        <div className="text-[11px] text-blue-200 font-normal mt-0.5">{data.meta.last3mLabel}</div>
+                      </th>
+
+                      {/* Last 6 months */}
+                      <th className="px-5 py-4 text-center min-w-[170px]">
+                        <div className="font-semibold text-xs uppercase tracking-widest">Last 6 Months</div>
+                        <div className="text-[11px] text-blue-200 font-normal mt-0.5">{data.meta.last6mLabel}</div>
+                      </th>
+
                       {/* YTD */}
                       <th className="px-5 py-4 text-center min-w-[120px]">
                         <div className="font-semibold text-xs uppercase tracking-widest">{data.meta.ytdLabel}</div>
@@ -966,6 +1005,16 @@ export function AdminActivityReport({ branches }: Props) {
                           <ValueCell value={row.monthly} avg={teamAvg?.monthly ?? 0} />
                         </td>
 
+                        {/* Last 3 months */}
+                        <td className="px-5 py-4 text-center">
+                          <ValueCell value={row.last3months} avg={teamAvg?.last3months ?? 0} />
+                        </td>
+
+                        {/* Last 6 months */}
+                        <td className="px-5 py-4 text-center">
+                          <ValueCell value={row.last6months} avg={teamAvg?.last6months ?? 0} />
+                        </td>
+
                         {/* YTD */}
                         <td className="px-5 py-4 text-center">
                           <ValueCell value={row.ytd} avg={teamAvg?.ytd ?? 0} large />
@@ -992,6 +1041,8 @@ export function AdminActivityReport({ branches }: Props) {
                         <FooterCell value={totals.daily} />
                         <FooterCell value={totals.weekly} />
                         <FooterCell value={totals.monthly} />
+                        <FooterCell value={totals.last3months} />
+                        <FooterCell value={totals.last6months} />
                         <FooterCell value={totals.ytd} />
                         <td className="px-5 py-4 text-center">
                           <span className="text-base font-bold text-gray-600 tabular-nums">—</span>
@@ -1004,6 +1055,8 @@ export function AdminActivityReport({ branches }: Props) {
                         <td className="px-5 py-3 text-center text-sm font-semibold text-blue-600 tabular-nums">{fmt1(teamAvg.daily)}</td>
                         <td className="px-5 py-3 text-center text-sm font-semibold text-blue-600 tabular-nums">{fmt1(teamAvg.weekly)}</td>
                         <td className="px-5 py-3 text-center text-sm font-semibold text-blue-600 tabular-nums">{fmt1(teamAvg.monthly)}</td>
+                        <td className="px-5 py-3 text-center text-sm font-semibold text-blue-600 tabular-nums">{fmt1(teamAvg.last3months)}</td>
+                        <td className="px-5 py-3 text-center text-sm font-semibold text-blue-600 tabular-nums">{fmt1(teamAvg.last6months)}</td>
                         <td className="px-5 py-3 text-center text-sm font-semibold text-blue-600 tabular-nums">{fmt1(teamAvg.ytd)}</td>
                         <td className="px-5 py-3 text-center text-sm font-bold text-blue-700 tabular-nums">{fmt1(teamAvg.avg)}</td>
                       </tr>

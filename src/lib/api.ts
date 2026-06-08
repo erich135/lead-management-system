@@ -1277,6 +1277,7 @@ export async function getMachines(params?: {
   limit?: number;
   sortField?: 'make' | 'serialNumber' | 'customer' | 'machineHours';
   sortDir?: 'asc' | 'desc';
+  ownershipType?: 'ars_rental' | 'customer' | '';
 }): Promise<{ machines: Machine[]; pagination: any }> {
   const queryParams = new URLSearchParams();
   if (params?.customerId) queryParams.append('customerId', params.customerId);
@@ -1285,6 +1286,7 @@ export async function getMachines(params?: {
   if (params?.limit) queryParams.append('limit', params.limit.toString());
   if (params?.sortField) queryParams.append('sortField', params.sortField);
   if (params?.sortDir) queryParams.append('sortDir', params.sortDir);
+  if (params?.ownershipType) queryParams.append('ownershipType', params.ownershipType);
   
   const query = queryParams.toString();
   return apiRequest(`/api/machines${query ? `?${query}` : ''}`);

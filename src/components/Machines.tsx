@@ -17,6 +17,8 @@ import {
   getMachineTypes,
   previewDedupMachines,
   confirmDedupMachines,
+  sendWhatsAppTest,
+  sendMachineWhatsAppTest,
   type Machine,
   type MachineRSR,
   type Customer,
@@ -68,6 +70,7 @@ export function Machines() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
+  const [ownershipFilter, setOwnershipFilter] = useState<'ars_rental' | 'customer' | ''>('ars_rental');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [machineTypes, setMachineTypes] = useState<MachineType[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 0 });
@@ -84,6 +87,8 @@ export function Machines() {
   const [deletingMachine, setDeletingMachine] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Machine>>({});
   const [saving, setSaving] = useState(false);
+  const [whatsAppTesting, setWhatsAppTesting] = useState(false);
+  const [whatsAppTestResult, setWhatsAppTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   // RSR state
   const [machineRSRs, setMachineRSRs] = useState<MachineRSR[]>([]);
@@ -125,6 +130,7 @@ export function Machines() {
     lastServiceDate: '', nextServiceDate: '',
     currentLocation: '', lastOilSampleDate: '', oilSampleComment: '',
     customerId: '', cashCustomer: '', isRental: false,
+    contactPerson: '', whatsAppNumber: '', readingFrequencyDays: 30,
   });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -156,6 +162,7 @@ export function Machines() {
       const params: any = { page, limit: 50 };
       if (searchQuery.trim()) params.search = searchQuery.trim();
       if (customerFilter) params.customerId = customerFilter;
+      if (ownershipFilter) params.ownershipType = ownershipFilter;
       if (sortField) {
         params.sortField = sortField;
         params.sortDir = sortDir;
@@ -168,7 +175,7 @@ export function Machines() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, customerFilter, sortField, sortDir]);
+  }, [searchQuery, customerFilter, ownershipFilter, sortField, sortDir]);
 
   useEffect(() => {
     const debounce = setTimeout(() => loadMachines(1), 300);
@@ -236,6 +243,7 @@ export function Machines() {
 
   const handleEdit = (machine: Machine) => {
     setEditingMachine(machine);
+    setWhatsAppTestResult(null);
     setEditForm({
       make: machine.make,
       model: machine.model,
@@ -253,6 +261,9 @@ export function Machines() {
       cashCustomer: machine.cashCustomer || '',
       currentLocation: machine.currentLocation || '',
       customerId: machine.customer && typeof machine.customer === 'object' ? (machine.customer as any)._id || '' : machine.customer || '',
+      contactPerson: (machine as any).contactPerson || '',
+      whatsAppNumber: (machine as any).whatsAppNumber || '',
+      readingFrequencyDays: (machine as any).readingFrequencyDays || 30,
     } as any);
   };
 
@@ -276,6 +287,9 @@ export function Machines() {
       if (!payload.nextServiceDate) delete payload.nextServiceDate;
       if (!payload.lastOilSampleDate) delete payload.lastOilSampleDate;
       if (!payload.oilSampleComment) delete payload.oilSampleComment;
+      if (payload.contactPerson) payload.contactPerson = payload.contactPerson.trim();
+      if (payload.whatsAppNumber) payload.whatsAppNumber = payload.whatsAppNumber.trim();
+      payload.readingFrequencyDays = Number(payload.readingFrequencyDays) || 30;
       if (!payload.cashCustomer) delete payload.cashCustomer;
       if (!payload.currentLocation) delete payload.currentLocation;
 
@@ -320,6 +334,9 @@ export function Machines() {
         if (createForm.nextServiceDate) payload.nextServiceDate = createForm.nextServiceDate;
       }
       if (createForm.lastOilSampleDate) payload.lastOilSampleDate = createForm.lastOilSampleDate;
+      if (createForm.contactPerson?.trim()) payload.contactPerson = createForm.contactPerson.trim();
+      if (createForm.whatsAppNumber?.trim()) payload.whatsAppNumber = createForm.whatsAppNumber.trim();
+      payload.readingFrequencyDays = Number(createForm.readingFrequencyDays) || 30;
       // Customer assignment
       if (createForm.customerId) {
         payload.customer = createForm.customerId;
@@ -336,6 +353,7 @@ export function Machines() {
         lastServiceDate: '', nextServiceDate: '',
         currentLocation: '', lastOilSampleDate: '', oilSampleComment: '',
         customerId: '', cashCustomer: '', isRental: false,
+        contactPerson: '', whatsAppNumber: '', readingFrequencyDays: 30,
       });
       await loadMachines(1);
     } catch (error: any) {
@@ -350,6 +368,7 @@ export function Machines() {
       const params: any = { page: 1, limit: 99999 };
       if (searchQuery.trim()) params.search = searchQuery.trim();
       if (customerFilter) params.customerId = customerFilter;
+      if (ownershipFilter) params.ownershipType = ownershipFilter;
       const response = await getMachines(params);
       const rows = response.machines || [];
 
@@ -738,6 +757,40 @@ export function Machines() {
       <div className={activeTab === 'list' ? '' : 'hidden'}>
       {/* Filters Bar */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6">
+        {/* Ownership Toggle */}
+        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg w-fit mb-3">
+          <button
+            onClick={() => setOwnershipFilter('ars_rental')}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              ownershipFilter === 'ars_rental'
+                ? 'bg-white text-blue-700 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            ARS Rental Units
+          </button>
+          <button
+            onClick={() => setOwnershipFilter('customer')}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              ownershipFilter === 'customer'
+                ? 'bg-white text-blue-700 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Customer's Own
+          </button>
+          <button
+            onClick={() => setOwnershipFilter('')}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              ownershipFilter === ''
+                ? 'bg-white text-blue-700 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            All Machines
+          </button>
+        </div>
+
         <div className="flex flex-col sm:flex-row gap-3">
           {/* Search */}
           <div className="relative flex-1">
@@ -1161,6 +1214,84 @@ export function Machines() {
                                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                               </div>
+                              <div className="md:col-span-3">
+                                <div className="border-t border-slate-200 pt-4 mb-3">
+                                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                                    <span>📱</span> WhatsApp Reading Reminders
+                                  </h4>
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Contact Person</label>
+                                <input
+                                  type="text"
+                                  value={(editForm as any).contactPerson || ''}
+                                  onChange={(e) => setEditForm({ ...editForm, contactPerson: e.target.value } as any)}
+                                  placeholder="e.g. John Smith"
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                                {!(editForm as any).contactPerson && editingMachine?.customer && typeof editingMachine.customer === 'object' && (editingMachine.customer as any).defaultContactPerson && (
+                                  <p className="text-xs text-blue-500 mt-0.5">Fallback: {(editingMachine.customer as any).defaultContactPerson}</p>
+                                )}
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">WhatsApp Number</label>
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    value={(editForm as any).whatsAppNumber || ''}
+                                    onChange={(e) => { setEditForm({ ...editForm, whatsAppNumber: e.target.value } as any); setWhatsAppTestResult(null); }}
+                                    placeholder="+27831234567"
+                                    className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  />
+                                  <button
+                                    type="button"
+                                    disabled={whatsAppTesting || !(editForm as any).whatsAppNumber}
+                                    onClick={async () => {
+                                      const num = (editForm as any).whatsAppNumber?.trim();
+                                      if (!num) return;
+                                      setWhatsAppTesting(true);
+                                      setWhatsAppTestResult(null);
+                                      try {
+                                        // Send the real production message so the layout can be previewed
+                                        if (editingMachine?._id) {
+                                          await sendMachineWhatsAppTest(editingMachine._id, num);
+                                        } else {
+                                          await sendWhatsAppTest(num);
+                                        }
+                                        setWhatsAppTestResult({ ok: true, message: `Real reminder sent to ${num} — check your phone!` });
+                                      } catch (err: any) {
+                                        setWhatsAppTestResult({ ok: false, message: err.message || 'Failed to send test' });
+                                      } finally {
+                                        setWhatsAppTesting(false);
+                                      }
+                                    }}
+                                    className="px-3 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-medium transition-colors whitespace-nowrap flex items-center gap-1"
+                                  >
+                                    {whatsAppTesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <span>📱</span>}
+                                    {whatsAppTesting ? 'Sending…' : 'Test'}
+                                  </button>
+                                </div>
+                                {!(editForm as any).whatsAppNumber && editingMachine?.customer && typeof editingMachine.customer === 'object' && (editingMachine.customer as any).defaultWhatsAppNumber && (
+                                  <p className="text-xs text-blue-500 mt-0.5">Fallback: {(editingMachine.customer as any).defaultWhatsAppNumber}</p>
+                                )}
+                                {whatsAppTestResult && (
+                                  <p className={`text-xs mt-1 font-medium ${whatsAppTestResult.ok ? 'text-green-600' : 'text-red-600'}`}>
+                                    {whatsAppTestResult.ok ? '✓' : '✗'} {whatsAppTestResult.message}
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Reading Frequency (days)</label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  value={(editForm as any).readingFrequencyDays || 30}
+                                  onChange={(e) => setEditForm({ ...editForm, readingFrequencyDays: parseInt(e.target.value) || 30 } as any)}
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                                <p className="text-xs text-slate-400 mt-0.5">Days between reading reminders</p>
+                              </div>
                             </div>
                           ) : (
                             /* Read-Only Details */
@@ -1240,6 +1371,29 @@ export function Machines() {
                                 <div className="text-xs font-semibold text-slate-400 uppercase">Oil Sample Comment</div>
                                 <div className="text-sm font-medium text-slate-800 mt-0.5">{machine.oilSampleComment || '—'}</div>
                               </div>
+                              {((machine as any).contactPerson || (machine as any).whatsAppNumber) && (
+                                <div className="md:col-span-4 border-t border-slate-200 pt-3">
+                                  <div className="text-xs font-bold text-slate-400 uppercase mb-2">📱 WhatsApp Reminders</div>
+                                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                    {(machine as any).contactPerson && (
+                                      <div>
+                                        <div className="text-xs font-semibold text-slate-400 uppercase">Contact Person</div>
+                                        <div className="text-sm font-medium text-slate-800 mt-0.5">{(machine as any).contactPerson}</div>
+                                      </div>
+                                    )}
+                                    {(machine as any).whatsAppNumber && (
+                                      <div>
+                                        <div className="text-xs font-semibold text-slate-400 uppercase">WhatsApp</div>
+                                        <div className="text-sm font-medium text-slate-800 mt-0.5">{(machine as any).whatsAppNumber}</div>
+                                      </div>
+                                    )}
+                                    <div>
+                                      <div className="text-xs font-semibold text-slate-400 uppercase">Reading Frequency</div>
+                                      <div className="text-sm font-medium text-slate-800 mt-0.5">{(machine as any).readingFrequencyDays || 30} days</div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
 
@@ -1770,9 +1924,27 @@ export function Machines() {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Next Service Date</label>
-                    <SmartDateInput value={createForm.nextServiceDate} onChange={e => setCreateForm({ ...createForm, nextServiceDate: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent" />
+                    <SmartDateInput value={createForm.nextServiceDate} onChange={e => setCreateForm({ ...createForm, nextServiceDate: e.target.value })} className="w-full px-3 py-2 border border-transparent" />
                   </div>
                 </>)}
+                <div className="md:col-span-2">
+                  <div className="border-t border-slate-200 pt-4 mb-3">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">📱 WhatsApp Reading Reminders</p>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Contact Person</label>
+                  <input type="text" value={createForm.contactPerson} onChange={e => setCreateForm({ ...createForm, contactPerson: e.target.value })} placeholder="e.g. John Smith" className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">WhatsApp Number</label>
+                  <input type="text" value={createForm.whatsAppNumber} onChange={e => setCreateForm({ ...createForm, whatsAppNumber: e.target.value })} placeholder="+27831234567" className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Reading Frequency (days)</label>
+                  <input type="number" min={1} value={createForm.readingFrequencyDays} onChange={e => setCreateForm({ ...createForm, readingFrequencyDays: parseInt(e.target.value) || 30 })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent" />
+                  <p className="text-xs text-slate-400 mt-0.5">Days between reading reminders</p>
+                </div>
               </div>
               {createError && (
                 <div className="mt-4 flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">

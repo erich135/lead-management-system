@@ -743,6 +743,45 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   async function handleSave() {
     setLoading(true);
     setError('');
+
+    // ── Date validation ──────────────────────────────────────────────────────
+    // Certain statuses require a corresponding date field to be filled.
+    // A technician booking requires Date Booked.
+    const statusName = typeof job.status === 'object'
+      ? (job.status as any)?.name?.trim()
+      : statuses.find(s => s._id === job.status)?.name?.trim();
+
+    const statusDateRules: { match: string; field: keyof typeof job; label: string }[] = [
+      { match: 'Quoted',      field: 'dateQuoted',   label: 'Quoted Date'    },
+      { match: 'Register',    field: 'registerDate', label: 'Register Date'  },
+      { match: 'PO Received', field: 'poDate',       label: 'PO Date'        },
+      { match: 'Invoiced',    field: 'invoiceDate',  label: 'Invoice Date'   },
+    ];
+
+    const validationErrors: string[] = [];
+
+    for (const rule of statusDateRules) {
+      if (statusName === rule.match && !job[rule.field]) {
+        validationErrors.push(
+          `Please enter the ${rule.label} before attempting to save`
+        );
+      }
+    }
+
+    // Technician booking added → Date Booked required
+    const hasBooking = Array.isArray((job as any).bookings) && (job as any).bookings.length > 0
+      && (job as any).bookings.some((b: any) => b.technicianId);
+    if (hasBooking && !job.dateBooked) {
+      validationErrors.push('Please enter the Date Booked before attempting to save');
+    }
+
+    if (validationErrors.length > 0) {
+      setError(validationErrors.join('\n'));
+      setLoading(false);
+      return;
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     try {
       let payload: any = { ...job };
       if (payload.techBooked && typeof payload.techBooked === 'object') {

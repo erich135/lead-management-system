@@ -752,10 +752,11 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
       : statuses.find(s => s._id === job.status)?.name?.trim();
 
     const statusDateRules: { match: string; field: keyof typeof job; label: string }[] = [
-      { match: 'Quoted',      field: 'dateQuoted',   label: 'Quoted Date'    },
-      { match: 'Register',    field: 'registerDate', label: 'Register Date'  },
-      { match: 'PO Received', field: 'poDate',       label: 'PO Date'        },
-      { match: 'Invoiced',    field: 'invoiceDate',  label: 'Invoice Date'   },
+      { match: 'Quoted',         field: 'dateQuoted',   label: 'Quoted Date'    },
+      { match: 'Sent to Client', field: 'dateQuoted',   label: 'Quoted Date'    },
+      { match: 'Register',       field: 'registerDate', label: 'Register Date'  },
+      { match: 'PO Received',    field: 'poDate',       label: 'PO Date'        },
+      { match: 'Invoiced',       field: 'invoiceDate',  label: 'Invoice Date'   },
     ];
 
     const validationErrors: string[] = [];

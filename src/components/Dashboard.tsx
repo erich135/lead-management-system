@@ -10,6 +10,7 @@ import {
   getRepCodes,
   getTechnicians,
   getAdminCodes,
+  listMachineReadingSubmissions,
   type JobStats,
   type OverdueJob,
   type Status,
@@ -41,6 +42,7 @@ import {
   ChevronDown,
   ChevronUp,
   ClipboardList,
+  ScanLine,
 } from 'lucide-react';
 import { LeadsList } from './LeadsList';
 import { LeadForm } from './LeadForm';
@@ -128,6 +130,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
   const [repCodes, setRepCodes] = useState<RepCode[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [_adminCodes, setAdminCodes] = useState<AdminCode[]>([]);
+  const [pendingReadingsCount, setPendingReadingsCount] = useState(0);
   const [selectedPriority, setSelectedPriority] = useState<'all' | 'critical' | 'warning' | 'info'>('all');
   const [leadsListRefreshKey, setLeadsListRefreshKey] = useState(0);
   const [isJobsMenuExpanded, setIsJobsMenuExpanded] = useState(false);
@@ -196,6 +199,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
         loadRepCodes(),
         loadTechnicians(),
         loadAdminCodes(),
+        loadPendingReadingsCount(),
       ]);
     } catch (err: any) {
       console.error('Error loading initial data:', err);
@@ -212,6 +216,15 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
     } catch (error) {
       console.error('Error loading stats:', error);
       throw error;
+    }
+  }
+
+  async function loadPendingReadingsCount() {
+    try {
+      const { submissions } = await listMachineReadingSubmissions('pending');
+      setPendingReadingsCount(submissions.length);
+    } catch {
+      // Non-critical — silently ignore
     }
   }
 
@@ -807,6 +820,24 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                     <Cog className={`w-4 h-4 transition-transform ${view === 'machines' ? 'scale-110' : ''}`} />
                     <span>Machines</span>
                   </Link>
+                {(isSuperAdmin || hasPermission('machines.verifyReadings')) && (
+                  <Link
+                    to="/pending-machine-readings"
+                    className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
+                      view === 'pendingReadings'
+                        ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
+                        : 'text-[#383838] hover:text-[#f7c12b]'
+                    }`}
+                  >
+                    <ScanLine className={`w-4 h-4 transition-transform ${view === 'pendingReadings' ? 'scale-110' : ''}`} />
+                    <span>QR Readings</span>
+                    {pendingReadingsCount > 0 && (
+                      <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full">
+                        {pendingReadingsCount > 9 ? '9+' : pendingReadingsCount}
+                      </span>
+                    )}
+                  </Link>
+                )}
                 {isSuperAdmin && (
                   <Link
                     to="/admin"
@@ -2039,6 +2070,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           onViewChange={navigateToView as ComponentProps<typeof MobileNavigation>['onViewChange']}
           notificationsCount={stats ? stats.overdueReminders + stats.approachingReminders : 0}
           onNotificationsClick={() => setShowNotifications(!showNotifications)}
+          pendingReadingsCount={pendingReadingsCount}
         />
       )}
 

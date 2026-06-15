@@ -38,7 +38,7 @@ export function FixedJobCardPrintView({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
   const visibleSections = filterVisibleSections((template.sections || []) as never[]);
-  const resolver = createFixedJobCardFieldResolver(fieldValues, job, machine);
+  const resolver = createFixedJobCardFieldResolver(fieldValues, job, machine, reportNumber);
   const header = getJobCardReportHeader();
   const isMechanical = template.templateKey === 'mechanical_checklist';
 

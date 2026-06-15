@@ -20,15 +20,30 @@ export interface TemplateFieldRef {
 export function createFixedJobCardFieldResolver(
   fieldValues: FieldValueEntry[],
   job?: Record<string, unknown>,
-  machine?: Record<string, unknown>
+  machine?: Record<string, unknown>,
+  reportNumber?: string
 ) {
   const valueMap = buildFieldValueMap(fieldValues);
+
+  /**
+   * Resolves RSR/MCC report number for template fields keyed as rsrNumber or reportNumber.
+   */
+  const resolveReportNumberField = (): string => {
+    if (reportNumber) return reportNumber;
+    return getJobFieldValue(job, 'rsrNumber');
+  };
 
   /**
    * Resolves a single field to its display string for the printed report.
    */
   const resolve = (field: TemplateFieldRef): string => {
     if (field.type === 'jobField' && field.jobFieldKey) {
+      if (field.jobFieldKey === 'rsrNumber' || field.jobFieldKey === 'reportNumber') {
+        return (
+          resolveReportNumberField() ||
+          getFieldDisplayValue(valueMap, field.id)
+        );
+      }
       return getJobFieldValue(job, field.jobFieldKey) || getFieldDisplayValue(valueMap, field.id);
     }
     if (field.type === 'machineField' && field.machineFieldKey) {

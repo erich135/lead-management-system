@@ -2663,6 +2663,11 @@ alert((response as any).message || 'User invited successfully');
               <p className="text-sm text-ars-body mb-4">
                 Upload the latest Android APK for technicians. Uploading a new file replaces the current release. Technicians download it from Jobs → Tech App when downloads are enabled.
               </p>
+              {techAppUploading && (
+                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  Uploading a large APK can take <strong>2–5 minutes</strong> depending on your connection. Keep this tab open until you see a success message — the request may look idle while the file is still transferring.
+                </div>
+              )}
 
               {techAppMessage && (
                 <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">

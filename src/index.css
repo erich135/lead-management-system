@@ -82,3 +82,29 @@
 .animate-slide-in-right {
   animation: slide-in-right 0.3s ease-out;
 }
+
+/* Job card filled report — print */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .job-card-print-root,
+  .job-card-print-root * {
+    visibility: visible;
+  }
+
+  .job-card-print-root {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: white !important;
+    overflow: visible !important;
+  }
+
+  .job-card-report {
+    box-shadow: none !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+}

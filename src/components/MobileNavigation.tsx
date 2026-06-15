@@ -1,9 +1,9 @@
-import { LayoutDashboard, FileText, BarChart3, Calendar, Users, Menu, X, Bell, LogOut, Clock, Cog, Briefcase } from 'lucide-react';
+import { LayoutDashboard, FileText, BarChart3, Calendar, Users, Menu, X, Bell, LogOut, Clock, Cog, Briefcase, Smartphone } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
-type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady';
+type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady' | 'techApp';
 
 interface MobileNavigationProps {
   currentView: View;
@@ -39,6 +39,7 @@ export function MobileNavigation({
     if (path === '/job-card-templates') return 'jobCardTemplates';
     if (path === '/job-card-submissions') return 'jobCardSubmissions';
     if (path === '/parts-ready') return 'partsReady';
+    if (path === '/tech-app') return 'techApp';
     return 'dashboard';
   };
 
@@ -47,6 +48,7 @@ export function MobileNavigation({
   // Only show Reports to users with reports.read permission or Super Admins
   const canViewReports = user?.isSuperAdmin || hasPermission('reports.read');
   const canViewSalesLeads = user?.isSuperAdmin || hasPermission('sales_leads.read');
+  const canViewTechApp = user?.isSuperAdmin || user?.role?.name?.toLowerCase() === 'technician';
 
   const navItems = [
     { id: 'dashboard' as View, label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
@@ -162,6 +164,21 @@ export function MobileNavigation({
                   <Cog className="w-5 h-5" />
                   <span className="font-medium">Machines</span>
                 </Link>
+
+                {canViewTechApp && (
+                  <Link
+                    to="/tech-app"
+                    onClick={() => setShowMenu(false)}
+                    className={`w-full flex items-center gap-4 p-4 rounded-[8px] transition-all ${
+                      activeView === 'techApp'
+                        ? 'bg-ars-secondary/20 text-ars-heading'
+                        : 'bg-gray-50 text-ars-heading hover:bg-gray-100'
+                    }`}
+                  >
+                    <Smartphone className="w-5 h-5" />
+                    <span className="font-medium">Tech App</span>
+                  </Link>
+                )}
 
                 {/* System Admin (if super admin) */}
                 {user?.isSuperAdmin ? (

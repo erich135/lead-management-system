@@ -41,6 +41,7 @@ import {
   ChevronDown,
   ChevronUp,
   ClipboardList,
+  Smartphone,
 } from 'lucide-react';
 import { LeadsList } from './LeadsList';
 import { LeadForm } from './LeadForm';
@@ -60,11 +61,12 @@ import { JobCardTemplates } from './JobCardTemplates';
 import { JobCardSubmissions } from './JobCardSubmissions';
 import { PartsReadyJobCards } from './PartsReadyJobCards';
 import { PendingMachineReadings } from './PendingMachineReadings';
+import { TechAppDownload } from './TechAppDownload';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { Tooltip, HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
 
-type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady' | 'pendingReadings';
+type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady' | 'pendingReadings' | 'techApp';
 
 interface DashboardProps {
   view?: View;
@@ -72,6 +74,13 @@ interface DashboardProps {
 
 export function Dashboard({ view: initialView }: DashboardProps = {}) {
   const { user, signOut, isSuperAdmin, hasPermission } = useAuth();
+  const isTechnician = user?.role?.name?.toLowerCase() === 'technician';
+  const canViewTechApp = isSuperAdmin || isTechnician;
+  const showJobsDropdown =
+    isSuperAdmin ||
+    hasPermission('job_card_templates.read') ||
+    hasPermission('job_card_submissions.read') ||
+    isTechnician;
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile();
@@ -89,6 +98,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
     if (path === '/job-card-submissions') return 'jobCardSubmissions';
     if (path === '/parts-ready') return 'partsReady';
     if (path === '/pending-machine-readings') return 'pendingReadings';
+    if (path === '/tech-app') return 'techApp';
     return 'dashboard';
   };
   
@@ -110,6 +120,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
       jobCardSubmissions: '/job-card-submissions',
       partsReady: '/parts-ready',
       pendingReadings: '/pending-machine-readings',
+      techApp: '/tech-app',
     };
     navigate(routes[newView]);
   };
@@ -671,17 +682,17 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                   </Link>
                 )}
                 {/* Jobs Menu - Expandable for super admins / job card permissions */}
-                {(isSuperAdmin || hasPermission('job_card_templates.read') || hasPermission('job_card_submissions.read')) ? (
+                {showJobsDropdown ? (
                   <div className="relative group jobs-menu-container">
                     <button
                       onClick={() => setIsJobsMenuExpanded(!isJobsMenuExpanded)}
                       className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
-                        view === 'leads' || view === 'jobCardTemplates' || view === 'jobCardSubmissions' || view === 'partsReady'
+                        view === 'leads' || view === 'jobCardTemplates' || view === 'jobCardSubmissions' || view === 'partsReady' || view === 'techApp'
                           ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
                           : 'text-[#383838] hover:text-[#f7c12b]'
                       }`}
                     >
-                      <FileText className={`w-4 h-4 transition-transform ${view === 'leads' || view === 'jobCardTemplates' || view === 'jobCardSubmissions' || view === 'partsReady' ? 'scale-110' : ''}`} />
+                      <FileText className={`w-4 h-4 transition-transform ${view === 'leads' || view === 'jobCardTemplates' || view === 'jobCardSubmissions' || view === 'partsReady' || view === 'techApp' ? 'scale-110' : ''}`} />
                       <span>Jobs</span>
                       {isJobsMenuExpanded ? (
                         <ChevronUp className="w-3 h-3" />
@@ -743,6 +754,20 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                           >
                             <FileText className="w-4 h-4" />
                             <span>Job Card Submissions</span>
+                          </Link>
+                        )}
+                        {canViewTechApp && (
+                          <Link
+                            to="/tech-app"
+                            onClick={() => setIsJobsMenuExpanded(false)}
+                            className={`block px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
+                              view === 'techApp'
+                                ? 'bg-[#f7c12b]/20 text-[#383838] font-medium'
+                                : 'text-[#383838] hover:bg-gray-100'
+                            }`}
+                          >
+                            <Smartphone className="w-4 h-4" />
+                            <span>Tech App</span>
                           </Link>
                         )}
                       </div>
@@ -1995,6 +2020,17 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           <div className="p-8 bg-white rounded-[8px] shadow-lg max-w-lg mx-auto mt-8">
             <h2 className="text-xl font-semibold text-[#383838] mb-2">Access restricted</h2>
             <p className="text-slate-600 mb-6">You don&apos;t have permission to view Parts Ready (Job Cards). Ask a Super Admin to grant you the &quot;Job Card Templates&quot; permission in System Admin → User Management.</p>
+          </div>
+        )}
+
+        {view === 'techApp' && canViewTechApp && (
+          <TechAppDownload />
+        )}
+
+        {view === 'techApp' && !canViewTechApp && (
+          <div className="p-8 bg-white rounded-[8px] shadow-lg max-w-lg mx-auto mt-8">
+            <h2 className="text-xl font-semibold text-[#383838] mb-2">Access restricted</h2>
+            <p className="text-slate-600 mb-6">The Tech App download page is only available to technicians and Super Admins.</p>
           </div>
         )}
 

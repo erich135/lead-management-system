@@ -13,11 +13,13 @@ import {
 import {
   getPartsReadyJobs,
   getJobCardTemplates,
+  getTechnicians,
   createJobCardAssignment,
   updateJobCardAssignment,
   deleteJobCardAssignment,
   type PartsReadyItem,
   type JobCardTemplate,
+  type Technician,
 } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -50,8 +52,10 @@ export function PartsReadyJobCards() {
   const [templates, setTemplates] = useState<JobCardTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [assigningJobId, setAssigningJobId] = useState<string | null>(null);
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [assigningJob, setAssigningJob] = useState<PartsReadyItem['job'] | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>('');
   const [notifyingId, setNotifyingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
@@ -64,12 +68,14 @@ export function PartsReadyJobCards() {
     setLoading(true);
     setError(null);
     try {
-      const [partsRes, templatesRes] = await Promise.all([
+      const [partsRes, templatesRes, techRes] = await Promise.all([
         getPartsReadyJobs(),
-        getJobCardTemplates(),
+        getJobCardTemplates(false, true),
+        getTechnicians(),
       ]);
       setItems(partsRes.items || []);
       setTemplates(templatesRes.templates || []);
+      setTechnicians(techRes.technicians || []);
     } catch (err: any) {
       setError(err.message || 'Failed to load Parts Ready jobs');
       setItems([]);
@@ -85,23 +91,28 @@ export function PartsReadyJobCards() {
   /**
    * Opens the assign-template modal for a job.
    */
-  const openAssign = (jobId: string) => {
-    setAssigningJobId(jobId);
+  const openAssign = (job: PartsReadyItem['job']) => {
+    setAssigningJob(job);
     setSelectedTemplateId(templates[0]?._id ?? '');
+    const firstBooking = job.bookings?.[0];
+    setSelectedTechnicianId(firstBooking?.technicianId ?? technicians[0]?._id ?? '');
   };
 
   /**
    * Assigns the selected template to the job and closes the modal.
    */
   const handleAssign = async () => {
-    if (!assigningJobId || !selectedTemplateId) return;
+    const jobId = (assigningJob as { _id?: string })?._id;
+    if (!jobId || !selectedTemplateId || !selectedTechnicianId) return;
     try {
       await createJobCardAssignment({
-        jobId: assigningJobId,
+        jobId,
         templateId: selectedTemplateId,
+        technicianId: selectedTechnicianId,
       });
-      setAssigningJobId(null);
+      setAssigningJob(null);
       setSelectedTemplateId('');
+      setSelectedTechnicianId('');
       await load();
     } catch (err: any) {
       setError(err.message || 'Failed to assign template');
@@ -229,6 +240,7 @@ export function PartsReadyJobCards() {
                   const assignment = item.assignment;
                   const submission = item.submission;
                   const templateName = assignment?.template?.name ?? (assignment?.template as any)?.name ?? '—';
+                  const assignedTech = (assignment as { technician?: { name?: string } })?.technician?.name;
                   return (
                     <tr
                       key={jobId}
@@ -244,7 +256,9 @@ export function PartsReadyJobCards() {
                         </button>
                       </td>
                       <td className="py-3 px-4 text-gray-700">{customerName(item.job)}</td>
-                      <td className="py-3 px-4 text-gray-600">{technicianNames(item.job)}</td>
+                      <td className="py-3 px-4 text-gray-600">
+                        {assignedTech || technicianNames(item.job)}
+                      </td>
                       <td className="py-3 px-4">{templateName}</td>
                       <td className="py-3 px-4">
                         <span
@@ -282,7 +296,7 @@ export function PartsReadyJobCards() {
                             {!assignment ? (
                               <button
                                 type="button"
-                                onClick={() => openAssign(jobId)}
+                                onClick={() => openAssign(item.job)}
                                 className="inline-flex items-center gap-1 px-2 py-1 rounded border border-amber-500 text-amber-700 hover:bg-amber-50 text-xs font-medium"
                               >
                                 <Plus className="w-3 h-3" />
@@ -299,7 +313,7 @@ export function PartsReadyJobCards() {
                                     title="Record that the technician was notified (no message or email is sent)"
                                   >
                                     <Bell className="w-3 h-3" />
-                                    {notifyingId === assignment._id ? 'Saving…' : 'Mark notified'}
+                                    {notifyingId === assignment._id ? 'Saving…' : 'Record notified'}
                                   </button>
                                 )}
                                 {submission && (
@@ -338,23 +352,23 @@ export function PartsReadyJobCards() {
       )}
 
       {/* Assign template modal */}
-      {assigningJobId && (
+      {assigningJob && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Assign job card template</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Assign job card</h2>
               <button
                 type="button"
-                onClick={() => setAssigningJobId(null)}
+                onClick={() => setAssigningJob(null)}
                 className="p-1 rounded hover:bg-gray-100"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
             <p className="text-sm text-gray-600 mb-4">
-              Select a template to assign to this job. The technician can then be notified to complete it.
+              Select the form and technician. The technician will see this assignment in the mobile app.
             </p>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Template</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Form</label>
             <select
               value={selectedTemplateId}
               onChange={(e) => setSelectedTemplateId(e.target.value)}
@@ -366,10 +380,27 @@ export function PartsReadyJobCards() {
                 </option>
               ))}
             </select>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Technician</label>
+            <select
+              value={selectedTechnicianId}
+              onChange={(e) => setSelectedTechnicianId(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-4"
+            >
+              {technicians.map((t) => {
+                const linkedEmail =
+                  t.user && typeof t.user === 'object' ? t.user.email : null;
+                return (
+                  <option key={t._id} value={t._id}>
+                    {t.name}
+                    {linkedEmail ? ` · app: ${linkedEmail}` : ' · no app login linked'}
+                  </option>
+                );
+              })}
+            </select>
             <div className="flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setAssigningJobId(null)}
+                onClick={() => setAssigningJob(null)}
                 className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
               >
                 Cancel
@@ -377,7 +408,8 @@ export function PartsReadyJobCards() {
               <button
                 type="button"
                 onClick={handleAssign}
-                className="px-4 py-2 rounded-lg bg-amber-500 text-gray-900 font-medium hover:bg-amber-600 flex items-center gap-2"
+                disabled={!selectedTemplateId || !selectedTechnicianId}
+                className="px-4 py-2 rounded-lg bg-amber-500 text-gray-900 font-medium hover:bg-amber-600 flex items-center gap-2 disabled:opacity-50"
               >
                 <FileCheck className="w-4 h-4" />
                 Assign

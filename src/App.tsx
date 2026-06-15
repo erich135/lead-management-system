@@ -137,6 +137,11 @@ function AppContent() {
             <Dashboard view="partsReady" />
           </ProtectedRoute>
         } />
+        <Route path="/tech-app" element={
+          <ProtectedRoute>
+            <Dashboard view="techApp" />
+          </ProtectedRoute>
+        } />
         <Route path="/pending-machine-readings" element={
           <ProtectedRoute>
             <Dashboard view="pendingReadings" />

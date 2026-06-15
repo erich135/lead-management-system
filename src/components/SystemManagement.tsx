@@ -22,6 +22,10 @@ import {
   importSalesLeads,
   updateJobs,
   downloadExampleCSV,
+  getTechnicianAppRelease,
+  uploadTechnicianAppRelease,
+  updateTechnicianAppReleaseSettings,
+  type TechnicianAppReleaseInfo,
   getRepCodes,
   createRepCode,
   updateRepCode,
@@ -96,7 +100,8 @@ import {
   TrendingUp,
   Calendar,
   MapPin,
-  Banknote
+  Banknote,
+  Smartphone,
 } from 'lucide-react';
 import { ChangelogViewer } from './ChangelogViewer';
 import { ScheduledReports } from './ScheduledReports';
@@ -132,6 +137,15 @@ export function SystemManagement() {
   const [clearExisting, setClearExisting] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState<string>(''); // Branch ID or code
   const [importResult, setImportResult] = useState<{ imported?: number; updated: number; skipped?: number; errors: string[]; notFound?: number; duplicates?: { row: number; serialNumber: string; make: string; model: string }[] } | null>(null);
+
+  // Technician app APK release state
+  const [techAppRelease, setTechAppRelease] = useState<TechnicianAppReleaseInfo | null>(null);
+  const [techAppVersion, setTechAppVersion] = useState('');
+  const [techAppDownloadEnabled, setTechAppDownloadEnabled] = useState(false);
+  const [techAppApkFile, setTechAppApkFile] = useState<File | null>(null);
+  const [techAppUploading, setTechAppUploading] = useState(false);
+  const [techAppSavingSettings, setTechAppSavingSettings] = useState(false);
+  const [techAppMessage, setTechAppMessage] = useState<string | null>(null);
   
   // Branches state
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -200,10 +214,91 @@ export function SystemManagement() {
     loadData();
     loadImportHistory();
     loadBranches();
+    if (activeTab === 'imports') {
+      loadTechnicianAppRelease();
+    }
     if (activeTab === 'reference' || activeTab === 'scheduled-reports' || showInviteForm) {
       loadReferenceData();
     }
   }, [currentPage, searchTerm, activeTab, showInviteForm]);
+
+  /**
+   * Loads the current technician app APK release metadata.
+   */
+  async function loadTechnicianAppRelease() {
+    try {
+      const release = await getTechnicianAppRelease();
+      setTechAppRelease(release);
+      setTechAppVersion(release.version || '');
+      setTechAppDownloadEnabled(release.downloadEnabled);
+    } catch (err: unknown) {
+      console.error('Error loading technician app release:', err);
+    }
+  }
+
+  /**
+   * Uploads a new APK and replaces the current technician app release.
+   */
+  async function handleUploadTechnicianApp() {
+    if (!techAppApkFile) {
+      setTechAppMessage('Please select an APK file to upload.');
+      return;
+    }
+    if (!techAppVersion.trim()) {
+      setTechAppMessage('Please enter the app version number.');
+      return;
+    }
+
+    if (!window.confirm('Upload this APK? It will replace the current technician app release.')) {
+      return;
+    }
+
+    setTechAppUploading(true);
+    setTechAppMessage(null);
+    try {
+      const response = await uploadTechnicianAppRelease(
+        techAppApkFile,
+        techAppVersion.trim(),
+        techAppDownloadEnabled,
+      );
+      setTechAppRelease(response.data);
+      setTechAppApkFile(null);
+      setTechAppMessage(response.message || 'Technician app uploaded successfully.');
+    } catch (err: unknown) {
+      setTechAppMessage(err instanceof Error ? err.message : 'Failed to upload APK');
+    } finally {
+      setTechAppUploading(false);
+    }
+  }
+
+  /**
+   * Saves version label and download toggle without uploading a new APK.
+   */
+  async function handleSaveTechnicianAppSettings() {
+    if (!techAppRelease?.hasApk) {
+      setTechAppMessage('Upload an APK first before saving settings.');
+      return;
+    }
+    if (!techAppVersion.trim()) {
+      setTechAppMessage('Please enter the app version number.');
+      return;
+    }
+
+    setTechAppSavingSettings(true);
+    setTechAppMessage(null);
+    try {
+      const response = await updateTechnicianAppReleaseSettings(
+        techAppVersion.trim(),
+        techAppDownloadEnabled,
+      );
+      setTechAppRelease(response);
+      setTechAppMessage('Technician app settings saved.');
+    } catch (err: unknown) {
+      setTechAppMessage(err instanceof Error ? err.message : 'Failed to save settings');
+    } finally {
+      setTechAppSavingSettings(false);
+    }
+  }
 
   /**
    * Loads import history/statistics.
@@ -2554,6 +2649,124 @@ alert((response as any).message || 'User invited successfully');
                     )}
                   </button>
                 </div>
+              </div>
+            </div>
+
+            {/* Technician App APK */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-ars-heading flex items-center gap-2">
+                  <Smartphone className="w-5 h-5 text-ars-primary" />
+                  ARS Technician App (APK)
+                </h3>
+              </div>
+              <p className="text-sm text-ars-body mb-4">
+                Upload the latest Android APK for technicians. Uploading a new file replaces the current release. Technicians download it from Jobs → Tech App when downloads are enabled.
+              </p>
+
+              {techAppMessage && (
+                <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                  {techAppMessage}
+                </div>
+              )}
+
+              {techAppRelease?.hasApk && (
+                <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                  Current release: v{techAppRelease.version}
+                  {techAppRelease.uploadedAt
+                    ? ` · uploaded ${new Date(techAppRelease.uploadedAt).toLocaleString()}`
+                    : ''}
+                  {techAppRelease.uploadedBy?.name ? ` by ${techAppRelease.uploadedBy.name}` : ''}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-medium text-gray-600 mb-1">App version</label>
+                  <input
+                    type="text"
+                    value={techAppVersion}
+                    onChange={(e) => setTechAppVersion(e.target.value)}
+                    placeholder="e.g. 1.0.0"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[13px]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-gray-600 mb-1">Allow download</label>
+                  <button
+                    type="button"
+                    onClick={() => setTechAppDownloadEnabled((current) => !current)}
+                    className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                      techAppDownloadEnabled ? 'bg-ars-primary' : 'bg-gray-300'
+                    }`}
+                    aria-pressed={techAppDownloadEnabled}
+                  >
+                    <span
+                      className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                        techAppDownloadEnabled ? 'translate-x-7' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                  <p className="text-xs text-ars-body mt-2">
+                    {techAppDownloadEnabled
+                      ? 'Technicians can download the APK from Jobs → Tech App.'
+                      : 'Download page shows “Not available at the moment”.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-[11px] font-medium text-gray-600 mb-1">APK file</label>
+                <input
+                  type="file"
+                  accept=".apk,application/vnd.android.package-archive"
+                  onChange={(e) => setTechAppApkFile(e.target.files?.[0] || null)}
+                  className="w-full px-2 py-2 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[13px] file:mr-4 file:py-1.5 file:px-4 file:rounded-[6px] file:border-0 file:text-[13px] file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 cursor-pointer"
+                />
+                {techAppApkFile && (
+                  <p className="text-xs text-ars-body mt-2">
+                    Selected: {techAppApkFile.name} ({(techAppApkFile.size / (1024 * 1024)).toFixed(1)} MB)
+                  </p>
+                )}
+              </div>
+
+              <div className="mt-5 flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={handleUploadTechnicianApp}
+                  disabled={techAppUploading || !techAppApkFile}
+                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {techAppUploading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#383838]" />
+                      UPLOADING APK...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      UPLOAD &amp; REPLACE APK
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveTechnicianAppSettings}
+                  disabled={techAppSavingSettings || !techAppRelease?.hasApk}
+                  className="flex-1 px-4 py-2.5 border-2 border-gray-300 text-ars-heading rounded-[8px] font-bold text-[14px] hover:bg-gray-50 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {techAppSavingSettings ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-ars-primary" />
+                      SAVING...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      SAVE SETTINGS ONLY
+                    </>
+                  )}
+                </button>
               </div>
             </div>
 

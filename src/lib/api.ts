@@ -1829,6 +1829,104 @@ export async function getImportHistory(): Promise<{ data: ImportHistory }> {
   return apiRequest('/api/import/history');
 }
 
+export interface TechnicianAppReleaseInfo {
+  version: string | null;
+  downloadEnabled: boolean;
+  hasApk: boolean;
+  fileSize: number | null;
+  originalFileName: string | null;
+  uploadedAt: string | null;
+  uploadedBy: { name?: string; email?: string } | null;
+}
+
+/**
+ * Gets metadata for the latest ARS Technician mobile app APK.
+ */
+export async function getTechnicianAppRelease(): Promise<TechnicianAppReleaseInfo> {
+  return apiRequest('/api/technician-app/release');
+}
+
+/**
+ * Uploads a new technician app APK (super admin only).
+ */
+export async function uploadTechnicianAppRelease(
+  file: File,
+  version: string,
+  downloadEnabled: boolean,
+): Promise<{ message: string; data: TechnicianAppReleaseInfo }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('version', version);
+  formData.append('downloadEnabled', String(downloadEnabled));
+
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/technician-app/release`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Failed to upload APK' } }));
+    throw new Error(error.error?.message || 'Failed to upload APK');
+  }
+
+  return response.json();
+}
+
+/**
+ * Updates technician app version label and download availability without replacing the APK.
+ */
+export async function updateTechnicianAppReleaseSettings(
+  version: string,
+  downloadEnabled: boolean,
+): Promise<TechnicianAppReleaseInfo> {
+  return apiRequest('/api/technician-app/release', {
+    method: 'PATCH',
+    body: JSON.stringify({ version, downloadEnabled }),
+  });
+}
+
+/**
+ * Downloads the latest technician app APK as a file.
+ */
+export async function downloadTechnicianAppApk(versionLabel?: string): Promise<void> {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/technician-app/release/download`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Download failed' } }));
+    throw new Error(error.error?.message || 'Download failed');
+  }
+
+  const blob = await response.blob();
+  const safeVersion = (versionLabel || 'latest').replace(/[^\w.-]+/g, '_');
+  const fileName = `ARS-Technician-${safeVersion}.apk`;
+
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 /**
  * Imports jobs from CSV file.
  */
@@ -2948,6 +3046,10 @@ export interface JobCardTemplate {
   _id?: string;
   name: string;
   description?: string;
+  templateKey?: string;
+  isSystemTemplate?: boolean;
+  sections?: unknown[];
+  pdfBackground?: string;
   fields?: any[]; // Legacy support
   groups?: any[]; // New structure: groups with tables
   header?: any; // Header configuration
@@ -2976,9 +3078,12 @@ export interface JobCardTemplateResponse {
 /**
  * Gets all job card templates.
  */
-export async function getJobCardTemplates(includeInactive?: boolean): Promise<JobCardTemplatesResponse> {
-  const params = includeInactive ? '?includeInactive=true' : '';
-  return await apiRequest<JobCardTemplatesResponse>(`/api/job-card-templates${params}`);
+export async function getJobCardTemplates(includeInactive?: boolean, systemOnly?: boolean): Promise<JobCardTemplatesResponse> {
+  const search = new URLSearchParams();
+  if (includeInactive) search.set('includeInactive', 'true');
+  if (systemOnly) search.set('systemOnly', 'true');
+  const qs = search.toString();
+  return await apiRequest<JobCardTemplatesResponse>(`/api/job-card-templates${qs ? `?${qs}` : ''}`);
 }
 
 /**
@@ -3055,12 +3160,51 @@ export async function getPartsReadyJobs(): Promise<{
 export async function createJobCardAssignment(params: {
   jobId: string;
   templateId: string;
+  technicianId: string;
   notes?: string;
 }): Promise<{ assignment: any }> {
   return apiRequest<{ assignment: any }>(
     '/api/job-card-assignments',
     { method: 'POST', body: JSON.stringify(params) }
   );
+}
+
+/** Job card submission record. */
+export interface JobCardSubmissionRecord {
+  _id: string;
+  template: JobCardTemplate & { templateKey?: string; sections?: unknown[]; pdfBackground?: string };
+  job: Job & Record<string, unknown>;
+  submittedBy?: { firstName?: string; lastName?: string; email?: string };
+  reportNumber?: string;
+  fieldValues: Array<{ fieldId: string; type: string; value: unknown; signatureData?: string }>;
+  submittedAt: string;
+  notes?: string;
+}
+
+/**
+ * Gets all job card submissions.
+ */
+export async function getJobCardSubmissions(params?: {
+  template?: string;
+  job?: string;
+  page?: number;
+}): Promise<{ submissions: JobCardSubmissionRecord[]; pagination: { total: number } }> {
+  const search = new URLSearchParams();
+  if (params?.template) search.set('template', params.template);
+  if (params?.job) search.set('job', params.job);
+  if (params?.page) search.set('page', String(params.page));
+  const qs = search.toString();
+  return apiRequest(`/api/job-card-submissions${qs ? `?${qs}` : ''}`);
+}
+
+/**
+ * Gets a single job card submission with machine data for print preview.
+ */
+export async function getJobCardSubmission(id: string): Promise<{
+  submission: JobCardSubmissionRecord;
+  machine?: Record<string, unknown>;
+}> {
+  return apiRequest(`/api/job-card-submissions/${id}`);
 }
 
 /**

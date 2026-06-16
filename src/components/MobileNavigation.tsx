@@ -1,15 +1,16 @@
-import { LayoutDashboard, FileText, BarChart3, Calendar, Users, Menu, X, Bell, LogOut, Clock, Cog, Briefcase, Smartphone } from 'lucide-react';
+import { LayoutDashboard, FileText, BarChart3, Calendar, Users, Menu, X, Bell, LogOut, Clock, Cog, Briefcase, Smartphone, ScanLine } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
-type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady' | 'techApp';
+type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady' | 'techApp' | 'pendingReadings';
 
 interface MobileNavigationProps {
   currentView: View;
   onViewChange: (view: View) => void;
   notificationsCount: number;
   onNotificationsClick: () => void;
+  pendingReadingsCount?: number;
 }
 
 /**
@@ -21,6 +22,7 @@ export function MobileNavigation({
   onViewChange,
   notificationsCount,
   onNotificationsClick,
+  pendingReadingsCount = 0,
 }: MobileNavigationProps) {
   const { user, signOut, hasPermission } = useAuth();
   const location = useLocation();
@@ -40,6 +42,7 @@ export function MobileNavigation({
     if (path === '/job-card-submissions') return 'jobCardSubmissions';
     if (path === '/parts-ready') return 'partsReady';
     if (path === '/tech-app') return 'techApp';
+    if (path === '/pending-machine-readings') return 'pendingReadings';
     return 'dashboard';
   };
 
@@ -49,6 +52,7 @@ export function MobileNavigation({
   const canViewReports = user?.isSuperAdmin || hasPermission('reports.read');
   const canViewSalesLeads = user?.isSuperAdmin || hasPermission('sales_leads.read');
   const canViewTechApp = user?.isSuperAdmin || user?.role?.name?.toLowerCase() === 'technician';
+  const canVerifyReadings = user?.isSuperAdmin || hasPermission('machines.verifyReadings');
 
   const navItems = [
     { id: 'dashboard' as View, label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
@@ -177,6 +181,32 @@ export function MobileNavigation({
                   >
                     <Smartphone className="w-5 h-5" />
                     <span className="font-medium">Tech App</span>
+                  </Link>
+                )}
+
+                {/* QR Readings (permission-gated) */}
+                {canVerifyReadings && (
+                  <Link
+                    to="/pending-machine-readings"
+                    onClick={() => setShowMenu(false)}
+                    className={`w-full flex items-center gap-4 p-4 rounded-[8px] transition-all ${
+                      activeView === 'pendingReadings'
+                        ? 'bg-ars-secondary/20 text-ars-heading'
+                        : 'bg-gray-50 text-ars-heading hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="relative">
+                      <ScanLine className="w-5 h-5" />
+                      {pendingReadingsCount > 0 && (
+                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                          {pendingReadingsCount > 9 ? '9+' : pendingReadingsCount}
+                        </span>
+                      )}
+                    </div>
+                    <span className="font-medium">QR Readings</span>
+                    {pendingReadingsCount > 0 && (
+                      <span className="ml-auto text-xs text-red-500 font-semibold">{pendingReadingsCount} pending</span>
+                    )}
                   </Link>
                 )}
 

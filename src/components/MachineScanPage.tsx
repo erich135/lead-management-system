@@ -9,11 +9,15 @@ import {
   Wrench,
   Clock,
   X,
+  History,
+  CalendarClock,
 } from 'lucide-react';
 import {
   getPublicMachineForScan,
   submitPublicMachineReading,
+  getPublicMachineReadingHistory,
   type PublicMachineForScan,
+  type PublicReadingHistoryEntry,
 } from '../lib/api';
 
 type Phase = 'loading' | 'capture' | 'submitting' | 'confirmed' | 'error';
@@ -32,6 +36,7 @@ export function MachineScanPage() {
   const [phase, setPhase] = useState<Phase>('loading');
   const [machine, setMachine] = useState<PublicMachineForScan | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [history, setHistory] = useState<PublicReadingHistoryEntry[]>([]);
 
   // Form state
   const [hours, setHours] = useState<string>('');
@@ -112,6 +117,10 @@ export function MachineScanPage() {
         setMachine(m);
         setHours(String(m.machineHours ?? ''));
         setPhase('capture');
+        // Load history in background — non-blocking
+        getPublicMachineReadingHistory(token)
+          .then(({ submissions }) => { if (!cancelled) setHistory(submissions); })
+          .catch(() => {/* silently ignore — history is non-critical */});
       } catch (e: any) {
         if (cancelled) return;
         setLoadError(e?.message || 'Unable to load machine');
@@ -274,7 +283,50 @@ export function MachineScanPage() {
               </span>
             )}
           </div>
+          {/* Service schedule */}
+          {machine.nextServiceHours > 0 && (
+            <div className="mt-3 pt-3 border-t border-slate-200 flex items-center gap-2 text-sm">
+              <CalendarClock className="w-4 h-4 text-slate-500" />
+              <span className="text-slate-600">Next service:</span>
+              <span className="font-semibold text-slate-800">
+                {machine.nextServiceHours.toLocaleString()} hrs
+              </span>
+              {machine.serviceDue ? (
+                <span className="ml-auto text-xs text-amber-700 font-medium">
+                  Overdue by {(machine.machineHours - machine.nextServiceHours).toLocaleString()} hrs
+                </span>
+              ) : (
+                <span className="ml-auto text-xs text-slate-500">
+                  {(machine.nextServiceHours - machine.machineHours).toLocaleString()} hrs remaining
+                </span>
+              )}
+            </div>
+          )}
         </div>
+
+        {/* Reading history */}
+        {history.length > 0 && (
+          <details className="border border-slate-200 rounded-lg">
+            <summary className="cursor-pointer flex items-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700">
+              <History className="w-4 h-4 text-slate-500" />
+              Reading History ({history.length})
+            </summary>
+            <div className="divide-y divide-slate-100">
+              {history.map((entry) => (
+                <div key={entry._id} className="px-4 py-2 flex items-center justify-between text-sm">
+                  <span className="font-medium text-slate-800">
+                    {(entry.approvedHours ?? entry.submittedHours).toLocaleString()} hrs
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    {new Date(entry.verifiedAt ?? entry.submittedAt).toLocaleDateString('en-ZA', {
+                      day: '2-digit', month: 'short', year: 'numeric',
+                    })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
 
         {/* Hours */}
         <div>

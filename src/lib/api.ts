@@ -4239,6 +4239,31 @@ export async function submitPublicMachineReading(
   return body.data;
 }
 
+export interface PublicReadingHistoryEntry {
+  _id: string;
+  submittedHours: number;
+  approvedHours?: number;
+  submittedAt: string;
+  verifiedAt?: string;
+}
+
+/**
+ * Public, unauthenticated — returns approved reading history for the machine.
+ */
+export async function getPublicMachineReadingHistory(
+  token: string,
+): Promise<{ submissions: PublicReadingHistoryEntry[] }> {
+  const url = `${API_BASE_URL}/api/public/machine-readings/${encodeURIComponent(token)}/history`;
+  const response = await fetch(url, {
+    headers: { Accept: 'application/json' },
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || !body?.success) {
+    throw new Error(body?.error?.message || body?.message || 'Failed to load history');
+  }
+  return body.data;
+}
+
 /**
  * Lists submissions in the verification queue.
  * Requires machines.verifyReadings.

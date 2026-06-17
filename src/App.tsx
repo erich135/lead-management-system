@@ -158,7 +158,7 @@ function AppContent() {
 
       {/* Auto-start GPS tracking for enabled users */}
       {/* AutoLocationTracker disabled — re-enable when location tracking is needed */}
-      {/* {user && <AutoLocationTracker />} */
+      {/* {user && <AutoLocationTracker />} */}
     </>
   );
 }

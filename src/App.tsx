@@ -5,7 +5,7 @@ import { SetPasswordPage } from './components/SetPasswordPage';
 import { ResetPasswordPage } from './components/ResetPasswordPage';
 import { Dashboard } from './components/Dashboard';
 import { ChatWidget } from './components/ChatWidget';
-import { AutoLocationTracker } from './components/AutoLocationTracker';
+// import { AutoLocationTracker } from './components/AutoLocationTracker'; // disabled
 import { MachineScanPage } from './components/MachineScanPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -157,7 +157,8 @@ function AppContent() {
       {user && <ChatWidget />}
 
       {/* Auto-start GPS tracking for enabled users */}
-      {user && <AutoLocationTracker />}
+      {/* AutoLocationTracker disabled — re-enable when location tracking is needed */}
+      {/* {user && <AutoLocationTracker />} */
     </>
   );
 }

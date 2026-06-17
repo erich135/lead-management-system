@@ -263,9 +263,37 @@ export function JobCardTemplates() {
               </div>
             </div>
 
-            {customTemplates.length > 0 && (
-              <div>
-                <h2 className="text-lg font-semibold text-gray-800 mb-3">Custom templates (legacy)</h2>
+            {/* Custom Templates Section */}
+            <div className="mt-8">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-800">Custom Templates</h2>
+                  <p className="text-sm text-gray-500">Build your own job card templates with custom sections and questions.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCreateNew}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d548] text-[#383838] font-semibold rounded-[8px] hover:shadow-md transition-all text-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  New Template
+                </button>
+              </div>
+
+              {customTemplates.length === 0 ? (
+                <div className="text-center py-10 border-2 border-dashed border-gray-200 rounded-[8px]">
+                  <ClipboardList className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                  <p className="text-sm text-gray-500 mb-4">No custom templates yet.</p>
+                  <button
+                    type="button"
+                    onClick={handleCreateNew}
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d548] text-[#383838] font-semibold rounded-[8px] hover:shadow-md transition-all text-sm mx-auto"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Create your first template
+                  </button>
+                </div>
+              ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {customTemplates.map((template) => (
                     <div key={template._id} className="bg-white border rounded-[8px] p-4">
@@ -284,8 +312,8 @@ export function JobCardTemplates() {
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             <div className="mt-6 p-4 bg-gray-50 border rounded-lg flex items-start gap-3">
               <Lock className="w-5 h-5 text-gray-500 shrink-0 mt-0.5" />

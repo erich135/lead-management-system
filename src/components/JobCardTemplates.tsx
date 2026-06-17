@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ClipboardList, Edit, Trash2, Eye, X, CheckCircle, Lock, FileCheck } from 'lucide-react';
+import { ClipboardList, Edit, Trash2, Eye, X, CheckCircle, Lock, FileCheck, Plus } from 'lucide-react';
 import {
   getJobCardTemplates,
   updateJobCardTemplate,
@@ -54,6 +54,11 @@ export function JobCardTemplates() {
     const t = setTimeout(() => setSuccessMessage(null), 4000);
     return () => clearTimeout(t);
   }, [successMessage]);
+
+  const handleCreateNew = () => {
+    setEditingTemplate(null);
+    setShowBuilder(true);
+  };
 
   /**
    * Opens configure editor for system templates.

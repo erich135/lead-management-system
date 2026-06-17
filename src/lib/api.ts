@@ -616,6 +616,9 @@ export interface Customer {
   name: string;
   defaultContactPerson?: string;
   defaultWhatsAppNumber?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
 }
 
 export interface CashCustomer {
@@ -911,17 +914,18 @@ export async function getCustomers(params?: { search?: string; page?: number; li
 /**
  * Creates a new customer.
  */
-export async function createCustomer(name: string): Promise<{ customer: Customer }> {
+export async function createCustomer(data: string | { name: string; address?: string; phone?: string; email?: string; defaultContactPerson?: string; defaultWhatsAppNumber?: string }): Promise<{ customer: Customer }> {
+  const body = typeof data === 'string' ? { name: data } : data;
   return apiRequest('/api/reference/customers', {
     method: 'POST',
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(body),
   });
 }
 
 /**
  * Updates a customer's name and/or WhatsApp defaults.
  */
-export async function updateCustomer(id: string, data: { name?: string; defaultContactPerson?: string; defaultWhatsAppNumber?: string }): Promise<{ customer: Customer }> {
+export async function updateCustomer(id: string, data: { name?: string; defaultContactPerson?: string; defaultWhatsAppNumber?: string; address?: string; phone?: string; email?: string }): Promise<{ customer: Customer }> {
   return apiRequest(`/api/reference/customers/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),

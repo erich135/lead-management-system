@@ -70,6 +70,10 @@ import {
   createMachineType,
   updateMachineType,
   deleteMachineType,
+  getCustomers,
+  createCustomer,
+  updateCustomer,
+  Customer,
 } from '../lib/api';
 import { 
   Users, 
@@ -102,6 +106,7 @@ import {
   MapPin,
   Banknote,
   Smartphone,
+  Phone,
 } from 'lucide-react';
 import { ChangelogViewer } from './ChangelogViewer';
 import { ScheduledReports } from './ScheduledReports';
@@ -192,6 +197,13 @@ export function SystemManagement() {
   const [showMachineTypeForm, setShowMachineTypeForm] = useState(false);
   const [newMachineType, setNewMachineType] = useState({ name: '', serviceType: 'hours' as 'hours' | 'date' });
   const [isMachineTypesExpanded, setIsMachineTypesExpanded] = useState(false);
+  const [isCustomersExpanded, setIsCustomersExpanded] = useState(false);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [showCustomerForm, setShowCustomerForm] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [newCustomer, setNewCustomer] = useState({ name: '', address: '', phone: '', email: '', defaultContactPerson: '', defaultWhatsAppNumber: '' });
+  const [savingCustomer, setSavingCustomer] = useState(false);
   
   // Invite user state
   const [showInviteForm, setShowInviteForm] = useState(false);
@@ -358,6 +370,9 @@ export function SystemManagement() {
       // Load statuses
       const statusesResponse = await getStatuses();
       setStatuses(statusesResponse.statuses || []);
+      // Load customers
+      const customersResponse = await getCustomers({ limit: 10000 });
+      setCustomers(customersResponse.customers || []);
     } catch (err: any) {
       console.error('Error loading reference data:', err);
       setError(err.message || 'Failed to load reference data');
@@ -4568,6 +4583,225 @@ alert((response as any).message || 'User invited successfully');
                       <p className="text-center text-ars-body py-8">No machine types found. Click "Add Machine Type" to create one.</p>
                     )}
                   </div>
+                </>
+              )}
+            </div>
+
+            {/* Customers Section */}
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <button
+                onClick={() => setIsCustomersExpanded(!isCustomersExpanded)}
+                className="w-full flex items-center gap-2 text-xl font-bold text-ars-heading hover:text-ars-primary transition-colors"
+              >
+                {isCustomersExpanded ? <ChevronUp className="w-6 h-6 text-ars-primary" /> : <ChevronDown className="w-6 h-6 text-ars-primary" />}
+                <Building2 className="w-6 h-6 text-ars-primary" />
+                Customers
+              </button>
+
+              {isCustomersExpanded && (
+                <>
+                  <p className="mt-5 text-sm text-ars-body mb-4">
+                    Manage customer records. Add address, phone, email and contact person details. These customers are used in Jobs and Machines.
+                  </p>
+
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="relative flex-1 max-w-sm">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={customerSearch}
+                        onChange={e => setCustomerSearch(e.target.value)}
+                        placeholder="Search customers..."
+                        className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        setEditingCustomer(null);
+                        setNewCustomer({ name: '', address: '', phone: '', email: '', defaultContactPerson: '', defaultWhatsAppNumber: '' });
+                        setShowCustomerForm(true);
+                      }}
+                      className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      ADD CUSTOMER
+                    </button>
+                  </div>
+
+                  {/* Customer Form */}
+                  {(showCustomerForm || editingCustomer) && (
+                    <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="font-semibold text-ars-heading">
+                          {editingCustomer ? `Edit: ${editingCustomer.name}` : 'New Customer'}
+                        </h4>
+                        <button
+                          onClick={() => { setEditingCustomer(null); setShowCustomerForm(false); }}
+                          className="p-1 hover:bg-gray-200 rounded transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-semibold text-ars-body mb-1">Customer Name *</label>
+                          <input
+                            type="text"
+                            value={editingCustomer ? editingCustomer.name : newCustomer.name}
+                            onChange={e => editingCustomer ? setEditingCustomer({ ...editingCustomer, name: e.target.value }) : setNewCustomer({ ...newCustomer, name: e.target.value })}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                            placeholder="e.g., GAY001-Gayatri Cans Stand 44"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-semibold text-ars-body mb-1">Address</label>
+                          <input
+                            type="text"
+                            value={editingCustomer ? (editingCustomer.address || '') : newCustomer.address}
+                            onChange={e => editingCustomer ? setEditingCustomer({ ...editingCustomer, address: e.target.value } as any) : setNewCustomer({ ...newCustomer, address: e.target.value })}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                            placeholder="Physical or postal address"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-ars-body mb-1">Phone Number</label>
+                          <input
+                            type="text"
+                            value={editingCustomer ? ((editingCustomer as any).phone || '') : newCustomer.phone}
+                            onChange={e => editingCustomer ? setEditingCustomer({ ...editingCustomer, ...{ phone: e.target.value } } as any) : setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                            placeholder="e.g., 011 123 4567"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-ars-body mb-1">Email Address</label>
+                          <input
+                            type="email"
+                            value={editingCustomer ? ((editingCustomer as any).email || '') : newCustomer.email}
+                            onChange={e => editingCustomer ? setEditingCustomer({ ...editingCustomer, ...{ email: e.target.value } } as any) : setNewCustomer({ ...newCustomer, email: e.target.value })}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                            placeholder="e.g., accounts@customer.co.za"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-ars-body mb-1">Contact Person</label>
+                          <input
+                            type="text"
+                            value={editingCustomer ? (editingCustomer.defaultContactPerson || '') : newCustomer.defaultContactPerson}
+                            onChange={e => editingCustomer ? setEditingCustomer({ ...editingCustomer, defaultContactPerson: e.target.value }) : setNewCustomer({ ...newCustomer, defaultContactPerson: e.target.value })}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                            placeholder="e.g., John Smith"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-ars-body mb-1">WhatsApp Number</label>
+                          <input
+                            type="text"
+                            value={editingCustomer ? (editingCustomer.defaultWhatsAppNumber || '') : newCustomer.defaultWhatsAppNumber}
+                            onChange={e => editingCustomer ? setEditingCustomer({ ...editingCustomer, defaultWhatsAppNumber: e.target.value }) : setNewCustomer({ ...newCustomer, defaultWhatsAppNumber: e.target.value })}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                            placeholder="e.g., +27821234567"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-3 mt-4">
+                        <button
+                          disabled={savingCustomer}
+                          onClick={async () => {
+                            setSavingCustomer(true);
+                            try {
+                              if (editingCustomer) {
+                                const res = await updateCustomer(editingCustomer._id, {
+                                  name: editingCustomer.name,
+                                  address: (editingCustomer as any).address,
+                                  phone: (editingCustomer as any).phone,
+                                  email: (editingCustomer as any).email,
+                                  defaultContactPerson: editingCustomer.defaultContactPerson,
+                                  defaultWhatsAppNumber: editingCustomer.defaultWhatsAppNumber,
+                                });
+                                setCustomers(prev => prev.map(c => c._id === editingCustomer._id ? res.customer : c));
+                                setEditingCustomer(null);
+                              } else {
+                                const res = await createCustomer({
+                                  name: newCustomer.name,
+                                  address: newCustomer.address || undefined,
+                                  phone: newCustomer.phone || undefined,
+                                  email: newCustomer.email || undefined,
+                                  defaultContactPerson: newCustomer.defaultContactPerson || undefined,
+                                  defaultWhatsAppNumber: newCustomer.defaultWhatsAppNumber || undefined,
+                                });
+                                setCustomers(prev => [...prev, res.customer]);
+                                setNewCustomer({ name: '', address: '', phone: '', email: '', defaultContactPerson: '', defaultWhatsAppNumber: '' });
+                                setShowCustomerForm(false);
+                              }
+                            } catch (err: any) {
+                              alert(err.message || 'Failed to save customer');
+                            } finally {
+                              setSavingCustomer(false);
+                            }
+                          }}
+                          className="px-4 py-2.5 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2 disabled:opacity-50"
+                        >
+                          <Save className="w-4 h-4" />
+                          {savingCustomer ? 'SAVING...' : editingCustomer ? 'UPDATE' : 'CREATE'}
+                        </button>
+                        <button
+                          onClick={() => { setEditingCustomer(null); setShowCustomerForm(false); }}
+                          className="px-4 py-2.5 border border-gray-300 rounded-[8px] font-bold text-[14px] hover:bg-gray-50 transition-colors"
+                        >
+                          CANCEL
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Customers List */}
+                  <div className="space-y-2">
+                    {customers
+                      .filter(c => !customerSearch || c.name.toLowerCase().includes(customerSearch.toLowerCase()))
+                      .map(c => (
+                        <div key={c._id} className="flex items-start justify-between p-4 bg-gray-50 rounded-xl border border-gray-200 gap-4">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-ars-heading">{c.name}</p>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+                              {(c as any).address && (
+                                <span className="text-xs text-ars-body flex items-center gap-1">
+                                  <MapPin className="w-3 h-3" />{(c as any).address}
+                                </span>
+                              )}
+                              {(c as any).phone && (
+                                <span className="text-xs text-ars-body flex items-center gap-1">
+                                  <Phone className="w-3 h-3" />{(c as any).phone}
+                                </span>
+                              )}
+                              {(c as any).email && (
+                                <span className="text-xs text-ars-body flex items-center gap-1">
+                                  <Mail className="w-3 h-3" />{(c as any).email}
+                                </span>
+                              )}
+                              {c.defaultContactPerson && (
+                                <span className="text-xs text-ars-body flex items-center gap-1">
+                                  <Users className="w-3 h-3" />{c.defaultContactPerson}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => { setShowCustomerForm(false); setEditingCustomer(c); }}
+                            className="p-2 text-ars-primary hover:bg-blue-50 rounded-lg transition-colors flex-shrink-0"
+                            title="Edit customer"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    {customers.filter(c => !customerSearch || c.name.toLowerCase().includes(customerSearch.toLowerCase())).length === 0 && (
+                      <p className="text-center text-ars-body py-8">
+                        {customerSearch ? 'No customers match your search.' : 'No customers found.'}
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-3">{customers.length} customer{customers.length !== 1 ? 's' : ''} total</p>
                 </>
               )}
             </div>

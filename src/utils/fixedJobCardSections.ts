@@ -137,6 +137,72 @@ export function getNextChecklistNumber(items: ChecklistItem[] = []): number {
   return max + 1;
 }
 
+/** Section types admins can add between header and sign-off. */
+export type AddableSectionType = 'fields' | 'checklist' | 'yesno_list';
+
+/**
+ * Generates a stable custom section ID for admin-added sections.
+ */
+export function generateCustomSectionId(prefix = 'section'): string {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Returns the index of the sign-off section, or -1 if not found.
+ */
+export function findSignOffSectionIndex(sections: FixedFormSection[]): number {
+  return sections.findIndex((section) => section.type === 'signatures');
+}
+
+/**
+ * Returns whether a section can be deleted from the template editor.
+ */
+export function canDeleteTemplateSection(
+  section: FixedFormSection,
+  isSystemTemplate: boolean
+): boolean {
+  if (section.type === 'header' || section.type === 'signatures') return false;
+  if (isSystemTemplate) return Boolean(section.isCustom);
+  return true;
+}
+
+/**
+ * Creates an empty custom section ready for questions to be added.
+ */
+export function createEmptyCustomSection(
+  type: AddableSectionType,
+  title: string
+): FixedFormSection {
+  const id = generateCustomSectionId();
+  const base: FixedFormSection = {
+    id,
+    title: title.trim() || 'New section',
+    type,
+    isCustom: true,
+    visible: true,
+  };
+
+  if (type === 'checklist') {
+    return { ...base, items: [] };
+  }
+
+  return { ...base, fields: [] };
+}
+
+/**
+ * Inserts a section immediately before the sign-off block.
+ */
+export function insertSectionBeforeSignOff(
+  sections: FixedFormSection[],
+  newSection: FixedFormSection
+): FixedFormSection[] {
+  const signOffIndex = findSignOffSectionIndex(sections);
+  if (signOffIndex < 0) return [...sections, newSection];
+  const next = [...sections];
+  next.splice(signOffIndex, 0, newSection);
+  return next;
+}
+
 /**
  * Returns how many items in a section are currently visible.
  */

@@ -70,7 +70,7 @@ export function PartsReadyJobCards() {
     try {
       const [partsRes, templatesRes, techRes] = await Promise.all([
         getPartsReadyJobs(),
-        getJobCardTemplates(false, true),
+        getJobCardTemplates(false, false, true),
         getTechnicians(),
       ]);
       setItems(partsRes.items || []);

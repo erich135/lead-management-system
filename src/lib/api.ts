@@ -3054,6 +3054,7 @@ export interface JobCardTemplate {
   isSystemTemplate?: boolean;
   sections?: unknown[];
   pdfBackground?: string;
+  reportPrefix?: 'RSR' | 'MCC';
   fields?: any[]; // Legacy support
   groups?: any[]; // New structure: groups with tables
   header?: any; // Header configuration
@@ -3082,10 +3083,15 @@ export interface JobCardTemplateResponse {
 /**
  * Gets all job card templates.
  */
-export async function getJobCardTemplates(includeInactive?: boolean, systemOnly?: boolean): Promise<JobCardTemplatesResponse> {
+export async function getJobCardTemplates(
+  includeInactive?: boolean,
+  systemOnly?: boolean,
+  assignableOnly?: boolean
+): Promise<JobCardTemplatesResponse> {
   const search = new URLSearchParams();
   if (includeInactive) search.set('includeInactive', 'true');
   if (systemOnly) search.set('systemOnly', 'true');
+  if (assignableOnly) search.set('assignableOnly', 'true');
   const qs = search.toString();
   return await apiRequest<JobCardTemplatesResponse>(`/api/job-card-templates${qs ? `?${qs}` : ''}`);
 }
@@ -3123,6 +3129,33 @@ export async function updateJobCardTemplate(id: string, template: Partial<JobCar
 export async function deleteJobCardTemplate(id: string): Promise<void> {
   return await apiRequest(`/api/job-card-templates/${id}`, {
     method: 'DELETE',
+  });
+}
+
+/**
+ * Duplicates a section-based template as a new custom form (mobile-compatible).
+ */
+export async function duplicateJobCardTemplate(
+  id: string,
+  data: { name: string; description?: string }
+): Promise<JobCardTemplateResponse> {
+  return await apiRequest<JobCardTemplateResponse>(`/api/job-card-templates/${id}/duplicate`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Creates a new blank mobile-ready form (job header + sign-off only).
+ */
+export async function createBlankJobCardTemplate(data: {
+  name: string;
+  description?: string;
+  reportPrefix?: 'RSR' | 'MCC';
+}): Promise<JobCardTemplateResponse> {
+  return await apiRequest<JobCardTemplateResponse>('/api/job-card-templates/blank', {
+    method: 'POST',
+    body: JSON.stringify(data),
   });
 }
 
@@ -4060,6 +4093,8 @@ export default {
   createJobCardTemplate,
   updateJobCardTemplate,
   deleteJobCardTemplate,
+  duplicateJobCardTemplate,
+  createBlankJobCardTemplate,
   // Location Tracking
   getLiveRepLocations,
   getLiveRepLocation,

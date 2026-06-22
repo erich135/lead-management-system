@@ -20,12 +20,16 @@ import { generateDummyJobCardPreviewData } from '../utils/fixedJobCardDummyData'
 import {
   type FixedFormSection,
   type ChecklistItem,
+  type AddableSectionType,
   isTemplateItemVisible,
   filterVisibleSections,
   countVisibleTemplateFields,
   countSectionVisibleItems,
   generateCustomFieldId,
   getNextChecklistNumber,
+  canDeleteTemplateSection,
+  createEmptyCustomSection,
+  insertSectionBeforeSignOff,
 } from '../utils/fixedJobCardSections';
 
 interface SystemJobCardTemplateEditorProps {
@@ -82,6 +86,7 @@ export function SystemJobCardTemplateEditor({
   const [sections, setSections] = useState<FixedFormSection[]>(
     () => JSON.parse(JSON.stringify(template.sections || [])) as FixedFormSection[]
   );
+  const [templateName, setTemplateName] = useState(template.name);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,6 +98,13 @@ export function SystemJobCardTemplateEditor({
     | null
   >(null);
   const [draft, setDraft] = useState<QuestionDraft>(EMPTY_DRAFT);
+  const [showSectionModal, setShowSectionModal] = useState(false);
+  const [sectionDraft, setSectionDraft] = useState<{ title: string; type: AddableSectionType }>({
+    title: '',
+    type: 'fields',
+  });
+
+  const isSystemTemplate = Boolean(template.isSystemTemplate);
 
   const visibleCount = useMemo(() => countVisibleTemplateFields(sections), [sections]);
   const totalCount = useMemo(
@@ -108,7 +120,11 @@ export function SystemJobCardTemplateEditor({
     setSaving(true);
     setError(null);
     try {
-      const res = await updateJobCardTemplate(template._id, { sections });
+      const payload: { sections: FixedFormSection[]; name?: string } = { sections };
+      if (!template.isSystemTemplate && templateName.trim()) {
+        payload.name = templateName.trim();
+      }
+      const res = await updateJobCardTemplate(template._id, payload);
       setSuccess('Form configuration saved. Technicians will see the updated questions.');
       onSaved?.(res.template);
       setTimeout(() => setSuccess(null), 4000);
@@ -442,6 +458,48 @@ export function SystemJobCardTemplateEditor({
     );
   };
 
+  /**
+   * Updates the title of an editable section.
+   */
+  const updateSectionTitle = (sectionId: string, title: string) => {
+    setSections((prev) =>
+      prev.map((section) => (section.id === sectionId ? { ...section, title } : section))
+    );
+  };
+
+  /**
+   * Inserts a new custom section before the sign-off block.
+   */
+  const addSection = () => {
+    if (!sectionDraft.title.trim()) return;
+    const newSection = createEmptyCustomSection(sectionDraft.type, sectionDraft.title);
+    setSections((prev) => insertSectionBeforeSignOff(prev, newSection));
+    setExpanded((prev) => ({ ...prev, [newSection.id]: true }));
+    setShowSectionModal(false);
+    setSectionDraft({ title: '', type: 'fields' });
+  };
+
+  /**
+   * Removes a section when allowed (not header/sign-off).
+   */
+  const deleteSection = (sectionId: string) => {
+    const section = sections.find((s) => s.id === sectionId);
+    if (!section || !canDeleteTemplateSection(section, isSystemTemplate)) return;
+    if (!confirm(`Delete section "${section.title}"? Questions in this section will be removed.`)) {
+      return;
+    }
+    setSections((prev) => prev.filter((s) => s.id !== sectionId));
+  };
+
+  /**
+   * Returns whether the section title can be edited in the UI.
+   */
+  const canEditSectionTitle = (section: FixedFormSection): boolean => {
+    if (section.type === 'header' || section.type === 'signatures') return false;
+    if (isSystemTemplate) return Boolean(section.isCustom);
+    return true;
+  };
+
   if (showFilledPreview) {
     const visibleSections = filterVisibleSections(sections);
     const dummy = generateDummyJobCardPreviewData(visibleSections, template.templateKey);
@@ -451,7 +509,11 @@ export function SystemJobCardTemplateEditor({
         fieldValues={dummy.fieldValues}
         job={dummy.job}
         machine={dummy.machine}
-        reportNumber={dummy.reportNumber}
+        reportNumber={
+          template.reportPrefix === 'MCC' || template.templateKey === 'mechanical_checklist'
+            ? 'MCC000001'
+            : 'RSR000001'
+        }
         isPreviewSample
         onClose={() => setShowFilledPreview(false)}
       />
@@ -464,15 +526,31 @@ export function SystemJobCardTemplateEditor({
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="sticky top-0 z-20 bg-white border-b shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between gap-4 flex-wrap">
-          <div>
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-bold text-gray-900">{template.name}</h1>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-900">
-                Configure form
+              {template.isSystemTemplate ? (
+                <h1 className="text-xl font-bold text-gray-900">{template.name}</h1>
+              ) : (
+                <input
+                  type="text"
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                  className="text-xl font-bold text-gray-900 border border-gray-300 rounded-lg px-2 py-1 max-w-full"
+                />
+              )}
+              <span
+                className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                  template.isSystemTemplate
+                    ? 'bg-amber-100 text-amber-900'
+                    : 'bg-blue-100 text-blue-900'
+                }`}
+              >
+                {template.isSystemTemplate ? 'System form' : 'Custom form'}
               </span>
             </div>
             <p className="text-sm text-gray-600 mt-1">
-              {visibleCount} of {totalCount} questions visible to technicians · Applies to this report only
+              {visibleCount} of {totalCount} questions visible to technicians
+              {template.isSystemTemplate ? ' · Applies to this report only' : ' · Assign from Parts Ready'}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0 flex-wrap">
@@ -512,22 +590,36 @@ export function SystemJobCardTemplateEditor({
         )}
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-900">
-          Toggle sections or individual questions on/off. Hidden items stay in the system but won&apos;t appear on
-          the technician app or printed report. Use <strong>Add question</strong> for extra checks on this form.
+          Toggle sections or individual questions on/off. Use <strong>Add section</strong> to insert new
+          blocks above sign-off. Job information and sign-off stay on every form. Hidden items won&apos;t
+          appear on the technician app or printed report.
         </div>
 
         {sections.map((section) => {
           const sectionVisible = isTemplateItemVisible(section);
           const counts = countSectionVisibleItems(section);
           const isOpen = expanded[section.id] ?? true;
+          const deletable = canDeleteTemplateSection(section, isSystemTemplate);
+          const titleEditable = canEditSectionTitle(section);
 
           return (
-            <div
-              key={section.id}
-              className={`bg-white rounded-lg border shadow-sm overflow-hidden ${
-                !sectionVisible ? 'opacity-60' : ''
-              }`}
-            >
+            <div key={section.id}>
+              {section.type === 'signatures' && (
+                <button
+                  type="button"
+                  onClick={() => setShowSectionModal(true)}
+                  className="w-full mb-4 py-3 px-4 rounded-lg border-2 border-dashed border-[#0969a9] text-[#0969a9] bg-blue-50/50 hover:bg-blue-50 flex items-center justify-center gap-2 text-sm font-semibold"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add section (above sign-off)
+                </button>
+              )}
+
+              <div
+                className={`bg-white rounded-lg border shadow-sm overflow-hidden mb-4 ${
+                  !sectionVisible ? 'opacity-60' : ''
+                }`}
+              >
               <div className="px-4 py-3 bg-gray-50 border-b flex items-center gap-3 flex-wrap">
                 <button
                   type="button"
@@ -537,9 +629,23 @@ export function SystemJobCardTemplateEditor({
                   {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                 </button>
                 <div className="flex-1 min-w-0">
-                  <h2 className="font-semibold text-gray-900">{section.title}</h2>
-                  <p className="text-xs text-gray-500">
-                    {counts.visible}/{counts.total} questions visible
+                  {titleEditable ? (
+                    <input
+                      type="text"
+                      value={section.title}
+                      onChange={(e) => updateSectionTitle(section.id, e.target.value)}
+                      className="font-semibold text-gray-900 border border-gray-300 rounded px-2 py-1 w-full max-w-md text-sm"
+                    />
+                  ) : (
+                    <h2 className="font-semibold text-gray-900">{section.title}</h2>
+                  )}
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {section.type === 'header'
+                      ? 'Auto-filled job & machine details'
+                      : section.type === 'signatures'
+                        ? 'Technician & customer sign-off'
+                        : `${counts.visible}/${counts.total} questions visible`}
+                    {section.isCustom ? ' · Custom section' : ''}
                   </p>
                 </div>
                 <button
@@ -559,6 +665,17 @@ export function SystemJobCardTemplateEditor({
                     </>
                   )}
                 </button>
+                {deletable && (
+                  <button
+                    type="button"
+                    onClick={() => deleteSection(section.id)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-red-200 text-red-700 text-xs font-medium hover:bg-red-50"
+                    title="Delete section"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete
+                  </button>
+                )}
                 {canAddToSection(section) && (
                   <button
                     type="button"
@@ -576,6 +693,7 @@ export function SystemJobCardTemplateEditor({
                   {renderSectionQuestions(section, setItemVisible, openEditModal, deleteQuestion)}
                 </div>
               )}
+              </div>
             </div>
           );
         })}
@@ -593,6 +711,61 @@ export function SystemJobCardTemplateEditor({
           }}
           onSave={saveQuestion}
         />
+      )}
+
+      {showSectionModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">Add section</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              New sections are inserted above sign-off. Add questions inside the section after creating it.
+            </p>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Section title</label>
+            <input
+              type="text"
+              value={sectionDraft.title}
+              onChange={(e) => setSectionDraft((prev) => ({ ...prev, title: e.target.value }))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-4"
+              placeholder="e.g. Site safety checks"
+              autoFocus
+            />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Section type</label>
+            <select
+              value={sectionDraft.type}
+              onChange={(e) =>
+                setSectionDraft((prev) => ({
+                  ...prev,
+                  type: e.target.value as AddableSectionType,
+                }))
+              }
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-4"
+            >
+              <option value="fields">Questions (text, yes/no, numbers)</option>
+              <option value="checklist">Checklist (pass / fail / N/A)</option>
+              <option value="yesno_list">Yes / No list</option>
+            </select>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSectionModal(false);
+                  setSectionDraft({ title: '', type: 'fields' });
+                }}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-sm hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={addSection}
+                disabled={!sectionDraft.title.trim()}
+                className="px-4 py-2 rounded-lg bg-[#0969a9] text-white text-sm font-medium hover:bg-[#075a8f] disabled:opacity-60"
+              >
+                Add section
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -629,6 +802,13 @@ function renderSectionQuestions(
   ) => void
 ) {
   if (section.type === 'checklist' && section.items) {
+    if (section.items.length === 0) {
+      return (
+        <p className="text-sm text-gray-500 italic">
+          No checklist items yet — click <strong>Add question</strong> above.
+        </p>
+      );
+    }
     return section.items.map((item) => (
       <QuestionRow
         key={item.id}
@@ -667,6 +847,13 @@ function renderSectionQuestions(
   }
 
   if (section.fields) {
+    if (section.fields.length === 0 && section.type !== 'header' && section.type !== 'signatures') {
+      return (
+        <p className="text-sm text-gray-500 italic">
+          No questions yet — click <strong>Add question</strong> above.
+        </p>
+      );
+    }
     return section.fields.map((field) => (
       <QuestionRow
         key={field.id}

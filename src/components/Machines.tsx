@@ -386,14 +386,20 @@ export function Machines() {
         return s.includes(',') || s.includes('"') || s.includes('\n')
           ? `"${s.replace(/"/g, '""')}"` : s;
       };
+      // Force Excel to treat as text (prevents phone → scientific notation, asset → date)
+      const escapeText = (v: unknown) => {
+        const s = v == null ? '' : String(v).trim();
+        if (!s) return '';
+        return `="` + s.replace(/"/g, '""') + `"`;
+      };
 
       const csvLines = [
         headers.join(','),
         ...rows.map((m) => [
           m.make,
           m.model,
-          m.serialNumber,
-          m.assetNumber ?? '',
+          escape(m.serialNumber),
+          escapeText(m.assetNumber ?? ''),
           m.machineType ?? '',
           typeof m.customer === 'object' && m.customer !== null ? m.customer.name : (m.customer ?? ''),
           m.cashCustomer ?? '',
@@ -408,9 +414,9 @@ export function Machines() {
           m.lastOilSampleDate ? new Date(m.lastOilSampleDate).toLocaleDateString('en-ZA') : '',
           m.oilSampleComment ?? '',
           m.contactPerson ?? '',
-          m.whatsAppNumber ?? '',
+          escapeText(m.whatsAppNumber ?? ''),
           m.readingFrequencyDays ?? '',
-        ].map(escape).join(',')),
+        ].join(',')),
       ];
 
       const blob = new Blob([csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });

@@ -378,6 +378,7 @@ export function Machines() {
         'Machine Hours', 'Next Service Hours',
         'Last Service Date', 'Next Service Date',
         'Current Location', 'Last Oil Sample Date', 'Oil Sample Comment',
+        'Contact Person', 'WhatsApp Number', 'Reading Frequency (Days)',
       ];
 
       const escape = (v: unknown) => {
@@ -406,6 +407,9 @@ export function Machines() {
           m.currentLocation ?? '',
           m.lastOilSampleDate ? new Date(m.lastOilSampleDate).toLocaleDateString('en-ZA') : '',
           m.oilSampleComment ?? '',
+          m.contactPerson ?? '',
+          m.whatsAppNumber ?? '',
+          m.readingFrequencyDays ?? '',
         ].map(escape).join(',')),
       ];
 

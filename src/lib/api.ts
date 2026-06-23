@@ -747,6 +747,8 @@ export interface Machine {
   whatsAppNumber?: string;
   /** How often (in days) to send a reading reminder. Default: 30 */
   readingFrequencyDays?: number;
+  /** Whether WhatsApp reading reminders are enabled for this machine */
+  whatsAppRemindersEnabled?: boolean;
   /** Stamped when an hour reading is approved */
   lastReadingReceivedAt?: string;
   /** Stamped when a WhatsApp reading reminder is sent */

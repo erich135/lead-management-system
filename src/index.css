@@ -94,17 +94,44 @@
     visibility: visible;
   }
 
+  /* Switch from fixed (viewport-clipped) to absolute so content can expand to full height */
   .job-card-print-root {
-    position: fixed;
-    inset: 0;
+    position: absolute !important;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: auto !important;
+    min-height: 100% !important;
     z-index: 99999;
     background: white !important;
     overflow: visible !important;
+    display: block !important;
+  }
+
+  /* Remove flex/scroll constraints from every direct child (toolbar bar + scroll container) */
+  .job-card-print-root > * {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    flex: none !important;
+    padding: 0 !important;
+    background: white !important;
   }
 
   .job-card-report {
     box-shadow: none !important;
     width: 100% !important;
     max-width: none !important;
+    page-break-inside: auto;
+  }
+
+  /* Allow tables to break across pages but keep rows together */
+  .job-card-report table {
+    page-break-inside: auto;
+  }
+
+  .job-card-report tr {
+    page-break-inside: avoid;
   }
 }

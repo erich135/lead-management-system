@@ -7,6 +7,7 @@ import { exportElementToPdf } from '../utils/exportJobCardPdf';
 import { filterVisibleSections } from '../utils/fixedJobCardSections';
 import { MechanicalChecklistReportDocument } from './fixedJobCardReports/MechanicalChecklistReportDocument';
 import { RepairStatusReportDocument } from './fixedJobCardReports/RepairStatusReportDocument';
+import { GenericSectionReportDocument } from './fixedJobCardReports/GenericSectionReportDocument';
 
 interface FixedJobCardPrintViewProps {
   template: {
@@ -118,15 +119,23 @@ export function FixedJobCardPrintView({
         className="flex-1 overflow-auto p-4 print:p-0 print:overflow-visible bg-gray-200 print:bg-white"
       >
         <div ref={printRef} className="mx-auto print:mx-0">
-          {isMechanical ? (
+          {template.templateKey === 'mechanical_checklist' ? (
             <MechanicalChecklistReportDocument
               sections={visibleSections as never[]}
               resolver={resolver}
               header={header}
               reportNumber={reportNumber}
             />
-          ) : (
+          ) : template.templateKey === 'repair_status_report' ? (
             <RepairStatusReportDocument
+              sections={visibleSections as never[]}
+              resolver={resolver}
+              header={header}
+              reportNumber={reportNumber}
+            />
+          ) : (
+            <GenericSectionReportDocument
+              templateName={template.name}
               sections={visibleSections as never[]}
               resolver={resolver}
               header={header}

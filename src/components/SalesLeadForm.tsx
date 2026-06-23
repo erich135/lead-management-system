@@ -285,15 +285,12 @@ export function SalesLeadForm({ lead, branches, repCodes, onClose, onSave }: Sal
                     if (selectedRep) {
                       const updates: any = { assignedRep: selectedRepId };
                       
-                      if (selectedRep.adminCode) {
-                        updates.adminCode = selectedRep.adminCode;
+                      if (selectedRep.adminCodes?.length > 0) {
+                        updates.adminCode = selectedRep.adminCodes[0];
                       }
                       
-                      if (selectedRep.branch) {
-                        const branchId = typeof selectedRep.branch === 'object' 
-                          ? selectedRep.branch._id 
-                          : selectedRep.branch;
-                        updates.branch = branchId;
+                      if (selectedRep.branches?.length > 0) {
+                        updates.branch = selectedRep.branches[0]._id;
                       }
                       
                       setFormData({ ...formData, ...updates });
@@ -437,10 +434,13 @@ export function SalesLeadForm({ lead, branches, repCodes, onClose, onSave }: Sal
             <textarea
               value={formData.notes}
               onChange={(e) => handleChange('notes', e.target.value)}
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
+              rows={8}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent resize-y"
               placeholder="Add any additional notes about this lead..."
             />
+            {formData.notes?.length > 0 && (
+              <p className="text-xs text-gray-400 mt-1 text-right">{formData.notes.length} characters</p>
+            )}
           </div>
 
           {/* Actions */}

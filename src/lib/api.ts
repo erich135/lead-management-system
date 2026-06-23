@@ -3128,6 +3128,27 @@ export async function deleteJobCardTemplate(id: string): Promise<void> {
   });
 }
 
+export async function duplicateJobCardTemplate(
+  id: string,
+  data: { name: string; description?: string }
+): Promise<JobCardTemplateResponse> {
+  return await apiRequest<JobCardTemplateResponse>(`/api/job-card-templates/${id}/duplicate`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function createBlankJobCardTemplate(data: {
+  name: string;
+  description?: string;
+  reportPrefix?: 'RSR' | 'MCC';
+}): Promise<JobCardTemplateResponse> {
+  return await apiRequest<JobCardTemplateResponse>('/api/job-card-templates/blank', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
 /** Parts Ready job row: job + optional assignment + optional submission. */
 export interface PartsReadyItem {
   job: Job & { bookings?: Array<{ technicianId: string; technicianName?: string }> };

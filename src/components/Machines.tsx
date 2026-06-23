@@ -130,7 +130,7 @@ export function Machines() {
     lastServiceDate: '', nextServiceDate: '',
     currentLocation: '', lastOilSampleDate: '', oilSampleComment: '',
     customerId: '', cashCustomer: '', isRental: false,
-    contactPerson: '', whatsAppNumber: '', readingFrequencyDays: 30,
+    contactPerson: '', whatsAppNumber: '', readingFrequencyDays: 30, whatsAppRemindersEnabled: true,
   });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -353,7 +353,7 @@ export function Machines() {
         lastServiceDate: '', nextServiceDate: '',
         currentLocation: '', lastOilSampleDate: '', oilSampleComment: '',
         customerId: '', cashCustomer: '', isRental: false,
-        contactPerson: '', whatsAppNumber: '', readingFrequencyDays: 30,
+        contactPerson: '', whatsAppNumber: '', readingFrequencyDays: 30, whatsAppRemindersEnabled: true,
       });
       await loadMachines(1);
     } catch (error: any) {
@@ -378,7 +378,7 @@ export function Machines() {
         'Machine Hours', 'Next Service Hours',
         'Last Service Date', 'Next Service Date',
         'Current Location', 'Last Oil Sample Date', 'Oil Sample Comment',
-        'Contact Person', 'WhatsApp Number', 'Reading Frequency (Days)',
+        'Contact Person', 'WhatsApp Number', 'Reading Frequency (Days)', 'Reminders Enabled',
       ];
 
       const escape = (v: unknown) => {
@@ -416,6 +416,7 @@ export function Machines() {
           m.contactPerson ?? '',
           escapeText(m.whatsAppNumber ?? ''),
           m.readingFrequencyDays ?? '',
+          m.whatsAppRemindersEnabled !== false ? 'Yes' : 'No',
         ].join(',')),
       ];
 
@@ -1302,6 +1303,24 @@ export function Machines() {
                                 />
                                 <p className="text-xs text-slate-400 mt-0.5">Days between reading reminders</p>
                               </div>
+                              <div className="md:col-span-3">
+                                <label className="flex items-center gap-3 cursor-pointer select-none">
+                                  <div className="relative">
+                                    <input
+                                      type="checkbox"
+                                      className="sr-only"
+                                      checked={(editForm as any).whatsAppRemindersEnabled !== false}
+                                      onChange={(e) => setEditForm({ ...editForm, whatsAppRemindersEnabled: e.target.checked } as any)}
+                                    />
+                                    <div className={`w-10 h-6 rounded-full transition-colors ${(editForm as any).whatsAppRemindersEnabled !== false ? 'bg-green-500' : 'bg-slate-300'}`} />
+                                    <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${(editForm as any).whatsAppRemindersEnabled !== false ? 'translate-x-4' : ''}`} />
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium text-slate-700">WhatsApp reminders enabled</p>
+                                    <p className="text-xs text-slate-400">Disable if customer no longer requires reminders</p>
+                                  </div>
+                                </label>
+                              </div>
                             </div>
                           ) : (
                             /* Read-Only Details */
@@ -1954,6 +1973,24 @@ export function Machines() {
                   <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Reading Frequency (days)</label>
                   <input type="number" min={1} value={createForm.readingFrequencyDays} onChange={e => setCreateForm({ ...createForm, readingFrequencyDays: parseInt(e.target.value) || 30 })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent" />
                   <p className="text-xs text-slate-400 mt-0.5">Days between reading reminders</p>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="flex items-center gap-3 cursor-pointer select-none">
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={createForm.whatsAppRemindersEnabled !== false}
+                        onChange={(e) => setCreateForm({ ...createForm, whatsAppRemindersEnabled: e.target.checked })}
+                      />
+                      <div className={`w-10 h-6 rounded-full transition-colors ${createForm.whatsAppRemindersEnabled !== false ? 'bg-green-500' : 'bg-slate-300'}`} />
+                      <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${createForm.whatsAppRemindersEnabled !== false ? 'translate-x-4' : ''}`} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-700">WhatsApp reminders enabled</p>
+                      <p className="text-xs text-slate-400">Disable if customer no longer requires reminders</p>
+                    </div>
+                  </label>
                 </div>
               </div>
               {createError && (

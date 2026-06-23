@@ -220,6 +220,7 @@ export function UnifiedMachineImport({ onClose, onImportComplete }: Props) {
                   {['Asset Number','Machine Type','Customer','Cash Customer','Unit Ownership',
                     'Service Type','Machine Hours','Next Service Hours','Last Service Date',
                     'Next Service Date','Current Location','Last Oil Sample Date','Oil Sample Comment',
+                    'Contact Person','WhatsApp Number','Reading Frequency (Days)',
                   ].map(c => (
                     <span key={c} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs">{c}</span>
                   ))}

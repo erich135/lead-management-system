@@ -903,11 +903,12 @@ export async function deleteStatus(id: string): Promise<void> {
 /**
  * Gets all customers.
  */
-export async function getCustomers(params?: { search?: string; page?: number; limit?: number }): Promise<{ customers: Customer[]; pagination: any }> {
+export async function getCustomers(params?: { search?: string; page?: number; limit?: number; includeArchived?: boolean }): Promise<{ customers: Customer[]; pagination: any }> {
   const queryParams = new URLSearchParams();
   if (params?.search) queryParams.append('search', params.search);
   if (params?.page) queryParams.append('page', params.page.toString());
   if (params?.limit) queryParams.append('limit', params.limit.toString());
+  if (params?.includeArchived) queryParams.append('includeArchived', 'true');
   
   const query = queryParams.toString();
   return apiRequest(`/api/reference/customers${query ? `?${query}` : ''}`);
@@ -927,7 +928,7 @@ export async function createCustomer(data: string | { name: string; address?: st
 /**
  * Updates a customer's name and/or WhatsApp defaults.
  */
-export async function updateCustomer(id: string, data: { name?: string; defaultContactPerson?: string; defaultWhatsAppNumber?: string; address?: string; phone?: string; email?: string }): Promise<{ customer: Customer }> {
+export async function updateCustomer(id: string, data: { name?: string; defaultContactPerson?: string; defaultWhatsAppNumber?: string; address?: string; phone?: string; email?: string; isActive?: boolean }): Promise<{ customer: Customer }> {
   return apiRequest(`/api/reference/customers/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
@@ -3238,6 +3239,19 @@ export async function getJobCardSubmission(id: string): Promise<{
   machine?: Record<string, unknown>;
 }> {
   return apiRequest(`/api/job-card-submissions/${id}`);
+}
+
+/**
+ * Patches editable field values on a submission. Signatures and photos are ignored server-side.
+ */
+export async function patchJobCardSubmission(
+  id: string,
+  data: { fieldValues?: { fieldId: string; value: unknown }[]; notes?: string }
+): Promise<{ submission: JobCardSubmissionRecord }> {
+  return apiRequest(`/api/job-card-submissions/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
 }
 
 /**

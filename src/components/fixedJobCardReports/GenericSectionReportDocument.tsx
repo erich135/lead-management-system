@@ -235,65 +235,38 @@ export function GenericSectionReportDocument({
       })}
 
       {/* Sign-off */}
-      {sigSection?.fields && sigSection.fields.length > 0 && (() => {
-        const nonPhotoFields = sigSection.fields.filter((f) => f.type !== 'photo');
-        const photoFields = sigSection.fields.filter((f) => f.type === 'photo');
-        return (
-          <div className="mb-2">
-            <SectionTitle title={sigSection.title} />
-            {nonPhotoFields.length > 0 && (
-              <table className="w-full border-collapse border border-black text-[8px]">
-                <tbody>
-                  {chunkArray(nonPhotoFields, 3).map((row, ri) => (
-                    <tr key={ri}>
-                      {row.map((field) => (
-                        <td key={field.id} className={cell}>
-                          <span className="font-semibold block text-gray-600">{field.label}</span>
-                          <div className="min-h-[20px] mt-0.5">
-                            {field.type === 'signature'
-                              ? (() => {
-                                  const img = resolver.resolveSignatureImage?.(field.id);
-                                  return img ? (
-                                    <img src={img} alt="Signature" className="max-h-10 max-w-[90px] object-contain" />
-                                  ) : null;
-                                })()
-                              : resolver.resolve(field)}
-                          </div>
-                        </td>
-                      ))}
-                      {row.length < 3 &&
-                        Array.from({ length: 3 - row.length }).map((_, i) => (
-                          <td key={`pad-${i}`} className={cell} />
-                        ))}
-                    </tr>
+      {sigSection?.fields && sigSection.fields.length > 0 && (
+        <div className="mb-2">
+          <SectionTitle title={sigSection.title} />
+          <table className="w-full border-collapse border border-black text-[8px]">
+            <tbody>
+              {chunkArray(sigSection.fields, 3).map((row, ri) => (
+                <tr key={ri}>
+                  {row.map((field) => (
+                    <td key={field.id} className={cell}>
+                      <span className="font-semibold block text-gray-600">{field.label}</span>
+                      <div className="min-h-[20px] mt-0.5">
+                        {field.type === 'signature'
+                          ? (() => {
+                              const img = resolver.resolveSignatureImage?.(field.id);
+                              return img ? (
+                                <img src={img} alt="Signature" className="max-h-10 max-w-[90px] object-contain" />
+                              ) : null;
+                            })()
+                          : resolver.resolve(field)}
+                      </div>
+                    </td>
                   ))}
-                </tbody>
-              </table>
-            )}
-            {photoFields.map((field) => {
-              const img = resolver.resolveSignatureImage?.(field.id);
-              return (
-                <table key={field.id} className="w-full border-collapse border border-black text-[8px] mt-1">
-                  <tbody>
-                    <tr>
-                      <td className={cell} style={{ width: '20%' }}>
-                        <span className="font-semibold text-gray-600">{field.label}</span>
-                      </td>
-                      <td className={cell}>
-                        {img ? (
-                          <img src={img} alt={field.label} className="max-h-32 max-w-[160px] object-contain" />
-                        ) : (
-                          <span className="text-gray-400 italic">No photo captured</span>
-                        )}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              );
-            })}
-          </div>
-        );
-      })()}
+                  {row.length < 3 &&
+                    Array.from({ length: 3 - row.length }).map((_, i) => (
+                      <td key={`pad-${i}`} className={cell} />
+                    ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

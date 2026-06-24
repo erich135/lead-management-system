@@ -106,8 +106,8 @@ export function createFixedJobCardFieldResolver(
    * Returns base64 image data for a captured signature field, if present.
    */
   const resolveSignatureImage = (fieldId: string): string | null => {
-    // Check signatureData first (drawn signatures), then imageData (captured photos)
-    const sig = valueMap.get(`${fieldId}_signature`) ?? valueMap.get(`${fieldId}_image`) ?? valueMap.get(fieldId);
+    // Check signatureData first (drawn signatures)
+    const sig = valueMap.get(`${fieldId}_signature`) ?? valueMap.get(fieldId);
     if (typeof sig === 'string' && sig.startsWith('data:image')) {
       return sig;
     }

@@ -107,6 +107,8 @@ import {
   Banknote,
   Smartphone,
   Phone,
+  Archive,
+  RotateCcw,
 } from 'lucide-react';
 import { ChangelogViewer } from './ChangelogViewer';
 import { ScheduledReports } from './ScheduledReports';
@@ -204,6 +206,9 @@ export function SystemManagement() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [newCustomer, setNewCustomer] = useState({ name: '', address: '', phone: '', email: '', defaultContactPerson: '', defaultWhatsAppNumber: '' });
   const [savingCustomer, setSavingCustomer] = useState(false);
+  const [showArchivedCustomers, setShowArchivedCustomers] = useState(false);
+  const [archivedCustomers, setArchivedCustomers] = useState<Customer[]>([]);
+  const [loadingArchivedCustomers, setLoadingArchivedCustomers] = useState(false);
   
   // Invite user state
   const [showInviteForm, setShowInviteForm] = useState(false);
@@ -4616,6 +4621,31 @@ alert((response as any).message || 'User invited successfully');
                       />
                     </div>
                     <button
+                      onClick={async () => {
+                        const next = !showArchivedCustomers;
+                        setShowArchivedCustomers(next);
+                        if (next && archivedCustomers.length === 0) {
+                          setLoadingArchivedCustomers(true);
+                          try {
+                            const res = await getCustomers({ includeArchived: true, limit: 500 });
+                            setArchivedCustomers(res.customers);
+                          } catch (err: any) {
+                            alert(err.message || 'Failed to load archived customers');
+                          } finally {
+                            setLoadingArchivedCustomers(false);
+                          }
+                        }
+                      }}
+                      className={`px-3 py-2 rounded-[8px] font-bold text-[13px] border transition-colors flex items-center gap-2 ${
+                        showArchivedCustomers
+                          ? 'bg-orange-100 border-orange-300 text-orange-700'
+                          : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      <Archive className="w-4 h-4" />
+                      {showArchivedCustomers ? 'HIDE ARCHIVED' : 'SHOW ARCHIVED'}
+                    </button>
+                    <button
                       onClick={() => {
                         setEditingCustomer(null);
                         setNewCustomer({ name: '', address: '', phone: '', email: '', defaultContactPerson: '', defaultWhatsAppNumber: '' });
@@ -4786,13 +4816,33 @@ alert((response as any).message || 'User invited successfully');
                               )}
                             </div>
                           </div>
-                          <button
-                            onClick={() => { setShowCustomerForm(false); setEditingCustomer(c); }}
-                            className="p-2 text-ars-primary hover:bg-blue-50 rounded-lg transition-colors flex-shrink-0"
-                            title="Edit customer"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              onClick={() => { setShowCustomerForm(false); setEditingCustomer(c); }}
+                              className="p-2 text-ars-primary hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Edit customer"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (!confirm(`Archive "${c.name}"?\n\nThis will hide the customer from all lists. You can restore it later from \'Show Archived\'.`)) return;
+                                try {
+                                  await updateCustomer(c._id, { isActive: false });
+                                  setCustomers(prev => prev.filter(x => x._id !== c._id));
+                                  if (showArchivedCustomers) {
+                                    setArchivedCustomers(prev => [...prev, c]);
+                                  }
+                                } catch (err: any) {
+                                  alert(err.message || 'Failed to archive customer');
+                                }
+                              }}
+                              className="p-2 text-orange-500 hover:bg-orange-50 rounded-lg transition-colors"
+                              title="Archive customer"
+                            >
+                              <Archive className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     {customers.filter(c => !customerSearch || c.name.toLowerCase().includes(customerSearch.toLowerCase())).length === 0 && (
@@ -4801,7 +4851,50 @@ alert((response as any).message || 'User invited successfully');
                       </p>
                     )}
                   </div>
-                  <p className="text-xs text-gray-400 mt-3">{customers.length} customer{customers.length !== 1 ? 's' : ''} total</p>
+
+                  {/* Archived Customers */}
+                  {showArchivedCustomers && (
+                    <div className="mt-6">
+                      <h4 className="text-sm font-semibold text-orange-600 mb-3 flex items-center gap-2">
+                        <Archive className="w-4 h-4" />
+                        Archived Customers ({archivedCustomers.length})
+                      </h4>
+                      {loadingArchivedCustomers ? (
+                        <p className="text-center text-ars-body py-4 text-sm">Loading archived customers...</p>
+                      ) : archivedCustomers.length === 0 ? (
+                        <p className="text-center text-ars-body py-4 text-sm">No archived customers.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {archivedCustomers.map(c => (
+                            <div key={c._id} className="flex items-start justify-between p-4 bg-orange-50 rounded-xl border border-orange-200 gap-4 opacity-75">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-ars-heading line-through">{c.name}</p>
+                                <p className="text-xs text-orange-600 mt-0.5">Archived</p>
+                              </div>
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const res = await updateCustomer(c._id, { isActive: true });
+                                    setArchivedCustomers(prev => prev.filter(x => x._id !== c._id));
+                                    setCustomers(prev => [...prev, res.customer]);
+                                  } catch (err: any) {
+                                    alert(err.message || 'Failed to restore customer');
+                                  }
+                                }}
+                                className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors flex-shrink-0 flex items-center gap-1 text-xs font-semibold"
+                                title="Restore customer"
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                                RESTORE
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <p className="text-xs text-gray-400 mt-3">{customers.length} active customer{customers.length !== 1 ? 's' : ''}</p>
                 </>
               )}
             </div>

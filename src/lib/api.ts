@@ -3203,9 +3203,15 @@ export interface JobCardSubmissionRecord {
   job: Job & Record<string, unknown>;
   submittedBy?: { firstName?: string; lastName?: string; email?: string };
   reportNumber?: string;
-  fieldValues: Array<{ fieldId: string; type: string; value: unknown; signatureData?: string }>;
+  fieldValues: Array<{ fieldId: string; type: string; value: unknown; signatureData?: string; imageData?: string }>;
   submittedAt: string;
   notes?: string;
+  submissionLocation?: {
+    lat: number;
+    lng: number;
+    accuracy?: number;
+    capturedAt?: string;
+  };
 }
 
 /**

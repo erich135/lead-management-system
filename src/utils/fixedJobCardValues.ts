@@ -7,6 +7,7 @@ export interface FieldValueEntry {
   type: string;
   value: unknown;
   signatureData?: string;
+  imageData?: string;
 }
 
 /**
@@ -18,6 +19,9 @@ export function buildFieldValueMap(fieldValues: FieldValueEntry[]): Map<string, 
     map.set(entry.fieldId, entry.value);
     if (entry.signatureData) {
       map.set(`${entry.fieldId}_signature`, entry.signatureData);
+    }
+    if (entry.imageData) {
+      map.set(`${entry.fieldId}_image`, entry.imageData);
     }
   }
   return map;

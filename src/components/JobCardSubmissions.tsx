@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { FileText, Eye, Download, Calendar, User, RefreshCw } from 'lucide-react';
+import { FileText, Eye, Download, Calendar, User, RefreshCw, MapPin } from 'lucide-react';
 import { getJobCardSubmissions, getJobCardSubmission, type JobCardSubmissionRecord } from '../lib/api';
 import { FixedJobCardPrintView } from './FixedJobCardPrintView';
 
@@ -146,6 +146,20 @@ export function JobCardSubmissions() {
                           <Calendar className="w-4 h-4" />
                           <span>{new Date(submission.submittedAt).toLocaleDateString()}</span>
                         </div>
+                        {submission.submissionLocation && (
+                          <div className="flex items-center gap-1">
+                            <MapPin className="w-4 h-4 text-green-600" />
+                            <a
+                              href={`https://www.google.com/maps?q=${submission.submissionLocation.lat},${submission.submissionLocation.lng}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-green-700 underline hover:text-green-900"
+                              title={`Accuracy: ${submission.submissionLocation.accuracy ? Math.round(submission.submissionLocation.accuracy) + 'm' : 'unknown'}`}
+                            >
+                              View location
+                            </a>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">

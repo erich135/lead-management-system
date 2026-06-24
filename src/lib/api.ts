@@ -3204,7 +3204,7 @@ export interface JobCardSubmissionRecord {
   job: Job & Record<string, unknown>;
   submittedBy?: { firstName?: string; lastName?: string; email?: string };
   reportNumber?: string;
-  fieldValues: Array<{ fieldId: string; type: string; value: unknown; signatureData?: string; imageData?: string }>;
+  fieldValues: Array<{ fieldId: string; type: string; value: unknown; signatureData?: string }>;
   submittedAt: string;
   notes?: string;
   submissionLocation?: {

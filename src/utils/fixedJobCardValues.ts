@@ -7,7 +7,6 @@ export interface FieldValueEntry {
   type: string;
   value: unknown;
   signatureData?: string;
-  imageData?: string;
 }
 
 /**

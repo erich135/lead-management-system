@@ -5,7 +5,7 @@ import {
   updateMachine,
   deleteMachine,
   getMachineRSRs,
-  uploadMachineRSR,
+  uploadRSR,
   getMachineRSRUrl,
   getRSRDocumentUrl,
   deleteMachineRSR,
@@ -19,11 +19,14 @@ import {
   confirmDedupMachines,
   sendWhatsAppTest,
   sendMachineWhatsAppTest,
+  getJobs,
+  getJob,
   type Machine,
   type MachineRSR,
   type Customer,
   type CustomerWithMachines,
   type MachineType,
+  type Job,
 } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { MachineQrPanel } from './MachineQrPanel';
@@ -93,9 +96,6 @@ export function Machines() {
   // RSR state
   const [machineRSRs, setMachineRSRs] = useState<MachineRSR[]>([]);
   const [loadingRSRs, setLoadingRSRs] = useState(false);
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Preview state
   const [previewRSR, setPreviewRSR] = useState<MachineRSR | null>(null);
@@ -135,16 +135,31 @@ export function Machines() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  // Upload form state
-  const [uploadTitle, setUploadTitle] = useState('');
-  const [uploadDescription, setUploadDescription] = useState('');
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadWorkDate, setUploadWorkDate] = useState('');
-  const [uploadCurrentHours, setUploadCurrentHours] = useState('');
-  const [uploadNextServiceHours, setUploadNextServiceHours] = useState('');
-  const [uploadNextServiceDate, setUploadNextServiceDate] = useState('');
-  const [isDragOver, setIsDragOver] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Job-linked RSR upload modal (top-level, fans out to a job's machines)
+  const [showJobRSRModal, setShowJobRSRModal] = useState(false);
+  const [jobRsrSearch, setJobRsrSearch] = useState('');
+  const [jobRsrResults, setJobRsrResults] = useState<Job[]>([]);
+  const [jobRsrSearching, setJobRsrSearching] = useState(false);
+  const [jobRsrSelectedJob, setJobRsrSelectedJob] = useState<Job | null>(null);
+  const [jobRsrMachineIds, setJobRsrMachineIds] = useState<string[]>([]);
+  const [jobRsrQuoteDate, setJobRsrQuoteDate] = useState('');
+  const [jobRsrJobNumber, setJobRsrJobNumber] = useState('');
+  const [jobRsrValue, setJobRsrValue] = useState('');
+  const [jobRsrDescription, setJobRsrDescription] = useState('');
+  const [jobRsrRsrNumber, setJobRsrRsrNumber] = useState('');
+  const [jobRsrPoNumber, setJobRsrPoNumber] = useState('');
+  const [jobRsrInvNumber, setJobRsrInvNumber] = useState('');
+  const [jobRsrFile, setJobRsrFile] = useState<File | null>(null);
+  const [jobRsrWorkDate, setJobRsrWorkDate] = useState('');
+  const [jobRsrCurrentHours, setJobRsrCurrentHours] = useState('');
+  const [jobRsrNextServiceHours, setJobRsrNextServiceHours] = useState('');
+  const [jobRsrNextServiceDate, setJobRsrNextServiceDate] = useState('');
+  const [jobRsrTech, setJobRsrTech] = useState('');
+  const [jobRsrHoursWorked, setJobRsrHoursWorked] = useState('');
+  const [jobRsrComments, setJobRsrComments] = useState('');
+  const [jobRsrUploading, setJobRsrUploading] = useState(false);
+  const [jobRsrError, setJobRsrError] = useState<string | null>(null);
+  const jobRsrFileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -434,105 +449,6 @@ export function Machines() {
     }
   };
 
-  const validateAndSetFile = (file: File) => {
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
-    if (!allowedTypes.includes(file.type)) {
-      setUploadError('Only PDF, JPEG, and PNG files are allowed');
-      return false;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      setUploadError('File size must be less than 10MB');
-      return false;
-    }
-    setUploadFile(file);
-    setUploadError(null);
-    return true;
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      validateAndSetFile(file);
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-  };
-
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-    
-    const files = e.dataTransfer?.files;
-    if (files && files.length > 0) {
-      const file = files[0];
-      validateAndSetFile(file);
-    }
-  }
-
-  const handleUploadRSR = async () => {
-    if (!expandedMachineId || !uploadFile || !uploadTitle.trim()) {
-      setUploadError('Please fill in all required fields');
-      return;
-    }
-    if (!uploadWorkDate) {
-      setUploadError('Date on RSR is required');
-      return;
-    }
-    // Validate based on machine service type
-    const machineServiceType = selectedMachine?.serviceType || 'hours';
-    if (machineServiceType === 'hours') {
-      if (!uploadCurrentHours || !uploadNextServiceHours) {
-        setUploadError('Current hours and next service hours are required');
-        return;
-      }
-    } else if (machineServiceType === 'date') {
-      if (!uploadNextServiceDate) {
-        setUploadError('Next service date is required');
-        return;
-      }
-    }
-    setUploading(true);
-    setUploadError(null);
-    try {
-      const extraFields: any = { workDate: uploadWorkDate };
-      if (machineServiceType === 'hours') {
-        extraFields.currentHours = Number(uploadCurrentHours);
-        extraFields.nextServiceHours = Number(uploadNextServiceHours);
-      } else {
-        extraFields.nextServiceDate = uploadNextServiceDate;
-      }
-      await uploadMachineRSR(expandedMachineId, uploadFile, uploadTitle.trim(), uploadDescription.trim() || undefined, extraFields);
-      const rsrs = await getMachineRSRs(expandedMachineId);
-      setMachineRSRs(rsrs);
-      // Also refresh the machines list to get updated hours/dates
-      await loadMachines(pagination.page);
-      setShowUploadModal(false);
-      setUploadTitle('');
-      setUploadDescription('');
-      setUploadFile(null);
-      setUploadWorkDate('');
-      setUploadCurrentHours('');
-      setUploadNextServiceHours('');
-      setUploadNextServiceDate('');
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    } catch (error: any) {
-      setUploadError(error.message || 'Failed to upload RSR');
-    } finally {
-      setUploading(false);
-    }
-  };
-
   const handleDownloadRSR = (rsr: MachineRSR) => {
     if (!expandedMachineId) return;
     const token = getAuthToken();
@@ -657,6 +573,163 @@ export function Machines() {
     }
   };
 
+  // ---- Job-linked RSR upload (top-level) ----
+  const resetJobRSRModal = () => {
+    setShowJobRSRModal(false);
+    setJobRsrSearch('');
+    setJobRsrResults([]);
+    setJobRsrSelectedJob(null);
+    setJobRsrMachineIds([]);
+    setJobRsrQuoteDate('');
+    setJobRsrJobNumber('');
+    setJobRsrValue('');
+    setJobRsrDescription('');
+    setJobRsrRsrNumber('');
+    setJobRsrPoNumber('');
+    setJobRsrInvNumber('');
+    setJobRsrFile(null);
+    setJobRsrWorkDate('');
+    setJobRsrCurrentHours('');
+    setJobRsrNextServiceHours('');
+    setJobRsrNextServiceDate('');
+    setJobRsrTech('');
+    setJobRsrHoursWorked('');
+    setJobRsrComments('');
+    setJobRsrError(null);
+    if (jobRsrFileInputRef.current) jobRsrFileInputRef.current.value = '';
+  };
+
+  // Debounced job search
+  useEffect(() => {
+    if (jobRsrSelectedJob) return; // don't search once a job is picked
+    const term = jobRsrSearch.trim();
+    if (term.length < 2) {
+      setJobRsrResults([]);
+      return;
+    }
+    let cancelled = false;
+    setJobRsrSearching(true);
+    const handle = setTimeout(async () => {
+      try {
+        const res = await getJobs({ search: term, limit: 10, allTime: 'true' });
+        if (!cancelled) setJobRsrResults(res.jobs || []);
+      } catch {
+        if (!cancelled) setJobRsrResults([]);
+      } finally {
+        if (!cancelled) setJobRsrSearching(false);
+      }
+    }, 300);
+    return () => { cancelled = true; clearTimeout(handle); };
+  }, [jobRsrSearch, jobRsrSelectedJob]);
+
+  const handleSelectJobForRSR = async (job: Job) => {
+    setJobRsrError(null);
+    try {
+      // Fetch full job to get populated machine details.
+      const { job: fullJob } = await getJob(job._id);
+      setJobRsrSelectedJob(fullJob);
+      const ids = (fullJob.machines || [])
+        .map((m: any) => (typeof m === 'string' ? m : m?._id))
+        .filter(Boolean) as string[];
+      setJobRsrMachineIds(ids);
+      // Pre-fill the technician from the job's bookings (still editable).
+      const techNames = Array.from(
+        new Set(
+          (fullJob.bookings || [])
+            .map((b: any) => (b.technicianName || '').trim())
+            .filter((n: string) => n.length > 0)
+        )
+      ) as string[];
+      if (techNames.length === 0 && fullJob.techBooked && typeof fullJob.techBooked === 'object') {
+        const tb = (fullJob.techBooked as any).name;
+        if (tb) techNames.push(tb);
+      }
+      setJobRsrTech(techNames.join(', '));
+      // Pre-fill the report fields from the job (all editable).
+      setJobRsrQuoteDate(fullJob.dateQuoted ? new Date(fullJob.dateQuoted).toISOString().split('T')[0] : '');
+      setJobRsrJobNumber(fullJob.jobNumber || '');
+      setJobRsrValue(fullJob.valueExVat != null ? String(fullJob.valueExVat) : '');
+      setJobRsrDescription(
+        typeof fullJob.description === 'object'
+          ? (fullJob.description?.name || '')
+          : (fullJob.description || '')
+      );
+      setJobRsrRsrNumber(fullJob.rsrNumber || '');
+      setJobRsrPoNumber(fullJob.poNumber || '');
+      setJobRsrInvNumber(fullJob.invNumber || '');
+      setJobRsrComments(fullJob.feedback || fullJob.notes || '');
+      const totalHrs = (fullJob.bookings || []).reduce((s: number, b: any) => s + (b.hoursWorked || 0), 0);
+      setJobRsrHoursWorked(totalHrs ? String(totalHrs) : '');
+      setJobRsrResults([]);
+    } catch (err: any) {
+      setJobRsrError(err.message || 'Failed to load job');
+    }
+  };
+
+  const toggleJobRsrMachine = (id: string) => {
+    setJobRsrMachineIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleUploadJobRSR = async () => {
+    if (!jobRsrSelectedJob) {
+      setJobRsrError('Select a job first');
+      return;
+    }
+    if (!jobRsrFile) {
+      setJobRsrError('Please attach the RSR file');
+      return;
+    }
+    if (!jobRsrWorkDate) {
+      setJobRsrError('Date on RSR is required');
+      return;
+    }
+    if (jobRsrMachineIds.length === 0) {
+      setJobRsrError('Select at least one machine to receive the RSR');
+      return;
+    }
+    setJobRsrUploading(true);
+    setJobRsrError(null);
+    try {
+      await uploadRSR({
+        file: jobRsrFile,
+        jobId: jobRsrSelectedJob._id,
+        machineIds: jobRsrMachineIds,
+        title: `RSR ${jobRsrSelectedJob.jobNumber}`,
+        workDate: jobRsrWorkDate,
+        jobNumber: jobRsrJobNumber.trim() || undefined,
+        quoteDate: jobRsrQuoteDate || undefined,
+        value: jobRsrValue ? Number(jobRsrValue) : undefined,
+        description: jobRsrDescription.trim() || undefined,
+        rsrNumber: jobRsrRsrNumber.trim() || undefined,
+        poNumber: jobRsrPoNumber.trim() || undefined,
+        invNumber: jobRsrInvNumber.trim() || undefined,
+        currentHours: jobRsrCurrentHours ? Number(jobRsrCurrentHours) : undefined,
+        nextServiceHours: jobRsrNextServiceHours ? Number(jobRsrNextServiceHours) : undefined,
+        nextServiceDate: jobRsrNextServiceDate || undefined,
+        tech: jobRsrTech.trim() || undefined,
+        hoursWorked: jobRsrHoursWorked ? Number(jobRsrHoursWorked) : undefined,
+        comments: jobRsrComments.trim() || undefined,
+      });
+      await loadMachines(pagination.page);
+      // Refresh the expanded machine's RSR list if it received a copy.
+      if (expandedMachineId && jobRsrMachineIds.includes(expandedMachineId)) {
+        const rsrs = await getMachineRSRs(expandedMachineId);
+        setMachineRSRs(rsrs);
+      }
+      resetJobRSRModal();
+    } catch (err: any) {
+      setJobRsrError(err.message || 'Failed to upload RSR');
+    } finally {
+      setJobRsrUploading(false);
+    }
+  };
+
+  // Machine dedup is hidden for now: merging duplicate machines can orphan RSR /
+  // job links. Re-enable once the dedup-on-create work is in place.
+  const SHOW_DEDUP_TOOL = false;
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
@@ -675,22 +748,22 @@ export function Machines() {
             {isSuperAdmin && (
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-lg hover:from-amber-600 hover:to-amber-700 shadow-sm transition-all text-sm font-medium"
+                className="flex items-center justify-center gap-2 w-40 h-14 px-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-lg hover:from-amber-600 hover:to-amber-700 shadow-sm transition-all text-sm font-medium text-center leading-tight"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-4 h-4 shrink-0" />
                 Add Machine
               </button>
             )}
             {isSuperAdmin && (
               <button
                 onClick={() => setShowImportWizard(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 shadow-sm transition-all text-sm font-medium"
+                className="flex items-center justify-center gap-2 w-40 h-14 px-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 shadow-sm transition-all text-sm font-medium text-center leading-tight"
               >
-                <Upload className="w-4 h-4" />
+                <Upload className="w-4 h-4 shrink-0" />
                 Import Machines
               </button>
             )}
-            {isSuperAdmin && (
+            {isSuperAdmin && SHOW_DEDUP_TOOL && (
               <button
                 onClick={async () => {
                   setShowDedupModal(true);
@@ -707,24 +780,31 @@ export function Machines() {
                     setDedupLoading(false);
                   }
                 }}
-                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg hover:from-orange-600 hover:to-orange-700 shadow-sm transition-all text-sm font-medium"
+                className="flex items-center justify-center gap-2 w-40 h-14 px-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg hover:from-orange-600 hover:to-orange-700 shadow-sm transition-all text-sm font-medium text-center leading-tight"
               >
-                <ShieldAlert className="w-4 h-4" />
+                <ShieldAlert className="w-4 h-4 shrink-0" />
                 Deduplicate
               </button>
             )}
             <button
-              onClick={handleOpenReportModal}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 shadow-sm transition-all text-sm font-medium"
+              onClick={() => setShowJobRSRModal(true)}
+              className="flex items-center justify-center gap-2 w-40 h-14 px-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 shadow-sm transition-all text-sm font-medium text-center leading-tight"
             >
-              <FileSpreadsheet className="w-4 h-4" />
+              <Upload className="w-4 h-4 shrink-0" />
+              Upload RSR
+            </button>
+            <button
+              onClick={handleOpenReportModal}
+              className="flex items-center justify-center gap-2 w-40 h-14 px-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 shadow-sm transition-all text-sm font-medium text-center leading-tight"
+            >
+              <FileSpreadsheet className="w-4 h-4 shrink-0" />
               Generate Machine Report
             </button>
             <button
               onClick={handleExportCSV}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-lg hover:from-teal-700 hover:to-teal-800 shadow-sm transition-all text-sm font-medium"
+              className="flex items-center justify-center gap-2 w-40 h-14 px-3 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-lg hover:from-teal-700 hover:to-teal-800 shadow-sm transition-all text-sm font-medium text-center leading-tight"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-4 h-4 shrink-0" />
               Export Machine List
             </button>
           </div>
@@ -1457,13 +1537,6 @@ export function Machines() {
                                 <span className="text-xs font-normal text-slate-400">({machineRSRs.length})</span>
                               )}
                             </h4>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setShowUploadModal(true); }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                            >
-                              <Upload className="w-3.5 h-3.5" />
-                              Upload RSR
-                            </button>
                           </div>
 
                           {loadingRSRs ? (
@@ -1552,122 +1625,6 @@ export function Machines() {
       </div>
       </div>
 
-      {/* Upload Modal */}
-      {showUploadModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-4 border-b border-slate-200">
-              <h3 className="text-lg font-semibold text-slate-800">Upload RSR Document</h3>
-              <button
-                onClick={() => { setShowUploadModal(false); setUploadError(null); setUploadFile(null); setUploadTitle(''); setUploadDescription(''); setUploadWorkDate(''); setUploadCurrentHours(''); setUploadNextServiceHours(''); setUploadNextServiceDate(''); }}
-                className="p-1 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-4 space-y-4">
-              {/* Machine Info */}
-              {selectedMachine && (
-                <div className="p-3 bg-amber-50 rounded-lg flex items-center gap-3">
-                  <Cog className="w-5 h-5 text-amber-600" />
-                  <div>
-                    <div className="font-medium text-slate-800">{selectedMachine.make} {selectedMachine.model}</div>
-                    <div className="text-sm text-slate-500">S/N: {selectedMachine.serialNumber}
-                      <span className="ml-2 px-1.5 py-0.5 rounded text-xs font-medium bg-slate-200 text-slate-600 capitalize">
-                        {selectedMachine.serviceType || 'hours'} based
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {/* Title */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Title <span className="text-red-500">*</span></label>
-                <input type="text" value={uploadTitle} onChange={(e) => setUploadTitle(e.target.value)} placeholder="e.g., Warranty RSR - Engine Repair"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" />
-              </div>
-              {/* Date on RSR */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Date on RSR <span className="text-red-500">*</span></label>
-                <SmartDateInput value={uploadWorkDate} onChange={(e) => setUploadWorkDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" />
-                <p className="text-xs text-slate-400 mt-1">The date the work was actually done</p>
-              </div>
-              {/* Conditional fields based on service type */}
-              {(selectedMachine?.serviceType || 'hours') === 'hours' ? (
-                /* Hour-based machine: Current Hours + Next Service Hours */
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Current Hours <span className="text-red-500">*</span></label>
-                    <input type="number" min="0" value={uploadCurrentHours} onChange={(e) => setUploadCurrentHours(e.target.value)}
-                      placeholder="e.g., 1250"
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Next Service Hours <span className="text-red-500">*</span></label>
-                    <input type="number" min="0" value={uploadNextServiceHours} onChange={(e) => setUploadNextServiceHours(e.target.value)}
-                      placeholder="e.g., 1500"
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" />
-                  </div>
-                </div>
-              ) : (
-                /* Date-based machine: Next Service Date */
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Next Service Date <span className="text-red-500">*</span></label>
-                  <SmartDateInput value={uploadNextServiceDate} onChange={(e) => setUploadNextServiceDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" />
-                </div>
-              )}
-              {/* Description */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-                <textarea value={uploadDescription} onChange={(e) => setUploadDescription(e.target.value)} placeholder="Optional notes about this RSR..." rows={2}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none" />
-              </div>
-              {/* File Upload */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">File <span className="text-red-500">*</span></label>
-                <div 
-                  onClick={() => fileInputRef.current?.click()}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-all ${isDragOver ? 'border-blue-400 bg-blue-50 scale-105' : uploadFile ? 'border-green-300 bg-green-50' : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'}`}>
-                  {uploadFile ? (
-                    <div className="flex items-center justify-center gap-2 text-green-700">
-                      <CheckCircle2 className="w-5 h-5" />
-                      <span className="font-medium">{uploadFile.name}</span>
-                      <span className="text-sm text-green-600">({formatFileSize(uploadFile.size)})</span>
-                    </div>
-                  ) : (
-                    <div className="text-slate-500">
-                      <Upload className={`w-8 h-8 mx-auto mb-2 transition-colors ${isDragOver ? 'text-blue-500' : ''}`} />
-                      <p>{isDragOver ? 'Drop your file here' : 'Click to select or drag and drop'}</p>
-                      <p className="text-xs text-slate-400 mt-1">PDF, JPEG, PNG • Max 10MB</p>
-                    </div>
-                  )}
-                  <input ref={fileInputRef} type="file" accept=".pdf,application/pdf,image/jpeg,image/jpg,image/png,.jpg,.jpeg,.png" onChange={handleFileChange} className="hidden" />
-                </div>
-              </div>
-              {uploadError && (
-                <div className="p-3 bg-red-50 text-red-700 rounded-lg flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                  <span className="text-sm">{uploadError}</span>
-                </div>
-              )}
-            </div>
-            <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-200">
-              <button onClick={() => { setShowUploadModal(false); setUploadError(null); setUploadFile(null); setUploadTitle(''); setUploadDescription(''); setUploadWorkDate(''); setUploadCurrentHours(''); setUploadNextServiceHours(''); setUploadNextServiceDate(''); }}
-                className="px-4 py-2 text-slate-600 hover:text-slate-800">Cancel</button>
-              <button onClick={handleUploadRSR} disabled={uploading || !uploadFile || !uploadTitle.trim() || !uploadWorkDate}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                {uploading ? (<><Loader2 className="w-4 h-4 animate-spin" />Uploading...</>) : (<><Upload className="w-4 h-4" />Upload</>)}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Preview Modal */}
       {showPreview && previewRSR && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
@@ -1692,6 +1649,267 @@ export function Machines() {
               ) : (
                 <iframe src={getPreviewUrl(previewRSR)} className="w-full h-full min-h-[70vh] rounded-lg bg-white" title={previewRSR.title || previewRSR.fileName} />
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Job-linked RSR Upload Modal */}
+      {showJobRSRModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 sticky top-0 bg-white">
+              <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                <Upload className="w-5 h-5 text-purple-600" />
+                Upload RSR
+              </h3>
+              <button onClick={resetJobRSRModal} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {jobRsrError && (
+                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  {jobRsrError}
+                </div>
+              )}
+
+              {/* Step 1: pick a job */}
+              {!jobRsrSelectedJob ? (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Job number <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={jobRsrSearch}
+                      onChange={(e) => setJobRsrSearch(e.target.value)}
+                      placeholder="Type a job number or customer…"
+                      autoFocus
+                      className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
+                    />
+                  </div>
+                  {jobRsrSearching && (
+                    <p className="text-xs text-slate-400 mt-2 flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin" /> Searching…
+                    </p>
+                  )}
+                  {jobRsrResults.length > 0 && (
+                    <div className="mt-2 border border-slate-200 rounded-lg divide-y divide-slate-100 max-h-64 overflow-y-auto">
+                      {jobRsrResults.map((job) => (
+                        <button
+                          key={job._id}
+                          onClick={() => handleSelectJobForRSR(job)}
+                          className="w-full text-left px-3 py-2 hover:bg-purple-50 transition-colors"
+                        >
+                          <div className="font-medium text-slate-800 text-sm">{job.jobNumber}</div>
+                          <div className="text-xs text-slate-500">
+                            {job.customer?.name || job.cashCustomer || '—'}
+                            {job.description && typeof job.description === 'object' ? ` · ${job.description.name}` : ''}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {!jobRsrSearching && jobRsrSearch.trim().length >= 2 && jobRsrResults.length === 0 && (
+                    <p className="text-xs text-slate-400 mt-2">No jobs found.</p>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* Selected job summary */}
+                  <div className="flex items-center justify-between p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                    <div>
+                      <div className="font-semibold text-slate-800">{jobRsrSelectedJob.jobNumber}</div>
+                      <div className="text-xs text-slate-600">
+                        {jobRsrSelectedJob.customer?.name || jobRsrSelectedJob.cashCustomer || '—'}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => { setJobRsrSelectedJob(null); setJobRsrMachineIds([]); }}
+                      className="text-xs text-purple-700 hover:underline"
+                    >
+                      Change job
+                    </button>
+                  </div>
+
+                  {/* Machines on the job */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Machines to update ({jobRsrMachineIds.length} selected)
+                    </label>
+                    {(!jobRsrSelectedJob.machines || jobRsrSelectedJob.machines.length === 0) ? (
+                      <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                        This job has no machines linked. Link machines to the job first.
+                      </p>
+                    ) : (
+                      <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 max-h-48 overflow-y-auto">
+                        {(jobRsrSelectedJob.machines as any[]).map((m) => {
+                          const id = typeof m === 'string' ? m : m?._id;
+                          const label = typeof m === 'string'
+                            ? m
+                            : `${m.make || ''} ${m.model || ''} · ${m.serialNumber || 'no serial'}`.trim();
+                          return (
+                            <label key={id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-slate-50">
+                              <input
+                                type="checkbox"
+                                checked={jobRsrMachineIds.includes(id)}
+                                onChange={() => toggleJobRsrMachine(id)}
+                                className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                              />
+                              <span className="text-sm text-slate-700">{label}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <p className="text-xs text-slate-400 mt-1">
+                      Every selected machine receives a copy of this RSR.
+                    </p>
+                  </div>
+
+                  {/* Job details (pre-filled from the job; edit anything that was never captured) */}
+                  <div className="border-t border-slate-100 pt-3">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                      Job details — pre-filled, edit if needed
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Quote date</label>
+                        <SmartDateInput value={jobRsrQuoteDate} onChange={(e) => setJobRsrQuoteDate(e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Job number</label>
+                        <input type="text" value={jobRsrJobNumber} onChange={(e) => setJobRsrJobNumber(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Total ex VAT</label>
+                        <input type="number" value={jobRsrValue} onChange={(e) => setJobRsrValue(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">RSR number</label>
+                        <input type="text" value={jobRsrRsrNumber} onChange={(e) => setJobRsrRsrNumber(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">PO number</label>
+                        <input type="text" value={jobRsrPoNumber} onChange={(e) => setJobRsrPoNumber(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Invoice number</label>
+                        <input type="text" value={jobRsrInvNumber} onChange={(e) => setJobRsrInvNumber(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm" />
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                      <input type="text" value={jobRsrDescription} onChange={(e) => setJobRsrDescription(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm" />
+                    </div>
+                  </div>
+
+                  {/* RSR file */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      RSR file <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      ref={jobRsrFileInputRef}
+                      type="file"
+                      onChange={(e) => setJobRsrFile(e.target.files?.[0] || null)}
+                      className="w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
+                    />
+                  </div>
+
+                  {/* Date + hours grid */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                        Date on RSR <span className="text-red-500">*</span>
+                      </label>
+                      <SmartDateInput value={jobRsrWorkDate} onChange={(e) => setJobRsrWorkDate(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Tech</label>
+                      <input
+                        type="text"
+                        value={jobRsrTech}
+                        onChange={(e) => setJobRsrTech(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Current hours</label>
+                      <input
+                        type="number"
+                        value={jobRsrCurrentHours}
+                        onChange={(e) => setJobRsrCurrentHours(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Next service hours</label>
+                      <input
+                        type="number"
+                        value={jobRsrNextServiceHours}
+                        onChange={(e) => setJobRsrNextServiceHours(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Next service date</label>
+                      <SmartDateInput value={jobRsrNextServiceDate} onChange={(e) => setJobRsrNextServiceDate(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Hours worked</label>
+                      <input
+                        type="number"
+                        value={jobRsrHoursWorked}
+                        onChange={(e) => setJobRsrHoursWorked(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Comments</label>
+                    <textarea
+                      value={jobRsrComments}
+                      onChange={(e) => setJobRsrComments(e.target.value)}
+                      rows={2}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
+                    />
+                  </div>
+
+                  <p className="text-xs text-slate-500">
+                    Hours and dates use “highest wins”: a back-dated RSR won’t lower a machine’s current hours or next-service date.
+                  </p>
+                </>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 p-4 border-t border-slate-200 sticky bottom-0 bg-white">
+              <button
+                onClick={resetJobRSRModal}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUploadJobRSR}
+                disabled={jobRsrUploading || !jobRsrSelectedJob || !jobRsrFile || !jobRsrWorkDate || jobRsrMachineIds.length === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+              >
+                {jobRsrUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                {jobRsrUploading ? 'Uploading…' : 'Upload RSR'}
+              </button>
             </div>
           </div>
         </div>

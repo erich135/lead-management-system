@@ -391,6 +391,7 @@ export interface Job {
     endTime?: string;
     location?: string;
     notes?: string;
+    hoursWorked?: number;
   }>;
   rsrNumber?: string;
   feedback?: string;
@@ -2720,6 +2721,68 @@ export async function uploadMachineRSR(
 
   const data = await response.json();
   return data.data.rsrDocument;
+}
+
+/**
+ * Unified RSR upload. Stores the file once and attaches a copy to every
+ * target machine. When `jobId` is supplied the backend defaults the target
+ * machines to that job's machines and pre-fills the report fields.
+ */
+export async function uploadRSR(params: {
+  file: File;
+  title?: string;
+  description?: string;
+  workDate: string;
+  jobId?: string;
+  machineIds?: string[];
+  currentHours?: number;
+  nextServiceHours?: number;
+  nextServiceDate?: string;
+  jobNumber?: string;
+  quoteDate?: string;
+  value?: number;
+  rsrNumber?: string;
+  poNumber?: string;
+  invNumber?: string;
+  tech?: string;
+  hoursWorked?: number;
+  comments?: string;
+}): Promise<{ rsrGroupId: string; documents: { machineId: string; rsrId: string }[] }> {
+  const formData = new FormData();
+  formData.append('file', params.file);
+  formData.append('workDate', params.workDate);
+  if (params.title) formData.append('title', params.title);
+  if (params.description) formData.append('description', params.description);
+  if (params.jobId) formData.append('jobId', params.jobId);
+  if (params.machineIds && params.machineIds.length > 0)
+    formData.append('machineIds', JSON.stringify(params.machineIds));
+  if (params.currentHours !== undefined) formData.append('currentHours', String(params.currentHours));
+  if (params.nextServiceHours !== undefined) formData.append('nextServiceHours', String(params.nextServiceHours));
+  if (params.nextServiceDate) formData.append('nextServiceDate', params.nextServiceDate);
+  if (params.jobNumber) formData.append('jobNumber', params.jobNumber);
+  if (params.quoteDate) formData.append('quoteDate', params.quoteDate);
+  if (params.value !== undefined) formData.append('value', String(params.value));
+  if (params.rsrNumber) formData.append('rsrNumber', params.rsrNumber);
+  if (params.poNumber) formData.append('poNumber', params.poNumber);
+  if (params.invNumber) formData.append('invNumber', params.invNumber);
+  if (params.tech) formData.append('tech', params.tech);
+  if (params.hoursWorked !== undefined) formData.append('hoursWorked', String(params.hoursWorked));
+  if (params.comments) formData.append('comments', params.comments);
+
+  const token = getAuthToken();
+  const response = await fetch(`${API_BASE_URL}/api/machines/rsr`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || 'Failed to upload RSR document');
+  }
+
+  const data = await response.json();
+  return data.data;
 }
 
 /**

@@ -700,6 +700,9 @@ export interface MachineRSR {
   fileSize: number;
   mimeType: string;
   description?: string;
+  /** Structured report fields (present on machine-native RSRs, pre-filled from the job) */
+  jobNumber?: string;
+  rsrNumber?: string;
   workDate?: string;
   currentHours?: number;
   nextServiceHours?: number;

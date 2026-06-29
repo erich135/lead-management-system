@@ -696,7 +696,9 @@ export function Machines() {
         file: jobRsrFile,
         jobId: jobRsrSelectedJob._id,
         machineIds: jobRsrMachineIds,
-        title: `RSR ${jobRsrSelectedJob.jobNumber}`,
+        title: jobRsrRsrNumber.trim()
+          ? `RSR ${jobRsrRsrNumber.trim()} · Job ${jobRsrSelectedJob.jobNumber}`
+          : `Job ${jobRsrSelectedJob.jobNumber}`,
         workDate: jobRsrWorkDate,
         jobNumber: jobRsrJobNumber.trim() || undefined,
         quoteDate: jobRsrQuoteDate || undefined,
@@ -1558,7 +1560,11 @@ export function Machines() {
                                     )}
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-medium text-slate-800">{rsr.title || rsr.fileName}</div>
+                                    <div className="text-sm font-medium text-slate-800">
+                                      {(rsr.rsrNumber || rsr.jobNumber)
+                                        ? [rsr.rsrNumber && `RSR ${rsr.rsrNumber}`, rsr.jobNumber && `Job ${rsr.jobNumber}`].filter(Boolean).join(' · ')
+                                        : (rsr.title || rsr.fileName)}
+                                    </div>
                                     <div className="flex items-center gap-3 text-xs text-slate-400">
                                       <span>{formatDate(rsr.uploadedAt)}</span>
                                       <span>{formatFileSize(rsr.fileSize)}</span>

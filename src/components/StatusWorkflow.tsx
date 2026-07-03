@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+// NOTE: This component was originally Supabase-era.
+// Supabase import removed — pending ARS backend attachment API migration.
 import { Lead, LeadStatus, Attachment } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -39,107 +40,25 @@ export function StatusWorkflow({ lead, statuses, onStatusChange, onClose }: Stat
   }, [lead.id, selectedStatus]);
 
   async function loadAttachments() {
-    try {
-      const { data } = await supabase
-        .from('attachments')
-        .select('*')
-        .eq('lead_id', lead.id)
-        .eq('status_id', selectedStatus || lead.current_status_id);
-
-      if (data) setAttachments(data);
-    } catch (error) {
-      console.error('Error loading attachments:', error);
-    }
+    // TODO: Replace Supabase attachment fetch with ARS backend API call.
+    // Supabase realtime removed — attachments currently disabled pending backend migration.
+    setAttachments([]);
   }
 
-  async function handleFileUpload(files: FileList | null) {
-    if (!files || files.length === 0) return;
-
-    setIsUploading(true);
-    const uploadPromises = Array.from(files).map(async (file) => {
-      try {
-        // Create a unique file path
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${lead.id}/${selectedStatus || lead.current_status_id}/${Date.now()}.${fileExt}`;
-
-        // Upload to Supabase Storage
-        const { error: uploadError } = await supabase.storage
-          .from('lead-attachments')
-          .upload(fileName, file);
-
-        if (uploadError) throw uploadError;
-
-        // Save metadata to database
-        const { error: dbError } = await supabase
-          .from('attachments')
-          .insert({
-            lead_id: lead.id,
-            status_id: selectedStatus || lead.current_status_id,
-            file_name: file.name,
-            file_path: fileName,
-            file_size: file.size,
-            file_type: file.type,
-            uploaded_by: user?.id
-          });
-
-        if (dbError) throw dbError;
-
-        return true;
-      } catch (error) {
-        console.error('Error uploading file:', error);
-        return false;
-      }
-    });
-
-    const results = await Promise.all(uploadPromises);
-    const successCount = results.filter(Boolean).length;
-
-    if (successCount > 0) {
-      loadAttachments();
-    }
-
+  async function handleFileUpload(_files: FileList | null) {
+    // TODO: Replace Supabase Storage upload with ARS backend S3 upload API.
+    console.warn('[StatusWorkflow] File upload disabled — pending ARS backend attachment migration.');
     setIsUploading(false);
   }
 
-  async function handleDeleteAttachment(attachmentId: string, filePath: string) {
-    try {
-      // Delete from storage
-      await supabase.storage
-        .from('lead-attachments')
-        .remove([filePath]);
-
-      // Delete from database
-      await supabase
-        .from('attachments')
-        .delete()
-        .eq('id', attachmentId);
-
-      loadAttachments();
-    } catch (error) {
-      console.error('Error deleting attachment:', error);
-    }
+  async function handleDeleteAttachment(_attachmentId: string, _filePath: string) {
+    // TODO: Replace Supabase delete with ARS backend attachment delete API.
+    console.warn('[StatusWorkflow] Attachment delete disabled — pending ARS backend attachment migration.');
   }
 
-  async function handleDownloadAttachment(filePath: string, fileName: string) {
-    try {
-      const { data, error } = await supabase.storage
-        .from('lead-attachments')
-        .download(filePath);
-
-      if (error) throw error;
-
-      // Create download link
-      const url = URL.createObjectURL(data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error downloading file:', error);
-    }
+  async function handleDownloadAttachment(_filePath: string, _fileName: string) {
+    // TODO: Replace Supabase Storage download with ARS backend presigned URL.
+    console.warn('[StatusWorkflow] Attachment download disabled — pending ARS backend attachment migration.');
   }
 
   function validateStatusChange(): string[] {

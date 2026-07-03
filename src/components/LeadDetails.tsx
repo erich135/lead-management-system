@@ -749,7 +749,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     // A technician booking requires Date Booked.
     const statusName = typeof job.status === 'object'
       ? (job.status as any)?.name?.trim()
-      : statuses.find(s => s._id === job.status)?.name?.trim();
+      : statuses.find(s => s._id === (job.status as unknown as string))?.name?.trim();
 
     const statusDateRules: { match: string; field: keyof typeof job; label: string }[] = [
       { match: 'Quoted',         field: 'dateQuoted',   label: 'Quoted Date'    },

@@ -4,13 +4,12 @@
  * Import from this file when consuming Bouwa module components externally.
  *
  * IMPORTANT: This barrel is NOT imported into:
- *   - src/App.tsx
  *   - src/components/Dashboard.tsx
  *   - src/components/MobileNavigation.tsx
  *
- * The module remains unmounted until Phase 4C-3+ wires it into routing/navigation.
- *
- * Phase 4C-2: shell exports only.
+ * Phase 4C-2: shell exports.
+ * Phase 4C-3: route guard exported.
+ * Phase 4C-4: API helpers and entity types exported.
  */
 
 // Shell page
@@ -21,8 +20,79 @@ export { BouwaPhaseCard } from './components/BouwaPhaseCard';
 export { BouwaAccessNotice } from './components/BouwaAccessNotice';
 export { BouwaRouteGuard } from './components/BouwaRouteGuard';
 
-// Types
+// Shell types
 export type { BouwaPhaseStatus, BouwaShellCard, BouwaAccessRequirement } from './types';
+
+// API entity types
+export type {
+  BouwaId,
+  ISODateString,
+  BouwaMachineSpec,
+  CreateBouwaMachineSpecPayload,
+  UpdateBouwaMachineSpecPayload,
+  BouwaTariffTable,
+  CreateBouwaTariffTablePayload,
+  UpdateBouwaTariffTablePayload,
+  BouwaAuditSessionStatus,
+  BouwaAuditSession,
+  CreateBouwaAuditSessionPayload,
+  UpdateBouwaAuditSessionPayload,
+  BouwaProposalStatus,
+  BouwaProposalDraft,
+  CreateBouwaProposalDraftPayload,
+  UpdateBouwaProposalDraftPayload,
+  BouwaFormulaApprovalStatus,
+  BouwaFormulaApproval,
+  CreateBouwaFormulaApprovalPayload,
+  UpdateBouwaFormulaApprovalPayload,
+  BouwaAssumption,
+  CreateBouwaAssumptionPayload,
+  UpdateBouwaAssumptionPayload,
+  BouwaEvidenceFile,
+  CreateBouwaEvidenceFileMetadataPayload,
+  UpdateBouwaEvidenceFileMetadataPayload,
+  BouwaReportTemplateStatus,
+  BouwaReportTemplate,
+  CreateBouwaReportTemplatePayload,
+  UpdateBouwaReportTemplatePayload,
+} from './types';
+
+// API helpers (scaffolded; not yet called from BouwaModuleShell)
+export {
+  listBouwaMachineSpecs,
+  getBouwaMachineSpec,
+  createBouwaMachineSpec,
+  updateBouwaMachineSpec,
+  listBouwaTariffTables,
+  getBouwaTariffTable,
+  createBouwaTariffTable,
+  updateBouwaTariffTable,
+  listBouwaAuditSessions,
+  getBouwaAuditSession,
+  createBouwaAuditSession,
+  updateBouwaAuditSession,
+  listBouwaProposalDrafts,
+  getBouwaProposalDraft,
+  createBouwaProposalDraft,
+  updateBouwaProposalDraft,
+  archiveBouwaProposalDraft,
+  listBouwaFormulaApprovals,
+  getBouwaFormulaApproval,
+  createBouwaFormulaApproval,
+  updateBouwaFormulaApproval,
+  listBouwaAssumptions,
+  getBouwaAssumption,
+  createBouwaAssumption,
+  updateBouwaAssumption,
+  listBouwaEvidenceFiles,
+  getBouwaEvidenceFile,
+  createBouwaEvidenceFileMetadata,
+  updateBouwaEvidenceFileMetadata,
+  listBouwaReportTemplates,
+  getBouwaReportTemplate,
+  createBouwaReportTemplate,
+  updateBouwaReportTemplate,
+} from './api/bouwaApi';
 
 // Config re-export for convenience
 export {

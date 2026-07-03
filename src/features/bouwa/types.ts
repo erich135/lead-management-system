@@ -1,9 +1,335 @@
 /**
- * Local types for the Bouwa frontend module shell.
+ * Local types for the Bouwa frontend module.
  *
  * Phase 4C-2: shell types only.
- * No API shapes defined here — those are added when /api/bouwa is wired up.
+ * Phase 4C-4: API entity types added.
+ *
+ * SAFETY: Create/update payload types deliberately exclude any field that
+ * could promote a draft or resource to a customer-visible / customer-safe
+ * state (customerQuoteSafe, status: "customer_ready", etc.).
  */
+
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+/** MongoDB ObjectId as a string. */
+export type BouwaId = string;
+
+/** ISO 8601 datetime string. */
+export type ISODateString = string;
+
+// ---------------------------------------------------------------------------
+// Machine Specs
+// ---------------------------------------------------------------------------
+
+export interface BouwaMachineSpec {
+  _id: BouwaId;
+  make?: string;
+  model?: string;
+  type?: string;
+  nominalKw?: number;
+  fad?: number;                    // free air delivery L/s or m³/min
+  pressureBar?: number;
+  driveType?: string;              // e.g. "fixed speed" | "VSD"
+  notes?: string;
+  isArchived?: boolean;
+  createdBy?: BouwaId;
+  createdAt?: ISODateString;
+  updatedAt?: ISODateString;
+  /** Arbitrary additional fields the backend may return. */
+  [key: string]: unknown;
+}
+
+export interface CreateBouwaMachineSpecPayload {
+  make?: string;
+  model?: string;
+  type?: string;
+  nominalKw?: number;
+  fad?: number;
+  pressureBar?: number;
+  driveType?: string;
+  notes?: string;
+}
+
+export type UpdateBouwaMachineSpecPayload = Partial<CreateBouwaMachineSpecPayload>;
+
+// ---------------------------------------------------------------------------
+// Tariff Tables
+// ---------------------------------------------------------------------------
+
+export interface BouwaTariffTable {
+  _id: BouwaId;
+  name?: string;
+  region?: string;
+  utility?: string;
+  effectiveDate?: ISODateString;
+  ratePerKwh?: number;
+  demandCharge?: number;
+  currency?: string;
+  notes?: string;
+  isArchived?: boolean;
+  createdBy?: BouwaId;
+  createdAt?: ISODateString;
+  updatedAt?: ISODateString;
+  [key: string]: unknown;
+}
+
+export interface CreateBouwaTariffTablePayload {
+  name?: string;
+  region?: string;
+  utility?: string;
+  effectiveDate?: ISODateString;
+  ratePerKwh?: number;
+  demandCharge?: number;
+  currency?: string;
+  notes?: string;
+}
+
+export type UpdateBouwaTariffTablePayload = Partial<CreateBouwaTariffTablePayload>;
+
+// ---------------------------------------------------------------------------
+// Audit Sessions
+// ---------------------------------------------------------------------------
+
+/** Internal-only audit session status — does NOT include customer_ready. */
+export type BouwaAuditSessionStatus =
+  | 'draft'
+  | 'in_progress'
+  | 'internal_review'
+  | 'approved_internal'
+  | 'archived';
+
+export interface BouwaAuditSession {
+  _id: BouwaId;
+  customerId?: BouwaId;
+  customerName?: string;
+  siteAddress?: string;
+  auditorId?: BouwaId;
+  auditorName?: string;
+  status?: BouwaAuditSessionStatus;
+  auditDate?: ISODateString;
+  completedAt?: ISODateString;
+  notes?: string;
+  isArchived?: boolean;
+  createdBy?: BouwaId;
+  createdAt?: ISODateString;
+  updatedAt?: ISODateString;
+  [key: string]: unknown;
+}
+
+export interface CreateBouwaAuditSessionPayload {
+  customerId?: BouwaId;
+  customerName?: string;
+  siteAddress?: string;
+  auditDate?: ISODateString;
+  notes?: string;
+}
+
+export type UpdateBouwaAuditSessionPayload = Partial<
+  CreateBouwaAuditSessionPayload & { status?: BouwaAuditSessionStatus }
+>;
+
+// ---------------------------------------------------------------------------
+// Proposal Drafts
+// ---------------------------------------------------------------------------
+
+/**
+ * Internal-only proposal status.
+ * DELIBERATELY excludes "customer_ready" — that requires a dedicated
+ * approval endpoint (Phase 4B-5+).
+ */
+export type BouwaProposalStatus =
+  | 'draft'
+  | 'in_review'
+  | 'approved_internal'
+  | 'archived';
+
+export interface BouwaProposalDraft {
+  _id: BouwaId;
+  title?: string;
+  customerId?: BouwaId;
+  customerName?: string;
+  auditSessionId?: BouwaId;
+  status?: BouwaProposalStatus;
+  totalSavingsKwh?: number;
+  totalSavingsRand?: number;
+  paybackPeriodMonths?: number;
+  notes?: string;
+  isArchived?: boolean;
+  createdBy?: BouwaId;
+  createdAt?: ISODateString;
+  updatedAt?: ISODateString;
+  [key: string]: unknown;
+}
+
+export interface CreateBouwaProposalDraftPayload {
+  title?: string;
+  customerId?: BouwaId;
+  customerName?: string;
+  auditSessionId?: BouwaId;
+  notes?: string;
+  /** Status is intentionally restricted to internal states only. */
+  status?: Exclude<BouwaProposalStatus, 'archived'>;
+}
+
+export type UpdateBouwaProposalDraftPayload = Partial<
+  Omit<CreateBouwaProposalDraftPayload, 'status'> & {
+    status?: BouwaProposalStatus;
+    totalSavingsKwh?: number;
+    totalSavingsRand?: number;
+    paybackPeriodMonths?: number;
+  }
+>;
+
+// ---------------------------------------------------------------------------
+// Formula Approvals
+// ---------------------------------------------------------------------------
+
+export type BouwaFormulaApprovalStatus =
+  | 'pending'
+  | 'under_review'
+  | 'approved_internal'
+  | 'rejected'
+  | 'archived';
+
+export interface BouwaFormulaApproval {
+  _id: BouwaId;
+  formulaKey?: string;
+  description?: string;
+  version?: string;
+  approvedBy?: BouwaId;
+  approvedAt?: ISODateString;
+  status?: BouwaFormulaApprovalStatus;
+  notes?: string;
+  isArchived?: boolean;
+  createdBy?: BouwaId;
+  createdAt?: ISODateString;
+  updatedAt?: ISODateString;
+  [key: string]: unknown;
+}
+
+export interface CreateBouwaFormulaApprovalPayload {
+  formulaKey?: string;
+  description?: string;
+  version?: string;
+  notes?: string;
+}
+
+export type UpdateBouwaFormulaApprovalPayload = Partial<
+  CreateBouwaFormulaApprovalPayload & { status?: BouwaFormulaApprovalStatus }
+>;
+
+// ---------------------------------------------------------------------------
+// Assumptions
+// ---------------------------------------------------------------------------
+
+export interface BouwaAssumption {
+  _id: BouwaId;
+  key?: string;
+  label?: string;
+  description?: string;
+  value?: number | string | boolean;
+  unit?: string;
+  category?: string;
+  isApproved?: boolean;
+  approvedBy?: BouwaId;
+  approvedAt?: ISODateString;
+  notes?: string;
+  isArchived?: boolean;
+  createdBy?: BouwaId;
+  createdAt?: ISODateString;
+  updatedAt?: ISODateString;
+  [key: string]: unknown;
+}
+
+export interface CreateBouwaAssumptionPayload {
+  key?: string;
+  label?: string;
+  description?: string;
+  value?: number | string | boolean;
+  unit?: string;
+  category?: string;
+  notes?: string;
+}
+
+export type UpdateBouwaAssumptionPayload = Partial<
+  CreateBouwaAssumptionPayload & { isApproved?: boolean }
+>;
+
+// ---------------------------------------------------------------------------
+// Evidence Files
+// ---------------------------------------------------------------------------
+
+export interface BouwaEvidenceFile {
+  _id: BouwaId;
+  auditSessionId?: BouwaId;
+  fileName?: string;
+  mimeType?: string;
+  fileSizeBytes?: number;
+  category?: string;              // e.g. "leak_survey" | "load_profile" | "measurement"
+  description?: string;
+  uploadedBy?: BouwaId;
+  storageKey?: string;            // backend storage path/key
+  isArchived?: boolean;
+  createdAt?: ISODateString;
+  updatedAt?: ISODateString;
+  [key: string]: unknown;
+}
+
+export interface CreateBouwaEvidenceFileMetadataPayload {
+  auditSessionId?: BouwaId;
+  fileName?: string;
+  mimeType?: string;
+  fileSizeBytes?: number;
+  category?: string;
+  description?: string;
+  storageKey?: string;
+}
+
+export type UpdateBouwaEvidenceFileMetadataPayload = Partial<
+  Pick<CreateBouwaEvidenceFileMetadataPayload, 'category' | 'description'>
+>;
+
+// ---------------------------------------------------------------------------
+// Report Templates
+// ---------------------------------------------------------------------------
+
+export type BouwaReportTemplateStatus =
+  | 'draft'
+  | 'under_review'
+  | 'approved_internal'
+  | 'archived';
+
+export interface BouwaReportTemplate {
+  _id: BouwaId;
+  name?: string;
+  version?: string;
+  description?: string;
+  status?: BouwaReportTemplateStatus;
+  templateKey?: string;
+  isDefault?: boolean;
+  approvedBy?: BouwaId;
+  approvedAt?: ISODateString;
+  notes?: string;
+  isArchived?: boolean;
+  createdBy?: BouwaId;
+  createdAt?: ISODateString;
+  updatedAt?: ISODateString;
+  [key: string]: unknown;
+}
+
+export interface CreateBouwaReportTemplatePayload {
+  name?: string;
+  version?: string;
+  description?: string;
+  templateKey?: string;
+  notes?: string;
+}
+
+export type UpdateBouwaReportTemplatePayload = Partial<
+  CreateBouwaReportTemplatePayload & { status?: BouwaReportTemplateStatus }
+>;
 
 /** Readiness state for each Bouwa sub-module area. */
 export type BouwaPhaseStatus =

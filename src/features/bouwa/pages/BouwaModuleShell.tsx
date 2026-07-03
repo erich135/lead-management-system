@@ -6,16 +6,18 @@
  * and the access/safety notice.
  *
  * IMPORTANT:
- * - This component is NOT mounted in App.tsx, Dashboard.tsx or MobileNavigation.tsx.
- * - It does NOT call any API endpoint.
+ * - This component is NOT mounted in Dashboard.tsx or MobileNavigation.tsx.
+ * - It calls listBouwaMachineSpecs() via BouwaMachineSpecLibrary (read-only; errors are handled gracefully).
  * - It does NOT expose any customer-facing data.
  * - Customer-facing proposal outputs remain DISABLED until formulas, assumptions
  *   and report templates are formally approved.
  *
  * Phase 4C-2: shell / placeholder only.
+ * Phase 4C-5: BouwaMachineSpecLibrary read-only screen added.
  */
 
 import { FileText, Cpu, DollarSign, Wind, ClipboardCheck, Eye, Download } from 'lucide-react';
+import { BouwaMachineSpecLibrary } from '../components/BouwaMachineSpecLibrary';
 import { BOUWA_MODULE_META } from '../bouwaFrontendConfig';
 import { BouwaAccessNotice } from '../components/BouwaAccessNotice';
 import { BouwaPhaseCard } from '../components/BouwaPhaseCard';
@@ -111,6 +113,9 @@ export function BouwaModuleShell() {
           ))}
         </div>
       </section>
+
+      {/* Machine Specification Library — read-only, internal only */}
+      <BouwaMachineSpecLibrary />
 
       {/* Phase/build status footer */}
       <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 flex flex-wrap items-center gap-4 text-xs text-ars-body">

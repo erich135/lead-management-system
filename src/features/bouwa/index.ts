@@ -19,6 +19,7 @@ export { BouwaModuleShell } from './pages/BouwaModuleShell';
 export { BouwaPhaseCard } from './components/BouwaPhaseCard';
 export { BouwaAccessNotice } from './components/BouwaAccessNotice';
 export { BouwaRouteGuard } from './components/BouwaRouteGuard';
+export { BouwaMachineSpecLibrary } from './components/BouwaMachineSpecLibrary';
 
 // Shell types
 export type { BouwaPhaseStatus, BouwaShellCard, BouwaAccessRequirement } from './types';
@@ -27,6 +28,8 @@ export type { BouwaPhaseStatus, BouwaShellCard, BouwaAccessRequirement } from '.
 export type {
   BouwaId,
   ISODateString,
+  BouwaMachineSpecCategory,
+  BouwaMachineSpecSpeedControl,
   BouwaMachineSpec,
   CreateBouwaMachineSpecPayload,
   UpdateBouwaMachineSpecPayload,

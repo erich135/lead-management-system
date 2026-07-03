@@ -23,32 +23,74 @@ export type ISODateString = string;
 // Machine Specs
 // ---------------------------------------------------------------------------
 
+/** Category of the compressor spec. */
+export type BouwaMachineSpecCategory = 'BOUWA' | 'COMPETITOR' | 'EXISTING_REFERENCE';
+
+/** Speed-control technology. */
+export type BouwaMachineSpecSpeedControl = 'FIXED_SPEED' | 'VSD' | 'VARIABLE_SPEED' | 'UNKNOWN';
+
+/**
+ * BouwaMachineSpec — matches the backend BouwaMachineSpec MongoDB document.
+ *
+ * approvalStatus is a read-only field.  The value "approved_customer" may be
+ * returned by the backend but is NEVER sent in any frontend create/update payload.
+ */
 export interface BouwaMachineSpec {
   _id: BouwaId;
-  make?: string;
-  model?: string;
-  type?: string;
-  nominalKw?: number;
-  fad?: number;                    // free air delivery L/s or m³/min
-  pressureBar?: number;
-  driveType?: string;              // e.g. "fixed speed" | "VSD"
+  specCategory?: BouwaMachineSpecCategory;
+  manufacturer?: string;
+  brand?: string;
+  modelName?: string;
+  series?: string;
+  variant?: string;
+  modelCode?: string;
+  compressorType?: string;
+  oilType?: string;
+  speedControl?: BouwaMachineSpecSpeedControl;
+  ratedPressureBar?: number;
+  ratedPressurePsi?: number;
+  ratedCapacityCfm?: number;
+  ratedCapacityM3Min?: number;
+  ratedCapacityM3Hour?: number;
+  packageInputKw?: number;
+  motorKw?: number;
+  specificPowerKwPer100Cfm?: number;
+  specificPowerKwPerM3Min?: number;
+  coolingType?: string;
+  testStandard?: string;
+  cagiVerified?: boolean;
+  iso1217Reference?: string;
+  /** 0–1 confidence score from source verification. */
+  sourceConfidence?: number;
+  /** Read-only display field — do not send in payloads. */
+  approvalStatus?: string;
   notes?: string;
   isArchived?: boolean;
   createdBy?: BouwaId;
+  updatedBy?: BouwaId;
   createdAt?: ISODateString;
   updatedAt?: ISODateString;
-  /** Arbitrary additional fields the backend may return. */
+  /** Forward-compat index for any additional backend fields. */
   [key: string]: unknown;
 }
 
 export interface CreateBouwaMachineSpecPayload {
-  make?: string;
-  model?: string;
-  type?: string;
-  nominalKw?: number;
-  fad?: number;
-  pressureBar?: number;
-  driveType?: string;
+  specCategory?: BouwaMachineSpecCategory;
+  manufacturer?: string;
+  brand?: string;
+  modelName?: string;
+  series?: string;
+  variant?: string;
+  modelCode?: string;
+  compressorType?: string;
+  oilType?: string;
+  speedControl?: BouwaMachineSpecSpeedControl;
+  ratedPressureBar?: number;
+  ratedCapacityM3Min?: number;
+  packageInputKw?: number;
+  motorKw?: number;
+  sourceConfidence?: number;
+  testStandard?: string;
   notes?: string;
 }
 

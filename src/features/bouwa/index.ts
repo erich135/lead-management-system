@@ -19,6 +19,7 @@ export { BouwaModuleShell } from './pages/BouwaModuleShell';
 // Sub-components
 export { BouwaPhaseCard } from './components/BouwaPhaseCard';
 export { BouwaAccessNotice } from './components/BouwaAccessNotice';
+export { BouwaRouteGuard } from './components/BouwaRouteGuard';
 
 // Types
 export type { BouwaPhaseStatus, BouwaShellCard, BouwaAccessRequirement } from './types';

@@ -164,27 +164,78 @@ export type UpdateBouwaTariffTablePayload = Partial<CreateBouwaTariffTablePayloa
 // Audit Sessions
 // ---------------------------------------------------------------------------
 
-/** Internal-only audit session status — does NOT include customer_ready. */
+/**
+ * Audit session status — matches backend BouwaAuditSession.status enum.
+ * Does NOT include customer_ready.
+ */
 export type BouwaAuditSessionStatus =
   | 'draft'
-  | 'in_progress'
-  | 'internal_review'
-  | 'approved_internal'
+  | 'ready_for_internal_review'
+  | 'blocked'
   | 'archived';
+
+export type BouwaAuditMode =
+  | 'NONE'
+  | 'MANUAL_CAPTURE'
+  | 'EXCEL_IMPORT'
+  | 'LOGGER_IMPORT'
+  | 'FULL_AIR_AUDIT';
 
 export interface BouwaAuditSession {
   _id: BouwaId;
+  /** Raw ObjectId reference to Customer document. */
+  customer?: BouwaId;
+  /** Legacy / populated alias — kept for backwards compat. */
   customerId?: BouwaId;
   customerName?: string;
+  siteName?: string;
+  siteLocation?: string;
+  /** Legacy alias — kept for backwards compat. */
   siteAddress?: string;
+  branch?: BouwaId;
+  salesLead?: BouwaId;
+  existingMachine?: BouwaId;
+  existingMachineSpec?: BouwaId;
+  proposedMachineSpec?: BouwaId;
+  tariffTable?: BouwaId;
+  auditMode?: BouwaAuditMode;
+  auditPeriodStart?: ISODateString;
+  auditPeriodEnd?: ISODateString;
+  siteConditions?: {
+    altitude?: number;
+    altitudeUnit?: string;
+    ambientTemperature?: number;
+    operatingPressureBar?: number;
+  };
+  productionSchedule?: {
+    weekdays?: number;
+    saturdays?: number;
+    sundays?: number;
+    publicHolidays?: number;
+    shutdownDays?: number;
+    notes?: string;
+  };
+  auditSummary?: {
+    measuredFlowM3Min?: number;
+    measuredPressureBar?: number;
+    measuredPowerKw?: number;
+    loadPercentage?: number;
+    unloadPercentage?: number;
+    notes?: string;
+  };
+  status?: BouwaAuditSessionStatus;
+  blockers?: string[];
+  warnings?: string[];
+  evidenceFiles?: BouwaId[];
+  /** Legacy field — kept for backwards compat. */
   auditorId?: BouwaId;
   auditorName?: string;
-  status?: BouwaAuditSessionStatus;
   auditDate?: ISODateString;
   completedAt?: ISODateString;
   notes?: string;
   isArchived?: boolean;
   createdBy?: BouwaId;
+  updatedBy?: BouwaId;
   createdAt?: ISODateString;
   updatedAt?: ISODateString;
   [key: string]: unknown;
@@ -333,16 +384,54 @@ export type UpdateBouwaAssumptionPayload = Partial<
 // Evidence Files
 // ---------------------------------------------------------------------------
 
+export type BouwaEvidenceEntityType =
+  | 'MACHINE_SPEC'
+  | 'TARIFF'
+  | 'AUDIT_SESSION'
+  | 'PROPOSAL'
+  | 'FORMULA_APPROVAL'
+  | 'ASSUMPTION'
+  | 'OTHER';
+
+export type BouwaEvidenceApprovalStatus =
+  | 'draft'
+  | 'pending_review'
+  | 'approved_internal'
+  | 'rejected'
+  | 'archived';
+
+export type BouwaStorageProvider = 'S3' | 'LOCAL' | 'EXTERNAL_URL' | 'UNKNOWN';
+
 export interface BouwaEvidenceFile {
   _id: BouwaId;
+  entityType?: BouwaEvidenceEntityType;
+  entityId?: BouwaId;
+  /** Legacy field — kept for backwards compat. */
   auditSessionId?: BouwaId;
   fileName?: string;
+  originalFileName?: string;
   mimeType?: string;
+  /** Backend field name — use this. */
+  sizeBytes?: number;
+  /** Legacy alias — kept for backwards compat. */
   fileSizeBytes?: number;
-  category?: string;              // e.g. "leak_survey" | "load_profile" | "measurement"
-  description?: string;
+  storageProvider?: BouwaStorageProvider;
+  s3Bucket?: string;
+  s3Key?: string;
+  externalUrl?: string;
+  sourceType?: string;
   uploadedBy?: BouwaId;
-  storageKey?: string;            // backend storage path/key
+  uploadedAt?: ISODateString;
+  /** Read-only display field — do not send in payloads. */
+  approvalStatus?: BouwaEvidenceApprovalStatus;
+  approvedBy?: BouwaId;
+  approvedAt?: ISODateString;
+  /** Legacy field — kept for backwards compat. */
+  category?: string;
+  description?: string;
+  /** Legacy field — kept for backwards compat. */
+  storageKey?: string;
+  notes?: string;
   isArchived?: boolean;
   createdAt?: ISODateString;
   updatedAt?: ISODateString;

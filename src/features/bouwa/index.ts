@@ -21,6 +21,7 @@ export { BouwaAccessNotice } from './components/BouwaAccessNotice';
 export { BouwaRouteGuard } from './components/BouwaRouteGuard';
 export { BouwaMachineSpecLibrary } from './components/BouwaMachineSpecLibrary';
 export { BouwaTariffTablesPanel } from './components/BouwaTariffTablesPanel';
+export { BouwaAirAuditEvidencePanel } from './components/BouwaAirAuditEvidencePanel';
 
 // Shell types
 export type { BouwaPhaseStatus, BouwaShellCard, BouwaAccessRequirement } from './types';
@@ -42,6 +43,7 @@ export type {
   CreateBouwaTariffTablePayload,
   UpdateBouwaTariffTablePayload,
   BouwaAuditSessionStatus,
+  BouwaAuditMode,
   BouwaAuditSession,
   CreateBouwaAuditSessionPayload,
   UpdateBouwaAuditSessionPayload,
@@ -57,6 +59,9 @@ export type {
   CreateBouwaAssumptionPayload,
   UpdateBouwaAssumptionPayload,
   BouwaEvidenceFile,
+  BouwaEvidenceEntityType,
+  BouwaEvidenceApprovalStatus,
+  BouwaStorageProvider,
   CreateBouwaEvidenceFileMetadataPayload,
   UpdateBouwaEvidenceFileMetadataPayload,
   BouwaReportTemplateStatus,

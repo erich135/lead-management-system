@@ -100,31 +100,61 @@ export type UpdateBouwaMachineSpecPayload = Partial<CreateBouwaMachineSpecPayloa
 // Tariff Tables
 // ---------------------------------------------------------------------------
 
+export type BouwaTariffProviderType = 'ESKOM' | 'MUNICIPAL' | 'CUSTOMER_SPECIFIC' | 'OTHER';
+export type BouwaTariffCategory = 'LDS' | 'HDS' | 'MIXED' | 'UNKNOWN';
+export type BouwaTariffTimeBand = 'PEAK' | 'STANDARD' | 'OFF_PEAK';
+
+/** A single time-of-use rate band within a tariff table. */
+export interface BouwaTariffRate {
+  season?: string;
+  dayType?: string;
+  timeBand?: BouwaTariffTimeBand;
+  ratePerKwh?: number;
+  currency?: string;
+  demandChargeRandPerKva?: number;
+}
+
+/**
+ * BouwaTariffTable — matches the backend BouwaTariffTable MongoDB document.
+ *
+ * approvalStatus is a read-only field. "approved_customer" may be returned
+ * by the backend but is NEVER sent in any frontend create/update payload.
+ */
 export interface BouwaTariffTable {
   _id: BouwaId;
-  name?: string;
-  region?: string;
-  utility?: string;
-  effectiveDate?: ISODateString;
-  ratePerKwh?: number;
-  demandCharge?: number;
-  currency?: string;
+  tariffName?: string;
+  providerName?: string;
+  providerType?: BouwaTariffProviderType;
+  tariffCode?: string;
+  tariffCategory?: BouwaTariffCategory;
+  effectiveFrom?: ISODateString;
+  effectiveTo?: ISODateString;
+  rates?: BouwaTariffRate[];
+  vatIncluded?: boolean;
+  sourceType?: string;
+  sourceReference?: string;
+  /** Read-only display field — do not send in payloads. */
+  approvalStatus?: string;
   notes?: string;
   isArchived?: boolean;
   createdBy?: BouwaId;
+  updatedBy?: BouwaId;
   createdAt?: ISODateString;
   updatedAt?: ISODateString;
   [key: string]: unknown;
 }
 
 export interface CreateBouwaTariffTablePayload {
-  name?: string;
-  region?: string;
-  utility?: string;
-  effectiveDate?: ISODateString;
-  ratePerKwh?: number;
-  demandCharge?: number;
-  currency?: string;
+  tariffName?: string;
+  providerName?: string;
+  providerType?: BouwaTariffProviderType;
+  tariffCode?: string;
+  tariffCategory?: BouwaTariffCategory;
+  effectiveFrom?: ISODateString;
+  effectiveTo?: ISODateString;
+  vatIncluded?: boolean;
+  sourceType?: string;
+  sourceReference?: string;
   notes?: string;
 }
 

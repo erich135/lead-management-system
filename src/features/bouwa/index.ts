@@ -20,6 +20,7 @@ export { BouwaPhaseCard } from './components/BouwaPhaseCard';
 export { BouwaAccessNotice } from './components/BouwaAccessNotice';
 export { BouwaRouteGuard } from './components/BouwaRouteGuard';
 export { BouwaMachineSpecLibrary } from './components/BouwaMachineSpecLibrary';
+export { BouwaTariffTablesPanel } from './components/BouwaTariffTablesPanel';
 
 // Shell types
 export type { BouwaPhaseStatus, BouwaShellCard, BouwaAccessRequirement } from './types';
@@ -33,6 +34,10 @@ export type {
   BouwaMachineSpec,
   CreateBouwaMachineSpecPayload,
   UpdateBouwaMachineSpecPayload,
+  BouwaTariffProviderType,
+  BouwaTariffCategory,
+  BouwaTariffTimeBand,
+  BouwaTariffRate,
   BouwaTariffTable,
   CreateBouwaTariffTablePayload,
   UpdateBouwaTariffTablePayload,

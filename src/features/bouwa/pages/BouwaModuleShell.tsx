@@ -14,10 +14,12 @@
  *
  * Phase 4C-2: shell / placeholder only.
  * Phase 4C-5: BouwaMachineSpecLibrary read-only screen added.
+ * Phase 4C-6: BouwaTariffTablesPanel read-only screen added.
  */
 
 import { FileText, Cpu, DollarSign, Wind, ClipboardCheck, Eye, Download } from 'lucide-react';
 import { BouwaMachineSpecLibrary } from '../components/BouwaMachineSpecLibrary';
+import { BouwaTariffTablesPanel } from '../components/BouwaTariffTablesPanel';
 import { BOUWA_MODULE_META } from '../bouwaFrontendConfig';
 import { BouwaAccessNotice } from '../components/BouwaAccessNotice';
 import { BouwaPhaseCard } from '../components/BouwaPhaseCard';
@@ -116,6 +118,9 @@ export function BouwaModuleShell() {
 
       {/* Machine Specification Library — read-only, internal only */}
       <BouwaMachineSpecLibrary />
+
+      {/* Tariff Tables — read-only, internal only */}
+      <BouwaTariffTablesPanel />
 
       {/* Phase/build status footer */}
       <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 flex flex-wrap items-center gap-4 text-xs text-ars-body">

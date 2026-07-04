@@ -258,29 +258,70 @@ export type UpdateBouwaAuditSessionPayload = Partial<
 // ---------------------------------------------------------------------------
 
 /**
- * Internal-only proposal status.
- * DELIBERATELY excludes "customer_ready" — that requires a dedicated
- * approval endpoint (Phase 4B-5+).
+ * Proposal status values — matches backend IBouwaProposalDraft.status.
+ * Values such as 'customer_ready' may be returned by the backend as
+ * read-only display values but are NEVER sent in frontend payloads.
  */
 export type BouwaProposalStatus =
   | 'draft'
+  | 'internal_review'
+  | 'customer_blocked'
+  | 'customer_ready'
+  | 'exported'
+  | 'archived'
+  // Legacy aliases kept for backwards compat with Phase 4C-4 scaffolding
   | 'in_review'
-  | 'approved_internal'
-  | 'archived';
+  | 'approved_internal';
+
+/**
+ * Readiness summary sub-document — mirrors backend IBouwaReadinessSummary.
+ * All fields are read-only display values.
+ */
+export interface BouwaReadinessSummary {
+  readyForInternalCalculation?: boolean;
+  readyForDraftCustomerPreview?: boolean;
+  readyForFinalCustomerProposal?: boolean;
+  totalBlockers?: number;
+  totalWarnings?: number;
+  blockerKeys?: string[];
+  warningKeys?: string[];
+  lastEvaluatedAt?: ISODateString;
+}
 
 export interface BouwaProposalDraft {
   _id: BouwaId;
-  title?: string;
+  /** Proposal number — from backend IBouwaProposalDraft.proposalNumber. */
+  proposalNumber?: string;
+  /** Backend primary customer reference. */
+  customer?: BouwaId;
+  /** Legacy alias — kept for backwards compat. */
   customerId?: BouwaId;
   customerName?: string;
+  branch?: BouwaId;
+  salesLead?: BouwaId;
+  /** Backend primary audit session reference. */
+  auditSession?: BouwaId;
+  /** Legacy alias — kept for backwards compat. */
   auditSessionId?: BouwaId;
+  /** Workflow mode — SPECIFICATION or AIR_AUDIT. */
+  proposalMode?: 'SPECIFICATION' | 'AIR_AUDIT';
   status?: BouwaProposalStatus;
+  /** Read-only safety flag — never set to true in frontend payloads. */
+  customerQuoteSafe?: boolean;
+  readinessSummary?: BouwaReadinessSummary;
+  blockers?: string[];
+  warnings?: string[];
   totalSavingsKwh?: number;
   totalSavingsRand?: number;
   paybackPeriodMonths?: number;
+  approvedBy?: BouwaId;
+  approvedAt?: ISODateString;
+  /** Legacy field — kept for backwards compat. */
+  title?: string;
   notes?: string;
   isArchived?: boolean;
   createdBy?: BouwaId;
+  updatedBy?: BouwaId;
   createdAt?: ISODateString;
   updatedAt?: ISODateString;
   [key: string]: unknown;
@@ -309,6 +350,21 @@ export type UpdateBouwaProposalDraftPayload = Partial<
 // Formula Approvals
 // ---------------------------------------------------------------------------
 
+/**
+ * Backend currentStatus values for formula approvals.
+ * 'VERIFIED_CUSTOMER_SAFE' may be returned by the backend as a read-only
+ * display value but is NEVER sent in frontend payloads.
+ */
+export type BouwaFormulaCurrentStatus =
+  | 'EXTRACTED_FROM_WORKBOOK'
+  | 'NEEDS_MANUAL_CONFIRMATION'
+  | 'VERIFIED_INTERNAL_ONLY'
+  | 'VERIFIED_CUSTOMER_SAFE'
+  | 'REJECTED';
+
+/**
+ * Legacy status type — kept for backwards compat with Phase 4C-4 scaffolding.
+ */
 export type BouwaFormulaApprovalStatus =
   | 'pending'
   | 'under_review'
@@ -318,15 +374,39 @@ export type BouwaFormulaApprovalStatus =
 
 export interface BouwaFormulaApproval {
   _id: BouwaId;
+  /** Backend primary key for this formula. */
+  calculationKey?: string;
+  /** Legacy field alias — kept for backwards compat. */
   formulaKey?: string;
+  formulaName?: string;
+  formulaVersion?: string;
+  formulaText?: string;
   description?: string;
-  version?: string;
+  /** Backend primary status field — use this for display. */
+  currentStatus?: BouwaFormulaCurrentStatus;
+  /** Legacy status alias — kept for backwards compat. */
+  status?: BouwaFormulaApprovalStatus;
+  /** Read-only safety flag — never set to true in frontend payloads. */
+  customerQuoteSafe?: boolean;
   approvedBy?: BouwaId;
   approvedAt?: ISODateString;
-  status?: BouwaFormulaApprovalStatus;
+  approvalNotes?: string;
+  rejectionReason?: string;
+  /** Backend: sourceWorkbook (was workbookName in spec). */
+  sourceWorkbook?: string;
+  /** Backend: sourceSheet (was sheetName in spec). */
+  sourceSheet?: string;
+  /** Backend: sourceCell (was cellReference in spec). */
+  sourceCell?: string;
+  testCaseReferences?: string[];
+  blockers?: string[];
+  warnings?: string[];
+  /** Legacy version field — kept for backwards compat. */
+  version?: string;
   notes?: string;
   isArchived?: boolean;
   createdBy?: BouwaId;
+  updatedBy?: BouwaId;
   createdAt?: ISODateString;
   updatedAt?: ISODateString;
   [key: string]: unknown;
@@ -347,20 +427,46 @@ export type UpdateBouwaFormulaApprovalPayload = Partial<
 // Assumptions
 // ---------------------------------------------------------------------------
 
+/** Scope of an assumption — matches backend IBouwaAssumption.scope enum. */
+export type BouwaAssumptionScope =
+  | 'GLOBAL'
+  | 'SITE'
+  | 'PROPOSAL'
+  | 'MACHINE_SPEC'
+  | 'TARIFF';
+
+/** Confidence level — matches backend CalculationConfidence enum. */
+export type BouwaAssumptionConfidence = 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
+
 export interface BouwaAssumption {
   _id: BouwaId;
+  /** Scope of this assumption — from backend IBouwaAssumption.scope. */
+  scope?: BouwaAssumptionScope;
+  /** Assumption key — primary identifier. */
   key?: string;
+  /** Human-readable label. */
   label?: string;
   description?: string;
   value?: number | string | boolean;
   unit?: string;
-  category?: string;
-  isApproved?: boolean;
+  appliesTo?: string;
+  sourceType?: string;
+  sourceReference?: string;
+  /** Confidence level — from backend CalculationConfidence. */
+  confidence?: BouwaAssumptionConfidence;
+  approvalStatus?: string;
   approvedBy?: BouwaId;
   approvedAt?: ISODateString;
+  validFrom?: ISODateString;
+  validTo?: ISODateString;
+  /** Legacy field — kept for backwards compat. */
+  category?: string;
+  /** Legacy field — kept for backwards compat. */
+  isApproved?: boolean;
   notes?: string;
   isArchived?: boolean;
   createdBy?: BouwaId;
+  updatedBy?: BouwaId;
   createdAt?: ISODateString;
   updatedAt?: ISODateString;
   [key: string]: unknown;
@@ -458,23 +564,57 @@ export type UpdateBouwaEvidenceFileMetadataPayload = Partial<
 
 export type BouwaReportTemplateStatus =
   | 'draft'
-  | 'under_review'
+  | 'pending_review'
   | 'approved_internal'
-  | 'archived';
+  | 'approved_customer'
+  | 'rejected'
+  | 'archived'
+  // Legacy alias kept for backwards compat
+  | 'under_review';
+
+/** Template type — matches backend IBouwaReportTemplate.templateType enum. */
+export type BouwaReportTemplateType =
+  | 'CUSTOMER_PROPOSAL'
+  | 'INTERNAL_CALCULATION_PACK'
+  | 'AUDIT_REPORT'
+  | 'OTHER';
+
+/** A single section within a report template — mirrors backend IBouwaReportSection. */
+export interface BouwaReportSection {
+  sectionKey?: string;
+  title?: string;
+  order?: number;
+  isRequired?: boolean;
+  isCustomerVisible?: boolean;
+  contentTemplate?: string;
+  status?: string;
+}
 
 export interface BouwaReportTemplate {
   _id: BouwaId;
+  /** Backend primary name field — use this for display. */
+  templateName?: string;
+  /** Template type enum. */
+  templateType?: BouwaReportTemplateType;
+  /** Legacy name field — kept for backwards compat. */
   name?: string;
   version?: string;
-  description?: string;
-  status?: BouwaReportTemplateStatus;
-  templateKey?: string;
-  isDefault?: boolean;
+  sections?: BouwaReportSection[];
+  approvalStatus?: BouwaReportTemplateStatus;
+  /** Read-only safety flag — never set to true in frontend payloads. */
+  customerQuoteSafe?: boolean;
   approvedBy?: BouwaId;
   approvedAt?: ISODateString;
+  description?: string;
+  /** Legacy status field — kept for backwards compat. */
+  status?: BouwaReportTemplateStatus;
+  /** Legacy fields — kept for backwards compat. */
+  templateKey?: string;
+  isDefault?: boolean;
   notes?: string;
   isArchived?: boolean;
   createdBy?: BouwaId;
+  updatedBy?: BouwaId;
   createdAt?: ISODateString;
   updatedAt?: ISODateString;
   [key: string]: unknown;

@@ -10,6 +10,9 @@
  * Phase 4C-2: shell exports.
  * Phase 4C-3: route guard exported.
  * Phase 4C-4: API helpers and entity types exported.
+ * Phase 4C-8: BouwaProposalDraftsPanel, BouwaFormulaApprovalsPanel,
+ *              BouwaAssumptionsPanel, BouwaReportTemplatesPanel exported;
+ *              new/corrected types exported.
  */
 
 // Shell page
@@ -22,6 +25,10 @@ export { BouwaRouteGuard } from './components/BouwaRouteGuard';
 export { BouwaMachineSpecLibrary } from './components/BouwaMachineSpecLibrary';
 export { BouwaTariffTablesPanel } from './components/BouwaTariffTablesPanel';
 export { BouwaAirAuditEvidencePanel } from './components/BouwaAirAuditEvidencePanel';
+export { BouwaProposalDraftsPanel } from './components/BouwaProposalDraftsPanel';
+export { BouwaFormulaApprovalsPanel } from './components/BouwaFormulaApprovalsPanel';
+export { BouwaAssumptionsPanel } from './components/BouwaAssumptionsPanel';
+export { BouwaReportTemplatesPanel } from './components/BouwaReportTemplatesPanel';
 
 // Shell types
 export type { BouwaPhaseStatus, BouwaShellCard, BouwaAccessRequirement } from './types';
@@ -48,13 +55,17 @@ export type {
   CreateBouwaAuditSessionPayload,
   UpdateBouwaAuditSessionPayload,
   BouwaProposalStatus,
+  BouwaReadinessSummary,
   BouwaProposalDraft,
   CreateBouwaProposalDraftPayload,
   UpdateBouwaProposalDraftPayload,
+  BouwaFormulaCurrentStatus,
   BouwaFormulaApprovalStatus,
   BouwaFormulaApproval,
   CreateBouwaFormulaApprovalPayload,
   UpdateBouwaFormulaApprovalPayload,
+  BouwaAssumptionScope,
+  BouwaAssumptionConfidence,
   BouwaAssumption,
   CreateBouwaAssumptionPayload,
   UpdateBouwaAssumptionPayload,
@@ -65,6 +76,8 @@ export type {
   CreateBouwaEvidenceFileMetadataPayload,
   UpdateBouwaEvidenceFileMetadataPayload,
   BouwaReportTemplateStatus,
+  BouwaReportTemplateType,
+  BouwaReportSection,
   BouwaReportTemplate,
   CreateBouwaReportTemplatePayload,
   UpdateBouwaReportTemplatePayload,

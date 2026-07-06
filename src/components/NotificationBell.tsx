@@ -31,13 +31,8 @@ export function NotificationBell({ onOpenPanel }: NotificationBellProps) {
 
   async function fetchCounts() {
     try {
-      const [notifCount, tasksResult] = await Promise.all([
-        getUnreadNotificationCount().catch(() => 0),
-        getDailyTasks().catch(() => ({ tasks: [], summary: { total: 0, critical: 0, warning: 0, info: 0 } })),
-      ]);
-      // Combine unread notifications + overdue daily tasks
-      const overdueCount = tasksResult.summary?.critical || 0;
-      setTotalCount(notifCount + overdueCount);
+      const notifCount = await getUnreadNotificationCount().catch(() => 0);
+      setTotalCount(notifCount);
     } catch (error) {
       console.error('Error fetching notification count:', error);
     }

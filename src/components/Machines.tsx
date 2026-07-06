@@ -1561,9 +1561,16 @@ export function Machines() {
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <div className="text-sm font-medium text-slate-800">
-                                      {(rsr.rsrNumber || rsr.jobNumber)
-                                        ? [rsr.rsrNumber && `RSR ${rsr.rsrNumber}`, rsr.jobNumber && `Job ${rsr.jobNumber}`].filter(Boolean).join(' · ')
-                                        : (rsr.title || rsr.fileName)}
+                                      {(() => {
+                                        const parts: string[] = [];
+                                        if (rsr.rsrNumber) parts.push(`RSR ${rsr.rsrNumber}`);
+                                        if (rsr.jobNumber) parts.push(`Job ${rsr.jobNumber}`);
+                                        if (rsr.fileName) parts.push(rsr.fileName);
+                                        else if (rsr.title) parts.push(rsr.title as string);
+                                        else if (rsr.uploadedAt) parts.push(new Date(rsr.uploadedAt).toLocaleString('en-ZA'));
+                                        else if (rsr._id) parts.push(String(rsr._id).slice(0, 8));
+                                        return parts.length > 0 ? parts.join(' · ') : 'RSR document';
+                                      })()}
                                     </div>
                                     <div className="flex items-center gap-3 text-xs text-slate-400">
                                       <span>{formatDate(rsr.uploadedAt)}</span>

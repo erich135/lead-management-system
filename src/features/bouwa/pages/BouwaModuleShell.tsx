@@ -18,6 +18,7 @@
  * Phase 4C-7: BouwaAirAuditEvidencePanel read-only screen added.
  * Phase 4C-8: BouwaProposalDraftsPanel, BouwaFormulaApprovalsPanel,
  *              BouwaAssumptionsPanel, BouwaReportTemplatesPanel added.
+ * Phase 4D-9: BouwaSupplierSpecReview (internal review panel with editable review fields).
  */
 
 import { FileText, Cpu, DollarSign, Wind, ClipboardCheck, Eye, Download } from 'lucide-react';
@@ -28,6 +29,7 @@ import { BouwaProposalDraftsPanel } from '../components/BouwaProposalDraftsPanel
 import { BouwaFormulaApprovalsPanel } from '../components/BouwaFormulaApprovalsPanel';
 import { BouwaAssumptionsPanel } from '../components/BouwaAssumptionsPanel';
 import { BouwaReportTemplatesPanel } from '../components/BouwaReportTemplatesPanel';
+import { BouwaSupplierSpecReview } from '../components/BouwaSupplierSpecReview';
 import { BOUWA_MODULE_META } from '../bouwaFrontendConfig';
 import { BouwaAccessNotice } from '../components/BouwaAccessNotice';
 import { BouwaPhaseCard } from '../components/BouwaPhaseCard';
@@ -126,6 +128,9 @@ export function BouwaModuleShell() {
 
       {/* Machine Specification Library — read-only, internal only */}
       <BouwaMachineSpecLibrary />
+
+      {/* Supplier Spec Review — Phase 4D-9 — internal review workflow, admin/super_admin only */}
+      <BouwaSupplierSpecReview />
 
       {/* Tariff Tables — read-only, internal only */}
       <BouwaTariffTablesPanel />

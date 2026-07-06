@@ -29,6 +29,13 @@ export type BouwaMachineSpecCategory = 'BOUWA' | 'COMPETITOR' | 'EXISTING_REFERE
 /** Speed-control technology. */
 export type BouwaMachineSpecSpeedControl = 'FIXED_SPEED' | 'VSD' | 'VARIABLE_SPEED' | 'UNKNOWN';
 
+/** Internal review workflow status (Phase 4D-8a). */
+export type BouwaMachineSpecInternalReviewStatus =
+  | 'needs_internal_review'
+  | 'reviewed_ok'
+  | 'needs_supplier_confirmation'
+  | 'rejected_internal';
+
 /**
  * BouwaMachineSpec — matches the backend BouwaMachineSpec MongoDB document.
  *
@@ -65,6 +72,15 @@ export interface BouwaMachineSpec {
   /** Read-only display field — do not send in payloads. */
   approvalStatus?: string;
   notes?: string;
+  // Phase 4D-8a: internal review fields
+  dryerCapacityM3Min?: number;
+  dewPointC?: number;
+  internalReviewStatus?: BouwaMachineSpecInternalReviewStatus;
+  internalReviewNotes?: string;
+  duplicateReviewRequired?: boolean;
+  duplicateReviewGroupKey?: string;
+  criticalMissingFields?: string[];
+  sourceImportPhase?: string;
   isArchived?: boolean;
   createdBy?: BouwaId;
   updatedBy?: BouwaId;
@@ -95,6 +111,21 @@ export interface CreateBouwaMachineSpecPayload {
 }
 
 export type UpdateBouwaMachineSpecPayload = Partial<CreateBouwaMachineSpecPayload>;
+
+/**
+ * Payload for the PATCH /machine-specs/:id/internal-review endpoint.
+ * Only internal review fields — never includes approvalStatus, approvedBy, etc.
+ */
+export interface UpdateBouwaMachineSpecInternalReviewPayload {
+  ratedPressureBar?: number;
+  ratedCapacityM3Min?: number;
+  packageInputKw?: number;
+  motorKw?: number;
+  dryerCapacityM3Min?: number;
+  dewPointC?: number;
+  internalReviewStatus?: BouwaMachineSpecInternalReviewStatus;
+  internalReviewNotes?: string;
+}
 
 // ---------------------------------------------------------------------------
 // Tariff Tables

@@ -35,6 +35,7 @@ import type {
   BouwaReportTemplate,
   CreateBouwaMachineSpecPayload,
   UpdateBouwaMachineSpecPayload,
+  UpdateBouwaMachineSpecInternalReviewPayload,
   CreateBouwaTariffTablePayload,
   UpdateBouwaTariffTablePayload,
   CreateBouwaAuditSessionPayload,
@@ -153,6 +154,21 @@ export async function updateBouwaMachineSpec(
   payload: UpdateBouwaMachineSpecPayload
 ): Promise<BouwaMachineSpec> {
   return bouwaRequest<BouwaMachineSpec>(`/machine-specs/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * PATCH /machine-specs/:id/internal-review
+ * Updates only internal review fields.  Approval/provenance fields are locked on the backend.
+ * SAFETY: payload type deliberately excludes approvalStatus and any customer-safe fields.
+ */
+export async function updateBouwaMachineSpecInternalReview(
+  id: string,
+  payload: UpdateBouwaMachineSpecInternalReviewPayload
+): Promise<BouwaMachineSpec> {
+  return bouwaRequest<BouwaMachineSpec>(`/machine-specs/${encodeURIComponent(id)}/internal-review`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   });

@@ -128,7 +128,7 @@ export function Machines() {
     ownershipType: 'customer', serviceType: 'hours',
     machineHours: 0, nextServiceHours: 0,
     lastServiceDate: '', nextServiceDate: '',
-    currentLocation: '', lastOilSampleDate: '', oilSampleComment: '',
+    currentLocation: '', lastOilSampleDate: '', oilSampleComment: '', yearOfManufacture: '',
     customerId: '', cashCustomer: '', isRental: false,
     contactPerson: '', whatsAppNumber: '', readingFrequencyDays: 30, whatsAppRemindersEnabled: true,
   });
@@ -273,6 +273,7 @@ export function Machines() {
       nextServiceDate: machine.nextServiceDate ? machine.nextServiceDate.split('T')[0] : '',
       lastOilSampleDate: machine.lastOilSampleDate ? machine.lastOilSampleDate.split('T')[0] : '',
       oilSampleComment: machine.oilSampleComment || '',
+      yearOfManufacture: (machine as any).yearOfManufacture || '',
       cashCustomer: machine.cashCustomer || '',
       currentLocation: machine.currentLocation || '',
       customerId: machine.customer && typeof machine.customer === 'object' ? (machine.customer as any)._id || '' : machine.customer || '',
@@ -302,6 +303,7 @@ export function Machines() {
       if (!payload.nextServiceDate) delete payload.nextServiceDate;
       if (!payload.lastOilSampleDate) delete payload.lastOilSampleDate;
       if (!payload.oilSampleComment) delete payload.oilSampleComment;
+      if (!payload.yearOfManufacture) delete payload.yearOfManufacture;
       if (payload.contactPerson) payload.contactPerson = payload.contactPerson.trim();
       if (payload.whatsAppNumber) payload.whatsAppNumber = payload.whatsAppNumber.trim();
       payload.readingFrequencyDays = Number(payload.readingFrequencyDays) || 30;
@@ -341,6 +343,7 @@ export function Machines() {
       if (createForm.machineType) payload.machineType = createForm.machineType;
       if (createForm.currentLocation.trim()) payload.currentLocation = createForm.currentLocation.trim();
       if (createForm.oilSampleComment.trim()) payload.oilSampleComment = createForm.oilSampleComment.trim();
+      if (createForm.yearOfManufacture) payload.yearOfManufacture = parseInt(createForm.yearOfManufacture, 10);
       if (createForm.serviceType === 'hours') {
         payload.machineHours = Number(createForm.machineHours) || 0;
         payload.nextServiceHours = Number(createForm.nextServiceHours) || 0;
@@ -366,7 +369,7 @@ export function Machines() {
         ownershipType: 'customer', serviceType: 'hours',
         machineHours: 0, nextServiceHours: 0,
         lastServiceDate: '', nextServiceDate: '',
-        currentLocation: '', lastOilSampleDate: '', oilSampleComment: '',
+        currentLocation: '', lastOilSampleDate: '', oilSampleComment: '', yearOfManufacture: '',
         customerId: '', cashCustomer: '', isRental: false,
         contactPerson: '', whatsAppNumber: '', readingFrequencyDays: 30, whatsAppRemindersEnabled: true,
       });
@@ -393,6 +396,7 @@ export function Machines() {
         'Machine Hours', 'Next Service Hours',
         'Last Service Date', 'Next Service Date',
         'Current Location', 'Last Oil Sample Date', 'Oil Sample Comment',
+        'Year of Manufacture',
         'Contact Person', 'WhatsApp Number', 'Reading Frequency (Days)', 'Reminders Enabled',
       ];
 
@@ -428,6 +432,7 @@ export function Machines() {
           m.currentLocation ?? '',
           m.lastOilSampleDate ? new Date(m.lastOilSampleDate).toLocaleDateString('en-ZA') : '',
           m.oilSampleComment ?? '',
+          (m as any).yearOfManufacture ?? '',
           m.contactPerson ?? '',
           escapeText(m.whatsAppNumber ?? ''),
           m.readingFrequencyDays ?? '',
@@ -1152,6 +1157,18 @@ export function Machines() {
                                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                               </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Year of Manufacture</label>
+                                <input
+                                  type="number"
+                                  min={1800}
+                                  max={new Date().getFullYear()}
+                                  value={(editForm as any).yearOfManufacture || ''}
+                                  onChange={(e) => setEditForm({ ...editForm, yearOfManufacture: e.target.value } as any)}
+                                  placeholder="e.g. 2015"
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                              </div>
                               {editingMachine?._id && (
                                 <div className="md:col-span-2">
                                   <MachineQrPanel
@@ -1422,6 +1439,10 @@ export function Machines() {
                               <div>
                                 <div className="text-xs font-semibold text-slate-400 uppercase">Asset Number</div>
                                 <div className="text-sm font-medium text-slate-800 mt-0.5">{machine.assetNumber || '—'}</div>
+                              </div>
+                              <div>
+                                <div className="text-xs font-semibold text-slate-400 uppercase">Year of Manufacture</div>
+                                <div className="text-sm font-medium text-slate-800 mt-0.5">{(machine as any).yearOfManufacture || '—'}</div>
                               </div>
                               <div>
                                 <div className="text-xs font-semibold text-slate-400 uppercase">Current Location</div>
@@ -2117,6 +2138,10 @@ export function Machines() {
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Asset Number</label>
                   <input type="text" value={createForm.assetNumber} onChange={e => setCreateForm({ ...createForm, assetNumber: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Year of Manufacture</label>
+                  <input type="number" min={1800} max={new Date().getFullYear()} value={createForm.yearOfManufacture} onChange={e => setCreateForm({ ...createForm, yearOfManufacture: e.target.value })} placeholder="e.g. 2015" className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Machine Type</label>

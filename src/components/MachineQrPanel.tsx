@@ -51,7 +51,7 @@ export function MachineQrPanel({
   /**
    * Sends the QR label to the Zebra GK420t via Zebra Browser Print (ZPL).
    * Label: 80 × 80 mm — GK420t is 203 dpi (8 dots/mm) → 640 × 640 dots.
-   * QR: 70 × 70 mm, 40-dot (5 mm) margin each side.
+   * QR: 65 × 65 mm, 40-dot (5 mm) margin each side.
    * ZPL: ^BQN,2,10 = QR model-2, magnification 10; ^FDLA = error-correction L, mode A.
    *
    * Falls back to a browser print popup if Zebra Browser Print is not running.
@@ -92,7 +92,7 @@ export function MachineQrPanel({
   .label { width: 80mm; height: 80mm; display: flex; flex-direction: column;
            align-items: center; justify-content: center; padding: 5mm;
            border: 1px dashed #999; box-sizing: border-box; }
-  .label svg { width: 70mm; height: 70mm; }
+  .label svg { width: 65mm; height: 65mm; }
   .meta { font-size: 6pt; line-height: 1.15; margin-top: 1mm; text-align: center; }
   .meta strong { display: block; font-size: 7pt; }
   @media print { .label { border: none; } .instructions { display: none; } }
@@ -152,7 +152,7 @@ export function MachineQrPanel({
             <QRCodeSVG
               id={`machine-qr-${machineId}`}
               value={scanUrl}
-              size={140}
+              size={130}
               level="M"
               includeMargin={false}
             />

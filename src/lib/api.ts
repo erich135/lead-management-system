@@ -740,6 +740,7 @@ export interface Machine {
   lastOilSampleDate?: string;
   oilSampleComment?: string;
   currentLocation?: string;
+  yearOfManufacture?: number;
   isActive: boolean;
   dbStatus?: string;
   rsrDocuments?: MachineRSR[];
@@ -800,6 +801,7 @@ export interface ValidatedMachineRow {
   currentLocation?: string;
   lastOilSampleDate?: string;
   oilSampleComment?: string;
+  yearOfManufacture?: number;
   isRental: boolean;
   customerId?: string;
   customerName?: string;
@@ -823,6 +825,7 @@ export interface ErrorMachineRow {
   currentLocation?: string;
   lastOilSampleDate?: string;
   oilSampleComment?: string;
+  yearOfManufacture?: number;
   cashCustomer?: string;
   errorType: 'customer_not_found' | 'missing_field' | 'duplicate_serial';
   errorMessage: string;

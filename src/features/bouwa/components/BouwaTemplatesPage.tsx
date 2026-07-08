@@ -397,6 +397,60 @@ export function BouwaTemplatesPage() {
         </div>
       </SectionCard>
 
+      {/* Industrial Tariff Profiles */}
+      <SectionCard title="Industrial Tariff Profiles" icon={<Banknote className="w-4 h-4" />} badge="Large Industrial / Mining">
+        <div className="space-y-3">
+          <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2.5 flex items-start gap-2">
+            <Info className="w-3.5 h-3.5 text-green-600 shrink-0 mt-0.5" />
+            <p className="text-xs text-green-800">
+              <span className="font-semibold">Preferred source: actual customer electricity bill. </span>
+              For large industrial and mining customers, electricity spend can run into millions of Rand per year.
+              A blended average tariff is acceptable for early estimates only.
+              Final savings calculations must be based on the customer's actual tariff structure wherever possible.
+            </p>
+          </div>
+          <div className="space-y-2 text-xs">
+            {[
+              {
+                rule: 'Customer bill is the preferred tariff source',
+                detail: 'Request the customer\'s most recent electricity bill. Extract actual R/kWh rates and demand charges. Record the bill reference and date.',
+                color: 'bg-green-50 border-green-200 text-green-800',
+              },
+              {
+                rule: 'Official Eskom / municipal schedules are secondary',
+                detail: 'Use official published tariff schedules when a customer bill is unavailable. Match the correct tariff category (LDS, HDS, MegaFlex, Ruraflex, etc.) to the site\'s supply agreement.',
+                color: 'bg-blue-50 border-blue-200 text-blue-800',
+              },
+              {
+                rule: 'Estimates / placeholders for internal drafts only',
+                detail: 'Placeholder tariffs must be labelled as such. Do not present estimate-based savings as final figures to a customer. Clearly mark proposals as "Draft — tariff unconfirmed".',
+                color: 'bg-amber-50 border-amber-200 text-amber-800',
+              },
+              {
+                rule: 'Tariffs must be versioned by effective date',
+                detail: 'Tariff schedules change annually (typically 1 April). Old proposals must retain the tariff rates used at the time. New proposals must use the latest confirmed tariff profile.',
+                color: 'bg-purple-50 border-purple-200 text-purple-800',
+              },
+              {
+                rule: 'TOU method preferred over blended estimate for large accounts',
+                detail: 'Annual Saving = (Peak kWh Saved × Peak Rate) + (Standard kWh Saved × Standard Rate) + (Off-peak kWh Saved × Off-peak Rate) + Demand charge impact. This is significantly more accurate than a blended rate for customers on TOU tariffs.',
+                color: 'bg-slate-50 border-slate-200 text-slate-700',
+              },
+              {
+                rule: 'Demand charges can be significant for large compressors',
+                detail: 'Large fixed-speed compressors draw high peak kVA. VSD compressors reduce peak demand. Demand charge savings (R/kVA/month) can be as significant as kWh savings for some customers.',
+                color: 'bg-slate-50 border-slate-200 text-slate-700',
+              },
+            ].map(r => (
+              <div key={r.rule} className={`rounded-lg border ${r.color} px-3 py-2`}>
+                <p className="font-semibold">{r.rule}</p>
+                <p className="mt-0.5 text-slate-600">{r.detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </SectionCard>
+
       {/* Manufacturer spec sources */}
       <SectionCard title="Manufacturer Spec Sources" icon={<FileText className="w-4 h-4" />}>
         <div className="space-y-2 text-xs">

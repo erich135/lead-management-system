@@ -23,6 +23,12 @@
 import { useState } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+// Phase 4D-17/18 — calculation modules
+import { INGRAIN_LOAD_PROFILE as LOAD_PROFILE } from '../calculations/loadProfileEngine';
+import { INGRAIN_COST_REFERENCE, MODEL_NAMING_CONFLICT_NOTE } from '../calculations/ingrainReferenceScenario';
+import { runValidation, summariseValidation } from '../calculations/validationEngine';
+import { INGRAIN_ROI_REFERENCE } from '../calculations/roiEngine';
+import { ESKOM_RATES_SET_A, ESKOM_RATES_SET_B, INGRAIN_DAY_CALENDAR } from '../calculations/tariffEngine';
 import {
   ChevronRight, ChevronLeft, Check, Wind, FileText, Cpu, Zap, BarChart3,
   AlertTriangle, CheckCircle2, Download, Upload, Plus, Info, Printer,
@@ -40,7 +46,8 @@ type DataSourceMode = 'audit-excel' | 'manual-entry' | 'manufacturer-specs';
 // Source quality levels for conditional fields
 type ConditionSource = 'audit-measured' | 'manual' | 'manufacturer-assumption';
 type TariffSource = 'actual-bill' | 'eskom-schedule' | 'municipal-schedule' | 'estimate';
-type TariffType = 'flat' | 'tou' | 'demand-based';
+type TariffType = 'flat' | 'tou' | 'demand-based' | 'blended-estimate';
+type TariffConfidence = 'bill-confirmed' | 'official-schedule' | 'estimate' | 'unknown';
 
 interface ProposalSetup {
   customer: string;
@@ -67,16 +74,48 @@ interface SiteConditions {
 }
 
 interface TariffProfile {
+  // --- Core provenance ---
+  tariffConfidence: TariffConfidence;
+  tariffSource: TariffSource;
+  // --- Supplier ---
   electricitySupplier: string;
   municipalityRegion: string;
+  tariffCategoryName: string;
   tariffType: TariffType;
+  vatIncluded: 'included' | 'excluded' | 'unknown';
+  // --- Rates ---
+  blendedAvgRkWh: string;
   peakRateRkWh: string;
   standardRateRkWh: string;
   offPeakRateRkWh: string;
-  blendedAvgRkWh: string;
+  // --- Demand & access charges ---
   demandChargeRkVA: string;
-  tariffSource: TariffSource;
+  networkAccessCharge: string;
+  serviceAdminCharge: string;
+  // --- High/Low demand season rates ---
+  highDemandMonths: string;
+  lowDemandMonths: string;
+  highDemandPeakRate: string;
+  highDemandOffPeakRate: string;
+  lowDemandPeakRate: string;
+  lowDemandOffPeakRate: string;
+  // --- Effective dates & provenance ---
+  effectiveFrom: string;
+  effectiveTo: string;
+  sourceDocumentRef: string;
+  lastCheckedDate: string;
+  confirmedBy: string;
   tariffDateConfirmed: string;
+}
+
+interface TariffOperatingProfile {
+  peakRunPct: string;
+  standardRunPct: string;
+  offPeakRunPct: string;
+  annualRunHours: string;
+  annualPeakHours: string;
+  annualStandardHours: string;
+  annualOffPeakHours: string;
 }
 
 const DEFAULT_SETUP: ProposalSetup = {
@@ -104,16 +143,42 @@ const DEFAULT_SITE_CONDITIONS: SiteConditions = {
 };
 
 const DEFAULT_TARIFF: TariffProfile = {
+  tariffConfidence: 'estimate',
+  tariffSource: 'estimate',
   electricitySupplier: 'City of Cape Town Municipal / Eskom (confirm with site)',
   municipalityRegion: 'City of Cape Town',
+  tariffCategoryName: 'TBC — confirm with site',
   tariffType: 'flat',
+  vatIncluded: 'unknown',
+  blendedAvgRkWh: 'Placeholder — from deck savings calculation',
   peakRateRkWh: 'TBC — confirm with site billing',
   standardRateRkWh: 'TBC — confirm with site billing',
   offPeakRateRkWh: 'TBC — confirm with site billing',
-  blendedAvgRkWh: 'Placeholder — from deck savings calculation',
   demandChargeRkVA: 'Not available',
-  tariffSource: 'estimate',
+  networkAccessCharge: 'TBC',
+  serviceAdminCharge: 'TBC',
+  highDemandMonths: 'Jun, Jul, Aug (typical HDS)',
+  lowDemandMonths: 'Sep – May (typical LDS)',
+  highDemandPeakRate: 'TBC',
+  highDemandOffPeakRate: 'TBC',
+  lowDemandPeakRate: 'TBC',
+  lowDemandOffPeakRate: 'TBC',
+  effectiveFrom: 'TBC',
+  effectiveTo: 'TBC',
+  sourceDocumentRef: 'Pending — request customer electricity bill',
+  lastCheckedDate: 'Not confirmed',
+  confirmedBy: '',
   tariffDateConfirmed: 'Not confirmed — pending site bill',
+};
+
+const DEFAULT_TARIFF_OP_PROFILE: TariffOperatingProfile = {
+  peakRunPct: '~80% (estimated)',
+  standardRunPct: '~15% (estimated)',
+  offPeakRunPct: '~5% (estimated)',
+  annualRunHours: '6,000',
+  annualPeakHours: '~4,800',
+  annualStandardHours: '~900',
+  annualOffPeakHours: '~300',
 };
 
 // Demo compressor rows — exact values from Ingrain Belville deck (30 May 2025 audit)
@@ -320,6 +385,22 @@ function SourceBadge({ source }: { source: string }) {
   );
 }
 
+function TariffConfidenceBadge({ confidence }: { confidence: TariffConfidence }) {
+  const cfg: Record<TariffConfidence, { label: string; cls: string; dot: string }> = {
+    'bill-confirmed':    { label: 'Customer Bill Confirmed', cls: 'bg-green-100 text-green-800 border-green-300',  dot: 'bg-green-500' },
+    'official-schedule': { label: 'Official Tariff Schedule', cls: 'bg-blue-100 text-blue-800 border-blue-300',    dot: 'bg-blue-500'  },
+    'estimate':          { label: 'Estimate',                 cls: 'bg-amber-100 text-amber-800 border-amber-300', dot: 'bg-amber-500' },
+    'unknown':           { label: 'Unknown',                  cls: 'bg-red-100 text-red-800 border-red-300',       dot: 'bg-red-500'   },
+  };
+  const { label, cls, dot } = cfg[confidence] ?? cfg.unknown;
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${cls}`}>
+      <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
+      {label}
+    </span>
+  );
+}
+
 function StepHeader({ icon, title, sub }: { icon: React.ReactNode; title: string; sub?: string }) {
   return (
     <div className="flex items-start gap-3 pb-4 border-b border-slate-200">
@@ -371,6 +452,7 @@ function LabelledSelect({ label, value, options, onChange, icon }: {
 
 function Step1_SiteAndConditions({
   data, onChange, siteConditions, onChangeSiteConditions, tariffProfile, onChangeTariff,
+  tariffOpProfile, onChangeTariffOpProfile,
 }: {
   data: ProposalSetup;
   onChange: (d: ProposalSetup) => void;
@@ -378,7 +460,10 @@ function Step1_SiteAndConditions({
   onChangeSiteConditions: (s: SiteConditions) => void;
   tariffProfile: TariffProfile;
   onChangeTariff: (t: TariffProfile) => void;
+  tariffOpProfile: TariffOperatingProfile;
+  onChangeTariffOpProfile: (p: TariffOperatingProfile) => void;
 }) {
+  const [showAdvancedTariff, setShowAdvancedTariff] = useState(false);
   function textField(label: string, value: string, onCh: (v: string) => void, icon?: React.ReactNode, type = 'text', textarea = false) {
     return (
       <div className="space-y-1">
@@ -406,8 +491,9 @@ function Step1_SiteAndConditions({
   }
 
   function sc(key: keyof SiteConditions) { return (v: string) => onChangeSiteConditions({ ...siteConditions, [key]: v }); }
-  function tp(key: keyof TariffProfile) { return (v: string) => onChangeTariff({ ...tariffProfile, [key]: v }); }
+  function tp(key: keyof TariffProfile) { return (v: string) => onChangeTariff({ ...tariffProfile, [key]: v as never }); }
   function su(key: keyof ProposalSetup) { return (v: string) => onChange({ ...data, [key]: v }); }
+  function op(key: keyof TariffOperatingProfile) { return (v: string) => onChangeTariffOpProfile({ ...tariffOpProfile, [key]: v }); }
 
   const condSourceOpts = [
     { value: 'audit-measured', label: 'Audit Measured' },
@@ -418,6 +504,7 @@ function Step1_SiteAndConditions({
     { value: 'flat', label: 'Flat Rate' },
     { value: 'tou', label: 'Time-of-Use (TOU)' },
     { value: 'demand-based', label: 'Demand-Based' },
+    { value: 'blended-estimate', label: 'Blended Estimate' },
   ];
   const tariffSourceOpts = [
     { value: 'actual-bill', label: 'Actual site electricity bill' },
@@ -504,19 +591,55 @@ function Step1_SiteAndConditions({
             <Banknote className="w-4 h-4 text-green-600" />
             C — Electricity Tariff Profile
           </h3>
-          <div className="text-xs text-green-800 bg-green-100 border border-green-200 rounded-lg px-3 py-1.5 flex items-center gap-1.5">
-            <Info className="w-3.5 h-3.5 shrink-0" />
-            Tariffs are site-specific. Confirm from actual electricity bill before finalising savings claims.
+          <div className="flex items-center gap-2 flex-wrap">
+            <TariffConfidenceBadge confidence={tariffProfile.tariffConfidence} />
+            <div className="text-xs text-green-800 bg-green-100 border border-green-200 rounded-lg px-2.5 py-1 flex items-center gap-1.5">
+              <Info className="w-3.5 h-3.5 shrink-0" />
+              Preferred source: actual customer electricity bill.
+            </div>
           </div>
         </div>
+
+        {(tariffProfile.tariffConfidence === 'estimate' || tariffProfile.tariffConfidence === 'unknown') && (
+          <div className="rounded-lg bg-amber-50 border border-amber-300 px-3 py-2.5 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-800">
+              <span className="font-bold">Tariff not confirmed. </span>
+              Savings can be used for internal discussion only.
+              Confirm customer bill or official tariff category before final proposal.
+            </p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <LabelledSelect
+            label="Tariff Confidence"
+            value={tariffProfile.tariffConfidence}
+            options={[
+              { value: 'bill-confirmed',    label: '✅ Customer bill confirmed' },
+              { value: 'official-schedule', label: '🔵 Official supplier tariff' },
+              { value: 'estimate',          label: '⚠️ Estimate' },
+              { value: 'unknown',           label: '❓ Unknown' },
+            ]}
+            onChange={v => onChangeTariff({ ...tariffProfile, tariffConfidence: v as TariffConfidence })}
+            icon={<CheckCircle2 className="w-3.5 h-3.5" />}
+          />
+          <LabelledSelect
+            label="Tariff Source"
+            value={tariffProfile.tariffSource}
+            options={tariffSourceOpts}
+            onChange={v => onChangeTariff({ ...tariffProfile, tariffSource: v as TariffSource })}
+            icon={<FileText className="w-3.5 h-3.5" />}
+          />
+          <LabelledSelect
             label="Electricity Supplier"
-            value={tariffProfile.electricitySupplier.split('/')[0].trim()}
+            value={['eskom-direct','municipal','other'].includes(tariffProfile.electricitySupplier) ? tariffProfile.electricitySupplier : 'other'}
             options={supplierOpts}
             onChange={v => onChangeTariff({ ...tariffProfile, electricitySupplier: v })}
             icon={<Bolt className="w-3.5 h-3.5" />}
           />
+          {textField('Municipality / Tariff Region', tariffProfile.municipalityRegion, tp('municipalityRegion'), <MapPin className="w-3.5 h-3.5" />)}
+          {textField('Tariff Category / Name', tariffProfile.tariffCategoryName, tp('tariffCategoryName'), <Banknote className="w-3.5 h-3.5" />)}
           <LabelledSelect
             label="Tariff Type"
             value={tariffProfile.tariffType}
@@ -524,31 +647,96 @@ function Step1_SiteAndConditions({
             onChange={v => onChangeTariff({ ...tariffProfile, tariffType: v as TariffType })}
             icon={<Banknote className="w-3.5 h-3.5" />}
           />
-          {textField('Municipality / Tariff Region', tariffProfile.municipalityRegion, tp('municipalityRegion'), <MapPin className="w-3.5 h-3.5" />)}
+          <LabelledSelect
+            label="VAT Treatment"
+            value={tariffProfile.vatIncluded}
+            options={[
+              { value: 'included', label: 'VAT Included in rates' },
+              { value: 'excluded', label: 'VAT Excluded (ex-VAT rates)' },
+              { value: 'unknown',  label: 'Unknown' },
+            ]}
+            onChange={v => onChangeTariff({ ...tariffProfile, vatIncluded: v as TariffProfile['vatIncluded'] })}
+            icon={<Zap className="w-3.5 h-3.5" />}
+          />
           {textField('Blended Average Rate (R/kWh)', tariffProfile.blendedAvgRkWh, tp('blendedAvgRkWh'), <Zap className="w-3.5 h-3.5" />)}
           {textField('Peak Rate (R/kWh)', tariffProfile.peakRateRkWh, tp('peakRateRkWh'), <Zap className="w-3.5 h-3.5" />)}
           {textField('Standard Rate (R/kWh)', tariffProfile.standardRateRkWh, tp('standardRateRkWh'), <Zap className="w-3.5 h-3.5" />)}
           {textField('Off-Peak Rate (R/kWh)', tariffProfile.offPeakRateRkWh, tp('offPeakRateRkWh'), <Zap className="w-3.5 h-3.5" />)}
-          {textField('Demand Charge (R/kVA/month)', tariffProfile.demandChargeRkVA, tp('demandChargeRkVA'), <Gauge className="w-3.5 h-3.5" />)}
-          {textField('Tariff Date Confirmed', tariffProfile.tariffDateConfirmed, tp('tariffDateConfirmed'), <Calendar className="w-3.5 h-3.5" />)}
+          {textField('Demand Charge (R/kVA or R/kW/month)', tariffProfile.demandChargeRkVA, tp('demandChargeRkVA'), <Gauge className="w-3.5 h-3.5" />)}
+          {textField('Source Document / Bill Ref', tariffProfile.sourceDocumentRef, tp('sourceDocumentRef'), <FileText className="w-3.5 h-3.5" />)}
+          {textField('Last Checked Date', tariffProfile.lastCheckedDate, tp('lastCheckedDate'), <Calendar className="w-3.5 h-3.5" />)}
+          {textField('Confirmed By', tariffProfile.confirmedBy, tp('confirmedBy'), <User className="w-3.5 h-3.5" />)}
         </div>
-        <LabelledSelect
-          label="Tariff Source"
-          value={tariffProfile.tariffSource}
-          options={tariffSourceOpts}
-          onChange={v => onChangeTariff({ ...tariffProfile, tariffSource: v as TariffSource })}
-          icon={<CheckCircle2 className="w-3.5 h-3.5" />}
-        />
-        {tariffProfile.tariffSource === 'estimate' && (
-          <div className="rounded-lg bg-amber-50 border border-amber-300 px-3 py-2 flex items-start gap-2">
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-800">
-              <span className="font-semibold">Estimate / placeholder tariff in use. </span>
-              Savings calculations using this tariff cannot be presented as final to the customer.
-              Confirm actual tariff from site electricity bill before issuing proposal.
-            </p>
+
+        {/* Advanced tariff details (collapsible) */}
+        <div className="border-t border-green-200 pt-3">
+          <button
+            type="button"
+            onClick={() => setShowAdvancedTariff(p => !p)}
+            className="flex items-center gap-2 text-xs font-semibold text-green-700 hover:text-green-900 transition"
+          >
+            <span className={`transition-transform duration-150 inline-block ${showAdvancedTariff ? 'rotate-90' : ''}`}>&#9654;</span>
+            {showAdvancedTariff ? 'Hide' : 'Show'} advanced tariff details — HDS/LDS season rates, charges &amp; effective dates
+          </button>
+          {showAdvancedTariff && (
+            <div className="mt-4 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {textField('High-Demand Season Months', tariffProfile.highDemandMonths, tp('highDemandMonths'), <Calendar className="w-3.5 h-3.5" />)}
+                {textField('Low-Demand Season Months', tariffProfile.lowDemandMonths, tp('lowDemandMonths'), <Calendar className="w-3.5 h-3.5" />)}
+                {textField('HDS Peak Rate (R/kWh)', tariffProfile.highDemandPeakRate, tp('highDemandPeakRate'), <Zap className="w-3.5 h-3.5" />)}
+                {textField('HDS Off-Peak Rate (R/kWh)', tariffProfile.highDemandOffPeakRate, tp('highDemandOffPeakRate'), <Zap className="w-3.5 h-3.5" />)}
+                {textField('LDS Peak Rate (R/kWh)', tariffProfile.lowDemandPeakRate, tp('lowDemandPeakRate'), <Zap className="w-3.5 h-3.5" />)}
+                {textField('LDS Off-Peak Rate (R/kWh)', tariffProfile.lowDemandOffPeakRate, tp('lowDemandOffPeakRate'), <Zap className="w-3.5 h-3.5" />)}
+                {textField('Network / Access Charge', tariffProfile.networkAccessCharge, tp('networkAccessCharge'), <Zap className="w-3.5 h-3.5" />)}
+                {textField('Service / Admin Charge', tariffProfile.serviceAdminCharge, tp('serviceAdminCharge'), <Banknote className="w-3.5 h-3.5" />)}
+                {textField('Effective From', tariffProfile.effectiveFrom, tp('effectiveFrom'), <Calendar className="w-3.5 h-3.5" />)}
+                {textField('Effective To', tariffProfile.effectiveTo, tp('effectiveTo'), <Calendar className="w-3.5 h-3.5" />)}
+              </div>
+              <div className="rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-800">
+                <span className="font-semibold">Tariff versioning: </span>
+                Tariffs must be versioned by effective date. Old proposals retain the tariff rates used at the time.
+                New proposals use the latest confirmed tariff profile. Customer bill is the preferred source.
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── D: Compressor Operating Profile by Tariff Period ─── */}
+      <div className="rounded-xl border border-purple-200 bg-purple-50/30 p-5 space-y-4">
+        <div className="flex items-start justify-between gap-2 flex-wrap">
+          <h3 className="text-sm font-bold text-ars-heading flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-purple-600" />
+            D — Compressor Operating Profile by Tariff Period
+          </h3>
+          <div className="text-xs text-purple-800 bg-purple-100 border border-purple-200 rounded-lg px-2.5 py-1 flex items-center gap-1.5">
+            <Info className="w-3.5 h-3.5 shrink-0" />
+            Used for TOU period-weighted savings calculation.
           </div>
-        )}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {textField('% Running During Peak', tariffOpProfile.peakRunPct, op('peakRunPct'), <Zap className="w-3.5 h-3.5" />)}
+          {textField('% Running During Standard', tariffOpProfile.standardRunPct, op('standardRunPct'), <Zap className="w-3.5 h-3.5" />)}
+          {textField('% Running During Off-Peak', tariffOpProfile.offPeakRunPct, op('offPeakRunPct'), <Zap className="w-3.5 h-3.5" />)}
+          {textField('Annual Run Hours (total)', tariffOpProfile.annualRunHours, op('annualRunHours'), <Calendar className="w-3.5 h-3.5" />)}
+          {textField('Annual Peak Hours', tariffOpProfile.annualPeakHours, op('annualPeakHours'), <Calendar className="w-3.5 h-3.5" />)}
+          {textField('Annual Standard Hours', tariffOpProfile.annualStandardHours, op('annualStandardHours'), <Calendar className="w-3.5 h-3.5" />)}
+          {textField('Annual Off-Peak Hours', tariffOpProfile.annualOffPeakHours, op('annualOffPeakHours'), <Calendar className="w-3.5 h-3.5" />)}
+        </div>
+        <div className="rounded-lg bg-purple-50 border border-purple-200 px-3 py-2.5">
+          <p className="text-xs font-semibold text-purple-800 mb-2">Calculation basis explained:</p>
+          <div className="space-y-1.5 text-xs text-purple-800">
+            <div className="rounded bg-white/60 border border-purple-200 px-2.5 py-1.5">
+              <span className="font-semibold">A) Blended estimate (simple): </span>
+              Annual Saving = kWh Saved × Blended R/kWh. Use for early/draft estimates.
+            </div>
+            <div className="rounded bg-white/60 border border-purple-200 px-2.5 py-1.5">
+              <span className="font-semibold">B) TOU method (accurate): </span>
+              Annual Saving = (Peak kWh Saved × Peak Rate) + (Standard kWh Saved × Standard Rate) + (Off-peak kWh Saved × Off-peak Rate) + Demand charge impact (if applicable).
+              Use when customer bill or official tariff schedule is confirmed.
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -784,6 +972,42 @@ function Step4_SiteObservations() {
           </div>
         ))}
       </div>
+
+      {/* ── Load Profile / Air Flow Analysis ─────────────────── */}
+      <SectionCard className="border-blue-200 bg-blue-50/30">
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          <h3 className="text-sm font-semibold text-ars-heading flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-blue-600" /> Load Profile / Air Flow Analysis
+          </h3>
+          <SourceBadge source="Audit" />
+          <span className="ml-auto text-[10px] text-blue-600 font-medium italic">Air Flow Result Input sheet — 29 May 2025</span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          {([
+            ['Date Range',         LOAD_PROFILE.dateRange],
+            ['Average Demand',     LOAD_PROFILE.avgFlowM3Min + ' m³/min'],
+            ['Peak Demand',        LOAD_PROFILE.peakFlowM3Min + ' m³/min'],
+            ['Minimum Demand',     LOAD_PROFILE.minFlowM3Min + ' m³/min'],
+            ['Avg Pressure',       LOAD_PROFILE.avgPressureBar ? LOAD_PROFILE.avgPressureBar + ' bar' : 'Not recorded'],
+            ['Readings',           LOAD_PROFILE.readingCount + ' (15-min intervals)'],
+            ['Demand Utilisation', LOAD_PROFILE.demandUtilisationPct + '% vs 29.7 m³/min rated'],
+            ['Source',             'Audit Excel — DS400 logger'],
+          ] as [string, string][]).map(([label, val]) => (
+            <div key={label} className="rounded-lg bg-white border border-blue-200 px-2.5 py-2">
+              <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">{label}</p>
+              <p className="font-medium text-ars-heading">{val}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 flex items-start gap-2">
+          <Info className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+          <p className="text-xs text-blue-800">
+            <span className="font-semibold">Right-sizing: </span>
+            Avg demand {LOAD_PROFILE.avgFlowM3Min} m³/min = {LOAD_PROFILE.demandUtilisationPct}% of L160 rated 29.7 m³/min. Confirms oversizing.
+            Bouwa RS132-II (28.4 m³/min) covers peak 26.81 m³/min with margin.
+          </p>
+        </div>
+      </SectionCard>
     </div>
   );
 }
@@ -897,6 +1121,57 @@ function Step5_PerformanceMetrics() {
           </div>
         </SectionCard>
       </div>
+
+      {/* ── Cost per m³ Compressed Air ────────────────────── */}
+      <SectionCard className="border-green-200 bg-green-50/30">
+        <h3 className="text-sm font-semibold text-ars-heading mb-3 flex items-center gap-2">
+          <Banknote className="w-4 h-4 text-green-600" /> Cost per m³ Compressed Air
+          <span className="ml-auto text-[10px] text-green-700 italic">Workbook formula: kW ÷ (motorEff × outputM³/h)</span>
+        </h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                {['Metric', 'L160', 'Bouwa RS132-II', 'Improvement', 'Source'].map(h => (
+                  <th key={h} className="px-3 py-2 text-left font-semibold text-slate-600">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {[
+                ['Effective Input kW',            '184 kW',    '151.8 kW',  '−23.6%',  'Workbook Report!R5'],
+                ['Output m³/h',                  '1,608.6',   '1,704',     '+5.9%',    'Workbook Report!R4'],
+                ['Motor Efficiency',              '87%',       '96%',       '+10.3pp', 'Workbook Report!R11'],
+                ['kWh/m³ (motor-eff adjusted)',  '0.1315',    '0.0928',    '−29.4%',  'Workbook Report!R10'],
+                ['kW/m³/min (direct ratio)',      '6.86',      '5.34*',     'TBC',     'Calculated / *TBC'],
+                ['Annual kWh (L160, ~24/7/364)',  '~1,608,384 kWh', '~1,336,272 kWh', 'TBC', 'Estimated'],
+              ].map(([m, ...vals]) => (
+                <tr key={m} className="hover:bg-slate-50">
+                  <td className="px-3 py-2 font-medium text-ars-body">{m}</td>
+                  {vals.map((v, i) => (
+                    <td key={i} className={`px-3 py-2 ${i === 2 ? 'text-green-700 font-semibold' : ''}`}>{v}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2">
+            <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-1">Workbook formula</p>
+            <p className="text-xs font-mono text-green-900">kWh/m³ = kW ÷ (motorEff × (FAD_m³/min × 60))</p>
+            <p className="text-xs font-mono text-green-900">L160: 184 ÷ (0.87 × 1608.6) = 0.1315</p>
+            <p className="text-xs font-mono text-green-900">Bouwa: 151.8 ÷ (0.96 × 1704) = 0.0928</p>
+          </div>
+          <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 flex items-start gap-2">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-800">
+              <span className="font-semibold">Tariff required for cost/m³: </span>
+              Rand cost per m³ = kWh/m³ × R/kWh. Confirm electricity tariff in Step 1 Section C before finalising.
+            </p>
+          </div>
+        </div>
+      </SectionCard>
     </div>
   );
 }
@@ -997,7 +1272,7 @@ function Step7_SelectBouwaSolution() {
   );
 }
 
-function Step8_SavingsOpportunity() {
+function Step8_SavingsOpportunity({ tariffProfile }: { tariffProfile: TariffProfile }) {
   return (
     <div className="space-y-5">
       <StepHeader
@@ -1005,6 +1280,44 @@ function Step8_SavingsOpportunity() {
         title="Savings Opportunity"
         sub="Estimated energy savings. Based on audit data and Bouwa VSD performance at operating point."
       />
+
+      {/* Tariff calculation basis summary */}
+      <div className="rounded-xl border border-green-200 bg-green-50/40 p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h3 className="text-sm font-semibold text-ars-heading flex items-center gap-2">
+            <Banknote className="w-4 h-4 text-green-600" />
+            Calculation Basis &amp; Tariff Status
+          </h3>
+          <TariffConfidenceBadge confidence={tariffProfile.tariffConfidence} />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          {([
+            ['Tariff Source',    tariffProfile.tariffSource],
+            ['Tariff Type',      tariffProfile.tariffType],
+            ['VAT Treatment',    tariffProfile.vatIncluded],
+            ['Demand Charge',    tariffProfile.demandChargeRkVA !== 'Not available' ? 'Included (TBC)' : 'Not included'],
+            ['Blended Rate',     tariffProfile.blendedAvgRkWh],
+            ['Peak Rate',        tariffProfile.peakRateRkWh],
+            ['Standard Rate',    tariffProfile.standardRateRkWh],
+            ['Source Doc / Ref', tariffProfile.sourceDocumentRef],
+          ] as [string, string][]).map(([label, val]) => (
+            <div key={label} className="rounded-lg bg-white border border-green-200 px-2.5 py-2">
+              <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">{label}</p>
+              <p className="text-xs font-medium text-ars-heading break-words">{val || '—'}</p>
+            </div>
+          ))}
+        </div>
+        {(tariffProfile.tariffConfidence === 'estimate' || tariffProfile.tariffConfidence === 'unknown') && (
+          <div className="rounded-lg bg-amber-50 border border-amber-300 px-3 py-2 flex items-start gap-2">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-800">
+              <span className="font-bold">Tariff not confirmed — for internal discussion only.</span>
+              {' '}Do not present these savings figures to the customer until site tariff is confirmed from the actual electricity bill.
+            </p>
+          </div>
+        )}
+      </div>
+
       <div className="overflow-x-auto rounded-xl border border-slate-200">
         <table className="w-full text-xs">
           <thead>
@@ -1046,6 +1359,49 @@ function Step8_SavingsOpportunity() {
           Do not present these savings as final until site-specific tariff (R/kWh) is confirmed.
         </p>
       </div>
+
+      {/* ── Tariff Calendar / TOU Basis ──────────────────────── */}
+      <SectionCard className="border-purple-200 bg-purple-50/30">
+        <h3 className="text-sm font-semibold text-ars-heading mb-3 flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-purple-600" /> Tariff Calendar / TOU Day Basis
+          <span className="text-[10px] text-purple-600 italic ml-auto">Source: Ingrain L160.xlsx — Day Calculations sheet</span>
+        </h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+          {([
+            ['LDS Work Days',   String(INGRAIN_DAY_CALENDAR.ldsWorkDays) + ' days'],
+            ['LDS Saturdays',   String(INGRAIN_DAY_CALENDAR.ldsSaturdays) + ' days'],
+            ['LDS Sundays',     String(INGRAIN_DAY_CALENDAR.ldsSundays) + ' days'],
+            ['HDS Work Days',   String(INGRAIN_DAY_CALENDAR.hdsWorkDays) + ' days'],
+            ['HDS Saturdays',   String(INGRAIN_DAY_CALENDAR.hdsSaturdays) + ' days'],
+            ['HDS Sundays',     String(INGRAIN_DAY_CALENDAR.hdsSundays) + ' days'],
+            ['Total Days',      String(INGRAIN_DAY_CALENDAR.totalDays) + ' (364 — 24/7 operation assumed)'],
+            ['LDS Rate Peak',   'R ' + ESKOM_RATES_SET_A.ldsPeak + '/kWh'],
+            ['LDS Rate Std',    'R ' + ESKOM_RATES_SET_A.ldsStandard + '/kWh'],
+            ['LDS Off-Peak',    'R ' + ESKOM_RATES_SET_A.ldsOffPeak + '/kWh'],
+            ['HDS Rate Peak',   'R ' + ESKOM_RATES_SET_A.hdsPeak + '/kWh'],
+            ['HDS Rate Std',    'R ' + ESKOM_RATES_SET_A.hdsStandard + '/kWh'],
+          ] as [string, string][]).map(([label, val]) => (
+            <div key={label} className="rounded-lg bg-white border border-purple-200 px-2.5 py-2">
+              <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">{label}</p>
+              <p className="text-xs font-medium text-ars-heading">{val}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 space-y-2">
+          <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 flex items-start gap-2">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-800">
+              <span className="font-semibold">Two rate sets in workbook: </span>
+              Set A (Report sheet — used for PPT R2.83M figure) vs Set B (Electricity Rates sheet — newer). Effective dates unknown.
+              Confirm Eskom tariff year before finalising.
+            </p>
+          </div>
+          <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-600">
+            <span className="font-semibold">TOU formula: </span>
+            Annual Saving = Σ (kW × rate × hours per period). Currently showing Set A (older) rates — same set that produced the PPT savings figures.
+          </div>
+        </div>
+      </SectionCard>
     </div>
   );
 }
@@ -1067,6 +1423,46 @@ function Step9_ROIComparison() {
           Bouwa pricing and buy-back assessment are available.
         </p>
       </div>
+
+      {/* ── Workbook Reference Values ─────────────────────────── */}
+      <SectionCard className="border-blue-200 bg-blue-50/30">
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          <h3 className="text-sm font-semibold text-ars-heading flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-blue-600" /> Workbook Reference ROI (RS132-II — 132kW)
+          </h3>
+          <span className="text-[10px] bg-amber-100 text-amber-700 border border-amber-200 rounded px-2 py-0.5 font-semibold">⚠ Model unconfirmed — see conflict note</span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          {([
+            ['Unit Price (RS132-II)', 'R 984,810'],
+            ['Quantity',             '2'],
+            ['Gross Machine Cost',   'R 1,969,620'],
+            ['Buy-back (L160+L250)', 'R 130,000'],
+            ['Net Investment',       'R 2,297,860'],
+            ['Annual Saving (L160)', 'R 1,110,997 / year'],
+            ['Payback Period',       '7.35 months'],
+            ['ROI %',                '48.35%'],
+            ['Annual Saving (L250)', 'R 2,639,781 / year'],
+            ['Refurb L160',          'R 472,760'],
+            ['Refurb L250',          'R 671,000'],
+            ['VAT',                  'Excluded'],
+          ] as [string, string][]).map(([label, val]) => (
+            <div key={label} className="rounded-lg bg-white border border-blue-200 px-2.5 py-2">
+              <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">{label}</p>
+              <p className="text-xs font-semibold text-ars-heading">{val}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 flex items-start gap-2">
+          <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />
+          <p className="text-xs text-red-800">
+            <span className="font-bold">⚠ Model conflict: </span>
+            {MODEL_NAMING_CONFLICT_NOTE}
+          </p>
+        </div>
+        <p className="text-[10px] text-slate-400 mt-2 italic">Source: Ingrain L160.xlsx — ROI Calculation sheet. VAT excluded per ROI sheet note.</p>
+      </SectionCard>
+
       <div className="space-y-4">
         {ROI_SCENARIOS.map(s => (
           <div key={s.id} className={`rounded-xl border-2 ${s.color} p-5 ${s.highlight ? 'shadow-md' : ''}`}>
@@ -1160,22 +1556,41 @@ function Step11_ReportPreview({ setup, siteConditions, tariffProfile, onGenerate
   onGeneratePDF: () => void;
 }) {
   const REPORT_SECTIONS = [
-    { num: 1, title: 'Cover Page', desc: `${setup.proposalTitle} — prepared ${setup.reportDate}` },
-    { num: 2, title: 'Agenda / Contents', desc: 'Full section listing as per Ingrain deck structure' },
-    { num: 3, title: 'Introduction', desc: 'Customer site overview and audit background' },
-    { num: 4, title: 'Objective of Audit', desc: 'Energy efficiency assessment and compressor right-sizing' },
-    { num: 5, title: 'Site Conditions & Tariff Basis', desc: `${siteConditions.altitudeM} | Ambient ${siteConditions.ambientTempC}°C | Tariff: ${tariffProfile.tariffSource}` },
-    { num: 6, title: 'Unit Specifications & Site Observations', desc: 'L250 / L160 specs, audit findings, ball valve, leak survey' },
-    { num: 7, title: 'Performance Metrics', desc: 'Flow vs power, load/unload utilisation, specific power comparison' },
-    { num: 8, title: 'Real-Time Data Overview', desc: 'Operating kW, pressure profile, demand vs capacity chart' },
-    { num: 9, title: 'Efficiency Analysis', desc: 'kW/m³/min analysis, benchmarking against VSD alternative' },
-    { num: 10, title: 'Root Cause Analysis', desc: 'Oversizing, fixed-speed mismatch, leak losses, age factors' },
-    { num: 11, title: 'Recommendations', desc: 'Right-size, leak repair, buy-back, control, follow-up schedule' },
-    { num: 12, title: 'Estimated Savings Opportunity', desc: `Annual kWh, R/year, CO₂ savings per scenario. Tariff basis: ${tariffProfile.tariffSource}` },
-    { num: 13, title: 'ROI Comparison', desc: 'Scenario A/B/C: capital cost, annual savings, payback period' },
-    { num: 14, title: 'Conclusion', desc: 'Summary recommendation and proposed next actions' },
-    { num: 15, title: 'Questions & Next Steps', desc: 'Follow-up meeting, airflow study, buy-back evaluation' },
+    { num: 1,    title: 'Cover Page',                          desc: `${setup.proposalTitle} — prepared ${setup.reportDate}` },
+    { num: 2,    title: 'Agenda / Contents',                   desc: 'Full section listing as per Ingrain deck structure' },
+    { num: 3,    title: 'Introduction',                        desc: 'Customer site overview and audit background' },
+    { num: 4,    title: 'Objective of Audit',                  desc: 'Energy efficiency assessment and compressor right-sizing' },
+    { num: '5a', title: 'Site Conditions & Tariff Basis',      desc: `${siteConditions.altitudeM} | Ambient ${siteConditions.ambientTempC}°C | Tariff: ${tariffProfile.tariffSource}` },
+    { num: '5b', title: 'Tariff Accuracy & Calculation Basis', desc: `Confidence: ${tariffProfile.tariffConfidence} | Type: ${tariffProfile.tariffType} | VAT: ${tariffProfile.vatIncluded}` },
+    { num: '5c', title: 'Tariff Calendar & TOU Basis',         desc: 'LDS/HDS day calendar, workday/weekend, peak/standard/off-peak rates used' },
+    { num: '5d', title: 'Altitude / Site Correction',         desc: `Alt: ${siteConditions.altitudeM} | Ambient: ${siteConditions.ambientTempC}°C | Correction: ${siteConditions.conditionSource}` },
+    { num: 6,    title: 'Unit Specifications & Site Observations', desc: 'L250 / L160 specs, audit findings, ball valve, leak survey' },
+    { num: '6b', title: 'Load Profile / Air Flow Analysis',   desc: `Avg: ${LOAD_PROFILE.avgFlowM3Min} m³/min | Peak: ${LOAD_PROFILE.peakFlowM3Min} m³/min | Min: ${LOAD_PROFILE.minFlowM3Min} m³/min — 29 May 2025` },
+    { num: 7,    title: 'Performance Metrics',                 desc: 'Flow vs power, load/unload utilisation, specific power comparison' },
+    { num: '7b', title: 'Cost per m³ Compressed Air',         desc: 'L160: 0.1315 kWh/m³ | Bouwa RS132: 0.0928 kWh/m³ | Improvement: 29.4%' },
+    { num: 8,    title: 'Real-Time Data Overview',             desc: 'Operating kW, pressure profile, demand vs capacity chart' },
+    { num: 9,    title: 'Efficiency Analysis',                 desc: 'kW/m³/min analysis, benchmarking against VSD alternative' },
+    { num: 10,   title: 'Root Cause Analysis',                 desc: 'Oversizing, fixed-speed mismatch, leak losses, age factors' },
+    { num: 11,   title: 'Recommendations',                     desc: 'Right-size, leak repair, buy-back, control, follow-up schedule' },
+    { num: 12,   title: 'Estimated Savings Opportunity',       desc: `Annual kWh, R/year, CO₂ savings per scenario. Tariff basis: ${tariffProfile.tariffSource}` },
+    { num: '12b',title: 'Gross Proposed Cost & VSD Credit',   desc: 'Gross Bouwa cost, 14% VSD credit, net proposed cost — shown separately' },
+    { num: 13,   title: 'ROI Scenario',                        desc: 'Workbook reference: R984,810/unit × 2 = R1,969,620 | Net invest R2,297,860 | Payback 7.35 months | ROI 48.35%' },
+    { num: '13b',title: 'Optimiser / Load-Sharing Scenario',   desc: 'Current vs proposed vs optimised annual cost — partial draft' },
+    { num: '13c',title: 'Calculation Trace / Review Status',   desc: 'Source per value, review status, conflict items requiring ARS confirmation' },
+    { num: 14,   title: 'Conclusion',                          desc: 'Summary recommendation and proposed next actions' },
+    { num: 15,   title: 'Questions & Next Steps',              desc: 'Follow-up meeting, airflow study, buy-back evaluation' },
   ];
+
+  const validationItems = runValidation();
+  const summary = summariseValidation(validationItems);
+
+  const statusConfig: Record<string, { label: string; cls: string }> = {
+    'match':           { label: 'Match',           cls: 'bg-green-100 text-green-700 border-green-200' },
+    'minor-rounding':  { label: 'Minor rounding',  cls: 'bg-blue-100 text-blue-700 border-blue-200' },
+    'mismatch':        { label: 'Mismatch',         cls: 'bg-red-100 text-red-700 border-red-200' },
+    'requires-review': { label: 'Requires review',  cls: 'bg-amber-100 text-amber-700 border-amber-200' },
+    'not-calculated':  { label: 'Not calculated',   cls: 'bg-slate-100 text-slate-500 border-slate-200' },
+  };
 
   return (
     <div className="space-y-5">
@@ -1192,6 +1607,74 @@ function Step11_ReportPreview({ setup, siteConditions, tariffProfile, onGenerate
           Generated PDF is watermarked DEMO ONLY — INTERNAL DRAFT. Not approved for customer issue.
         </p>
       </div>
+
+      {/* ── Calculation Validation / Review Status ───────────── */}
+      <SectionCard className="border-slate-300 bg-slate-50/50">
+        <div className="flex items-center gap-3 mb-3 flex-wrap">
+          <h3 className="text-sm font-semibold text-ars-heading flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-slate-600" /> Calculation Validation — App vs Workbook
+          </h3>
+          <div className="flex gap-2 ml-auto flex-wrap">
+            {([
+              ['match', 'Match'],
+              ['minor-rounding', 'Rounding'],
+              ['mismatch', 'Mismatch'],
+              ['requires-review', 'Review'],
+            ] as [string, string][]).map(([k, l]) => (
+              <span key={k} className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${statusConfig[k].cls}`}>
+                {l}: {summary[k === 'minor-rounding' ? 'minorRounding' : k === 'requires-review' ? 'requiresReview' : k as keyof typeof summary]}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-slate-100 border-b border-slate-200">
+                {['Metric', 'Workbook Ref', 'App Calculated', 'PPT Value', 'Difference', 'Status'].map(h => (
+                  <th key={h} className="px-2 py-2 text-left font-semibold text-slate-600 whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {validationItems.map(item => {
+                const cfg = statusConfig[item.status] ?? statusConfig['not-calculated'];
+                return (
+                  <tr key={item.metric} className="hover:bg-slate-50">
+                    <td className="px-2 py-2 font-medium text-ars-body text-[11px] max-w-[180px] break-words">{item.metric}</td>
+                    <td className="px-2 py-2 font-mono text-[11px]">{String(item.workbookRef)}</td>
+                    <td className="px-2 py-2 font-mono text-[11px]">{item.appCalculated != null ? String(item.appCalculated) : '—'}</td>
+                    <td className="px-2 py-2 text-[11px] text-slate-500">{item.pptValue != null ? String(item.pptValue) : '—'}</td>
+                    <td className="px-2 py-2 text-[11px]">{item.difference ?? '—'}</td>
+                    <td className="px-2 py-2">
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border ${cfg.cls}`}>
+                        {cfg.label}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {validationItems.some(i => i.note) && (
+          <div className="mt-3 space-y-1">
+            {validationItems.filter(i => i.note).slice(0, 4).map(i => (
+              <p key={i.metric} className="text-[10px] text-slate-500 italic">
+                <span className="font-semibold">{i.metric}:</span> {i.note}
+              </p>
+            ))}
+          </div>
+        )}
+        <div className="mt-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 flex items-start gap-2">
+          <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />
+          <p className="text-xs text-red-800">
+            <span className="font-bold">Do not issue final customer report until: </span>
+            Confirm customer electricity bill, tariff category, Bouwa model (RS132 vs RS160-II), and machine price.
+            See bouwa-calculation-map.md §14 for full conflict list.
+          </p>
+        </div>
+      </SectionCard>
 
       <SectionCard>
         <h3 className="text-sm font-semibold text-ars-heading mb-3">Report Sections</h3>
@@ -1234,7 +1717,7 @@ function Step11_ReportPreview({ setup, siteConditions, tariffProfile, onGenerate
 // PDF generator
 // ---------------------------------------------------------------------------
 
-function generateProposalPDF(setup: ProposalSetup, siteConditions: SiteConditions, tariffProfile: TariffProfile) {
+function generateProposalPDF(setup: ProposalSetup, siteConditions: SiteConditions, tariffProfile: TariffProfile, tariffOpProfile: TariffOperatingProfile) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const W = 210;
   const MARGIN = 15;
@@ -1353,6 +1836,70 @@ function generateProposalPDF(setup: ProposalSetup, siteConditions: SiteCondition
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(40, 40, 40);
 
+  // ── Tariff Accuracy & Calculation Basis ──────────────────
+  addPage();
+  y = sectionTitle('Tariff Accuracy & Calculation Basis', 20);
+  const tariffConfLabel: Record<string, string> = {
+    'bill-confirmed':    'Customer Bill Confirmed',
+    'official-schedule': 'Official Tariff Schedule',
+    'estimate':          'Estimate / Placeholder',
+    'unknown':           'Unknown — cannot finalise',
+  };
+  autoTable(doc, {
+    startY: y,
+    margin: { left: MARGIN, right: MARGIN },
+    head: [['Field', 'Value']],
+    body: [
+      ['Tariff Confidence',           tariffConfLabel[tariffProfile.tariffConfidence] ?? tariffProfile.tariffConfidence],
+      ['Tariff Source',               tariffProfile.tariffSource],
+      ['Electricity Supplier',        tariffProfile.electricitySupplier],
+      ['Municipality / Region',       tariffProfile.municipalityRegion],
+      ['Tariff Category / Name',      tariffProfile.tariffCategoryName],
+      ['Tariff Type',                 tariffProfile.tariffType],
+      ['VAT Treatment',               tariffProfile.vatIncluded],
+      ['Blended Average Rate (R/kWh)',tariffProfile.blendedAvgRkWh],
+      ['Peak Rate (R/kWh)',           tariffProfile.peakRateRkWh],
+      ['Standard Rate (R/kWh)',       tariffProfile.standardRateRkWh],
+      ['Off-Peak Rate (R/kWh)',       tariffProfile.offPeakRateRkWh],
+      ['Demand Charge',               tariffProfile.demandChargeRkVA],
+      ['Network / Access Charge',     tariffProfile.networkAccessCharge],
+      ['Service / Admin Charge',      tariffProfile.serviceAdminCharge],
+      ['HDS Months',                  tariffProfile.highDemandMonths],
+      ['LDS Months',                  tariffProfile.lowDemandMonths],
+      ['HDS Peak Rate',               tariffProfile.highDemandPeakRate],
+      ['HDS Off-Peak Rate',           tariffProfile.highDemandOffPeakRate],
+      ['LDS Peak Rate',               tariffProfile.lowDemandPeakRate],
+      ['LDS Off-Peak Rate',           tariffProfile.lowDemandOffPeakRate],
+      ['Effective From',              tariffProfile.effectiveFrom],
+      ['Effective To',                tariffProfile.effectiveTo],
+      ['Source Document / Bill Ref',  tariffProfile.sourceDocumentRef],
+      ['Last Checked',                tariffProfile.lastCheckedDate],
+      ['Confirmed By',                tariffProfile.confirmedBy || '—'],
+      ['Operating Profile — Peak Run %',     tariffOpProfile.peakRunPct],
+      ['Operating Profile — Standard Run %', tariffOpProfile.standardRunPct],
+      ['Operating Profile — Off-Peak Run %', tariffOpProfile.offPeakRunPct],
+      ['Annual Run Hours',            tariffOpProfile.annualRunHours],
+      ['Annual Peak Hours',           tariffOpProfile.annualPeakHours],
+      ['Annual Standard Hours',       tariffOpProfile.annualStandardHours],
+      ['Annual Off-Peak Hours',       tariffOpProfile.annualOffPeakHours],
+    ],
+    styles: { fontSize: 7.5 },
+    headStyles: { fillColor: [30, 66, 120] },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+  });
+  const taccFinalY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4;
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'italic');
+  if (tariffProfile.tariffConfidence === 'estimate' || tariffProfile.tariffConfidence === 'unknown') {
+    doc.setTextColor(180, 80, 0);
+    doc.text('DISCLAIMER: Tariff not confirmed. Savings calculations are estimates for internal discussion only. Confirm customer electricity bill or official tariff schedule before issuing final proposal.', MARGIN, taccFinalY, { maxWidth: W - MARGIN * 2 });
+  } else {
+    doc.setTextColor(30, 100, 30);
+    doc.text('Tariff: ' + (tariffConfLabel[tariffProfile.tariffConfidence] ?? tariffProfile.tariffConfidence) + '. Source: ' + tariffProfile.sourceDocumentRef, MARGIN, taccFinalY, { maxWidth: W - MARGIN * 2 });
+  }
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(40, 40, 40);
+
   // ── Existing Compressors ─────────────────────────────────
   addPage();
   y = sectionTitle('Unit Specifications — Ingrain Belville', 20);
@@ -1393,9 +1940,113 @@ function generateProposalPDF(setup: ProposalSetup, siteConditions: SiteCondition
     alternateRowStyles: { fillColor: [248, 250, 252] },
   });
 
+  // ── Gross Proposed Cost & VSD Credit ─────────────────────
+  addPage();
+  y = sectionTitle('Gross Proposed Cost, VSD Saving Credit & Net Proposed Cost', 20);
+  autoTable(doc, {
+    startY: y,
+    margin: { left: MARGIN, right: MARGIN },
+    head: [['Item', 'L160 (Current)', 'Bouwa RS132-II (Proposed)', 'Source / Note']],
+    body: [
+      ['Gross Annual Energy Cost', 'R 2,826,866', 'R 1,995,196', 'Workbook TOU calc (Set A rates)'],
+      ['VSD Saving Credit (14%)', 'N/A', 'R 279,327', 'Workbook Report!R31 — internal adjustment'],
+      ['Net Proposed Annual Cost', 'N/A', 'R 1,715,869', 'Gross minus VSD credit'],
+      ['Annual Saving', '', 'R 1,110,997', 'R 2,826,866 − R 1,715,869'],
+      ['Saving %', '', '~39.3%', 'vs L160 gross cost'],
+      ['PPT stated Bouwa cost', '', 'R 1,680,000', 'PPT Slide 4 — rounded/older figure (see conflict note)'],
+      ['PPT stated saving vs L160', '', 'R 1,130,000 (40%)', 'PPT Slide 4'],
+      ['Wizard current (from PPT)', '', 'R 1,680,000', 'REQUIRES REVIEW — see bouwa-calculation-map.md §14.2'],
+      ['VAT treatment', 'Excluded', 'Excluded', 'Confirmed — ROI sheet note'],
+    ],
+    styles: { fontSize: 7.5 },
+    headStyles: { fillColor: [30, 66, 120] },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+  });
+  const savCY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4;
+  doc.setFontSize(7.5); doc.setTextColor(180, 80, 0); doc.setFont('helvetica', 'italic');
+  doc.text('SOURCE CONFLICT: PPT Bouwa cost R1.68M vs workbook gross R1.995M (VSD credit accounts for ~R279K). Wizard uses PPT value. DO NOT issue final report until ARS confirms tariff basis and VSD credit treatment.', MARGIN, savCY, { maxWidth: W - MARGIN * 2 });
+  doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40);
+
+  // ── Load Profile ───────────────────────────────────────────
+  addPage();
+  y = sectionTitle('Load Profile / Air Flow Analysis', 20);
+  autoTable(doc, {
+    startY: y,
+    margin: { left: MARGIN, right: MARGIN },
+    head: [['Parameter', 'Value', 'Source']],
+    body: [
+      ['Date Range',           LOAD_PROFILE.dateRange,                                    'Air Flow Result Input sheet'],
+      ['Average Demand',       LOAD_PROFILE.avgFlowM3Min + ' m³/min',                    'Workbook — 15-min logger'],
+      ['Peak Demand',          LOAD_PROFILE.peakFlowM3Min + ' m³/min',                   'Workbook — confirmed PPT Slide 12'],
+      ['Minimum Demand',       LOAD_PROFILE.minFlowM3Min + ' m³/min',                    'Workbook — Air Flow Result Input'],
+      ['Avg Pressure',         LOAD_PROFILE.avgPressureBar ? LOAD_PROFILE.avgPressureBar + ' bar' : 'Not recorded', 'Approximate — Data File readings'],
+      ['Reading Count',        String(LOAD_PROFILE.readingCount) + ' (15-min intervals)','Workbook'],
+      ['Demand Utilisation',   LOAD_PROFILE.demandUtilisationPct + '% of L160 rated',   'Calculated — 25.94 / 29.7 × 100'],
+      ['Right-sizing note',    'Bouwa RS132-II (28.4 m³/min) covers peak 26.81 m³/min', 'Workbook Report!R3'],
+    ],
+    styles: { fontSize: 7.5 },
+    headStyles: { fillColor: [30, 66, 120] },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+  });
+
+  // ── ROI (workbook reference + placeholder scenarios) ───────
+  addPage();
+  y = sectionTitle('ROI Scenario', 20);
+  autoTable(doc, {
+    startY: y,
+    margin: { left: MARGIN, right: MARGIN },
+    head: [['Item', 'Workbook Reference', 'Note']],
+    body: [
+      ['Machine Model',          'Bouwa SVC-RS132-II (132kW)',            '⚠ CONFLICT: PPT recs SVC-RS160-II (160kW). Confirm with Bouwa.'],
+      ['Unit Price',             'R 984,810',                             'Workbook ROI sheet. Price is for RS132. Changes if model changes.'],
+      ['Quantity',               '2 units',                               'Replace both L160 and L250'],
+      ['Gross Machine Cost',     'R 1,969,620',                           'R984,810 × 2'],
+      ['Buy-back (L160+L250)',   'R 130,000',                             'Workbook ROI!R8'],
+      ['Refurb L160',            'R 472,760',                             'Workbook ROI!R9'],
+      ['Refurb L250',            'R 671,000',                             'Workbook ROI!R10'],
+      ['Net Initial Investment', 'R 2,297,860',                           'Workbook ROI!R13 (buy-back offset scenario)'],
+      ['Annual Saving (L160)',   'R 1,110,997 / year',                    'Workbook ROI!R6'],
+      ['Annual Saving (L250)',   'R 2,639,781 / year',                    'Workbook ROI!R7'],
+      ['Payback Period',         '7.35 months (0.613 years)',              'Workbook ROI!R14'],
+      ['ROI %',                  '48.35%',                                'Workbook ROI!R12'],
+      ['VAT',                    'Excluded',                              'Workbook ROI!R31 explicit note'],
+    ],
+    styles: { fontSize: 7.5 },
+    headStyles: { fillColor: [30, 66, 120] },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+  });
+  const roiY2 = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4;
+  doc.setFontSize(7.5); doc.setTextColor(180, 80, 0); doc.setFont('helvetica', 'italic');
+  doc.text('REQUIRES REVIEW: Machine model (RS132 vs RS160-II), savings figures (PPT vs workbook), and tariff basis must be confirmed with ARS/Bouwa before customer issue.', MARGIN, roiY2, { maxWidth: W - MARGIN * 2 });
+  doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40);
+
+  // ── Calculation Trace ──────────────────────────────────────
+  addPage();
+  y = sectionTitle('Calculation Trace / Review Status', 20);
+  const valItems = runValidation();
+  autoTable(doc, {
+    startY: y,
+    margin: { left: MARGIN, right: MARGIN },
+    head: [['Metric', 'Workbook', 'App Calc', 'PPT', 'Status']],
+    body: valItems.map(i => [
+      i.metric,
+      String(i.workbookRef),
+      i.appCalculated != null ? String(i.appCalculated) : '—',
+      i.pptValue != null ? String(i.pptValue) : '—',
+      i.status.toUpperCase().replace(/-/g, ' '),
+    ]),
+    styles: { fontSize: 6.5 },
+    headStyles: { fillColor: [30, 66, 120] },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+  });
+  const ctY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4;
+  doc.setFontSize(7); doc.setTextColor(180, 80, 0); doc.setFont('helvetica', 'italic');
+  doc.text('INTERNAL DRAFT — Conflicts and "requires review" items must be resolved before customer issue. Do not present conflicting values to customer.', MARGIN, ctY, { maxWidth: W - MARGIN * 2 });
+  doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40);
+
   // ── ROI ────────────────────────────────────────────────────
   addPage();
-  y = sectionTitle('ROI Comparison', 20);
+  y = sectionTitle('ROI Comparison — Scenarios', 20);
   autoTable(doc, {
     startY: y,
     margin: { left: MARGIN, right: MARGIN },
@@ -1494,6 +2145,7 @@ export function BouwaNewProposalWizard() {
   const [setup, setSetup] = useState<ProposalSetup>(DEFAULT_SETUP);
   const [siteConditions, setSiteConditions] = useState<SiteConditions>(DEFAULT_SITE_CONDITIONS);
   const [tariffProfile, setTariffProfile] = useState<TariffProfile>(DEFAULT_TARIFF);
+  const [tariffOpProfile, setTariffOpProfile] = useState<TariffOperatingProfile>(DEFAULT_TARIFF_OP_PROFILE);
   const [dataMode, setDataMode] = useState<DataSourceMode>('audit-excel');
   const [recs, setRecs] = useState(RECOMMENDATIONS);
   const TOTAL = STEP_LABELS.length;
@@ -1504,17 +2156,17 @@ export function BouwaNewProposalWizard() {
 
   function renderStep() {
     switch (step) {
-      case 1:  return <Step1_SiteAndConditions data={setup} onChange={setSetup} siteConditions={siteConditions} onChangeSiteConditions={setSiteConditions} tariffProfile={tariffProfile} onChangeTariff={setTariffProfile} />;
+      case 1:  return <Step1_SiteAndConditions data={setup} onChange={setSetup} siteConditions={siteConditions} onChangeSiteConditions={setSiteConditions} tariffProfile={tariffProfile} onChangeTariff={setTariffProfile} tariffOpProfile={tariffOpProfile} onChangeTariffOpProfile={setTariffOpProfile} />;
       case 2:  return <Step2_ExistingCompressors />;
       case 3:  return <Step3_DataSource mode={dataMode} onChange={setDataMode} />;
       case 4:  return <Step4_SiteObservations />;
       case 5:  return <Step5_PerformanceMetrics />;
       case 6:  return <Step6_EfficiencyRootCause />;
       case 7:  return <Step7_SelectBouwaSolution />;
-      case 8:  return <Step8_SavingsOpportunity />;
+      case 8:  return <Step8_SavingsOpportunity tariffProfile={tariffProfile} />;
       case 9:  return <Step9_ROIComparison />;
       case 10: return <Step10_Recommendations recs={recs} onToggle={toggleRec} />;
-      case 11: return <Step11_ReportPreview setup={setup} siteConditions={siteConditions} tariffProfile={tariffProfile} onGeneratePDF={() => generateProposalPDF(setup, siteConditions, tariffProfile)} />;
+      case 11: return <Step11_ReportPreview setup={setup} siteConditions={siteConditions} tariffProfile={tariffProfile} onGeneratePDF={() => generateProposalPDF(setup, siteConditions, tariffProfile, tariffOpProfile)} />;
       default: return null;
     }
   }
@@ -1563,7 +2215,7 @@ export function BouwaNewProposalWizard() {
         ) : (
           <button
             type="button"
-            onClick={() => generateProposalPDF(setup, siteConditions, tariffProfile)}
+            onClick={() => generateProposalPDF(setup, siteConditions, tariffProfile, tariffOpProfile)}
             className="flex items-center gap-2 px-5 py-2 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-700 transition shadow-sm"
           >
             <Download className="w-4 h-4" /> Generate PDF

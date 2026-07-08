@@ -1144,7 +1144,7 @@ function Step5_PerformanceMetrics() {
                 ['Motor Efficiency',              '87%',       '96%',       '+10.3pp', 'Workbook Report!R11'],
                 ['kWh/m³ (motor-eff adjusted)',  '0.1315',    '0.0928',    '−29.4%',  'Workbook Report!R10'],
                 ['kW/m³/min (direct ratio)',      '6.86',      '5.34*',     'TBC',     'Calculated / *TBC'],
-                ['Annual kWh (L160, ~24/7/364)',  '~1,608,384 kWh', '~1,336,272 kWh', 'TBC', 'Estimated'],
+                ['Annual Energy Use (kWh/year, ~24/7/364)', '~2,568,384 kWh', '~1,607,424 kWh', '~1,326,125 kWh', 'Estimated (kW × 8,736 h)'],
               ].map(([m, ...vals]) => (
                 <tr key={m} className="hover:bg-slate-50">
                   <td className="px-3 py-2 font-medium text-ars-body">{m}</td>

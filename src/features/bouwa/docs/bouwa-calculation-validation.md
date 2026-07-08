@@ -169,3 +169,91 @@ R984,810 is for RS132-II (132kW). If RS160-II (160kW) is confirmed, price will b
 *Document created: Phase 4D-19.*  
 *Calculation modules: bouwaTypes.ts, unitConversions.ts, altitudeCorrection.ts, tariffEngine.ts, loadProfileEngine.ts, compressorPerformance.ts, energyCostEngine.ts, roiEngine.ts, optimiserEngine.ts, validationEngine.ts, ingrainReferenceScenario.ts*  
 *No UI was redesigned. 15D tariff model preserved. Demo values unchanged pending ARS review.*
+
+---
+
+## 6. Phase 4D-20B — Mismatch Investigation Findings
+
+**Date:** Phase 4D-20B  
+**Branch:** feature/bouwa-module-integration (commit 37839ba + 4D-20B edits)  
+**Scope:** Investigation and targeted fixes for Step 11 validation mismatches.
+
+---
+
+### F1 — L160 kWh/m³: 0.1271 (app) vs 0.1315 (workbook)
+| | |
+|---|---|
+| **Root cause** | `L160_SPEC.motorEfficiency` was set to **0.90** in `ingrainReferenceScenario.ts`. The workbook formula `184 / (0.87 × 1608.6) = 0.1315` (Report!R10) requires **0.87**. |
+| **Evidence** | The validation doc's own formula note (Section 1, Compressor Performance) says 0.87. The spec file comment ("from PPT Slide 12 and Report!R11") was misread. |
+| **Fix applied** | `L160_SPEC.motorEfficiency` changed **0.90 → 0.87** in `ingrainReferenceScenario.ts`. |
+| **Impact** | `calcCompressorPerformance` kWh/m³ now returns **0.1315** (match). `costPerM3` also corrected. `calcGrossAnnualCost` is unaffected — it uses `effectiveInputKw` directly, not motorEfficiency. |
+
+---
+
+### F2 — Payback: 24.82 months (app) vs 7.35 months (workbook)
+| | |
+|---|---|
+| **Root cause** | **Workbook uses combined annual saving** (L160 + L250) as payback denominator: R1,110,997 + R2,639,781 = **R3,750,778**. App uses L160-only saving: R1,110,997. |
+| **Verification** | R2,297,860 / R3,750,778 = 0.6126 years = **7.35 months** ✓. App: R2,297,860 / R1,110,997 = 2.069 years = **24.82 months** ✓. |
+| **Workbook inconsistency** | The same workbook ROI sheet uses **L160-only saving** for ROI % calculation: R1,110,997 / R2,297,860 = **48.35%** ✓. So ROI and payback use different savings figures — an intentional (or overlooked) inconsistency in the workbook. |
+| **Fix applied** | **None.** Changing `annualSavingR` would fix payback but break the ROI % match. A note was added to the `Payback period` row in `validationEngine.ts`. The mismatch is explained — it is not a calculation error. |
+| **Resolution** | ARS/Bouwa to confirm: is the intended payback basis (a) L160-only saving, (b) combined saving, or (c) a separate financial model? |
+
+---
+
+### F3 — L160 annual gross cost: R2,899,344 (app) vs R2,826,866 (workbook) — **+2.56%**
+| | |
+|---|---|
+| **Root cause** | The app uses a **fixed TOU hour distribution** per workday (6h peak / 10h standard / 8h off-peak). The workbook uses an exact period-hour matrix from the `Calculations - Compare` sheet (`Data File` tab). |
+| **Magnitude** | R72,478 over-estimate (~2.56%). Within the ±5% tolerance noted in Section 4. |
+| **Fix applied** | **None** — requires full hour-by-hour workbook matrix (not yet extracted). Documented in Section 4 (Known Incomplete Areas). |
+| **Impact on saving** | Annual saving mismatch (F5) is entirely explained by this L160 cost over-estimate. |
+
+---
+
+### F4 — Bouwa gross annual cost: R2,391,959 (app) vs R1,995,196 (workbook) — **+19.9%**
+| | |
+|---|---|
+| **Root cause** | App uses **constant rated kW (151.8 kW)**. Workbook implies VSD part-load effective kW ≈ **129.9 kW** (derived: R1,995,196 ÷ (R2,826,866/184) = 129.9 kW). |
+| **VSD load explanation** | Site avg demand 25.94 m³/min ÷ rated 28.4 m³/min = **91.3% of rated flow**. For a VSD rotary screw compressor, power at partial load is sub-linear. The workbook appears to apply a load-weighted kW reduction not captured by the app's constant-kW model. |
+| **Fix applied** | **None** — requires Bouwa VSD load curve (power vs flow) to implement accurately. A note was added to the `Bouwa gross annual cost` row in `validationEngine.ts`. |
+| **Resolution** | Obtain Bouwa RS132-II (or RS160-II) power-vs-flow curve from Bouwa/Compressor World. Apply VSD load factor to `BOUWA_RS132_SPEC` before customer proposal. |
+
+---
+
+### F5 — Annual saving: R1,183,475 (app) vs R1,110,997 (workbook) — **+R72,478**
+| | |
+|---|---|
+| **Root cause** | Entirely derived from F3 (L160 cost over-estimate). App computes: R2,899,344 − R1,715,869 (hardcoded workbook Bouwa net cost) = R1,183,475. Workbook: R2,826,866 − R1,715,869 = R1,110,997. |
+| **Formula correct** | The saving formula is correct. The mismatch flows directly from the TOU hour distribution error in the L160 cost. |
+| **Fix applied** | **None** — fix F3 to resolve this automatically. |
+
+---
+
+### F6 — Step 5 Annual kWh table row
+| | |
+|---|---|
+| **Issue** | Row labelled "Annual kWh (L160, ~24/7/364)" had L160 value (~1,608,384) in the **L250 column** and Bouwa value (~1,336,272) in the **L160 column**. Values were shifted and the row label implied L160 only. |
+| **No negative values in current source** | The Step 5 table uses hardcoded positive strings. Any negative values visible in earlier browser sessions would be from a pre-4D-20 build artifact. |
+| **Fix applied** | Row corrected in `BouwaNewProposalWizard.tsx`: |
+| | - Label: **"Annual Energy Use (kWh/year, ~24/7/364)"** |
+| | - L250 column: **~2,568,384 kWh** (294 kW × 8,736 h) |
+| | - L160 column: **~1,607,424 kWh** (184 kW × 8,736 h) |
+| | - Bouwa column: **~1,326,125 kWh** (151.8 kW × 8,736 h) |
+
+---
+
+### Summary table
+
+| # | Metric | Workbook | App | Root cause | Fixed? |
+|---|---|---|---|---|---|
+| F1 | L160 kWh/m³ | 0.1315 | 0.1315 (**was** 0.1271) | motorEfficiency typo (0.90 vs 0.87) | ✅ Fixed |
+| F2 | Payback | 7.35 mo | 24.82 mo | Workbook uses combined saving; app uses L160-only | 📝 Documented |
+| F3 | L160 annual cost | R2,826,866 | R2,899,344 | TOU period hour approx (+2.56%) | 📝 Documented |
+| F4 | Bouwa gross cost | R1,995,196 | R2,391,959 | Constant kW vs VSD part-load (~129.9 kW effective) | 📝 Documented |
+| F5 | Annual saving | R1,110,997 | R1,183,475 | Flows from F3 | 📝 Documented |
+| F6 | Step 5 kWh row | — | Wrong columns + label | Data entry error in static table | ✅ Fixed |
+
+---
+
+*Phase 4D-20B investigation. Files changed: `ingrainReferenceScenario.ts` (motorEfficiency), `validationEngine.ts` (payback+Bouwa notes), `BouwaNewProposalWizard.tsx` (Step 5 kWh row). No UI redesigned. No silently forced value matches.*

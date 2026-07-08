@@ -109,7 +109,7 @@ export function runValidation(): ValidationItem[] {
     pptValue: 'R 1,680,000 (PPT stated — see conflict note)',
     wizardCurrent: 'R 1,680,000',
     ...compareNumbers(INGRAIN_COST_REFERENCE.bouwaAnnualGrossCostR, bouwaCost.annualGrossCostR),
-    note: 'App TOU calc differs from workbook — workbook uses per-period efficiency matrix; app uses constant kW. VSD credit not yet applied.',
+    note: '4D-20B: App uses constant rated kW (151.8 kW). Workbook implies VSD part-load effective kW ~129.9 kW (derived: R1,995,196 / (R2,826,866/184) = 129.9 kW). At site demand 25.94/28.4 = 91.3% of rated, VSD power is sub-linear. App over-estimates by ~19.9%. Requires Bouwa VSD load-curve to resolve.',
   });
 
   results.push({
@@ -171,6 +171,7 @@ export function runValidation(): ValidationItem[] {
     pptValue: 'N/A (visual only)',
     wizardCurrent: 'TBC',
     ...compareNumbers(INGRAIN_ROI_REFERENCE.paybackMonths, roiCalc.paybackMonths),
+    note: '4D-20B: Workbook payback (7.35 mo) uses COMBINED saving (L160 R1,110,997 + L250 R2,639,781 = R3,750,778): 2,297,860 / 3,750,778 = 0.613 yr = 7.35 mo. App uses L160-only saving (R1,110,997) → 24.82 mo. Workbook uses L160-only saving for ROI % (48.35%). This is an intentional inconsistency in the workbook ROI sheet. Mismatch is explained — no formula error.',
   });
 
   results.push({

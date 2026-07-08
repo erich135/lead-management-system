@@ -26,7 +26,9 @@ export const L160_SPEC: CompressorSpec = {
   ratedFadM3Min:    29.7,
   ratedPressureBar: 7.5,
   ratedKw:          184,
-  motorEfficiency:  0.90,  // 90% — from PPT Slide 12 and workbook Report!R11
+  motorEfficiency:  0.87,  // 0.87 — confirmed by workbook formula: 184 / (0.87 × 1608.6) = 0.1315 (Report!R10).
+                           // NB: PPT Slide 12 / Report!R11 reference was misread as 0.90 in 4D-18;
+                           //     the workbook calculation output (0.1315 kWh/m³) requires exactly 0.87. (4D-20B fix)
   speedControl:     'fixed',
   type:             'Fixed-speed oil-injected rotary screw',
 };

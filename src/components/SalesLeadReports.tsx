@@ -69,7 +69,7 @@ interface AnalyticsData {
 
 const SalesLeadReports: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<ReportCategory>('overview');
-  const [dateRange, setDateRange] = useState('thisMonth');
+  const [dateRange, setDateRange] = useState('allTime');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
@@ -108,6 +108,10 @@ const SalesLeadReports: React.FC = () => {
       case 'thisYear': {
         const startOfYear = new Date(now.getFullYear(), 0, 1);
         filters.startDate = startOfYear.toISOString().split('T')[0];
+        break;
+      }
+      case 'allTime': {
+        // No date filters — return all records
         break;
       }
       case 'custom': {
@@ -213,6 +217,7 @@ const SalesLeadReports: React.FC = () => {
               onChange={(e) => setDateRange(e.target.value)}
               className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ars-primary focus:border-transparent"
             >
+              <option value="allTime">All Time</option>
               <option value="today">Today</option>
               <option value="thisWeek">This Week</option>
               <option value="thisMonth">This Month</option>
@@ -362,7 +367,7 @@ const ExecutiveOverview: React.FC<{ data: AnalyticsData; formatCurrency: (value:
     <div className="bg-white p-6 rounded-lg border border-gray-200">
       <h4 className="text-md font-semibold text-gray-900 mb-4">Lead Status Breakdown</h4>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {Object.entries(data.leadPerformance.statusBreakdown).map(([status, count]) => (
+        {Object.entries(data.leadPerformance?.statusBreakdown ?? {}).map(([status, count]) => (
           <div key={status} className="text-center p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-600 capitalize">{status.replace(/_/g, ' ')}</p>
             <p className="text-2xl font-bold text-gray-900 mt-1">{count}</p>
@@ -400,7 +405,7 @@ const ExecutiveOverview: React.FC<{ data: AnalyticsData; formatCurrency: (value:
     <div className="bg-white p-6 rounded-lg border border-gray-200">
       <h4 className="text-md font-semibold text-gray-900 mb-4">Lead Aging Analysis</h4>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {data.leadAging.ranges.map((range) => (
+        {(data.leadAging?.ranges ?? []).map((range) => (
           <div key={range.range} className="text-center p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-600">{range.range}</p>
             <p className="text-2xl font-bold text-gray-900 mt-1">{range.count}</p>
@@ -436,7 +441,7 @@ const LeadPerformanceReport: React.FC<{ data: AnalyticsData; formatCurrency: (va
       <div className="border-t border-gray-200 pt-6">
         <h4 className="font-semibold text-gray-900 mb-4">Status Distribution</h4>
         <div className="space-y-3">
-          {Object.entries(data.leadPerformance.statusBreakdown).map(([status, count]) => {
+          {Object.entries(data.leadPerformance?.statusBreakdown ?? {}).map(([status, count]) => {
             const percentage = data.leadPerformance.totalLeads > 0 
               ? (count / data.leadPerformance.totalLeads * 100).toFixed(1) 
               : 0;
@@ -491,11 +496,11 @@ const LeadPerformanceReport: React.FC<{ data: AnalyticsData; formatCurrency: (va
     </div>
 
     {/* Lost Reasons */}
-    {data.lostReasons.length > 0 && (
+    {(data.lostReasons?.length ?? 0) > 0 && (
       <div className="bg-white p-6 rounded-lg border border-gray-200">
         <h4 className="font-semibold text-gray-900 mb-4">Top Lost Reasons</h4>
         <div className="space-y-2">
-          {data.lostReasons.map((reason, index) => (
+          {(data.lostReasons ?? []).map((reason, index) => (
             <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
               <span className="text-sm text-gray-700">{reason.reason || 'No reason provided'}</span>
               <span className="text-sm font-semibold text-gray-900">{reason.count}</span>
@@ -522,7 +527,7 @@ const SourceAnalysisReport: React.FC<{ data: AnalyticsData; formatCurrency: (val
             </tr>
           </thead>
           <tbody>
-            {data.sourceAnalysis.leadsBySource.map((source) => (
+            {(data.sourceAnalysis?.leadsBySource ?? []).map((source) => (
               <tr key={source.source} className="border-b border-gray-100 hover:bg-gray-50">
                 <td className="py-3 px-4 text-sm text-gray-900 capitalize">{source.source || 'Not Specified'}</td>
                 <td className="py-3 px-4 text-sm text-gray-900 text-right font-medium">{source.count}</td>
@@ -540,7 +545,7 @@ const SourceAnalysisReport: React.FC<{ data: AnalyticsData; formatCurrency: (val
     <div className="bg-white p-6 rounded-lg border border-gray-200">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Source Conversion Rates</h3>
       <div className="space-y-4">
-        {data.sourceAnalysis.sourceConversionRates.map((source) => (
+        {(data.sourceAnalysis?.sourceConversionRates ?? []).map((source) => (
           <div key={source.source}>
             <div className="flex justify-between items-center mb-2">
               <div>
@@ -570,7 +575,7 @@ const SourceAnalysisReport: React.FC<{ data: AnalyticsData; formatCurrency: (val
 
 const RepPerformanceReport: React.FC<{ data: AnalyticsData; formatCurrency: (value: number) => string }> = ({ data, formatCurrency }) => {
   // Sort reps by converted value (descending)
-  const sortedReps = [...data.repPerformance.reps].sort((a, b) => b.totalValue - a.totalValue);
+  const sortedReps = [...(data.repPerformance?.reps ?? [])].sort((a, b) => b.totalValue - a.totalValue);
 
   return (
     <div className="space-y-6">
@@ -664,9 +669,9 @@ const RepPerformanceReport: React.FC<{ data: AnalyticsData; formatCurrency: (val
         <div className="bg-white p-6 rounded-lg border border-gray-200">
           <p className="text-sm font-medium text-gray-600">Total Reps</p>
           <div className="mt-2">
-            <p className="text-lg font-bold text-gray-900">{data.repPerformance.reps.length}</p>
+            <p className="text-lg font-bold text-gray-900">{(data.repPerformance?.reps ?? []).length}</p>
             <p className="text-sm text-gray-600">
-              {data.repPerformance.reps.filter(r => r.convertedLeads > 0).length} with conversions
+              {(data.repPerformance?.reps ?? []).filter(r => r.convertedLeads > 0).length} with conversions
             </p>
           </div>
         </div>
@@ -804,7 +809,7 @@ const AppointmentAnalyticsReport: React.FC<{ data: AnalyticsData }> = ({ data })
 
 const BranchPerformanceReport: React.FC<{ data: AnalyticsData; formatCurrency: (value: number) => string }> = ({ data, formatCurrency }) => {
   // Sort branches by total value (descending)
-  const sortedBranches = [...data.branchPerformance].sort((a, b) => b.totalValue - a.totalValue);
+  const sortedBranches = [...(data.branchPerformance ?? [])].sort((a, b) => b.totalValue - a.totalValue);
 
   return (
     <div className="space-y-6">

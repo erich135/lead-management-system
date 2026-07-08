@@ -152,12 +152,13 @@ const SalesLeadReports: React.FC = () => {
 
   // Format currency
   const formatCurrency = (value: number) => {
-    if (value >= 1000000) {
-      return `R ${(value / 1000000).toFixed(1)}M`;
-    } else if (value >= 1000) {
-      return `R ${(value / 1000).toFixed(0)}K`;
+    const n = Number(value ?? 0);
+    if (n >= 1000000) {
+      return `R ${(n / 1000000).toFixed(1)}M`;
+    } else if (n >= 1000) {
+      return `R ${(n / 1000).toFixed(0)}K`;
     }
-    return `R ${value.toFixed(0)}`;
+    return `R ${n.toFixed(0)}`;
   };
 
   if (loading) {
@@ -551,7 +552,7 @@ const SourceAnalysisReport: React.FC<{ data: AnalyticsData; formatCurrency: (val
                 </span>
               </div>
               <span className="text-sm font-bold text-gray-900">
-                {source.conversionRate.toFixed(1)}%
+                {Number(source.conversionRate ?? 0).toFixed(1)}%
               </span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-3">
@@ -614,7 +615,7 @@ const RepPerformanceReport: React.FC<{ data: AnalyticsData; formatCurrency: (val
                           rep.conversionRate >= 20 ? 'bg-yellow-100 text-yellow-800' : 
                           'bg-red-100 text-red-800'}
                       `}>
-                        {rep.conversionRate.toFixed(1)}%
+                        {Number(rep.conversionRate ?? 0).toFixed(1)}%
                       </span>
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-900 text-right font-semibold">
@@ -653,7 +654,7 @@ const RepPerformanceReport: React.FC<{ data: AnalyticsData; formatCurrency: (val
               <div className="mt-2">
                 <p className="text-lg font-bold text-gray-900">{topConverter.repName}</p>
                 <p className="text-sm text-gray-600">
-                  {topConverter.conversionRate.toFixed(1)}% conversion rate
+                  {Number(topConverter.conversionRate ?? 0).toFixed(1)}% conversion rate
                 </p>
               </div>
             );
@@ -713,13 +714,13 @@ const AppointmentAnalyticsReport: React.FC<{ data: AnalyticsData }> = ({ data })
                   className="bg-gradient-to-r from-green-400 to-green-600 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold transition-all"
                   style={{ width: `${appointmentAnalytics.appointmentShowRate}%` }}
                 >
-                  {appointmentAnalytics.appointmentShowRate > 10 && `${appointmentAnalytics.appointmentShowRate.toFixed(1)}%`}
+                  {(appointmentAnalytics.appointmentShowRate ?? 0) > 10 && `${Number(appointmentAnalytics.appointmentShowRate ?? 0).toFixed(1)}%`}
                 </div>
               </div>
             </div>
             <div className="text-right">
               <p className="text-3xl font-bold text-gray-900">
-                {appointmentAnalytics.appointmentShowRate.toFixed(1)}%
+                {Number(appointmentAnalytics.appointmentShowRate ?? 0).toFixed(1)}%
               </p>
               <p className="text-sm text-gray-600">Show Rate</p>
             </div>

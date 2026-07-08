@@ -1,180 +1,141 @@
 /**
  * BouwaModuleShell
  *
- * Internal placeholder shell for the Bouwa Proposal Module.
- * Renders the structural overview of the module including phase status cards
- * and the access/safety notice.
+ * Phase 4D-15: Air Audit Proposal Builder — full rebuild.
  *
- * IMPORTANT:
- * - This component is NOT mounted in Dashboard.tsx or MobileNavigation.tsx.
- * - It calls listBouwaMachineSpecs() via BouwaMachineSpecLibrary (read-only; errors are handled gracefully).
- * - It does NOT expose any customer-facing data.
- * - Customer-facing proposal outputs remain DISABLED until formulas, assumptions
- *   and report templates are formally approved.
+ * Navigation:
+ *   Dashboard | New Proposal | Drafts | Machine Spec Library | Templates & Assumptions
  *
- * Phase 4C-2: shell / placeholder only.
- * Phase 4C-5: BouwaMachineSpecLibrary read-only screen added.
- * Phase 4C-6: BouwaTariffTablesPanel read-only screen added.
- * Phase 4C-7: BouwaAirAuditEvidencePanel read-only screen added.
- * Phase 4C-8: BouwaProposalDraftsPanel, BouwaFormulaApprovalsPanel,
- *              BouwaAssumptionsPanel, BouwaReportTemplatesPanel added.
- * Phase 4D-9: BouwaSupplierSpecReview (internal review panel with editable review fields).
+ * Removed from main UI:
+ *   - Customer-Safe Export module card
+ *   - Access Requirements panel (BouwaAccessNotice)
+ *   - Feature flag explanation text
+ *   - Big approval warnings / approvalStatus wording
+ *   - Excessive module card grid on landing screen
+ *
+ * Preserved:
+ *   - BouwaSupplierSpecReview (under Machine Spec Library)
+ *   - 75 imported Bouwa specs
+ *   - Excel template download (Templates & Assumptions)
+ *   - Demo PDF generation (New Proposal Step 11)
+ *   - Detailed technical report direction
+ *
+ * SAFETY:
+ *   - NOT mounted in Dashboard.tsx or MobileNavigation.tsx.
+ *   - Only reachable via hidden /bouwa route behind BouwaRouteGuard.
+ *   - approvalStatus is never set, never "approved_customer".
+ *   - No customer-safe export exposed.
  */
 
-import { FileText, Cpu, DollarSign, Wind, ClipboardCheck, Eye, Download } from 'lucide-react';
-import { BouwaMachineSpecLibrary } from '../components/BouwaMachineSpecLibrary';
-import { BouwaTariffTablesPanel } from '../components/BouwaTariffTablesPanel';
-import { BouwaAirAuditEvidencePanel } from '../components/BouwaAirAuditEvidencePanel';
-import { BouwaProposalDraftsPanel } from '../components/BouwaProposalDraftsPanel';
-import { BouwaFormulaApprovalsPanel } from '../components/BouwaFormulaApprovalsPanel';
-import { BouwaAssumptionsPanel } from '../components/BouwaAssumptionsPanel';
-import { BouwaReportTemplatesPanel } from '../components/BouwaReportTemplatesPanel';
-import { BouwaSupplierSpecReview } from '../components/BouwaSupplierSpecReview';
-import { BOUWA_MODULE_META } from '../bouwaFrontendConfig';
-import { BouwaAccessNotice } from '../components/BouwaAccessNotice';
-import { BouwaPhaseCard } from '../components/BouwaPhaseCard';
-import type { BouwaShellCard } from '../types';
+import { useState } from 'react';
+import { Cpu, ChevronRight, Wind, FileText, Database, LayoutDashboard, FolderOpen } from 'lucide-react';
 
-const SHELL_CARDS: BouwaShellCard[] = [
-  {
-    title: 'Machine Specification Library',
-    description:
-      'Stores validated compressor specifications used as the basis for energy and savings calculations.',
-    status: 'pending',
-    iconKey: 'Cpu',
-  },
-  {
-    title: 'Tariff Tables',
-    description:
-      'Electricity and compressed-air tariff schedules by region. Must be reviewed before use in any proposal.',
-    status: 'pending',
-    iconKey: 'DollarSign',
-  },
-  {
-    title: 'Air Audit Evidence',
-    description:
-      'Stores site measurement data, leak surveys and load-profile evidence gathered during audits.',
-    status: 'pending',
-    iconKey: 'Wind',
-  },
-  {
-    title: 'Proposal Drafts',
-    description:
-      'Internal working copies of energy-saving proposals. Not visible to customers until exported.',
-    status: 'pending',
-    iconKey: 'FileText',
-  },
-  {
-    title: 'Internal Calculation Review',
-    description:
-      'Formulas and assumption sets pending review. Proposals cannot be finalised until calculations are approved.',
-    status: 'pending',
-    iconKey: 'ClipboardCheck',
-  },
-  {
-    title: 'Customer-Safe Proposal Export',
-    description:
-      'Generates the customer-visible PDF output. Blocked until all approvals are complete.',
-    status: 'disabled',
-    iconKey: 'Download',
-  },
+import { BouwaDashboard }          from '../components/BouwaDashboard';
+import { BouwaNewProposalWizard }  from '../components/BouwaNewProposalWizard';
+import { BouwaDraftProposalsList } from '../components/BouwaDraftProposalsList';
+import { BouwaSpecLibraryPage }    from '../components/BouwaSpecLibraryPage';
+import { BouwaTemplatesPage }      from '../components/BouwaTemplatesPage';
+
+import type { BouwaTopNav }        from '../components/BouwaDashboard';
+
+// ---------------------------------------------------------------------------
+// Nav definition
+// ---------------------------------------------------------------------------
+
+interface NavItem {
+  key: BouwaTopNav;
+  label: string;
+  icon: React.ReactNode;
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { key: 'dashboard',    label: 'Dashboard',               icon: <LayoutDashboard className="w-4 h-4" /> },
+  { key: 'new-proposal', label: 'New Proposal',            icon: <Wind            className="w-4 h-4" /> },
+  { key: 'drafts',       label: 'Draft Proposals',         icon: <FolderOpen      className="w-4 h-4" /> },
+  { key: 'spec-library', label: 'Machine Spec Library',    icon: <Database        className="w-4 h-4" /> },
+  { key: 'templates',    label: 'Templates & Assumptions', icon: <FileText        className="w-4 h-4" /> },
 ];
 
-/**
- * Renders the Bouwa module shell overview.
- *
- * Not routed or visible in any navigation until Phase 4C-3+ wires it up.
- */
-export function BouwaModuleShell() {
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+function TopNav({ active, onChange }: { active: BouwaTopNav; onChange: (k: BouwaTopNav) => void }) {
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-start gap-3">
-        <div className="rounded-xl bg-slate-100 p-2.5">
-          <Eye className="w-6 h-6 text-ars-primary" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-ars-heading">
-            {BOUWA_MODULE_META.label}
-          </h1>
-          <p className="text-sm text-ars-body mt-1">
-            {BOUWA_MODULE_META.description}{' '}
-            This is an internal preparation module — not visible to customers.
-          </p>
-        </div>
-      </div>
+    <nav className="flex items-center gap-1 overflow-x-auto pb-0.5 border-b border-slate-200">
+      {NAV_ITEMS.map((item) => {
+        const isActive = item.key === active;
+        return (
+          <button
+            key={item.key}
+            type="button"
+            onClick={() => onChange(item.key)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-t-lg text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+              isActive
+                ? 'text-ars-primary border-ars-primary bg-white'
+                : 'text-ars-body border-transparent hover:text-ars-heading hover:bg-slate-50'
+            }`}
+          >
+            {item.icon}
+            {item.label}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
 
-      {/* Internal safety banner */}
-      <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 flex items-start gap-3">
-        <FileText className="w-5 h-5 text-red-700 shrink-0 mt-0.5" />
-        <p className="text-sm text-red-900 font-medium leading-relaxed">
-          Customer-facing proposal outputs remain disabled until formulas, assumptions and report
-          templates are approved by an authorised reviewer.
-        </p>
-      </div>
-
-      {/* Access requirements */}
-      <BouwaAccessNotice />
-
-      {/* Phase status cards */}
-      <section>
-        <h2 className="text-base font-semibold text-ars-heading mb-4">Module Areas</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {SHELL_CARDS.map((card) => (
-            <BouwaPhaseCard key={card.title} card={card} />
-          ))}
-        </div>
-      </section>
-
-      {/* Machine Specification Library — read-only, internal only */}
-      <BouwaMachineSpecLibrary />
-
-      {/* Supplier Spec Review — Phase 4D-9 — internal review workflow, admin/super_admin only */}
-      <BouwaSupplierSpecReview />
-
-      {/* Tariff Tables — read-only, internal only */}
-      <BouwaTariffTablesPanel />
-
-      {/* Air Audit Evidence — read-only, internal only */}
-      <BouwaAirAuditEvidencePanel />
-
-      {/* Proposal Drafts — read-only, internal only */}
-      <BouwaProposalDraftsPanel />
-
-      {/* Formula Approvals — read-only, internal only */}
-      <BouwaFormulaApprovalsPanel />
-
-      {/* Assumptions — read-only, internal only */}
-      <BouwaAssumptionsPanel />
-
-      {/* Report Templates — read-only, internal only */}
-      <BouwaReportTemplatesPanel />
-
-      {/* Phase/build status footer */}
-      <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 flex flex-wrap items-center gap-4 text-xs text-ars-body">
-        <span>
-          <span className="font-medium">Feature flag:</span>{' '}
-          <code className="rounded bg-slate-100 border border-slate-200 px-1 py-0.5 font-mono">
-            {BOUWA_MODULE_META.featureFlag}
-          </code>
-        </span>
-        <span>
-          <span className="font-medium">View permission:</span>{' '}
-          <code className="rounded bg-slate-100 border border-slate-200 px-1 py-0.5 font-mono">
-            {BOUWA_MODULE_META.viewPermission}
-          </code>
-        </span>
-        <span className="ml-auto">
-          {BOUWA_MODULE_META.uiReady ? (
-            <span className="text-green-700 font-medium">UI Ready</span>
-          ) : (
-            <span className="text-amber-700 font-medium">UI Not Yet Wired</span>
-          )}
-        </span>
-      </div>
+function Breadcrumb({ view }: { view: BouwaTopNav }) {
+  const label = NAV_ITEMS.find(n => n.key === view)?.label ?? view;
+  return (
+    <div className="flex items-center gap-1.5 text-xs text-slate-400">
+      <Cpu className="w-3.5 h-3.5" />
+      <span>Bouwa</span>
+      <ChevronRight className="w-3 h-3" />
+      <span className="text-ars-body font-medium">{label}</span>
     </div>
   );
 }
 
-// Named exports for icons — kept here so components above don't need to import individually
-export { Cpu, DollarSign, Wind, ClipboardCheck, Download };
+// ---------------------------------------------------------------------------
+// Main shell
+// ---------------------------------------------------------------------------
+
+export function BouwaModuleShell() {
+  const [view, setView] = useState<BouwaTopNav>('dashboard');
+
+  function navigate(v: BouwaTopNav) {
+    setView(v);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function renderView() {
+    switch (view) {
+      case 'dashboard':
+        return <BouwaDashboard onNavigate={navigate} />;
+      case 'new-proposal':
+        return <BouwaNewProposalWizard />;
+      case 'drafts':
+        return (
+          <BouwaDraftProposalsList
+            onNewProposal={() => navigate('new-proposal')}
+            onOpenProposal={() => navigate('new-proposal')}
+          />
+        );
+      case 'spec-library':
+        return <BouwaSpecLibraryPage />;
+      case 'templates':
+        return <BouwaTemplatesPage />;
+      default:
+        return <BouwaDashboard onNavigate={navigate} />;
+    }
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-4">
+      <Breadcrumb view={view} />
+      <TopNav active={view} onChange={navigate} />
+      <div className="pt-2">{renderView()}</div>
+    </div>
+  );
+}

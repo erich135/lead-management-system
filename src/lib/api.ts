@@ -670,6 +670,13 @@ export interface RepCode {
     lastName: string;
     email?: string;
   };
+  /** Array of linked users — populated by backend when requested. */
+  users?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email?: string;
+  }[];
   isActive: boolean;
   dbStatus?: string;
   createdAt?: string;
@@ -1583,6 +1590,7 @@ export interface User {
     phone?: string;
   } | string;
   passwordSet?: boolean;
+  locationTrackingEnabled?: boolean;
   createdAt: string;
   updatedAt: string;
   lastLogin?: string;
@@ -1789,6 +1797,7 @@ export async function updateRolePermissions(id: string, permissions: string[]): 
 export async function applyGroupPermissions(
   roleId: string,
   permissions: string[],
+  includeInactive?: boolean,
 ): Promise<{ role: Role; usersUpdated: number; message: string }> {
   return apiRequest(`/api/roles/${roleId}/apply-group-permissions`, {
     method: 'PUT',
@@ -3123,8 +3132,9 @@ export interface JobCardTemplate {
   name: string;
   description?: string;
   templateKey?: string;
+  reportPrefix?: 'RSR' | 'MCC';
   isSystemTemplate?: boolean;
-  sections?: unknown[];
+  sections?: any[];
   pdfBackground?: string;
   fields?: any[]; // Legacy support
   groups?: any[]; // New structure: groups with tables
@@ -3154,10 +3164,11 @@ export interface JobCardTemplateResponse {
 /**
  * Gets all job card templates.
  */
-export async function getJobCardTemplates(includeInactive?: boolean, systemOnly?: boolean): Promise<JobCardTemplatesResponse> {
+export async function getJobCardTemplates(includeInactive?: boolean, systemOnly?: boolean, partsReadyOnly?: boolean): Promise<JobCardTemplatesResponse> {
   const search = new URLSearchParams();
   if (includeInactive) search.set('includeInactive', 'true');
   if (systemOnly) search.set('systemOnly', 'true');
+  if (partsReadyOnly) search.set('partsReadyOnly', 'true');
   const qs = search.toString();
   return await apiRequest<JobCardTemplatesResponse>(`/api/job-card-templates${qs ? `?${qs}` : ''}`);
 }

@@ -7,6 +7,9 @@ import { Dashboard } from './components/Dashboard';
 import { ChatWidget } from './components/ChatWidget';
 // import { AutoLocationTracker } from './components/AutoLocationTracker'; // disabled
 import { MachineScanPage } from './components/MachineScanPage';
+// Bouwa module — hidden route, unmounted from nav, guarded by permission
+import { BouwaModuleShell } from './features/bouwa/pages/BouwaModuleShell';
+import { BouwaRouteGuard } from './features/bouwa/components/BouwaRouteGuard';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -145,6 +148,14 @@ function AppContent() {
         <Route path="/pending-machine-readings" element={
           <ProtectedRoute>
             <Dashboard view="pendingReadings" />
+          </ProtectedRoute>
+        } />
+        {/* Hidden Bouwa route — authenticated + permission-gated, not in nav */}
+        <Route path="/bouwa" element={
+          <ProtectedRoute>
+            <BouwaRouteGuard>
+              <BouwaModuleShell />
+            </BouwaRouteGuard>
           </ProtectedRoute>
         } />
         {/* Public QR scan landing — NO auth, NO PublicRoute redirect. */}

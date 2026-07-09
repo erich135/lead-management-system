@@ -1,11 +1,25 @@
 # Element Six — Bouwa Validation Scenario 2
-## Workbook Mapping Document — Phase 4D-21A
+## Workbook Mapping Document — Phase 4D-21A / 4D-21B
 
 **Source file:** `bouwa-source-data/excel-proposals/Element Six BOUWA SVC RS132 KW Updated - March 2025.xlsx`  
 **Mapping date:** July 2026  
 **Reference scenario:** Ingrain L160 (Scenario 1) — see `bouwa-calculation-validation.md`  
 **Branch:** validation/bouwa-excel-proposals  
-**Status:** Inspection only — no app code changed
+**Status:** ✅ Implemented as Scenario 2 — Phase 4D-21B
+
+### Phase 4D-21B — John Confirmations (July 2026)
+
+| Item | John's confirmation |
+|---|---|
+| Model variant SVC-RS132A-II | "A" = Air Cooled. Same RS132 model family. ARS staff sometimes omit "A". Store as SVC-RS132A-II, base model SVC-RS132-II, cooling type Air Cooled. |
+| Buy-back — two units | Offer document confirms: Ingersoll Rand ML250 R220,000 incl. VAT + Ingersoll Rand R132i R100,000 incl. VAT = R320,000 total. Workbook split (R200,000 + R120,000) differs from offer split but total agrees. Both stored; discrepancy visible. |
+| Altitude — 30.1 m³/min | Sea-level FAD only. At 5,337 ft and 20% loss, corrected site output = 24.0 m³/min. App must not treat 30.1 m³/min as site-effective output. |
+
+### Implementation (Phase 4D-21B)
+
+- `src/features/bouwa/calculations/elementSixReferenceScenario.ts` — created
+- `src/features/bouwa/calculations/validationEngine.ts` — `runE6Validation()` and `E6_VALIDATION_META` added
+- `src/features/bouwa/components/BouwaNewProposalWizard.tsx` — Step 11 scenario selector added (Ingrain / Element Six)
 
 ---
 

@@ -26,7 +26,7 @@ import autoTable from 'jspdf-autotable';
 // Phase 4D-17/18 — calculation modules
 import { INGRAIN_LOAD_PROFILE as LOAD_PROFILE } from '../calculations/loadProfileEngine';
 import { INGRAIN_COST_REFERENCE, MODEL_NAMING_CONFLICT_NOTE } from '../calculations/ingrainReferenceScenario';
-import { runValidation, summariseValidation } from '../calculations/validationEngine';
+import { runValidation, summariseValidation, runE6Validation, E6_VALIDATION_META } from '../calculations/validationEngine';
 import { INGRAIN_ROI_REFERENCE } from '../calculations/roiEngine';
 import { ESKOM_RATES_SET_A, ESKOM_RATES_SET_B, INGRAIN_DAY_CALENDAR } from '../calculations/tariffEngine';
 import {
@@ -1583,6 +1583,12 @@ function Step11_ReportPreview({ setup, siteConditions, tariffProfile, onGenerate
 
   const validationItems = runValidation();
   const summary = summariseValidation(validationItems);
+  const [valScenario, setValScenario] = useState<'ingrain' | 'e6'>('ingrain');
+  const e6ValidationItems = runE6Validation();
+  const e6Summary = summariseValidation(e6ValidationItems);
+
+  const activeItems = valScenario === 'e6' ? e6ValidationItems : validationItems;
+  const activeSummary = valScenario === 'e6' ? e6Summary : summary;
 
   const statusConfig: Record<string, { label: string; cls: string }> = {
     'match':           { label: 'Match',           cls: 'bg-green-100 text-green-700 border-green-200' },
@@ -1614,6 +1620,25 @@ function Step11_ReportPreview({ setup, siteConditions, tariffProfile, onGenerate
           <h3 className="text-sm font-semibold text-ars-heading flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-slate-600" /> Calculation Validation — App vs Workbook
           </h3>
+        </div>
+
+        {/* ── Scenario selector ─────────────────────────────── */}
+        <div className="flex gap-2 mb-3 flex-wrap items-center">
+          <span className="text-[11px] font-semibold text-slate-500 mr-1">Scenario:</span>
+          <button
+            type="button"
+            onClick={() => setValScenario('ingrain')}
+            className={`px-3 py-1 rounded-full text-[11px] font-semibold border transition ${valScenario === 'ingrain' ? 'bg-ars-primary text-white border-ars-primary' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'}`}
+          >
+            1 — Ingrain Bellville
+          </button>
+          <button
+            type="button"
+            onClick={() => setValScenario('e6')}
+            className={`px-3 py-1 rounded-full text-[11px] font-semibold border transition ${valScenario === 'e6' ? 'bg-ars-primary text-white border-ars-primary' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'}`}
+          >
+            2 — Element Six
+          </button>
           <div className="flex gap-2 ml-auto flex-wrap">
             {([
               ['match', 'Match'],
@@ -1622,11 +1647,39 @@ function Step11_ReportPreview({ setup, siteConditions, tariffProfile, onGenerate
               ['requires-review', 'Review'],
             ] as [string, string][]).map(([k, l]) => (
               <span key={k} className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${statusConfig[k].cls}`}>
-                {l}: {summary[k === 'minor-rounding' ? 'minorRounding' : k === 'requires-review' ? 'requiresReview' : k as keyof typeof summary]}
+                {l}: {activeSummary[k === 'minor-rounding' ? 'minorRounding' : k === 'requires-review' ? 'requiresReview' : k as keyof typeof activeSummary]}
               </span>
             ))}
           </div>
         </div>
+
+        {/* ── Element Six context notes ──────────────────────── */}
+        {valScenario === 'e6' && (
+          <div className="mb-3 space-y-2">
+            <div className="rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 flex items-start gap-2">
+              <Mountain className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-900">
+                <span className="font-bold">Altitude correction: </span>
+                {E6_VALIDATION_META.altitudeNote}
+              </p>
+            </div>
+            <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 flex items-start gap-2">
+              <Banknote className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-900">
+                <span className="font-bold">Buy-back note: </span>
+                {E6_VALIDATION_META.buyBackNote}
+              </p>
+            </div>
+            <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-1.5">
+              <p className="text-[10px] text-slate-600">
+                <span className="font-semibold">Scenario 2 — {E6_VALIDATION_META.customer}:</span>{' '}
+                Existing: {E6_VALIDATION_META.existingMachine} · Proposed: {E6_VALIDATION_META.proposedModel} ·
+                Confirmed by: {E6_VALIDATION_META.confirmedBy} · Source: {E6_VALIDATION_META.workbookFile}
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
@@ -1637,7 +1690,7 @@ function Step11_ReportPreview({ setup, siteConditions, tariffProfile, onGenerate
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {validationItems.map(item => {
+              {activeItems.map(item => {
                 const cfg = statusConfig[item.status] ?? statusConfig['not-calculated'];
                 return (
                   <tr key={item.metric} className="hover:bg-slate-50">
@@ -1657,9 +1710,9 @@ function Step11_ReportPreview({ setup, siteConditions, tariffProfile, onGenerate
             </tbody>
           </table>
         </div>
-        {validationItems.some(i => i.note) && (
+        {activeItems.some(i => i.note) && (
           <div className="mt-3 space-y-1">
-            {validationItems.filter(i => i.note).slice(0, 4).map(i => (
+            {activeItems.filter(i => i.note).slice(0, 5).map(i => (
               <p key={i.metric} className="text-[10px] text-slate-500 italic">
                 <span className="font-semibold">{i.metric}:</span> {i.note}
               </p>
@@ -1670,8 +1723,9 @@ function Step11_ReportPreview({ setup, siteConditions, tariffProfile, onGenerate
           <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />
           <p className="text-xs text-red-800">
             <span className="font-bold">Do not issue final customer report until: </span>
-            Confirm customer electricity bill, tariff category, Bouwa model (RS132 vs RS160-II), and machine price.
-            See bouwa-calculation-map.md §14 for full conflict list.
+            {valScenario === 'ingrain'
+              ? 'Confirm customer electricity bill, tariff category, Bouwa model (RS132 vs RS160-II), and machine price. See bouwa-calculation-map.md §14 for full conflict list.'
+              : 'Confirm VAT treatment on buy-back (offer incl. VAT vs workbook excl. VAT), tariff year/category for Element Six site, and altitude correction (24.0 m³/min site output confirmed by John).'}
           </p>
         </div>
       </SectionCard>

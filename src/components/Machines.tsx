@@ -73,7 +73,7 @@ export function Machines() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
-  const [ownershipFilter, setOwnershipFilter] = useState<'ars_rental' | 'customer' | ''>('ars_rental');
+  const [ownershipFilter, setOwnershipFilter] = useState<'ars_rental' | 'customer' | '' | 'archived'>('ars_rental');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [machineTypes, setMachineTypes] = useState<MachineType[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 0 });
@@ -177,7 +177,11 @@ export function Machines() {
       const params: any = { page, limit: 50 };
       if (searchQuery.trim()) params.search = searchQuery.trim();
       if (customerFilter) params.customerId = customerFilter;
-      if (ownershipFilter) params.ownershipType = ownershipFilter;
+      if (ownershipFilter === 'archived') {
+        params.dbStatus = 'archived';
+      } else if (ownershipFilter) {
+        params.ownershipType = ownershipFilter;
+      }
       if (sortField) {
         params.sortField = sortField;
         params.sortDir = sortDir;
@@ -386,7 +390,11 @@ export function Machines() {
       const params: any = { page: 1, limit: 99999 };
       if (searchQuery.trim()) params.search = searchQuery.trim();
       if (customerFilter) params.customerId = customerFilter;
-      if (ownershipFilter) params.ownershipType = ownershipFilter;
+      if (ownershipFilter === 'archived') {
+        params.dbStatus = 'archived';
+      } else if (ownershipFilter) {
+        params.ownershipType = ownershipFilter;
+      }
       const response = await getMachines(params);
       const rows = response.machines || [];
 
@@ -887,6 +895,16 @@ export function Machines() {
           >
             All Machines
           </button>
+          <button
+            onClick={() => setOwnershipFilter('archived')}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              ownershipFilter === 'archived'
+                ? 'bg-white text-amber-600 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Archived
+          </button>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3">
@@ -992,7 +1010,14 @@ export function Machines() {
                     <div className="col-span-3 flex items-center gap-2.5">
                       <Cog className={`w-5 h-5 flex-shrink-0 ${isExpanded ? 'text-amber-600' : 'text-slate-400'}`} />
                       <div className="min-w-0">
-                        <div className="font-semibold text-slate-800 truncate">{machine.make} {machine.model}</div>
+                        <div className="font-semibold text-slate-800 truncate flex items-center gap-1.5">
+                          {machine.make} {machine.model}
+                          {(machine as any).dbStatus === 'archived' && (
+                            <span className="text-[10px] font-medium text-amber-700 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                              Archived
+                            </span>
+                          )}
+                        </div>
                         {machine.assetNumber && (
                           <div className="text-xs text-slate-400">Asset: {machine.assetNumber}</div>
                         )}

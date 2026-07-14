@@ -3,6 +3,7 @@ import {
   getMachines,
   createMachine,
   updateMachine,
+  relinkMachineToCustomer,
   deleteMachine,
   getMachineRSRs,
   uploadRSR,
@@ -173,17 +174,7 @@ export function Machines() {
     setRelinkSaving(true);
     setRelinkError(null);
     try {
-      const oldCashCustomer = (relinkMachine as any).cashCustomer?.trim();
-      const existingLocation = (relinkMachine as any).currentLocation?.trim();
-      const payload: any = {
-        customer: relinkCustomerId,
-        cashCustomer: '',           // clear cash customer
-      };
-      // Preserve old cash customer name as currentLocation only if not already set
-      if (oldCashCustomer && !existingLocation) {
-        payload.currentLocation = oldCashCustomer;
-      }
-      const response = await updateMachine(relinkMachine._id, payload);
+      const response = await relinkMachineToCustomer(relinkMachine._id, relinkCustomerId);
       setMachines(prev => prev.map(m => m._id === relinkMachine._id ? { ...m, ...response.machine } : m));
       setRelinkMachine(null);
       setRelinkCustomerId('');
@@ -1145,7 +1136,7 @@ export function Machines() {
                                 Edit
                               </button>
                               )}
-                              {(machine as any).dbStatus !== 'archived' && (machine as any).cashCustomer && (
+                              {(machine as any).cashCustomer && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setRelinkMachine(machine); setRelinkCustomerId(''); setRelinkError(null); }}
                                   className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"

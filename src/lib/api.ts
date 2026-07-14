@@ -2722,7 +2722,7 @@ export async function uploadMachineRSR(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'Failed to upload RSR document');
+    throw new Error(error.error?.message || error.message || 'Failed to upload RSR document');
   }
 
   const data = await response.json();
@@ -2784,7 +2784,7 @@ export async function uploadRSR(params: {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'Failed to upload RSR document');
+    throw new Error(error.error?.message || error.message || 'Failed to upload RSR document');
   }
 
   const data = await response.json();

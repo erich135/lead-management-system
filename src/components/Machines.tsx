@@ -1103,6 +1103,7 @@ export function Machines() {
                           <div className="flex items-center gap-2">
                             {!isEditing ? (
                               <>
+                              {(machine as any).dbStatus !== 'archived' && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleEdit(machine); }}
                                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -1110,7 +1111,8 @@ export function Machines() {
                                 <Edit3 className="w-3.5 h-3.5" />
                                 Edit
                               </button>
-                              {isSuperAdmin && (
+                              )}
+                              {isSuperAdmin && (machine as any).dbStatus !== 'archived' && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setMachineToDelete(machine); }}
                                   className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"

@@ -16,6 +16,7 @@ export interface FixedFormField extends TemplateVisibilityItem {
   unit?: string;
   jobFieldKey?: string;
   machineFieldKey?: string;
+  companionField?: FixedFormField;
 }
 
 export interface ChecklistItem extends TemplateVisibilityItem {

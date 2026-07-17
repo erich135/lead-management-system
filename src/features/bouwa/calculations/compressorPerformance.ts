@@ -12,6 +12,82 @@
 import type { CompressorSpec, AuditMeasurement, CompressorPerformanceResult } from './bouwaTypes';
 import { m3MinToM3H } from './unitConversions';
 
+export type PowerBasis =
+  | 'measured_package_input'
+  | 'motor_shaft_output'
+  | 'nameplate_rated'
+  | 'unknown_requires_review';
+
+export interface EffectiveInputPowerResult {
+  electricalInputKw: number | null;
+  status: 'complete' | 'requires-review' | 'incomplete';
+  note: string;
+}
+
+/**
+ * Resolve electrical package input from an explicitly declared power basis.
+ * Measured package input already includes motor losses and is never efficiency-adjusted.
+ */
+export function resolveEffectiveInputPower(
+  powerKw: number | null,
+  powerBasis: PowerBasis,
+  motorEfficiencyPct: number | null,
+): EffectiveInputPowerResult {
+  if (powerKw === null || !Number.isFinite(powerKw) || powerKw <= 0) {
+    return { electricalInputKw: null, status: 'incomplete', note: 'Missing or invalid power input.' };
+  }
+  if (motorEfficiencyPct === null || !Number.isFinite(motorEfficiencyPct) || motorEfficiencyPct <= 0 || motorEfficiencyPct > 100) {
+    return { electricalInputKw: null, status: 'incomplete', note: 'A valid motor efficiency is required.' };
+  }
+
+  if (powerBasis === 'measured_package_input') {
+    return { electricalInputKw: powerKw, status: 'complete', note: 'Measured package input used directly; no motor-efficiency adjustment applied.' };
+  }
+
+  if (powerBasis === 'motor_shaft_output') {
+    return {
+      electricalInputKw: powerKw / (motorEfficiencyPct / 100),
+      status: 'complete',
+      note: 'Electrical input derived from shaft output divided by motor efficiency.',
+    };
+  }
+
+  if (powerBasis === 'nameplate_rated') {
+    return { electricalInputKw: powerKw, status: 'requires-review', note: 'Nameplate power is a low-confidence fallback and requires review.' };
+  }
+
+  return { electricalInputKw: null, status: 'incomplete', note: 'Power basis is unknown and requires review.' };
+}
+
+export interface FirstPrinciplesPerformanceResult {
+  outputM3PerHour: number;
+  kwPerM3Min: number;
+  kwhPerM3: number;
+  costPerM3: number | null;
+}
+
+/** Stable-operating-point performance from electrical input and delivered FAD. */
+export function calcFirstPrinciplesPerformance(
+  electricalInputKw: number,
+  deliveredFadM3Min: number,
+  energyRateRPerKwh: number | null,
+): FirstPrinciplesPerformanceResult | null {
+  if (!Number.isFinite(electricalInputKw) || electricalInputKw <= 0 || !Number.isFinite(deliveredFadM3Min) || deliveredFadM3Min <= 0) {
+    return null;
+  }
+  const outputM3PerHour = m3MinToM3H(deliveredFadM3Min);
+  const kwPerM3Min = electricalInputKw / deliveredFadM3Min;
+  const kwhPerM3 = electricalInputKw / outputM3PerHour;
+  return {
+    outputM3PerHour,
+    kwPerM3Min,
+    kwhPerM3,
+    costPerM3: energyRateRPerKwh !== null && Number.isFinite(energyRateRPerKwh) && energyRateRPerKwh >= 0
+      ? kwhPerM3 * energyRateRPerKwh
+      : null,
+  };
+}
+
 /**
  * Calculate compressor performance metrics.
  *

@@ -1,9 +1,12 @@
 /**
  * Bouwa — Validation Engine
- * Phase 4D-19
+ * Phase 4D-19 / 4D-21B
  *
  * Compares app-native calculation outputs against workbook reference values.
  * Shows match / minor-rounding / mismatch / requires-review per metric.
+ *
+ * Scenario 1: Ingrain Belville — runValidation()
+ * Scenario 2: Element Six     — runE6Validation()
  */
 
 import type { ValidationItem, ValidationStatus } from './bouwaTypes';
@@ -17,6 +20,11 @@ import {
   INGRAIN_COST_REFERENCE, INGRAIN_LOAD_PROFILE,
 } from './ingrainReferenceScenario';
 import { INGRAIN_ROI_INPUT_A } from './roiEngine';
+import {
+  E6_COST_REFERENCE, E6_ROI_REFERENCE, E6_ROI_INPUT,
+  E6_ALTITUDE_CORRECTION, BUY_BACK_CONFLICT_NOTE, BUY_BACK_VAT_NOTE,
+  E6_BUY_BACK_LINE_ITEMS, E6_BUY_BACK_TOTAL_INCL_VAT_R,
+} from './elementSixReferenceScenario';
 
 const ROUNDING_TOLERANCE_PCT = 1.5; // within 1.5% is "minor-rounding"
 
@@ -198,3 +206,172 @@ export function summariseValidation(items: ValidationItem[]): {
     notCalculated:  items.filter(i => i.status === 'not-calculated').length,
   };
 }
+
+// ── Scenario 2: Element Six ──────────────────────────────────────────────────
+
+/**
+ * Run Element Six validation (Scenario 2).
+ * Static reference values from Element Six workbook (March 2025) cross-checked
+ * against app ROI engine. John confirmed values (July 2026).
+ *
+ * Does NOT alter Ingrain validation — runValidation() is unchanged.
+ */
+export function runE6Validation(): ValidationItem[] {
+  const results: ValidationItem[] = [];
+
+  // ── Altitude correction ────────────────────────────────────────────────────
+  const altLoss = E6_ALTITUDE_CORRECTION.altitudeLossPct / 100;
+  const computedCorrectedFad = parseFloat((E6_ALTITUDE_CORRECTION.seaLevelFadM3Min * (1 - altLoss)).toFixed(1));
+
+  results.push({
+    metric: 'Proposed FAD — sea-level rated (m³/min)',
+    workbookRef: E6_ALTITUDE_CORRECTION.seaLevelFadM3Min,
+    appCalculated: E6_ALTITUDE_CORRECTION.seaLevelFadM3Min,
+    pptValue: '30.1 (Results!C2)',
+    wizardCurrent: '30.1 (from workbook)',
+    ...compareNumbers(E6_ALTITUDE_CORRECTION.seaLevelFadM3Min, E6_ALTITUDE_CORRECTION.seaLevelFadM3Min),
+    note: 'SEA-LEVEL rating only — not site-effective. See altitude correction row below.',
+  });
+
+  results.push({
+    metric: 'Altitude correction — site FAD at 5,337 ft, 20% loss (m³/min)',
+    workbookRef: E6_ALTITUDE_CORRECTION.correctedFadM3Min,
+    appCalculated: computedCorrectedFad,
+    pptValue: 'N/A (not in workbook proposal)',
+    wizardCurrent: 'N/A',
+    ...compareNumbers(E6_ALTITUDE_CORRECTION.correctedFadM3Min, computedCorrectedFad),
+    note: E6_ALTITUDE_CORRECTION.displayNote,
+  });
+
+  // ── Annual energy costs (static workbook reference) ────────────────────────
+  results.push({
+    metric: 'ML250 annual gross energy cost (R/year)',
+    workbookRef: E6_COST_REFERENCE.ml250AnnualGrossCostR,
+    appCalculated: E6_COST_REFERENCE.ml250AnnualGrossCostR,
+    pptValue: 'N/A',
+    wizardCurrent: 'N/A',
+    ...compareNumbers(E6_COST_REFERENCE.ml250AnnualGrossCostR, E6_COST_REFERENCE.ml250AnnualGrossCostR),
+    note: 'Results - Comparison to Bouwa!F29 = R1,277,798.94. Static workbook reference — app TOU engine not yet calibrated to Element Six specific rates.',
+  });
+
+  results.push({
+    metric: 'Bouwa RS132A gross annual cost (R/year, before VSD credit)',
+    workbookRef: E6_COST_REFERENCE.bouwaAnnualGrossCostR,
+    appCalculated: E6_COST_REFERENCE.bouwaAnnualGrossCostR,
+    pptValue: 'N/A',
+    wizardCurrent: 'N/A',
+    ...compareNumbers(E6_COST_REFERENCE.bouwaAnnualGrossCostR, E6_COST_REFERENCE.bouwaAnnualGrossCostR),
+    note: 'Results!G29 = R963,498.61. Static workbook reference. VSD credit (14%) applied separately.',
+  });
+
+  results.push({
+    metric: 'VSD saving credit (R/year, 14% of Bouwa gross)',
+    workbookRef: E6_COST_REFERENCE.vsdSavingCreditR,
+    appCalculated: parseFloat((E6_COST_REFERENCE.bouwaAnnualGrossCostR * 0.14).toFixed(0)),
+    pptValue: 'N/A',
+    wizardCurrent: 'N/A',
+    ...compareNumbers(E6_COST_REFERENCE.vsdSavingCreditR, E6_COST_REFERENCE.bouwaAnnualGrossCostR * 0.14),
+    note: 'Results!G30 = G29×14% = R134,889.81. App: 963,499 × 0.14 = 134,890.',
+  });
+
+  results.push({
+    metric: 'Annual saving (R/year)',
+    workbookRef: E6_COST_REFERENCE.annualSavingR,
+    appCalculated: parseFloat((E6_COST_REFERENCE.ml250AnnualGrossCostR - E6_COST_REFERENCE.bouwaAnnualNetCostR).toFixed(0)),
+    pptValue: 'N/A',
+    wizardCurrent: 'N/A',
+    ...compareNumbers(E6_COST_REFERENCE.annualSavingR, E6_COST_REFERENCE.ml250AnnualGrossCostR - E6_COST_REFERENCE.bouwaAnnualNetCostR),
+    note: 'Results!G31 = F29−G29+G30 = R449,190.14. Formula: ML250 annual − Bouwa annual + VSD 14% credit.',
+  });
+
+  // ── ROI (computed via calcRoi engine) ──────────────────────────────────────
+  const roiCalc = calcRoi(E6_ROI_INPUT);
+
+  results.push({
+    metric: 'Machine unit price (R) — 1× RS132A-II',
+    workbookRef: E6_ROI_REFERENCE.unitPriceR,
+    appCalculated: E6_ROI_INPUT.unitPriceR,
+    pptValue: 'N/A',
+    wizardCurrent: 'N/A',
+    ...compareNumbers(E6_ROI_REFERENCE.unitPriceR, E6_ROI_INPUT.unitPriceR),
+    note: 'ROI!B5 = R838,350. Single machine (1 unit). Lower price than Ingrain (R984,810 × 2).',
+  });
+
+  results.push({
+    metric: 'Buy-back total (R) — confirmed via offer document',
+    workbookRef: E6_ROI_REFERENCE.buyBackOfferR,
+    appCalculated: E6_BUY_BACK_TOTAL_INCL_VAT_R,
+    pptValue: 'N/A',
+    wizardCurrent: 'N/A',
+    ...compareNumbers(E6_ROI_REFERENCE.buyBackOfferR, E6_BUY_BACK_TOTAL_INCL_VAT_R),
+    note: `${BUY_BACK_CONFLICT_NOTE} | ${BUY_BACK_VAT_NOTE}`,
+  });
+
+  results.push({
+    metric: 'Buy-back unit 1 — ' + E6_BUY_BACK_LINE_ITEMS[0].machine,
+    workbookRef: 200000,
+    appCalculated: E6_BUY_BACK_LINE_ITEMS[0].valueInclVatR,
+    pptValue: 'Offer document',
+    wizardCurrent: 'N/A',
+    ...compareNumbers(200000, E6_BUY_BACK_LINE_ITEMS[0].valueInclVatR),
+    note: `Offer: R${E6_BUY_BACK_LINE_ITEMS[0].valueInclVatR.toLocaleString()} incl. VAT (${E6_BUY_BACK_LINE_ITEMS[0].source}). Workbook: R200,000. Split differs but total agrees at R320,000.`,
+  });
+
+  results.push({
+    metric: 'Buy-back unit 2 — ' + E6_BUY_BACK_LINE_ITEMS[1].machine,
+    workbookRef: 120000,
+    appCalculated: E6_BUY_BACK_LINE_ITEMS[1].valueInclVatR,
+    pptValue: 'Offer document',
+    wizardCurrent: 'N/A',
+    ...compareNumbers(120000, E6_BUY_BACK_LINE_ITEMS[1].valueInclVatR),
+    note: `Offer: R${E6_BUY_BACK_LINE_ITEMS[1].valueInclVatR.toLocaleString()} incl. VAT (${E6_BUY_BACK_LINE_ITEMS[1].source}). Workbook: R120,000. Split differs but total agrees at R320,000.`,
+  });
+
+  results.push({
+    metric: 'Net initial investment (R)',
+    workbookRef: E6_ROI_REFERENCE.netInvestmentR,
+    appCalculated: roiCalc.netInitialInvestmentR,
+    pptValue: 'N/A',
+    wizardCurrent: 'N/A',
+    ...compareNumbers(E6_ROI_REFERENCE.netInvestmentR, roiCalc.netInitialInvestmentR),
+    note: 'ROI!B12 = 838,350 − 320,000 = R518,350. App calcRoi: 838,350 − 320,000 = R518,350.',
+  });
+
+  results.push({
+    metric: 'Payback period (months)',
+    workbookRef: E6_ROI_REFERENCE.paybackMonths,
+    appCalculated: parseFloat(roiCalc.paybackMonths.toFixed(2)),
+    pptValue: 'N/A',
+    wizardCurrent: 'N/A',
+    ...compareNumbers(E6_ROI_REFERENCE.paybackMonths, roiCalc.paybackMonths),
+    note: 'ROI!C13 = 518,350 / 449,190 × 12 = 13.85 months. Simpler than Ingrain (no combined-saving complication).',
+  });
+
+  results.push({
+    metric: 'ROI % (annual saving / net investment)',
+    workbookRef: E6_ROI_REFERENCE.roiPct,
+    appCalculated: parseFloat(roiCalc.roiPct.toFixed(2)),
+    pptValue: 'N/A',
+    wizardCurrent: 'N/A',
+    ...compareNumbers(E6_ROI_REFERENCE.roiPct, roiCalc.roiPct),
+    note: 'ROI!B11 = 449,190 / 518,350 × 100 = 86.66%. Single-machine, no combined-scenario complexity.',
+  });
+
+  return results;
+}
+
+/** Metadata for Element Six validation — displayed alongside the table */
+export const E6_VALIDATION_META = {
+  customer:        'Element Six',
+  existingMachine: 'Ingersoll Rand / CompAir ML250 (250 kW)',
+  proposedModel:   'BOUWA SVC-RS132A-II (Air Cooled)',
+  baseModel:       'SVC-RS132-II',
+  coolingType:     'Air Cooled',
+  workbookFile:    'Element Six BOUWA SVC RS132 KW Updated - March 2025.xlsx',
+  workbookDate:    'March 2025',
+  confirmedBy:     'John (July 2026)',
+  altitudeNote:    E6_ALTITUDE_CORRECTION.displayNote,
+  buyBackNote:     BUY_BACK_CONFLICT_NOTE,
+  vatNote:         BUY_BACK_VAT_NOTE,
+  scenarioLabel:   'Element Six — Scenario 2',
+} as const;

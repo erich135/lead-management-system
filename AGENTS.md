@@ -28,7 +28,7 @@ This is a production application used by Air Rotory Services staff and technicia
 ## Workspace layout
 
 - Backend: `C:\Dev\ARS-Integration-Workspace\ars-app-backend`
-- Frontend: `C:\Dev\ARS-Integration-Workspace\lead-management-system`
+- Frontend: `C:\Dev\ARS-Integration-Workspace\ars-app-frontend`
 - Standalone reference app: `C:\Dev\ARS-Integration-Workspace\ARS-Bouwa-Proposal-App`
 - Source data outside git: `C:\Dev\ARS-Integration-Workspace\bouwa-source-data`
 - Excel proposal workbooks: `C:\Dev\ARS-Integration-Workspace\bouwa-source-data\excel-proposals`

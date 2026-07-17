@@ -67,6 +67,14 @@ interface AnalyticsData {
   }>;
 }
 
+const toFiniteNumber = (value: unknown): number => {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : 0;
+};
+
+const formatFixed = (value: unknown, fractionDigits = 1): string =>
+  toFiniteNumber(value).toFixed(fractionDigits);
+
 const SalesLeadReports: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<ReportCategory>('overview');
   const [dateRange, setDateRange] = useState('allTime');
@@ -156,7 +164,7 @@ const SalesLeadReports: React.FC = () => {
 
   // Format currency
   const formatCurrency = (value: number) => {
-    const n = Number(value ?? 0);
+    const n = toFiniteNumber(value);
     if (n >= 1000000) {
       return `R ${(n / 1000000).toFixed(1)}M`;
     } else if (n >= 1000) {
@@ -323,7 +331,7 @@ const ExecutiveOverview: React.FC<{ data: AnalyticsData; formatCurrency: (value:
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Conversion Rate</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{data.leadPerformance.conversionRate.toFixed(1)}%</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">{formatFixed(data.leadPerformance.conversionRate)}%</p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
               <TrendingUp className="w-6 h-6 text-green-600" />
@@ -428,7 +436,7 @@ const LeadPerformanceReport: React.FC<{ data: AnalyticsData; formatCurrency: (va
         </div>
         <div className="p-4 bg-green-50 rounded-lg">
           <p className="text-sm font-medium text-gray-600">Conversion Rate</p>
-          <p className="text-3xl font-bold text-gray-900 mt-2">{data.leadPerformance.conversionRate.toFixed(1)}%</p>
+          <p className="text-3xl font-bold text-gray-900 mt-2">{formatFixed(data.leadPerformance.conversionRate)}%</p>
         </div>
         <div className="p-4 bg-purple-50 rounded-lg">
           <p className="text-sm font-medium text-gray-600">Avg Days to Conversion</p>
@@ -557,13 +565,13 @@ const SourceAnalysisReport: React.FC<{ data: AnalyticsData; formatCurrency: (val
                 </span>
               </div>
               <span className="text-sm font-bold text-gray-900">
-                {Number(source.conversionRate ?? 0).toFixed(1)}%
+                {formatFixed(source.conversionRate)}%
               </span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-3">
               <div 
                 className="bg-gradient-to-r from-green-400 to-green-600 h-3 rounded-full transition-all"
-                style={{ width: `${Math.min(source.conversionRate, 100)}%` }}
+                style={{ width: `${Math.min(toFiniteNumber(source.conversionRate), 100)}%` }}
               ></div>
             </div>
           </div>
@@ -616,11 +624,11 @@ const RepPerformanceReport: React.FC<{ data: AnalyticsData; formatCurrency: (val
                     <td className="py-3 px-4 text-sm text-right">
                       <span className={`
                         inline-block px-2 py-1 rounded-full text-xs font-semibold
-                        ${rep.conversionRate >= 30 ? 'bg-green-100 text-green-800' : 
-                          rep.conversionRate >= 20 ? 'bg-yellow-100 text-yellow-800' : 
+                        ${toFiniteNumber(rep.conversionRate) >= 30 ? 'bg-green-100 text-green-800' :
+                          toFiniteNumber(rep.conversionRate) >= 20 ? 'bg-yellow-100 text-yellow-800' :
                           'bg-red-100 text-red-800'}
                       `}>
-                        {Number(rep.conversionRate ?? 0).toFixed(1)}%
+                        {formatFixed(rep.conversionRate)}%
                       </span>
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-900 text-right font-semibold">
@@ -659,7 +667,7 @@ const RepPerformanceReport: React.FC<{ data: AnalyticsData; formatCurrency: (val
               <div className="mt-2">
                 <p className="text-lg font-bold text-gray-900">{topConverter.repName}</p>
                 <p className="text-sm text-gray-600">
-                  {Number(topConverter.conversionRate ?? 0).toFixed(1)}% conversion rate
+                  {formatFixed(topConverter.conversionRate)}% conversion rate
                 </p>
               </div>
             );
@@ -717,15 +725,15 @@ const AppointmentAnalyticsReport: React.FC<{ data: AnalyticsData }> = ({ data })
               <div className="w-full bg-gray-200 rounded-full h-8">
                 <div 
                   className="bg-gradient-to-r from-green-400 to-green-600 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold transition-all"
-                  style={{ width: `${appointmentAnalytics.appointmentShowRate}%` }}
+                  style={{ width: `${toFiniteNumber(appointmentAnalytics.appointmentShowRate)}%` }}
                 >
-                  {(appointmentAnalytics.appointmentShowRate ?? 0) > 10 && `${Number(appointmentAnalytics.appointmentShowRate ?? 0).toFixed(1)}%`}
+                  {toFiniteNumber(appointmentAnalytics.appointmentShowRate) > 10 && `${formatFixed(appointmentAnalytics.appointmentShowRate)}%`}
                 </div>
               </div>
             </div>
             <div className="text-right">
               <p className="text-3xl font-bold text-gray-900">
-                {Number(appointmentAnalytics.appointmentShowRate ?? 0).toFixed(1)}%
+                {formatFixed(appointmentAnalytics.appointmentShowRate)}%
               </p>
               <p className="text-sm text-gray-600">Show Rate</p>
             </div>

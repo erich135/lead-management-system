@@ -66,6 +66,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [showNewMachineForm, setShowNewMachineForm] = useState(false);
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
+  const showInlineMachineCreate = false;
   const [newMachine, setNewMachine] = useState({
     machineType: '',
     make: '',
@@ -2109,30 +2110,36 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                           </option>
                         ))}
                     </select>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingMachine(null);
-                        setNewMachine({
-                          machineType: '',
-                          make: '',
-                          model: '',
-                          serialNumber: '',
-                          machineHours: '',
-                          nextServiceHours: '',
-                          lastServiceDate: '',
-                          nextServiceDate: '',
-                        });
-                        setShowNewMachineForm(!showNewMachineForm);
-                      }}
-                      className="px-4 py-3 bg-ars-primary text-white rounded-[8px] hover:bg-ars-primary/90 transition-colors whitespace-nowrap flex-shrink-0 font-bold text-[14px] uppercase"
-                    >
-                      {showNewMachineForm ? 'CANCEL' : '+ NEW'}
-                    </button>
+                    {showInlineMachineCreate ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingMachine(null);
+                          setNewMachine({
+                            machineType: '',
+                            make: '',
+                            model: '',
+                            serialNumber: '',
+                            machineHours: '',
+                            nextServiceHours: '',
+                            lastServiceDate: '',
+                            nextServiceDate: '',
+                          });
+                          setShowNewMachineForm(!showNewMachineForm);
+                        }}
+                        className="px-4 py-3 bg-ars-primary text-white rounded-[8px] hover:bg-ars-primary/90 transition-colors whitespace-nowrap flex-shrink-0 font-bold text-[14px] uppercase"
+                      >
+                        {showNewMachineForm ? 'CANCEL' : '+ NEW'}
+                      </button>
+                    ) : (
+                      <p className="text-sm text-ars-body" role="note">
+                        New machines must be created from the Machines tab first. After creating the machine, return here and link it to the job.
+                      </p>
+                    )}
                   </div>
                   
                   {/* New Machine Form */}
-                  {showNewMachineForm && (
+                  {showNewMachineForm && (showInlineMachineCreate || editingMachine) && (
                     <div className="p-4 bg-gray-50 rounded-[8px] border border-gray-200 space-y-3">
                       <h4 className="font-semibold text-ars-heading">{editingMachine ? 'Edit Machine' : 'Add New Machine'}</h4>
                       <div className="grid grid-cols-2 gap-3">

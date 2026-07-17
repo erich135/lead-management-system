@@ -2729,12 +2729,14 @@ export async function uploadMachineRSR(
     body: formData,
   });
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'Failed to upload RSR document');
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.error?.message || data?.message || 'Failed to upload RSR document');
+  }
+  if (!data.data?.rsrDocument) {
+    throw new Error('RSR upload completed without returning a document');
   }
 
-  const data = await response.json();
   return data.data.rsrDocument;
 }
 
@@ -2762,7 +2764,13 @@ export async function uploadRSR(params: {
   tech?: string;
   hoursWorked?: number;
   comments?: string;
-}): Promise<{ rsrGroupId: string; documents: { machineId: string; rsrId: string }[] }> {
+}): Promise<{
+  rsrGroupId: string;
+  documents: { machineId: string; rsrId: string }[];
+  attachedCount: number;
+  targetMachineIds: string[];
+  rsrDocumentIds: string[];
+}> {
   const formData = new FormData();
   formData.append('file', params.file);
   formData.append('workDate', params.workDate);
@@ -2791,12 +2799,23 @@ export async function uploadRSR(params: {
     body: formData,
   });
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'Failed to upload RSR document');
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.error?.message || data?.message || 'Failed to upload RSR document');
+  }
+  if (
+    !data.data ||
+    !Array.isArray(data.data.documents) ||
+    !Array.isArray(data.data.targetMachineIds) ||
+    !Array.isArray(data.data.rsrDocumentIds) ||
+    !Number.isInteger(data.data.attachedCount)
+  ) {
+    throw new Error('RSR upload completed without attachment results');
+  }
+  if (data.data.attachedCount === 0) {
+    throw new Error('RSR file was saved but was not attached to any machine');
   }
 
-  const data = await response.json();
   return data.data;
 }
 

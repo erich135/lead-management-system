@@ -31,6 +31,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
   const [rentalMachines, setRentalMachines] = useState<Machine[]>([]);
   const [isRentalBranch, setIsRentalBranch] = useState(false);
   const [showNewMachineForm, setShowNewMachineForm] = useState(false);
+  const showInlineMachineCreate = false;
   const [newMachine, setNewMachine] = useState({
     make: '',
     model: '',
@@ -1216,19 +1217,25 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
                           <option value="" disabled>No machines found for this customer</option>
                         )}
                       </select>
-                      <button
-                        type="button"
-                        onClick={() => setShowNewMachineForm(!showNewMachineForm)}
-                        className="px-4 py-2.5 bg-ars-primary text-white rounded-[8px] hover:bg-ars-primary/90 transition-colors whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-1 sm:w-auto w-full"
-                      >
-                        <Plus className="w-4 h-4" />
-                        {showNewMachineForm ? 'Cancel' : 'New Machine'}
-                      </button>
+                      {showInlineMachineCreate ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowNewMachineForm(!showNewMachineForm)}
+                          className="px-4 py-2.5 bg-ars-primary text-white rounded-[8px] hover:bg-ars-primary/90 transition-colors whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-1 sm:w-auto w-full"
+                        >
+                          <Plus className="w-4 h-4" />
+                          {showNewMachineForm ? 'Cancel' : 'New Machine'}
+                        </button>
+                      ) : (
+                        <p className="text-sm text-ars-body" role="note">
+                          New machines must be created from the Machines tab first. After creating the machine, return here and link it to the job.
+                        </p>
+                      )}
                     </div>
                   )}
                   
                   {/* New Machine Form */}
-                  {showNewMachineForm && (
+                  {showNewMachineForm && showInlineMachineCreate && (
                     <div className="p-4 bg-gray-50 rounded-[8px] border border-gray-200 space-y-3">
                       <h4 className="font-semibold text-ars-heading text-sm">Add New Machine</h4>
                       <div className="grid grid-cols-2 gap-3">

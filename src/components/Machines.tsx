@@ -141,6 +141,7 @@ export function Machines() {
   const [jobRsrResults, setJobRsrResults] = useState<Job[]>([]);
   const [jobRsrSearching, setJobRsrSearching] = useState(false);
   const [jobRsrSelectedJob, setJobRsrSelectedJob] = useState<Job | null>(null);
+  const [jobRsrPinnedMachine, setJobRsrPinnedMachine] = useState<Machine | null>(null);
   const [jobRsrMachineIds, setJobRsrMachineIds] = useState<string[]>([]);
   const [jobRsrQuoteDate, setJobRsrQuoteDate] = useState('');
   const [jobRsrJobNumber, setJobRsrJobNumber] = useState('');
@@ -159,6 +160,7 @@ export function Machines() {
   const [jobRsrComments, setJobRsrComments] = useState('');
   const [jobRsrUploading, setJobRsrUploading] = useState(false);
   const [jobRsrError, setJobRsrError] = useState<string | null>(null);
+  const [jobRsrSuccess, setJobRsrSuccess] = useState<{ message: string; machineIds: string[] } | null>(null);
   const jobRsrFileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSort = (field: string) => {
@@ -584,6 +586,7 @@ export function Machines() {
     setJobRsrSearch('');
     setJobRsrResults([]);
     setJobRsrSelectedJob(null);
+    setJobRsrPinnedMachine(null);
     setJobRsrMachineIds([]);
     setJobRsrQuoteDate('');
     setJobRsrJobNumber('');
@@ -602,6 +605,12 @@ export function Machines() {
     setJobRsrComments('');
     setJobRsrError(null);
     if (jobRsrFileInputRef.current) jobRsrFileInputRef.current.value = '';
+  };
+
+  const openJobRSRModal = (machine?: Machine) => {
+    setJobRsrSuccess(null);
+    setJobRsrPinnedMachine(machine || null);
+    setShowJobRSRModal(true);
   };
 
   // Debounced job search
@@ -632,11 +641,17 @@ export function Machines() {
     try {
       // Fetch full job to get populated machine details.
       const { job: fullJob } = await getJob(job._id);
-      setJobRsrSelectedJob(fullJob);
       const ids = (fullJob.machines || [])
         .map((m: any) => (typeof m === 'string' ? m : m?._id))
         .filter(Boolean) as string[];
-      setJobRsrMachineIds(ids);
+      if (jobRsrPinnedMachine && !ids.includes(jobRsrPinnedMachine._id)) {
+        setJobRsrError(
+          `Job ${fullJob.jobNumber} is not linked to the expanded machine. Select a job that contains this machine.`,
+        );
+        return;
+      }
+      setJobRsrSelectedJob(fullJob);
+      setJobRsrMachineIds(jobRsrPinnedMachine ? [jobRsrPinnedMachine._id] : ids);
       // Pre-fill the technician from the job's bookings (still editable).
       const techNames = Array.from(
         new Set(
@@ -694,10 +709,19 @@ export function Machines() {
       setJobRsrError('Select at least one machine to receive the RSR');
       return;
     }
+    const expectedMachineIds = Array.from(new Set(jobRsrMachineIds));
+    if (
+      jobRsrPinnedMachine &&
+      (expectedMachineIds.length !== 1 || expectedMachineIds[0] !== jobRsrPinnedMachine._id)
+    ) {
+      setJobRsrError('The expanded machine is no longer the selected RSR target. Reopen the upload form and try again.');
+      return;
+    }
     setJobRsrUploading(true);
     setJobRsrError(null);
+    setJobRsrSuccess(null);
     try {
-      await uploadRSR({
+      const result = await uploadRSR({
         file: jobRsrFile,
         jobId: jobRsrSelectedJob._id,
         machineIds: jobRsrMachineIds,
@@ -719,12 +743,32 @@ export function Machines() {
         hoursWorked: jobRsrHoursWorked ? Number(jobRsrHoursWorked) : undefined,
         comments: jobRsrComments.trim() || undefined,
       });
+
       await loadMachines(pagination.page);
-      // Refresh the expanded machine's RSR list if it received a copy.
-      if (expandedMachineId && jobRsrMachineIds.includes(expandedMachineId)) {
+      // Refresh from the backend-confirmed target, not pre-request UI state.
+      if (expandedMachineId && result.targetMachineIds.includes(expandedMachineId)) {
         const rsrs = await getMachineRSRs(expandedMachineId);
         setMachineRSRs(rsrs);
       }
+
+      const attachedMachineIds = new Set(result.targetMachineIds);
+      const missingMachineIds = expectedMachineIds.filter((machineId) => !attachedMachineIds.has(machineId));
+      if (
+        result.attachedCount !== expectedMachineIds.length ||
+        result.documents.length !== expectedMachineIds.length ||
+        result.rsrDocumentIds.length !== expectedMachineIds.length ||
+        missingMachineIds.length > 0
+      ) {
+        setJobRsrError(
+          `RSR upload was incomplete: attached to ${result.attachedCount} of ${expectedMachineIds.length} selected machines. The upload form has been kept open.`,
+        );
+        return;
+      }
+
+      setJobRsrSuccess({
+        message: `RSR uploaded successfully to ${result.attachedCount} ${result.attachedCount === 1 ? 'machine' : 'machines'}.`,
+        machineIds: result.targetMachineIds,
+      });
       resetJobRSRModal();
     } catch (err: any) {
       setJobRsrError(err.message || 'Failed to upload RSR');
@@ -794,7 +838,7 @@ export function Machines() {
               </button>
             )}
             <button
-              onClick={() => setShowJobRSRModal(true)}
+              onClick={() => openJobRSRModal()}
               className="flex items-center justify-center gap-2 w-40 h-14 px-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 shadow-sm transition-all text-sm font-medium text-center leading-tight"
             >
               <Upload className="w-4 h-4 shrink-0" />
@@ -817,6 +861,13 @@ export function Machines() {
           </div>
         </div>
       </div>
+
+      {jobRsrSuccess && (
+        <div className="mb-6 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+          <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+          {jobRsrSuccess.message}
+        </div>
+      )}
 
       {/* Tabs */}
       {canVerifyReadings && (
@@ -1560,7 +1611,25 @@ export function Machines() {
                                 <span className="text-xs font-normal text-slate-400">({machineRSRs.length})</span>
                               )}
                             </h4>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openJobRSRModal(machine);
+                              }}
+                              className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700"
+                            >
+                              <Upload className="h-3.5 w-3.5" />
+                              Upload RSR
+                            </button>
                           </div>
+
+                          {jobRsrSuccess?.machineIds.includes(machine._id) && (
+                            <div className="mb-3 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+                              <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+                              {jobRsrSuccess.message}
+                            </div>
+                          )}
 
                           {loadingRSRs ? (
                             <div className="flex items-center justify-center py-6">
@@ -1774,7 +1843,7 @@ export function Machines() {
                   {/* Machines on the job */}
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Machines to update ({jobRsrMachineIds.length} selected)
+                      {jobRsrPinnedMachine ? 'Machine to update' : 'Machines to update'} ({jobRsrMachineIds.length} selected)
                     </label>
                     {(!jobRsrSelectedJob.machines || jobRsrSelectedJob.machines.length === 0) ? (
                       <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
@@ -1782,7 +1851,12 @@ export function Machines() {
                       </p>
                     ) : (
                       <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 max-h-48 overflow-y-auto">
-                        {(jobRsrSelectedJob.machines as any[]).map((m) => {
+                        {(jobRsrSelectedJob.machines as any[])
+                          .filter((m) => {
+                            const id = typeof m === 'string' ? m : m?._id;
+                            return !jobRsrPinnedMachine || id === jobRsrPinnedMachine._id;
+                          })
+                          .map((m) => {
                           const id = typeof m === 'string' ? m : m?._id;
                           const label = typeof m === 'string'
                             ? m
@@ -1792,7 +1866,10 @@ export function Machines() {
                               <input
                                 type="checkbox"
                                 checked={jobRsrMachineIds.includes(id)}
-                                onChange={() => toggleJobRsrMachine(id)}
+                                disabled={Boolean(jobRsrPinnedMachine)}
+                                onChange={() => {
+                                  if (!jobRsrPinnedMachine) toggleJobRsrMachine(id);
+                                }}
                                 className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
                               />
                               <span className="text-sm text-slate-700">{label}</span>
@@ -1802,7 +1879,9 @@ export function Machines() {
                       </div>
                     )}
                     <p className="text-xs text-slate-400 mt-1">
-                      Every selected machine receives a copy of this RSR.
+                      {jobRsrPinnedMachine
+                        ? 'This upload is pinned to the expanded machine.'
+                        : 'Every selected machine receives a copy of this RSR.'}
                     </p>
                   </div>
 

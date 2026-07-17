@@ -10,6 +10,7 @@ interface FixedFormField {
   machineFieldKey?: string;
   options?: string[];
   unit?: string;
+  companionField?: FixedFormField;
 }
 
 interface ChecklistItem {
@@ -130,7 +131,10 @@ export function GenericSectionReportDocument({
               <table className="w-full border-collapse border border-black text-[8px]">
                 <thead>
                   <tr>
-                    <th className={th} style={{ width: '60%' }}>Item</th>
+                    <th className={th} style={{ width: '45%' }}>Item</th>
+                    {section.fields?.some((field) => field.companionField) && (
+                      <th className={th} style={{ width: '25%' }}>Part Number</th>
+                    )}
                     <th className={th} style={{ width: '20%' }}>Yes</th>
                     <th className={th} style={{ width: '20%' }}>No</th>
                   </tr>
@@ -143,6 +147,11 @@ export function GenericSectionReportDocument({
                     return (
                       <tr key={field.id}>
                         <td className={cell}>{field.label}</td>
+                        {section.fields?.some((item) => item.companionField) && (
+                          <td className={cell}>
+                            {field.companionField ? resolver.resolve(field.companionField) : ''}
+                          </td>
+                        )}
                         <td className={`${cell} text-center`}>{isYes ? '✓' : ''}</td>
                         <td className={`${cell} text-center`}>{isNo ? '✓' : ''}</td>
                       </tr>

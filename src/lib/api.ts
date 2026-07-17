@@ -1299,6 +1299,7 @@ export async function getMachines(params?: {
   sortField?: 'make' | 'serialNumber' | 'customer' | 'machineHours';
   sortDir?: 'asc' | 'desc';
   ownershipType?: 'ars_rental' | 'customer' | '';
+  dbStatus?: 'active' | 'archived';
 }): Promise<{ machines: Machine[]; pagination: any }> {
   const queryParams = new URLSearchParams();
   if (params?.customerId) queryParams.append('customerId', params.customerId);
@@ -1308,6 +1309,7 @@ export async function getMachines(params?: {
   if (params?.sortField) queryParams.append('sortField', params.sortField);
   if (params?.sortDir) queryParams.append('sortDir', params.sortDir);
   if (params?.ownershipType) queryParams.append('ownershipType', params.ownershipType);
+  if (params?.dbStatus) queryParams.append('dbStatus', params.dbStatus);
   
   const query = queryParams.toString();
   return apiRequest(`/api/machines${query ? `?${query}` : ''}`);
@@ -1372,6 +1374,18 @@ export async function updateMachine(id: string, machineData: Partial<Machine>): 
   return apiRequest(`/api/machines/${id}`, {
     method: 'PUT',
     body: JSON.stringify(machineData),
+  });
+}
+
+/** Re-links an active or archived cash-customer machine to a customer record. */
+export async function relinkMachineToCustomer(
+  machineId: string,
+  customerId: string,
+  preserveAsLocation = true,
+): Promise<{ machine: Machine }> {
+  return apiRequest(`/api/machines/${machineId}/relink`, {
+    method: 'PUT',
+    body: JSON.stringify({ customerId, preserveAsLocation }),
   });
 }
 

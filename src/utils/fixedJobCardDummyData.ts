@@ -5,6 +5,7 @@ interface FixedFormField {
   label: string;
   type: string;
   options?: string[];
+  companionField?: FixedFormField;
 }
 
 interface ChecklistItem {
@@ -167,6 +168,13 @@ export function generateDummyJobCardPreviewData(
           type: field.type,
           value: dummyValueForField(field, fieldIndex++),
         });
+        if (field.companionField) {
+          fieldValues.push({
+            fieldId: field.companionField.id,
+            type: field.companionField.type,
+            value: `PN-${String(fieldIndex).padStart(4, '0')}`,
+          });
+        }
       }
     }
   }

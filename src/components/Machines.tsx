@@ -3,7 +3,7 @@ import {
   getMachines,
   createMachine,
   updateMachine,
-  deleteMachine,
+  relinkMachineToCustomer,
   getMachineRSRs,
   uploadRSR,
   getMachineRSRUrl,
@@ -58,6 +58,7 @@ import {
   Plus,
   ShieldAlert,
   QrCode,
+  Link,
 } from 'lucide-react';
 import { SmartDateInput } from './SmartDateInput';
 
@@ -73,7 +74,7 @@ export function Machines() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
-  const [ownershipFilter, setOwnershipFilter] = useState<'ars_rental' | 'customer' | ''>('ars_rental');
+  const [ownershipFilter, setOwnershipFilter] = useState<'ars_rental' | 'customer' | '' | 'archived'>('ars_rental');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [machineTypes, setMachineTypes] = useState<MachineType[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 0 });
@@ -86,8 +87,6 @@ export function Machines() {
 
   // Edit state
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
-  const [machineToDelete, setMachineToDelete] = useState<Machine | null>(null);
-  const [deletingMachine, setDeletingMachine] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Machine>>({});
   const [saving, setSaving] = useState(false);
   const [whatsAppTesting, setWhatsAppTesting] = useState(false);
@@ -163,6 +162,30 @@ export function Machines() {
   const [jobRsrSuccess, setJobRsrSuccess] = useState<{ message: string; machineIds: string[] } | null>(null);
   const jobRsrFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Re-link state (cash customer to proper customer)
+  const [relinkMachine, setRelinkMachine] = useState<Machine | null>(null);
+  const [relinkCustomerId, setRelinkCustomerId] = useState('');
+  const [relinkSaving, setRelinkSaving] = useState(false);
+  const [relinkError, setRelinkError] = useState<string | null>(null);
+
+  const handleRelink = async () => {
+    if (!relinkMachine || !relinkCustomerId) return;
+    setRelinkSaving(true);
+    setRelinkError(null);
+    try {
+      const response = await relinkMachineToCustomer(relinkMachine._id, relinkCustomerId);
+      setMachines(prev => prev.map(machine => (
+        machine._id === relinkMachine._id ? { ...machine, ...response.machine } : machine
+      )));
+      setRelinkMachine(null);
+      setRelinkCustomerId('');
+    } catch (err: any) {
+      setRelinkError(err.message || 'Failed to re-link machine');
+    } finally {
+      setRelinkSaving(false);
+    }
+  };
+
   const handleSort = (field: string) => {
     if (sortField === field) {
       setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -179,7 +202,11 @@ export function Machines() {
       const params: any = { page, limit: 50 };
       if (searchQuery.trim()) params.search = searchQuery.trim();
       if (customerFilter) params.customerId = customerFilter;
-      if (ownershipFilter) params.ownershipType = ownershipFilter;
+      if (ownershipFilter === 'archived') {
+        params.dbStatus = 'archived';
+      } else if (ownershipFilter) {
+        params.ownershipType = ownershipFilter;
+      }
       if (sortField) {
         params.sortField = sortField;
         params.sortDir = sortDir;
@@ -388,7 +415,11 @@ export function Machines() {
       const params: any = { page: 1, limit: 99999 };
       if (searchQuery.trim()) params.search = searchQuery.trim();
       if (customerFilter) params.customerId = customerFilter;
-      if (ownershipFilter) params.ownershipType = ownershipFilter;
+      if (ownershipFilter === 'archived') {
+        params.dbStatus = 'archived';
+      } else if (ownershipFilter) {
+        params.ownershipType = ownershipFilter;
+      }
       const response = await getMachines(params);
       const rows = response.machines || [];
 
@@ -532,21 +563,6 @@ export function Machines() {
     if (machine.cashCustomer) return 'cash';
     if (machine.isRental) return 'rental';
     return 'unknown';
-  };
-
-  const handleDeleteMachine = async () => {
-    if (!machineToDelete) return;
-    setDeletingMachine(true);
-    try {
-      await deleteMachine(machineToDelete._id);
-      setMachineToDelete(null);
-      setExpandedMachineId(null);
-      await loadMachines(pagination.page);
-    } catch (err: any) {
-      console.error('Failed to delete machine:', err);
-    } finally {
-      setDeletingMachine(false);
-    }
   };
 
   const handleOpenReportModal = async () => {
@@ -938,6 +954,16 @@ export function Machines() {
           >
             All Machines
           </button>
+          <button
+            onClick={() => setOwnershipFilter('archived')}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              ownershipFilter === 'archived'
+                ? 'bg-white text-amber-600 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Archived
+          </button>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3">
@@ -1043,7 +1069,14 @@ export function Machines() {
                     <div className="col-span-3 flex items-center gap-2.5">
                       <Cog className={`w-5 h-5 flex-shrink-0 ${isExpanded ? 'text-amber-600' : 'text-slate-400'}`} />
                       <div className="min-w-0">
-                        <div className="font-semibold text-slate-800 truncate">{machine.make} {machine.model}</div>
+                        <div className="font-semibold text-slate-800 truncate flex items-center gap-1.5">
+                          {machine.make} {machine.model}
+                          {machine.dbStatus === 'archived' && (
+                            <span className="text-[10px] font-medium text-amber-700 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                              Archived
+                            </span>
+                          )}
+                        </div>
                         {machine.assetNumber && (
                           <div className="text-xs text-slate-400">Asset: {machine.assetNumber}</div>
                         )}
@@ -1129,6 +1162,7 @@ export function Machines() {
                           <div className="flex items-center gap-2">
                             {!isEditing ? (
                               <>
+                              {machine.dbStatus !== 'archived' && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleEdit(machine); }}
                                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -1136,13 +1170,20 @@ export function Machines() {
                                 <Edit3 className="w-3.5 h-3.5" />
                                 Edit
                               </button>
-                              {isSuperAdmin && (
+                              )}
+                              {machine.cashCustomer && (
                                 <button
-                                  onClick={(e) => { e.stopPropagation(); setMachineToDelete(machine); }}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRelinkMachine(machine);
+                                    setRelinkCustomerId('');
+                                    setRelinkError(null);
+                                  }}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
+                                  title="Re-link this machine from a cash customer to a proper customer record"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                  Delete
+                                  <Link className="w-3.5 h-3.5" />
+                                  Re-Link
                                 </button>
                               )}
                               </>
@@ -2117,69 +2158,80 @@ export function Machines() {
         />
       )}
 
-      {/* Delete Machine Confirmation Modal */}
-      {machineToDelete && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60]" onClick={() => !deletingMachine && setMachineToDelete(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6">
-              {/* Header */}
-              <div className="flex items-center gap-3 mb-5">
-                <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Trash2 className="w-7 h-7 text-red-600" />
+      {/* Re-Link Machine Modal */}
+      {relinkMachine && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4"
+          onClick={() => !relinkSaving && setRelinkMachine(null)}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center">
+                  <Link className="w-5 h-5 text-amber-600" />
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">Delete Machine</h3>
-                  <p className="text-sm text-gray-500">This action cannot be undone</p>
-                </div>
+                <h2 className="text-lg font-bold text-slate-800">Re-Link Machine to Customer</h2>
               </div>
-
-              {/* Machine Info */}
-              <div className="mb-5 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <p className="font-semibold text-slate-800">{machineToDelete.make} {machineToDelete.model}</p>
-                <p className="text-sm text-slate-500 font-mono mt-0.5">S/N: {machineToDelete.serialNumber}</p>
-                {machineToDelete.assetNumber && <p className="text-sm text-slate-500">Asset: {machineToDelete.assetNumber}</p>}
+              <button
+                onClick={() => setRelinkMachine(null)}
+                disabled={relinkSaving}
+                className="p-1.5 hover:bg-slate-100 rounded-lg"
+              >
+                <X className="w-4 h-4 text-slate-500" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                <p className="text-xs font-semibold text-slate-500 uppercase mb-0.5">Machine</p>
+                <p className="font-semibold text-slate-800">{relinkMachine.make} {relinkMachine.model}</p>
+                <p className="text-xs text-slate-500 font-mono">S/N: {relinkMachine.serialNumber}</p>
               </div>
-
-              {/* Big Warning Banner */}
-              <div className="mb-6 bg-red-50 border-2 border-red-400 rounded-xl p-4">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-bold text-red-800 text-base mb-1">⚠ PERMANENT DELETION WARNING</p>
-                    <p className="text-sm text-red-700 mb-2">
-                      You are about to <strong>permanently delete</strong> this machine record. This will:
-                    </p>
-                    <ul className="text-sm text-red-700 space-y-1 list-none">
-                      <li>• Remove the machine from the system entirely</li>
-                      <li>• Delete all linked RSR documents</li>
-                      <li>• Break historical job references to this machine</li>
-                    </ul>
-                    <p className="text-sm font-bold text-red-800 mt-3">This cannot be reversed. Are you absolutely sure?</p>
-                  </div>
-                </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase mb-1">Currently assigned to cash customer</p>
+                <p className="text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                  {relinkMachine.cashCustomer}
+                </p>
+                <p className="text-xs text-slate-400 mt-1">
+                  The old cash customer is preserved as Current Location when that field is empty.
+                </p>
               </div>
-
-              {/* Actions */}
-              <div className="flex items-center gap-3 justify-end">
-                <button
-                  onClick={() => setMachineToDelete(null)}
-                  disabled={deletingMachine}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800 disabled:opacity-50 font-bold text-[14px] uppercase"
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
+                  Link to customer <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={relinkCustomerId}
+                  onChange={e => setRelinkCustomerId(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent"
                 >
-                  CANCEL
-                </button>
-                <button
-                  onClick={handleDeleteMachine}
-                  disabled={deletingMachine}
-                  className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-[14px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {deletingMachine ? (
-                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />DELETING...</>
-                  ) : (
-                    <><Trash2 className="w-4 h-4" />YES, DELETE MACHINE</>
-                  )}
-                </button>
+                  <option value="">Select a customer...</option>
+                  {customers.map(customer => (
+                    <option key={customer._id} value={customer._id}>
+                      {customer.name}
+                    </option>
+                  ))}
+                </select>
               </div>
+              {relinkError && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{relinkError}</p>
+              )}
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-200">
+              <button
+                onClick={() => setRelinkMachine(null)}
+                disabled={relinkSaving}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRelink}
+                disabled={relinkSaving || !relinkCustomerId}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
+              >
+                {relinkSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link className="w-4 h-4" />}
+                {relinkSaving ? 'Saving...' : 'Re-Link Machine'}
+              </button>
             </div>
           </div>
         </div>

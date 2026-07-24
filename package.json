@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "verify:sales-report-numbers": "node --experimental-strip-types scripts/verify-sales-report-numbers.ts"
   },
   "dependencies": {
     "@types/leaflet": "^1.9.21",

@@ -1,10 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getJob, updateJob, getMachinesByCustomer, createMachine, updateMachine, getTechnicians, getRepCodes, getCustomers, getActivities, getServiceDescriptions, getJobSources, getMachineTypes, deleteJob, uploadRSRDocument, getRSRDocuments, getRSRDocumentUrl, deleteRSRDocument, createJobNote, getJobNotes, uploadJobNoteAttachment, getJobNoteAttachmentUrl, deleteJobNote, type Job, type Status, type Branch, type Machine, type Technician, type RepCode, type Customer, type Activity, type ServiceDescription, type JobSource, type MachineType, type OverdueJob, type JobRSRDocument, type JobNote, type JobNoteAttachment } from '../lib/api';
+import { getJob, updateJob, getMachinesByCustomer, createMachine, updateMachine, getTechnicians, getRepCodes, getCustomers, getActivities, getServiceDescriptions, getJobSources, getMachineTypes, deleteJob, uploadRSRDocument, getRSRDocuments, getRSRDocumentUrl, createJobNote, getJobNotes, uploadJobNoteAttachment, getJobNoteAttachmentUrl, deleteJobNote, resolveCanonicalMachineSelections, type Job, type Status, type Branch, type Machine, type Technician, type RepCode, type Customer, type Activity, type ServiceDescription, type JobSource, type MachineType, type OverdueJob, type JobRSRDocument, type JobNote, type JobNoteAttachment } from '../lib/api';
 import { X, Edit, Save, Clock, User, Trash2, FileText, Paperclip, Upload, Download, Plus, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 import { HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
 import { SmartDateInput } from './SmartDateInput';
+import { isCanonicalMachineSelectable } from '../lib/canonicalMachines';
+import {
+  clearCommittedRSRUploadAttempt,
+  createResolvingMachineResolution,
+  createOrReuseRSRUploadAttempt,
+  entryForMachineReference,
+  machineResolutionMessage,
+  preserveMachineReferences,
+  retainRSRUploadOperation,
+  resolutionBlocksSubmission,
+  type MachineResolutionSnapshot,
+  type RSRUploadAttempt,
+} from '../lib/machineAssociationSafety';
 
 interface LeadDetailsProps {
   lead: Job;
@@ -61,6 +74,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   const [isEditing, setIsEditing] = useState(false);
   const [job, setJob] = useState<Job>(normalizeJob(initialLead));
   const [originalJobBeforeEdit, setOriginalJobBeforeEdit] = useState<Job | null>(null);
+  const [jobMachineResolution, setJobMachineResolution] = useState<MachineResolutionSnapshot<Machine> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
@@ -110,6 +124,8 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
   const [rsrVisibility, setRsrVisibility] = useState<'all' | 'private'>('all');
   const [rsrFile, setRsrFile] = useState<File | null>(null);
   const [uploadingRSR, setUploadingRSR] = useState(false);
+  const [rsrUploadAttempt, setRsrUploadAttempt] = useState<RSRUploadAttempt | null>(null);
+  const rsrUploadInFlightRef = useRef(false);
   const [rsrDragActive, setRsrDragActive] = useState(false);
   const [previewRSR, setPreviewRSR] = useState<JobRSRDocument | null>(null);
   const [showRSRPreview, setShowRSRPreview] = useState(false);
@@ -160,6 +176,15 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
     try {
       const response = await getJob(initialLead._id);
       const normalizedJob = normalizeJob(response.job);
+      const existingMachineIds = (normalizedJob.machines || [])
+        .map((machine) => typeof machine === 'string' ? machine : machine?._id)
+        .filter(Boolean) as string[];
+      setJobMachineResolution(createResolvingMachineResolution(existingMachineIds));
+      const machineResolution = await resolveCanonicalMachineSelections(normalizedJob.machines || []);
+      setJobMachineResolution(machineResolution);
+      const resolutionError = machineResolutionMessage(machineResolution);
+      if (resolutionError) setError(resolutionError);
+      normalizedJob.machines = preserveMachineReferences(normalizedJob.machines || [], machineResolution);
       // Ensure bookings array exists
       if (!normalizedJob.bookings) {
         normalizedJob.bookings = [];
@@ -323,35 +348,57 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
       return;
     }
 
+    let machineResolution: MachineResolutionSnapshot<Machine>;
+    try {
+      setJobMachineResolution(createResolvingMachineResolution((job.machines || [])
+        .map((machine) => typeof machine === 'string' ? machine : machine?._id)
+        .filter(Boolean)));
+      machineResolution = await resolveCanonicalMachineSelections(job.machines || []);
+    } catch (err: any) {
+      setError(`${err.message || 'Machine resolution failed'} Existing associations and the selected file were retained for retry.`);
+      return;
+    }
+    setJobMachineResolution(machineResolution);
+    const resolutionError = machineResolutionMessage(machineResolution);
+    if (resolutionError || resolutionBlocksSubmission(machineResolution) || machineResolution.machineIds.length === 0) {
+      setError(resolutionError || 'At least one resolved machine association is required before uploading an RSR.');
+      return;
+    }
+    if (rsrUploadInFlightRef.current) return;
+    const attempt = createOrReuseRSRUploadAttempt(rsrUploadAttempt, {
+      routeType: 'job_document',
+      file: rsrFile,
+      jobId: job._id,
+      targetMachineIds: machineResolution.machineIds,
+      metadata: { title: rsrTitle.trim(), visibility: rsrVisibility },
+    });
+    rsrUploadInFlightRef.current = true;
+    setRsrUploadAttempt(attempt);
     setUploadingRSR(true);
     setError(null);
     try {
-      await uploadRSRDocument(job._id, rsrFile, rsrTitle.trim(), rsrVisibility);
+      const result = await uploadRSRDocument(job._id, rsrFile, rsrTitle.trim(), rsrVisibility, {
+        attempt,
+        machineIds: machineResolution.machineIds,
+      });
+      const retainedAttempt = retainRSRUploadOperation(attempt, result.operationId);
+      setRsrUploadAttempt(retainedAttempt);
+      if (result.state !== 'COMMITTED') {
+        setError('RSR upload is pending recovery. Retry will use the same upload attempt.');
+        return;
+      }
       await loadRSRDocuments();
+      setRsrUploadAttempt(clearCommittedRSRUploadAttempt(retainedAttempt, result.state));
       setShowRSRUpload(false);
       setRsrTitle('');
       setRsrFile(null);
       setRsrVisibility('all');
       onUpdate();
     } catch (err: any) {
-      setError(err.message || 'Failed to upload RSR document');
+      setError(`${err.message || 'Failed to upload RSR document'} The selected file, targets, and upload attempt were retained for retry.`);
     } finally {
+      rsrUploadInFlightRef.current = false;
       setUploadingRSR(false);
-    }
-  }
-
-  /**
-   * Handles deleting an RSR document (super admin only).
-   */
-  async function handleDeleteRSR(documentId: string) {
-    if (!window.confirm('Are you sure you want to delete this RSR document?')) return;
-
-    try {
-      await deleteRSRDocument(documentId);
-      await loadRSRDocuments();
-      onUpdate();
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete RSR document');
     }
   }
 
@@ -816,6 +863,20 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
         payload.machines = payload.machines.map((m: any) => 
           typeof m === 'object' && m !== null ? m._id : m
         ).filter(Boolean);
+        setJobMachineResolution(createResolvingMachineResolution(payload.machines));
+        const machineResolution = await resolveCanonicalMachineSelections(payload.machines);
+        setJobMachineResolution(machineResolution);
+        const resolutionError = machineResolutionMessage(machineResolution);
+        if (resolutionError || resolutionBlocksSubmission(machineResolution)) {
+          setError(resolutionError || 'One or more selected machines could not be resolved safely.');
+          setLoading(false);
+          return;
+        }
+        payload.machines = machineResolution.machineIds;
+        setJob((current) => ({
+          ...current,
+          machines: preserveMachineReferences(current.machines || [], machineResolution),
+        }));
       }
       // Explicitly handle date fields - ensure undefined/null dates are sent as null to clear them
       const dateFields = ['startDate', 'registerDate', 'dateBooked', 'dateQuoted', 'poDate', 'invoiceDate'];
@@ -2000,7 +2061,27 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                         const machine = typeof machineRef === 'object' && machineRef !== null
                           ? machineRef
                           : machines.find(m => m._id === machineRef);
-                        if (!machine) return null;
+                        if (!machine) {
+                          const originalMachineId = typeof machineRef === 'string' ? machineRef : machineRef?._id;
+                          const resolution = entryForMachineReference(jobMachineResolution, machineRef);
+                          const invalid = resolution?.status === 'UNRESOLVED_INVALID';
+                          const resolving = resolution?.status === 'RESOLVING';
+                          return (
+                            <div key={originalMachineId || index} className="p-3 bg-amber-50 rounded-lg border border-amber-200 flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="font-semibold text-amber-900">{invalid ? 'Invalid machine association' : resolving ? 'Resolving machine association' : 'Machine resolution failed; retry required'}</div>
+                                <div className="text-xs text-amber-800 break-all">Stored machine ID: {originalMachineId}</div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setJob({ ...job, machines: (job.machines || []).filter((entry) => (typeof entry === 'string' ? entry : entry._id) !== originalMachineId) })}
+                                className="px-2 py-1 text-red-600 hover:bg-red-50 rounded transition-colors font-bold text-[14px] uppercase"
+                              >
+                                REMOVE
+                              </button>
+                            </div>
+                          );
+                        }
                         
                         // Auto-detect service type from Make or machineType field if not explicitly set
                         const makeLC = (machine.make || '').toLowerCase();
@@ -2084,6 +2165,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                   <div className="flex gap-2">
                     <select
                       value=""
+                      aria-label="Add machine to job"
                       onChange={(e) => {
                         if (e.target.value) {
                           const currentMachines = Array.isArray(job.machines) ? job.machines : [];
@@ -2099,7 +2181,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       <option value="">Select Machine to Add</option>
                       {machines
                         .filter(m => {
-                          if (!m.isActive) return false;
+                          if (!isCanonicalMachineSelectable(m)) return false;
                           const currentMachines = Array.isArray(job.machines) ? job.machines : [];
                           const machineIds = currentMachines.map(m => typeof m === 'object' && m !== null ? m._id : m).filter(Boolean);
                           return !machineIds.includes(m._id);
@@ -2267,7 +2349,18 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       const machine = typeof machineRef === 'object' && machineRef !== null
                         ? machineRef
                         : machines.find(m => m._id === machineRef);
-                      if (!machine) return null;
+                      if (!machine) {
+                        const originalMachineId = typeof machineRef === 'string' ? machineRef : machineRef?._id;
+                        const resolution = entryForMachineReference(jobMachineResolution, machineRef);
+                        const invalid = resolution?.status === 'UNRESOLVED_INVALID';
+                        const resolving = resolution?.status === 'RESOLVING';
+                        return (
+                          <div key={originalMachineId || index} className="px-4 py-3 bg-amber-50 rounded-[8px] border border-amber-200">
+                            <div className="font-semibold text-amber-900">{invalid ? 'Invalid machine association' : resolving ? 'Resolving machine association' : 'Machine resolution failed temporarily'}</div>
+                            <div className="text-sm text-amber-800 break-all">Stored machine ID retained: {originalMachineId}</div>
+                          </div>
+                        );
+                      }
                       return (
                         <div key={machine._id || index} className="px-4 py-3 bg-gray-50 rounded-[8px] border border-gray-200">
                           <div className="space-y-1">
@@ -2411,16 +2504,6 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                         >
                           <Download className="w-4 h-4" />
                         </a>
-                        {isSuperAdmin && (
-                          <button
-                            onClick={() => handleDeleteRSR(doc._id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete"
-                            type="button"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
                       </div>
                     </div>
                   );

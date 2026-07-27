@@ -14,6 +14,22 @@ export type {
   CanvassingPlan,
   CanvassingPlanStatus,
 } from '../types';
+import {
+  buildCanonicalMachineHistoryEndpoint,
+  type MachineHistoryIdentity,
+  type MachineHistorySection,
+} from './machineActivityHistory';
+import { canonicalMachineOptions } from './canonicalMachines';
+import {
+  classifyApiFailure,
+  createMachineResolutionSnapshot,
+  machineResolutionStatusForFailure,
+  rsrUploadAttemptHeaders,
+  type ApiFailureKind,
+  type MachineResolutionEntry,
+  type MachineResolutionSnapshot,
+  type RSRUploadAttempt,
+} from './machineAssociationSafety';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
@@ -28,6 +44,19 @@ interface ApiResponse<T> {
     stack?: string;
   };
   message?: string;
+}
+
+/** Narrow typed error surface for machine resolution and RSR retry callers. */
+export class ApiRequestError extends Error {
+  readonly kind: ApiFailureKind;
+  readonly status?: number;
+
+  constructor(message: string, options: { kind: ApiFailureKind; status?: number }) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.kind = options.kind;
+    this.status = options.status;
+  }
 }
 
 /**
@@ -152,10 +181,18 @@ async function apiRequest<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (error) {
+    throw new ApiRequestError(
+      error instanceof Error && error.message ? error.message : 'Network request failed',
+      { kind: 'transient' },
+    );
+  }
 
   // Try to parse JSON response
   let data: ApiResponse<T>;
@@ -188,7 +225,10 @@ async function apiRequest<T>(
   // Check if request was successful
   if (!response.ok || !data.success) {
     const errorMessage = data.error?.message || data.message || 'An error occurred';
-    throw new Error(errorMessage);
+    throw new ApiRequestError(errorMessage, {
+      kind: response.ok ? 'malformed' : classifyApiFailure({ status: response.status }),
+      status: response.status,
+    });
   }
 
   // If there's a data property, return it; otherwise return the response (for message-only responses)
@@ -574,9 +614,10 @@ export async function getDiaryJobs(params?: {
  * Creates a new job.
  */
 export async function createJob(jobData: Partial<Job>): Promise<{ job: Job }> {
+  const canonicalJobData = await canonicalizeJobMachinePayload(jobData);
   return apiRequest('/api/jobs', {
     method: 'POST',
-    body: JSON.stringify(jobData),
+    body: JSON.stringify(canonicalJobData),
   });
 }
 
@@ -584,9 +625,10 @@ export async function createJob(jobData: Partial<Job>): Promise<{ job: Job }> {
  * Updates a job.
  */
 export async function updateJob(id: string, jobData: Partial<Job>): Promise<{ job: Job }> {
+  const canonicalJobData = await canonicalizeJobMachinePayload(jobData);
   return apiRequest(`/api/jobs/${id}`, {
     method: 'PUT',
-    body: JSON.stringify(jobData),
+    body: JSON.stringify(canonicalJobData),
   });
 }
 
@@ -750,6 +792,11 @@ export interface Machine {
   yearOfManufacture?: number;
   isActive: boolean;
   dbStatus?: string;
+  /** Deduplication metadata returned only for legacy/stale machine records. */
+  mergeStatus?: 'merged';
+  redirectStatus?: 'redirected';
+  isReadOnly?: boolean;
+  canonicalMachineId?: string;
   rsrDocuments?: MachineRSR[];
   /** Count of RSR documents attached via a job referencing this machine. */
   jobRSRDocumentsCount?: number;
@@ -1312,14 +1359,78 @@ export async function getMachines(params?: {
   if (params?.dbStatus) queryParams.append('dbStatus', params.dbStatus);
   
   const query = queryParams.toString();
-  return apiRequest(`/api/machines${query ? `?${query}` : ''}`);
+  const response = await apiRequest<{ machines: Machine[]; pagination: any }>(`/api/machines${query ? `?${query}` : ''}`);
+  // The explicit archived view is an audit/history surface, not a normal
+  // selectable-machine result. Preserve its existing backend contract.
+  return {
+    ...response,
+    machines: params?.dbStatus === 'archived'
+      ? (response.machines || [])
+      : canonicalMachineOptions(response.machines || []),
+  };
 }
 
 /**
  * Gets a single machine by ID.
  */
-export async function getMachine(id: string): Promise<{ machine: Machine }> {
+export async function getMachine(id: string): Promise<{ machine: Machine; redirectedFromMachineId?: string }> {
   return apiRequest(`/api/machines/${id}`);
+}
+
+export interface CanonicalMachineSelectionResolution extends MachineResolutionSnapshot<Machine> {}
+
+/**
+ * Resolves a small set of current form selections through the direct backend
+ * endpoint. This is deliberately not used for paginated lists: list APIs are
+ * already canonical-only and must retain their pagination behaviour.
+ */
+export async function resolveCanonicalMachineSelections(
+  machineIds: Array<Machine | string | null | undefined>,
+): Promise<CanonicalMachineSelectionResolution> {
+  const requestedIds = Array.from(new Set(machineIds
+    .map((machine) => typeof machine === 'string' ? machine : machine?._id)
+    .filter((machineId): machineId is string => Boolean(machineId))));
+  const entries = await Promise.all(requestedIds.map(async (requestedId): Promise<MachineResolutionEntry<Machine>> => {
+    try {
+      const response = await getMachine(requestedId);
+      const machine = response?.machine;
+      if (!machine || canonicalMachineOptions([machine]).length !== 1) {
+        return {
+          originalMachineId: requestedId,
+          status: 'UNRESOLVED_TRANSIENT',
+          failureKind: 'malformed',
+        };
+      }
+      const redirectedFromMachineId = response.redirectedFromMachineId
+        || (machine._id !== requestedId ? requestedId : undefined);
+      return {
+        originalMachineId: requestedId,
+        status: redirectedFromMachineId ? 'RESOLVED_CANONICAL' : 'RESOLVED',
+        machine,
+        canonicalMachineId: machine._id,
+        redirectedFromMachineId,
+      };
+    } catch (error) {
+      return {
+        originalMachineId: requestedId,
+        status: machineResolutionStatusForFailure(error),
+        failureKind: classifyApiFailure(error),
+      };
+    }
+  }));
+
+  return createMachineResolutionSnapshot(entries);
+}
+
+async function canonicalizeJobMachinePayload(jobData: Partial<Job>): Promise<Partial<Job>> {
+  if (!Array.isArray(jobData.machines)) return jobData;
+
+  const resolution = await resolveCanonicalMachineSelections(jobData.machines);
+  if (resolution.unresolvedMachineIds.length > 0) {
+    throw new Error('One or more selected machines could not be resolved safely. Refresh the machine selection and try again.');
+  }
+
+  return { ...jobData, machines: resolution.machineIds };
 }
 
 /**
@@ -1327,10 +1438,12 @@ export async function getMachine(id: string): Promise<{ machine: Machine }> {
  */
 export async function getMachinesByCustomer(customerId?: string, cashCustomer?: string): Promise<{ machines: Machine[] }> {
   if (cashCustomer) {
-    return apiRequest(`/api/machines/cash-customer/${encodeURIComponent(cashCustomer)}`);
+    const response = await apiRequest<{ machines: Machine[] }>(`/api/machines/cash-customer/${encodeURIComponent(cashCustomer)}`);
+    return { ...response, machines: canonicalMachineOptions(response.machines || []) };
   }
   if (customerId) {
-    return apiRequest(`/api/machines/customer/${customerId}`);
+    const response = await apiRequest<{ machines: Machine[] }>(`/api/machines/customer/${customerId}`);
+    return { ...response, machines: canonicalMachineOptions(response.machines || []) };
   }
   throw new Error('Either customerId or cashCustomer must be provided');
 }
@@ -1342,7 +1455,8 @@ export async function getRentalMachines(search?: string): Promise<{ machines: Ma
   const queryParams = new URLSearchParams();
   if (search) queryParams.append('search', search);
   const query = queryParams.toString();
-  return apiRequest(`/api/machines/rental${query ? `?${query}` : ''}`);
+  const response = await apiRequest<{ machines: Machine[] }>(`/api/machines/rental${query ? `?${query}` : ''}`);
+  return { ...response, machines: canonicalMachineOptions(response.machines || []) };
 }
 
 /**
@@ -2334,38 +2448,44 @@ export async function getActivities(params?: {
 }
 
 /**
+ * Gets the complete canonical-machine activity history for one requested
+ * machine ID. The backend resolves retired and triplicate machine history.
+ */
+export interface MachineHistoryRecord {
+  id: string;
+  type: string;
+  occurredAt: string | null;
+  record: Record<string, unknown>;
+  provenance: Record<string, unknown> & { machineIds: string[] };
+  file?: Record<string, unknown>;
+}
+
+export interface CanonicalMachineHistoryData {
+  requestedMachineId: string;
+  canonicalMachineId: string;
+  resolvedFromRetired: boolean;
+  canonicalIdentity?: MachineHistoryIdentity;
+  groupIdentities: MachineHistoryIdentity[];
+  section: MachineHistorySection;
+  records: MachineHistoryRecord[];
+  pagination: { page: number; limit: number; total: number; hasMore: boolean };
+}
+
+/** Gets one paginated, read-only section of canonical machine history. */
+export async function getCanonicalMachineHistory(
+  machineId: string,
+  params: { section: MachineHistorySection; page: number; limit: number },
+): Promise<CanonicalMachineHistoryData> {
+  return apiRequest<CanonicalMachineHistoryData>(
+    buildCanonicalMachineHistoryEndpoint(machineId, params.section, params.page, params.limit),
+  );
+}
+
+/**
  * Gets a single activity by ID.
  */
 export async function getActivity(id: string): Promise<{ activity: Activity }> {
   return apiRequest<{ activity: Activity }>(`/api/activities/${id}`);
-}
-
-/**
- * Logs a view activity from the frontend.
- * This is a helper function to log page views and other view actions.
- */
-export async function logViewActivity(
-  action: string,
-  resourceType: string,
-  description: string,
-  resourceId?: string,
-  metadata?: Record<string, any>
-): Promise<void> {
-  try {
-    await apiRequest('/api/activities/log', {
-      method: 'POST',
-      body: JSON.stringify({
-        action,
-        resourceType,
-        resourceId,
-        description,
-        metadata,
-      }),
-    });
-  } catch (error) {
-    // Silently fail - activity logging should not break the app
-    console.error('Failed to log view activity:', error);
-  }
 }
 
 /**
@@ -2651,36 +2771,78 @@ export interface SupportTicketFull {
   updatedAt: string;
 }
 
-/**
- * Upload RSR document for a job.
- */
+export type RSRUploadOperationState = 'PREPARED' | 'FILE_STORED' | 'COMMITTED' | 'RECOVERY_REQUIRED';
+
+export interface RSRUploadOperationResult {
+  operationId: string;
+  state: RSRUploadOperationState;
+  idempotentReplay?: boolean;
+}
+
+function rsrUploadHeaders(attempt?: RSRUploadAttempt): Record<string, string> {
+  const token = getAuthToken();
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...rsrUploadAttemptHeaders(attempt),
+  };
+}
+
+async function postRSRUpload<T>(
+  endpoint: string,
+  formData: FormData,
+  attempt?: RSRUploadAttempt,
+): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'POST',
+      headers: rsrUploadHeaders(attempt),
+      body: formData,
+    });
+  } catch (error) {
+    throw new ApiRequestError(
+      error instanceof Error && error.message ? error.message : 'Network request failed',
+      { kind: 'transient' },
+    );
+  }
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.success) {
+    throw new ApiRequestError(
+      data?.error?.message || data?.message || 'Failed to upload RSR document',
+      {
+        kind: response.ok ? 'malformed' : classifyApiFailure({ status: response.status }),
+        status: response.status,
+      },
+    );
+  }
+  return data.data as T;
+}
+
+/** Upload RSR document for a job with an optional sealed target set and retry identity. */
 export async function uploadRSRDocument(
   jobId: string,
   file: File,
   title: string,
-  visibility: 'all' | 'private' = 'all'
-): Promise<JobRSRDocument> {
+  visibility: 'all' | 'private' = 'all',
+  options: { attempt?: RSRUploadAttempt; machineIds?: string[] } = {},
+): Promise<RSRUploadOperationResult & { rsrDocument: JobRSRDocument }> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('title', title);
   formData.append('visibility', visibility);
-
-  const token = getAuthToken();
-  const response = await fetch(`${API_BASE_URL}/api/jobs/${jobId}/rsr-documents`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || 'Failed to upload RSR document');
+  if (options.machineIds) {
+    const resolution = await resolveCanonicalMachineSelections(options.machineIds);
+    if (resolution.unresolvedMachineIds.length > 0 || resolution.machineIds.length === 0) {
+      throw new ApiRequestError('One or more intended machines could not be resolved safely.', { kind: 'validation' });
+    }
+    formData.append('machineIds', JSON.stringify(resolution.machineIds));
   }
-
-  const data = await response.json();
-  return data.data.rsrDocument;
+  const data = await postRSRUpload<RSRUploadOperationResult & { rsrDocument: JobRSRDocument }>(`/api/jobs/${jobId}/rsr-documents`, formData, options.attempt);
+  if (!data?.operationId || !data?.state || !data?.rsrDocument) {
+    throw new ApiRequestError('RSR upload completed without a durable operation result.', { kind: 'malformed' });
+  }
+  return data;
 }
 
 /**
@@ -2700,12 +2862,13 @@ export function getRSRDocumentUrl(documentId: string): string {
 }
 
 /**
- * Delete RSR document (super admin only).
+ * @deprecated RSR records are retained for audit and historical integrity.
+ * The frontend intentionally exposes no deletion flow and the backend rejects
+ * this legacy operation before performing any storage or metadata change.
  */
-export async function deleteRSRDocument(documentId: string): Promise<void> {
-  await apiRequest(`/api/rsr-documents/${documentId}`, {
-    method: 'DELETE',
-  });
+export async function deleteRSRDocument(_documentId: string): Promise<never> {
+  void _documentId;
+  throw new Error('RSR deletion is unavailable. RSR records are retained for audit and historical integrity.');
 }
 
 // ============================================================================
@@ -2725,8 +2888,14 @@ export async function uploadMachineRSR(
     currentHours?: number;
     nextServiceHours?: number;
     nextServiceDate?: string;
+  },
+  attempt?: RSRUploadAttempt,
+): Promise<RSRUploadOperationResult & { rsrDocument: MachineRSR }> {
+  const resolution = await resolveCanonicalMachineSelections([machineId]);
+  if (resolution.unresolvedMachineIds.length > 0 || resolution.machineIds.length !== 1) {
+    throw new Error('The selected machine could not be resolved safely. Refresh the machine selection and try again.');
   }
-): Promise<MachineRSR> {
+  const canonicalMachineId = resolution.machineIds[0];
   const formData = new FormData();
   formData.append('file', file);
   formData.append('title', title);
@@ -2736,22 +2905,11 @@ export async function uploadMachineRSR(
   if (extraFields?.nextServiceHours !== undefined) formData.append('nextServiceHours', String(extraFields.nextServiceHours));
   if (extraFields?.nextServiceDate) formData.append('nextServiceDate', extraFields.nextServiceDate);
 
-  const token = getAuthToken();
-  const response = await fetch(`${API_BASE_URL}/api/machines/${machineId}/rsr`, {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-  });
-
-  const data = await response.json().catch(() => null);
-  if (!response.ok || !data?.success) {
-    throw new Error(data?.error?.message || data?.message || 'Failed to upload RSR document');
+  const data = await postRSRUpload<RSRUploadOperationResult & { rsrDocument: MachineRSR }>(`/api/machines/${canonicalMachineId}/rsr`, formData, attempt);
+  if (!data?.operationId || !data?.state || !data?.rsrDocument) {
+    throw new ApiRequestError('RSR upload completed without a durable operation result.', { kind: 'malformed' });
   }
-  if (!data.data?.rsrDocument) {
-    throw new Error('RSR upload completed without returning a document');
-  }
-
-  return data.data.rsrDocument;
+  return data;
 }
 
 /**
@@ -2778,21 +2936,31 @@ export async function uploadRSR(params: {
   tech?: string;
   hoursWorked?: number;
   comments?: string;
+  attempt?: RSRUploadAttempt;
 }): Promise<{
+  operationId: string;
+  state: RSRUploadOperationState;
+  idempotentReplay?: boolean;
   rsrGroupId: string;
   documents: { machineId: string; rsrId: string }[];
   attachedCount: number;
   targetMachineIds: string[];
   rsrDocumentIds: string[];
 }> {
+  const machineResolution = params.machineIds
+    ? await resolveCanonicalMachineSelections(params.machineIds)
+    : null;
+  if (machineResolution && (machineResolution.unresolvedMachineIds.length > 0 || machineResolution.machineIds.length === 0)) {
+    throw new ApiRequestError('One or more intended machines could not be resolved safely.', { kind: 'validation' });
+  }
   const formData = new FormData();
   formData.append('file', params.file);
   formData.append('workDate', params.workDate);
   if (params.title) formData.append('title', params.title);
   if (params.description) formData.append('description', params.description);
   if (params.jobId) formData.append('jobId', params.jobId);
-  if (params.machineIds && params.machineIds.length > 0)
-    formData.append('machineIds', JSON.stringify(params.machineIds));
+  if (machineResolution)
+    formData.append('machineIds', JSON.stringify(machineResolution.machineIds));
   if (params.currentHours !== undefined) formData.append('currentHours', String(params.currentHours));
   if (params.nextServiceHours !== undefined) formData.append('nextServiceHours', String(params.nextServiceHours));
   if (params.nextServiceDate) formData.append('nextServiceDate', params.nextServiceDate);
@@ -2806,31 +2974,40 @@ export async function uploadRSR(params: {
   if (params.hoursWorked !== undefined) formData.append('hoursWorked', String(params.hoursWorked));
   if (params.comments) formData.append('comments', params.comments);
 
-  const token = getAuthToken();
-  const response = await fetch(`${API_BASE_URL}/api/machines/rsr`, {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-  });
-
-  const data = await response.json().catch(() => null);
-  if (!response.ok || !data?.success) {
-    throw new Error(data?.error?.message || data?.message || 'Failed to upload RSR document');
-  }
+  const data = await postRSRUpload<{
+    operationId?: string;
+    state?: RSRUploadOperationState;
+    idempotentReplay?: boolean;
+    rsrGroupId?: string;
+    documents?: { machineId: string; rsrId: string }[];
+    attachedCount?: number;
+    targetMachineIds?: string[];
+    rsrDocumentIds?: string[];
+  }>('/api/machines/rsr', formData, params.attempt);
   if (
-    !data.data ||
-    !Array.isArray(data.data.documents) ||
-    !Array.isArray(data.data.targetMachineIds) ||
-    !Array.isArray(data.data.rsrDocumentIds) ||
-    !Number.isInteger(data.data.attachedCount)
+    !data?.operationId ||
+    !data?.state ||
+    !Array.isArray(data.documents) ||
+    !Array.isArray(data.targetMachineIds) ||
+    !Array.isArray(data.rsrDocumentIds) ||
+    !Number.isInteger(data.attachedCount)
   ) {
-    throw new Error('RSR upload completed without attachment results');
+    throw new ApiRequestError('RSR upload completed without attachment results.', { kind: 'malformed' });
   }
-  if (data.data.attachedCount === 0) {
-    throw new Error('RSR file was saved but was not attached to any machine');
+  if (data.attachedCount === 0) {
+    throw new ApiRequestError('RSR file was saved but was not attached to any machine.', { kind: 'malformed' });
   }
 
-  return data.data;
+  return data as {
+    operationId: string;
+    state: RSRUploadOperationState;
+    idempotentReplay?: boolean;
+    rsrGroupId: string;
+    documents: { machineId: string; rsrId: string }[];
+    attachedCount: number;
+    targetMachineIds: string[];
+    rsrDocumentIds: string[];
+  };
 }
 
 /**
@@ -2869,12 +3046,13 @@ export function getMachineRSRUrl(machineId: string, rsrId: string): string {
 }
 
 /**
- * Delete RSR document from a machine (super admin only).
+ * @deprecated RSR records are retained for audit and historical integrity.
+ * Kept as a fail-closed compatibility export for legacy callers only.
  */
-export async function deleteMachineRSR(machineId: string, rsrId: string): Promise<void> {
-  await apiRequest(`/api/machines/${machineId}/rsr/${rsrId}`, {
-    method: 'DELETE',
-  });
+export async function deleteMachineRSR(_machineId: string, _rsrId: string): Promise<never> {
+  void _machineId;
+  void _rsrId;
+  throw new Error('RSR deletion is unavailable. RSR records are retained for audit and historical integrity.');
 }
 
 /**

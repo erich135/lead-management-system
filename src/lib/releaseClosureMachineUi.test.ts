@@ -73,7 +73,15 @@ test('the canonical consolidation banner appears only behind confirmed metadata'
   assert.match(machinesSource, /Find canonical machine/);
 });
 
-test('RSR editing controls remain out of scope', () => {
-  assert.doesNotMatch(machinesSource, /Edit RSR/);
+test('RSR editing is limited to authorised machine metadata corrections', () => {
+  // ARS-RSR-EDIT-001 introduced a metadata-only correction control on the
+  // machine RSR list. It stays out of scope everywhere else.
   assert.doesNotMatch(leadDetailsSource, /Edit RSR/);
+
+  assert.match(machinesSource, /title="Edit RSR details"/);
+  assert.match(machinesSource, /canEditRSRMetadata\(rsr, isReadOnlyMachine\)/);
+  // Editing must never become deletion or file replacement.
+  assert.doesNotMatch(machinesSource, /handleDeleteRSR/);
+  assert.doesNotMatch(machinesSource, /deleteMachineRSR/);
+  assert.doesNotMatch(machinesSource, /replaceFile|replaceRSR/i);
 });

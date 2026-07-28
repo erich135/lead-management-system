@@ -30,6 +30,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { MachineQrPanel } from './MachineQrPanel';
 import { MachineActivityHistory } from './MachineActivityHistory';
+import { MachineRSRMetadataEditModal } from './MachineRSRMetadataEditModal';
 import { PendingMachineReadings } from './PendingMachineReadings';
 import { UnifiedMachineImport } from './UnifiedMachineImport';
 import {
@@ -86,6 +87,7 @@ export function Machines() {
   // Top-level tab inside the Machines page
   const [activeTab, setActiveTab] = useState<'list' | 'verify'>('list');
   const canVerifyReadings = isSuperAdmin || hasPermission('machines.verifyReadings');
+  const canManageMachines = isSuperAdmin || hasPermission('machines.manage');
 
   // Machine list state
   const [machines, setMachines] = useState<Machine[]>([]);
@@ -119,6 +121,9 @@ export function Machines() {
   // Preview state
   const [previewRSR, setPreviewRSR] = useState<{ rsr: MachineRSR; context: MachineActionContext } | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+
+  // RSR metadata correction state
+  const [editingRSR, setEditingRSR] = useState<{ rsr: MachineRSR; context: MachineActionContext } | null>(null);
 
   // Report generation state
   const [showReportModal, setShowReportModal] = useState(false);
@@ -554,6 +559,29 @@ export function Machines() {
   const handleViewRSR = (rsr: MachineRSR, context: MachineActionContext) => {
     setPreviewRSR({ rsr, context });
     setShowPreview(true);
+  };
+
+  // Only machine-native RSRs carry correctable report metadata, and a retired
+  // machine row is never a write target.
+  const canEditRSRMetadata = (rsr: MachineRSR, isReadOnlyMachine: boolean) =>
+    canManageMachines && !isReadOnlyMachine && rsr.source !== 'job';
+
+  const handleEditRSR = (rsr: MachineRSR, context: MachineActionContext) => {
+    setEditingRSR({ rsr, context });
+  };
+
+  const handleRSRMetadataSaved = (updated: MachineRSR) => {
+    setMachineRSRs((current) =>
+      current.map((candidate) =>
+        candidate._id === updated._id ? { ...candidate, ...updated } : candidate,
+      ),
+    );
+    setPreviewRSR((current) =>
+      current && current.rsr._id === updated._id
+        ? { ...current, rsr: { ...current.rsr, ...updated } }
+        : current,
+    );
+    setEditingRSR(null);
   };
 
   const getPreviewUrl = ({ rsr, context }: { rsr: MachineRSR; context: MachineActionContext }) => {
@@ -1860,6 +1888,16 @@ export function Machines() {
                                     <button onClick={(e) => { e.stopPropagation(); if (rsrContext) handleDownloadRSR(rsr, rsrContext); }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" title="Download">
                                       <Download className="w-4 h-4" />
                                     </button>
+                                    {canEditRSRMetadata(rsr, isReadOnlyMachine) && (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); if (rsrContext) handleEditRSR(rsr, rsrContext); }}
+                                        className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg"
+                                        title="Edit RSR details"
+                                        aria-label="Edit RSR details"
+                                      >
+                                        <Edit3 className="w-4 h-4" />
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                               ))}
@@ -2226,6 +2264,16 @@ export function Machines() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Edit RSR metadata modal */}
+      {editingRSR && (
+        <MachineRSRMetadataEditModal
+          machineId={editingRSR.context.requestedMachineId}
+          rsr={editingRSR.rsr}
+          onCancel={() => setEditingRSR(null)}
+          onSaved={handleRSRMetadataSaved}
+        />
       )}
 
       {/* Generate Report Modal */}

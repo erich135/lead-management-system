@@ -30,6 +30,14 @@ import {
   type MachineResolutionSnapshot,
   type RSRUploadAttempt,
 } from './machineAssociationSafety';
+import { permittedMetadataPayload } from './machineRsrMetadataEdit';
+
+export {
+  EDITABLE_MACHINE_RSR_FIELDS,
+  type EditableMachineRSRField,
+  type MachineRSRMetadataUpdate,
+} from './machineRsrMetadataEdit';
+import type { MachineRSRMetadataUpdate } from './machineRsrMetadataEdit';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
@@ -756,6 +764,19 @@ export interface MachineRSR {
   currentHours?: number;
   nextServiceHours?: number;
   nextServiceDate?: string;
+  quoteDate?: string;
+  value?: number;
+  poNumber?: string;
+  invNumber?: string;
+  tech?: string;
+  hoursWorked?: number;
+  comments?: string;
+  /** Present when report metadata was corrected after upload. */
+  metadataCorrection?: {
+    values: Record<string, unknown>;
+    editedBy: string | { _id: string; firstName?: string; lastName?: string };
+    editedAt: string;
+  };
   uploadedBy: {
     _id: string;
     firstName: string;
@@ -3046,6 +3067,33 @@ export function getMachineRSRUrl(machineId: string, rsrId: string): string {
 }
 
 /**
+ * Corrects report metadata on one already-uploaded machine RSR.
+ *
+ * Sends only correctable fields. The uploaded file is never replaced, and there
+ * is no deletion counterpart.
+ */
+export async function updateMachineRSRMetadata(
+  machineId: string,
+  rsrId: string,
+  updates: MachineRSRMetadataUpdate,
+): Promise<MachineRSR> {
+  const permitted = permittedMetadataPayload(updates);
+  const response = await apiRequest<{ rsrDocument: MachineRSR }>(
+    `/api/machines/${machineId}/rsr/${rsrId}/metadata`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(permitted),
+    },
+  );
+  if (!response?.rsrDocument) {
+    throw new ApiRequestError('RSR metadata was saved without a refreshed record.', {
+      kind: 'malformed',
+    });
+  }
+  return { ...response.rsrDocument, source: 'machine' as const };
+}
+
+/**
  * @deprecated RSR records are retained for audit and historical integrity.
  * Kept as a fail-closed compatibility export for legacy callers only.
  */
@@ -4354,6 +4402,7 @@ export default {
   uploadMachineRSR,
   getMachineRSRs,
   getMachineRSRUrl,
+  updateMachineRSRMetadata,
   deleteMachineRSR,
   createJobNote,
   getJobNotes,

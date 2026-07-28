@@ -2,6 +2,7 @@ import { LayoutDashboard, FileText, BarChart3, Calendar, Users, Menu, X, Bell, L
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { canAccessMachineReadingWorkflow } from '../lib/readingAccess';
 
 type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady' | 'techApp' | 'pendingReadings';
 
@@ -52,7 +53,7 @@ export function MobileNavigation({
   const canViewReports = user?.isSuperAdmin || hasPermission('reports.read');
   const canViewSalesLeads = user?.isSuperAdmin || hasPermission('sales_leads.read');
   const canViewTechApp = user?.isSuperAdmin || user?.role?.name?.toLowerCase() === 'technician';
-  const canVerifyReadings = user?.isSuperAdmin || hasPermission('machines.verifyReadings');
+  const canVerifyReadings = canAccessMachineReadingWorkflow(user);
 
   const navItems = [
     { id: 'dashboard' as View, label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },

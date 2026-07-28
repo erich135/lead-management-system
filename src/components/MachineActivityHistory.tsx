@@ -1,14 +1,83 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertCircle, Clock, FileText, History, Loader2, RefreshCw } from 'lucide-react';
-import { type CanonicalMachineHistoryData, type MachineHistoryRecord, getCanonicalMachineHistory } from '../lib/api';
+import { AlertCircle, AlertTriangle, Clock, Download, Eye, FileText, History, Loader2, Printer, RefreshCw } from 'lucide-react';
+import { type CanonicalMachineHistoryData, type MachineHistoryRecord, getAuthToken, getCanonicalMachineHistory, getMachineRSRUrl, getRSRDocumentUrl } from '../lib/api';
 import {
   MACHINE_HISTORY_SECTIONS,
   type MachineHistorySection,
+  type RsrHistoryFileUrls,
+  buildRsrHistoryFileUrls,
   isCurrentMachineHistoryRequest,
+  isPrintableRsrMimeType,
+  isRsrHistoryFileAvailable,
+  isRsrHistoryRecordType,
   machineHistoryProvenanceText,
   mergeMachineHistoryPages,
 } from '../lib/machineActivityHistory';
 import { formatDateTime } from '../utils/dateFormat';
+
+const rsrUrlHelpers = { machineRSRUrl: getMachineRSRUrl, rsrDocumentUrl: getRSRDocumentUrl };
+
+/**
+ * View/Download/Print actions for one retained RSR history record, reusing
+ * the existing authorised machine-RSR and job-RSR file endpoints. Renders a
+ * "File unavailable" status instead of actions when the file cannot be
+ * opened right now.
+ */
+function RsrHistoryActions({ item, machineId }: { item: MachineHistoryRecord; machineId: string }) {
+  if (!isRsrHistoryRecordType(item.type)) return null;
+  if (!isRsrHistoryFileAvailable(item)) {
+    return (
+      <span className="inline-flex items-center gap-1 text-amber-700">
+        <AlertTriangle className="h-3.5 w-3.5" />File unavailable
+      </span>
+    );
+  }
+  const urls = buildRsrHistoryFileUrls(item, machineId, getAuthToken(), rsrUrlHelpers);
+  if (!urls) {
+    return (
+      <span className="inline-flex items-center gap-1 text-amber-700">
+        <AlertTriangle className="h-3.5 w-3.5" />File unavailable
+      </span>
+    );
+  }
+  const printable = isPrintableRsrMimeType(item.record.mimeType);
+  const view = (target: RsrHistoryFileUrls) => window.open(target.viewUrl, '_blank');
+  const print = (target: RsrHistoryFileUrls) => {
+    const preview = window.open(target.viewUrl, '_blank');
+    if (!preview) return;
+    setTimeout(() => {
+      try {
+        preview.print();
+      } catch {
+        // Cross-origin preview — the browser's own viewer still offers printing.
+      }
+    }, 800);
+  };
+  const download = (target: RsrHistoryFileUrls) => {
+    const link = document.createElement('a');
+    link.href = target.downloadUrl;
+    link.download = target.downloadFileName;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  return (
+    <span className="inline-flex items-center gap-1">
+      <button type="button" onClick={() => view(urls)} title="View" className="rounded p-1 text-slate-500 hover:bg-slate-200 hover:text-slate-700">
+        <Eye className="h-3.5 w-3.5" />
+      </button>
+      <button type="button" onClick={() => download(urls)} title="Download" className="rounded p-1 text-slate-500 hover:bg-slate-200 hover:text-slate-700">
+        <Download className="h-3.5 w-3.5" />
+      </button>
+      {printable && (
+        <button type="button" onClick={() => print(urls)} title="Print" className="rounded p-1 text-slate-500 hover:bg-slate-200 hover:text-slate-700">
+          <Printer className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </span>
+  );
+}
 
 interface MachineActivityHistoryProps { machineId: string; }
 
@@ -119,7 +188,8 @@ export function MachineActivityHistory({ machineId }: MachineActivityHistoryProp
             const provenance = machineHistoryProvenanceText(item.provenance.machineIds, history.groupIdentities);
             const detail = recordDetail(item);
             const actor = activityActor(item);
-            return <article key={item.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm"><div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3"><div className="min-w-0"><p className="font-medium text-slate-800">{recordTitle(item)}</p><div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">{item.occurredAt && <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{formatDateTime(String(item.occurredAt))}</span>}<span>{item.type}</span>{actor && <span>Actor: {actor}</span>}{item.file && <span className="inline-flex items-center gap-1"><FileText className="h-3.5 w-3.5" />Document retained</span>}</div></div></div>{detail && <p className="mt-2 text-xs text-slate-600">{detail}</p>}{provenance && <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-800">{provenance}</p>}</article>;
+            const isRetainedRsr = isRsrHistoryRecordType(item.type);
+            return <article key={item.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm"><div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3"><div className="min-w-0"><p className="font-medium text-slate-800">{recordTitle(item)}</p><div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">{item.occurredAt && <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{formatDateTime(String(item.occurredAt))}</span>}<span>{item.type}</span>{actor && <span>Actor: {actor}</span>}{!isRetainedRsr && item.file && <span className="inline-flex items-center gap-1"><FileText className="h-3.5 w-3.5" />Document retained</span>}{isRetainedRsr && <RsrHistoryActions item={item} machineId={machineId} />}</div></div></div>{detail && <p className="mt-2 text-xs text-slate-600">{detail}</p>}{provenance && <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-800">{provenance}</p>}</article>;
           })}
         </div>}
         {history.records.length > 0 && <div className="mt-4 flex items-center justify-between gap-3"><span className="text-xs text-slate-500" role="status">{loading && history.pagination.hasMore ? 'Loading more history...' : history.pagination.hasMore ? `More ${sectionLabels[section].toLowerCase()} history is available.` : `All ${sectionLabels[section].toLowerCase()} history is shown.`}</span>{history.pagination.hasMore && <button type="button" onClick={loadMore} disabled={loading} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60">{loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}Load more</button>}</div>}

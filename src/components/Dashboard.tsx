@@ -1,6 +1,7 @@
 import { useState, useEffect, type ComponentProps } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { canAccessMachineReadingWorkflow } from '../lib/readingAccess';
 import {
   getJobStats,
   getOverdueJobs,
@@ -845,7 +846,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                     <Cog className={`w-4 h-4 transition-transform ${view === 'machines' ? 'scale-110' : ''}`} />
                     <span>Machines</span>
                   </Link>
-                {(isSuperAdmin || hasPermission('machines.verifyReadings')) && (
+                {canAccessMachineReadingWorkflow(user) && (
                   <Link
                     to="/pending-machine-readings"
                     className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${

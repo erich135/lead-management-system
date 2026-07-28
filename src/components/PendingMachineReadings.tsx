@@ -17,16 +17,20 @@ import {
   type MachineReadingSubmission,
 } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { canAccessMachineReadingWorkflow } from '../lib/readingAccess';
 
 type Tab = 'pending' | 'approved' | 'rejected';
 
 /**
  * Verification queue for customer-submitted machine hour readings.
- * Visible to any user with the `machines.verifyReadings` permission.
+ *
+ * ARS-READINGS-ACCESS-001 (temporary policy): visible to every authenticated
+ * user until a final authorised-user list is supplied. See
+ * `../lib/readingAccess` for how to restrict this later.
  */
 export function PendingMachineReadings() {
-  const { hasPermission } = useAuth();
-  const canVerify = hasPermission('machines.verifyReadings');
+  const { user } = useAuth();
+  const canVerify = canAccessMachineReadingWorkflow(user);
 
   const [tab, setTab] = useState<Tab>('pending');
   const [items, setItems] = useState<MachineReadingSubmission[]>([]);
@@ -59,10 +63,9 @@ export function PendingMachineReadings() {
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
           <div>
-            <p className="font-semibold text-amber-900">Permission required</p>
+            <p className="font-semibold text-amber-900">Sign in required</p>
             <p className="text-sm text-amber-800">
-              You need the <code className="px-1 bg-amber-100 rounded">machines.verifyReadings</code>{' '}
-              permission to access this page.
+              You need to be signed in to an ARS account to access this page.
             </p>
           </div>
         </div>

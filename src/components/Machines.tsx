@@ -28,6 +28,7 @@ import {
   type Job,
 } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { canAccessMachineReadingWorkflow } from '../lib/readingAccess';
 import { MachineQrPanel } from './MachineQrPanel';
 import { MachineActivityHistory } from './MachineActivityHistory';
 import { MachineRSRMetadataEditModal } from './MachineRSRMetadataEditModal';
@@ -82,11 +83,11 @@ import {
 } from '../lib/machineAssociationSafety';
 
 export function Machines() {
-  const { isSuperAdmin, hasPermission } = useAuth();
+  const { user, isSuperAdmin, hasPermission } = useAuth();
 
   // Top-level tab inside the Machines page
   const [activeTab, setActiveTab] = useState<'list' | 'verify'>('list');
-  const canVerifyReadings = isSuperAdmin || hasPermission('machines.verifyReadings');
+  const canVerifyReadings = canAccessMachineReadingWorkflow(user);
   const canManageMachines = isSuperAdmin || hasPermission('machines.manage');
 
   // Machine list state

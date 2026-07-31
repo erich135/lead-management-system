@@ -72,6 +72,137 @@ export interface PeriodSummary {
   }>;
 }
 
+export type ScientificCalculationProvenance =
+  | 'exact_mathematics'
+  | 'established_engineering'
+  | 'manufacturer_specification'
+  | 'approved_assumption'
+  | 'business_input'
+  | 'user_input';
+
+export type ScientificUncertainty =
+  | 'measured'
+  | 'derived_exact'
+  | 'derived_manufacturer'
+  | 'estimated'
+  | 'estimated_from_short_record'
+  | 'unavailable';
+
+export type ScientificCalculationId =
+  | 'CALC-007'
+  | 'CALC-008'
+  | 'CALC-021'
+  | 'CALC-023'
+  | 'CALC-025'
+  | 'CALC-030'
+  | 'CALC-031'
+  | 'CALC-032'
+  | 'CALC-033'
+  | 'CALC-034'
+  | 'CALC-035'
+  | 'CALC-036'
+  | 'CALC-041'
+  | 'CALC-042'
+  | 'CALC-043'
+  | 'CALC-045'
+  | 'CALC-046'
+  | 'CALC-047'
+  | 'CALC-051'
+  | 'CALC-052'
+  | 'CALC-053'
+  | 'CALC-056'
+  | 'CALC-058'
+  | 'CALC-059'
+  | 'CALC-060'
+  | 'CALC-061'
+  | 'CALC-062'
+  | 'CALC-063'
+  | 'CALC-067';
+
+export interface ScientificNumericUncertainty {
+  plusMinus: number;
+  unit: string;
+  basis: 'counter_quantisation';
+}
+
+export interface ScientificFigureMetadata {
+  unit: string;
+  provenance: ScientificCalculationProvenance;
+  uncertainty: ScientificUncertainty;
+  calculationId: ScientificCalculationId;
+  numericUncertainty: ScientificNumericUncertainty | null;
+  reason: string;
+}
+
+export interface ScientificSourceReference {
+  sourceFilename: string;
+  sourceSha256: string;
+}
+
+export type LowFlowCutOffStatus = 'cut_off_unconfirmed' | 'cut_off_confirmed';
+
+export interface RuntimeFigureCutOffMetadata {
+  status: LowFlowCutOffStatus;
+  unit: 's' | 'fraction' | 'm3/min';
+  reason: string;
+}
+
+export interface RuntimeFigureMetadata {
+  flowingDurationSeconds: RuntimeFigureCutOffMetadata;
+  nonFlowingDurationSeconds: RuntimeFigureCutOffMetadata;
+  flowingFraction: RuntimeFigureCutOffMetadata;
+  meanFlowWhileFlowingM3PerMin: RuntimeFigureCutOffMetadata;
+}
+
+export interface MeasuredDemandFigureMetadata {
+  supportedDurationSeconds: ScientificFigureMetadata;
+  deliveredVolumeM3: ScientificFigureMetadata;
+  meteredVolumeM3: ScientificFigureMetadata;
+  volumeBalanceClosure: ScientificFigureMetadata;
+  meanFlowM3PerMin: ScientificFigureMetadata;
+  flowP50M3PerMin: ScientificFigureMetadata;
+  flowP90M3PerMin: ScientificFigureMetadata;
+  peakMeanFlowWindowMinutes: ScientificFigureMetadata;
+  peakMeanFlowM3PerMin: ScientificFigureMetadata;
+  flowingDurationSeconds: ScientificFigureMetadata;
+  nonFlowingDurationSeconds: ScientificFigureMetadata;
+  flowingFraction: ScientificFigureMetadata;
+  meanFlowWhileFlowingM3PerMin: ScientificFigureMetadata;
+  meanPressureBarG: ScientificFigureMetadata;
+  meanPressureWhileFlowingBarG: ScientificFigureMetadata;
+  lowFlowCutOffM3PerMin: ScientificFigureMetadata;
+  observedMinimumNonZeroFlowM3PerMin: ScientificFigureMetadata;
+  annualisationFactor: ScientificFigureMetadata;
+  recordDurationDays: ScientificFigureMetadata;
+}
+
+export interface MeasuredDemandProfile {
+  source: ScientificSourceReference;
+  supportedDurationSeconds: number;
+  deliveredVolumeM3: number;
+  meteredVolumeM3: number | null;
+  volumeBalanceClosure: number | null;
+  meanFlowM3PerMin: number | null;
+  flowP50M3PerMin: number | null;
+  flowP90M3PerMin: number | null;
+  peakMeanFlowM3PerMin: Array<{ windowMinutes: number; value: number }>;
+  flowingDurationSeconds: number;
+  nonFlowingDurationSeconds: number;
+  flowingFraction: number | null;
+  meanFlowWhileFlowingM3PerMin: number | null;
+  meanPressureBarG: number | null;
+  meanPressureWhileFlowingBarG: number | null;
+  lowFlowCutOffM3PerMin: number | null;
+  lowFlowCutOffStatus: LowFlowCutOffStatus;
+  reportedZeroFlowLabel: 'below cut-off';
+  runtimeFigureMetadata: RuntimeFigureMetadata;
+  observedMinimumNonZeroFlowM3PerMin: number | null;
+  annualisationFactor: number | null;
+  recordDurationDays: number;
+  confidence: 'measured' | 'estimated_from_short_record' | 'insufficient';
+  figureMetadata: MeasuredDemandFigureMetadata;
+}
+
 export interface BouwaLocalAnalysis {
   attestation: {
     analysisId: string;
@@ -126,6 +257,7 @@ export interface BouwaLocalAnalysis {
     warningRowCount: number;
     warnings: string[];
   };
+  measuredDemand: MeasuredDemandProfile;
   rawStatistics: RawStatistics[];
   trends: Trend[];
   summaries: {

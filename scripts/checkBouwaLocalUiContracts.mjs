@@ -188,7 +188,7 @@ for (const declaration of [
 ])
   requireText(measuredDemandContract, declaration, measuredDemandLabel);
 
-for (const commercialOutput of [
+const commercialOutputs = [
   'annualEnergy',
   'electricityCost',
   'tariffRate',
@@ -203,7 +203,167 @@ for (const commercialOutput of [
   'siteCorrection',
   'altitudeCorrection',
   'proposedMachine',
-])
+];
+
+for (const commercialOutput of commercialOutputs)
   forbidText(loggerLocalTypes, commercialOutput, 'blocked commercial output');
+
+const measuredDemandUiLabel = 'measured-demand screen';
+const measuredDemandUi = page.slice(
+  page.indexOf('const MEASURED_DEMAND_UNAVAILABLE_LABEL'),
+  page.indexOf('export function BouwaLoggerLocalApp'),
+);
+if (!measuredDemandUi)
+  throw new Error('The measured-demand presentation block is missing.');
+
+requireText(page, 'analysis.measuredDemand', 'rendered measured-demand response');
+requireText(page, '<MeasuredDemandSection', 'measured-demand section');
+
+for (const nullCheck of [
+  'value === null',
+  'measuredDemand.lowFlowCutOffM3PerMin === null',
+  'metadata.numericUncertainty === null',
+  'peak === null',
+])
+  requireText(measuredDemandUi, nullCheck, `${measuredDemandUiLabel} explicit null check`);
+
+requireText(
+  measuredDemandUi,
+  "const MEASURED_DEMAND_UNAVAILABLE_LABEL = 'Unavailable';",
+  `${measuredDemandUiLabel} unavailable label`,
+);
+requireText(
+  measuredDemandUi,
+  'MEASURED_DEMAND_UNAVAILABLE_LABEL',
+  `${measuredDemandUiLabel} unavailable rendering`,
+);
+requireText(measuredDemandUi, 'metadata.reason', `${measuredDemandUiLabel} backend reason`);
+requireText(measuredDemandUi, 'cutOff.reason', `${measuredDemandUiLabel} cut-off reason`);
+requireText(
+  measuredDemandUi,
+  'runtimeFigureMetadata.flowingDurationSeconds.reason',
+  `${measuredDemandUiLabel} runtime classification reason`,
+);
+requireText(
+  measuredDemandUi,
+  'figures.peakMeanFlowM3PerMin.reason',
+  `${measuredDemandUiLabel} peak rolling-mean reason`,
+);
+requireText(
+  measuredDemandUi,
+  'minimumFractionDigits: digits',
+  `${measuredDemandUiLabel} valid-zero formatting`,
+);
+
+for (const truthinessTrap of [
+  'value ? ',
+  'value ?\n',
+  '!value',
+  'value || ',
+  'value && ',
+  '|| 0',
+  '?? 0',
+  'Boolean(',
+  "'—'",
+  "'-'",
+  'parseFloat(',
+])
+  forbidText(
+    measuredDemandUi,
+    truthinessTrap,
+    `${measuredDemandUiLabel} valid-zero preservation`,
+  );
+
+requireText(measuredDemandUi, "'Cutoff confirmed'", `${measuredDemandUiLabel} confirmed cut-off state`);
+requireText(measuredDemandUi, "'Cutoff not confirmed'", `${measuredDemandUiLabel} unconfirmed cut-off state`);
+requireText(
+  measuredDemandUi,
+  "measuredDemand.lowFlowCutOffStatus === 'cut_off_confirmed'",
+  `${measuredDemandUiLabel} cut-off status source`,
+);
+requireText(
+  measuredDemandUi,
+  'label="Configured low-flow cut-off"',
+  `${measuredDemandUiLabel} configured cut-off figure`,
+);
+requireText(
+  measuredDemandUi,
+  'label="Observed minimum positive flow"',
+  `${measuredDemandUiLabel} observed minimum figure`,
+);
+requireText(
+  measuredDemandUi,
+  'value={measuredDemand.lowFlowCutOffM3PerMin}',
+  `${measuredDemandUiLabel} configured cut-off value`,
+);
+requireText(
+  measuredDemandUi,
+  'value={measuredDemand.observedMinimumNonZeroFlowM3PerMin}',
+  `${measuredDemandUiLabel} observed minimum value`,
+);
+requireText(
+  measuredDemandUi,
+  'measuredDemand.reportedZeroFlowLabel',
+  `${measuredDemandUiLabel} reported-zero label`,
+);
+
+requireText(
+  measuredDemandUi,
+  'value={measuredDemand.annualisationFactor}',
+  `${measuredDemandUiLabel} annualisation figure`,
+);
+for (const annualAssumption of [
+  '8760',
+  '8,760',
+  '8784',
+  'annualOperatingHours',
+  'annualHours',
+  'operatingHours',
+])
+  forbidText(
+    measuredDemandUi,
+    annualAssumption,
+    `${measuredDemandUiLabel} annual-hours assumption`,
+  );
+
+requireText(
+  measuredDemandUi,
+  'measuredDemand.source.sourceFilename',
+  `${measuredDemandUiLabel} source filename`,
+);
+requireText(
+  measuredDemandUi,
+  'measuredDemand.source.sourceSha256',
+  `${measuredDemandUiLabel} source SHA-256`,
+);
+requireText(measuredDemandUi, 'metadata.provenance', `${measuredDemandUiLabel} provenance`);
+requireText(measuredDemandUi, 'metadata.uncertainty', `${measuredDemandUiLabel} uncertainty`);
+requireText(measuredDemandUi, 'provenanceLabels[metadata.provenance]', `${measuredDemandUiLabel} provenance label`);
+requireText(measuredDemandUi, 'uncertaintyLabels[metadata.uncertainty]', `${measuredDemandUiLabel} uncertainty label`);
+requireText(measuredDemandUi, 'metadata.calculationId', `${measuredDemandUiLabel} calculation identifier`);
+requireText(
+  measuredDemandUi,
+  'MeasuredDemandTechnicalTable',
+  `${measuredDemandUiLabel} technical details`,
+);
+
+for (const commercialOutput of [...commercialOutputs, 'kWh', 'tariff', 'Payback', 'ROI'])
+  forbidText(measuredDemandUi, commercialOutput, `${measuredDemandUiLabel} blocked commercial output`);
+
+for (const formulaToken of [
+  'Math.',
+  ' * ',
+  ' / ',
+  ' - ',
+  '.reduce(',
+  'toFixed(',
+  'SECONDS_PER',
+  'annualise',
+])
+  forbidText(
+    measuredDemandUi,
+    formulaToken,
+    `${measuredDemandUiLabel} frontend scientific formula`,
+  );
 
 process.stdout.write('Bouwa local UI contracts passed.\n');

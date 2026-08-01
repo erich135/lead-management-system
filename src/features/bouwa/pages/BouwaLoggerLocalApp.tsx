@@ -8,6 +8,7 @@ import {
   FileText,
   Gauge,
   HardDrive,
+  Info,
   LockKeyhole,
   LogOut,
   Server,
@@ -22,8 +23,13 @@ import type {
   DisabledCapability,
   EngineeringSetting,
   LocalHealth,
+  MeasuredDemandFigureMetadata,
+  MeasuredDemandProfile,
   PeriodSummary,
   RawStatistics,
+  ScientificCalculationProvenance,
+  ScientificFigureMetadata,
+  ScientificUncertainty,
   Trend,
 } from '../loggerLocalTypes';
 import type { LocalSession, ProposalMode } from '../proposalLocalTypes';
@@ -51,6 +57,15 @@ const dateTime = (value: string | null) =>
     timeZone: 'Africa/Johannesburg',
   }).format(new Date(value)) : 'Unavailable';
 
+const cardTones = {
+  slate: 'border-slate-200 bg-white',
+  blue: 'border-blue-200 bg-blue-50/60',
+  amber: 'border-amber-200 bg-amber-50/60',
+  green: 'border-emerald-200 bg-emerald-50/60',
+};
+
+type CardTone = keyof typeof cardTones;
+
 function Metric({
   label,
   value,
@@ -60,16 +75,10 @@ function Metric({
   label: string;
   value: string;
   detail?: string;
-  tone?: 'slate' | 'blue' | 'amber' | 'green';
+  tone?: CardTone;
 }) {
-  const tones = {
-    slate: 'border-slate-200 bg-white',
-    blue: 'border-blue-200 bg-blue-50/60',
-    amber: 'border-amber-200 bg-amber-50/60',
-    green: 'border-emerald-200 bg-emerald-50/60',
-  };
   return (
-    <div className={`rounded-xl border p-4 ${tones[tone]}`}>
+    <div className={`rounded-xl border p-4 ${cardTones[tone]}`}>
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</p>
       <p className="mt-1 text-xl font-semibold text-slate-900">{value}</p>
       {detail && <p className="mt-1 text-xs leading-5 text-slate-500">{detail}</p>}
@@ -317,6 +326,274 @@ function DisabledCard({ capability }: { capability: DisabledCapability }) {
         <p className="mt-1 text-xs leading-5 text-amber-900">{capability.requiredAnswerOrEvidence}</p>
       </div>
     </div>
+  );
+}
+
+const MEASURED_DEMAND_UNAVAILABLE_LABEL = 'Unavailable';
+
+const measuredNumber = (value: number, digits: number) =>
+  value.toLocaleString('en-ZA', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+
+const measuredUnit = (unit: string) => unit.replace('m3', 'm³');
+
+const provenanceLabels: Record<ScientificCalculationProvenance, string> = {
+  exact_mathematics: 'Exact calculation',
+  established_engineering: 'Established engineering',
+  manufacturer_specification: 'Manufacturer-derived',
+  approved_assumption: 'Approved assumption',
+  business_input: 'Business input',
+  user_input: 'User input',
+};
+
+const uncertaintyLabels: Record<ScientificUncertainty, string> = {
+  measured: 'Measured',
+  derived_exact: 'Exact calculation',
+  derived_manufacturer: 'Manufacturer-derived',
+  estimated: 'Estimated',
+  estimated_from_short_record: 'Estimated from short record',
+  unavailable: 'Unavailable',
+};
+
+const confidenceLabels: Record<MeasuredDemandProfile['confidence'], string> = {
+  measured: 'Measured',
+  estimated_from_short_record: 'Estimated from short record',
+  insufficient: 'Insufficient',
+};
+
+const measuredDemandFigureLabels: Array<[keyof MeasuredDemandFigureMetadata, string]> = [
+  ['supportedDurationSeconds', 'Supported duration'],
+  ['deliveredVolumeM3', 'Delivered volume'],
+  ['meteredVolumeM3', 'Metered volume'],
+  ['volumeBalanceClosure', 'Volume-balance closure'],
+  ['meanFlowM3PerMin', 'Mean flow'],
+  ['flowP50M3PerMin', 'Flow P50'],
+  ['flowP90M3PerMin', 'Flow P90'],
+  ['peakMeanFlowWindowMinutes', 'Peak rolling-mean window'],
+  ['peakMeanFlowM3PerMin', 'Peak rolling mean flow'],
+  ['flowingDurationSeconds', 'Flowing duration'],
+  ['nonFlowingDurationSeconds', 'Non-flowing duration'],
+  ['flowingFraction', 'Flowing fraction'],
+  ['meanFlowWhileFlowingM3PerMin', 'Mean flow while flowing'],
+  ['meanPressureBarG', 'Mean pressure'],
+  ['meanPressureWhileFlowingBarG', 'Mean pressure while flowing'],
+  ['lowFlowCutOffM3PerMin', 'Configured low-flow cut-off'],
+  ['observedMinimumNonZeroFlowM3PerMin', 'Observed minimum positive flow'],
+  ['annualisationFactor', 'Annualisation factor'],
+  ['recordDurationDays', 'Record duration'],
+];
+
+function ScientificFigure({
+  label,
+  value,
+  digits,
+  metadata,
+  tone = 'slate',
+}: {
+  label: string;
+  value: number | null;
+  digits: number;
+  metadata: ScientificFigureMetadata;
+  tone?: CardTone;
+}) {
+  return (
+    <div className={`rounded-xl border p-4 ${cardTones[tone]}`}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</p>
+      <p className="mt-1 text-xl font-semibold text-slate-900">
+        {value === null
+          ? MEASURED_DEMAND_UNAVAILABLE_LABEL
+          : `${measuredNumber(value, digits)} ${measuredUnit(metadata.unit)}`}
+      </p>
+      <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+        {uncertaintyLabels[metadata.uncertainty]} · {provenanceLabels[metadata.provenance]} · {metadata.calculationId}
+      </p>
+      {value === null && (
+        <p className="mt-1 text-xs leading-5 text-slate-500">{metadata.reason}</p>
+      )}
+    </div>
+  );
+}
+
+function CutOffStatusCard({ measuredDemand }: { measuredDemand: MeasuredDemandProfile }) {
+  const confirmed = measuredDemand.lowFlowCutOffStatus === 'cut_off_confirmed';
+  const cutOff = measuredDemand.figureMetadata.lowFlowCutOffM3PerMin;
+  return (
+    <div className={`rounded-xl border p-4 text-sm ${confirmed ? cardTones.green : 'border-blue-200 bg-blue-50'}`}>
+      <div className="flex items-start gap-3">
+        {confirmed
+          ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+          : <Info className="mt-0.5 h-5 w-5 shrink-0 text-ars-primary" />}
+        <div>
+          <p className={`font-semibold ${confirmed ? 'text-emerald-800' : 'text-blue-900'}`}>
+            {confirmed ? 'Cutoff confirmed' : 'Cutoff not confirmed'}
+          </p>
+          <p className="mt-1 leading-6 text-slate-700">
+            {confirmed
+              ? `Flowing and non-flowing time is classified against the configured low-flow cut-off of ${
+                  measuredDemand.lowFlowCutOffM3PerMin === null
+                    ? MEASURED_DEMAND_UNAVAILABLE_LABEL
+                    : `${measuredNumber(measuredDemand.lowFlowCutOffM3PerMin, 3)} ${measuredUnit(cutOff.unit)}`
+                }.`
+              : 'Flowing and non-flowing classification is provisional until the low-flow cut-off is confirmed. The observed minimum positive flow shown below is a logger observation, not an engineering setting.'}
+          </p>
+          <p className="mt-2 text-xs leading-5 text-slate-600">{cutOff.reason}</p>
+          <p className="mt-1 text-xs leading-5 text-slate-600">
+            {measuredDemand.runtimeFigureMetadata.flowingDurationSeconds.reason}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-slate-600">
+            Reported zero flow is labelled “{measuredDemand.reportedZeroFlowLabel}”.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MeasuredDemandTechnicalTable({ figureMetadata }: { figureMetadata: MeasuredDemandFigureMetadata }) {
+  return (
+    <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
+      <div className="max-h-[32rem] overflow-y-auto">
+        <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <thead className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            <tr>
+              <th className="px-4 py-3">Figure</th>
+              <th className="px-4 py-3">Unit</th>
+              <th className="px-4 py-3">Provenance</th>
+              <th className="px-4 py-3">Uncertainty</th>
+              <th className="px-4 py-3">Calculation</th>
+              <th className="px-4 py-3">Numeric uncertainty</th>
+              <th className="px-4 py-3">Backend reason</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 bg-white">
+            {measuredDemandFigureLabels.map(([key, label]) => {
+              const metadata = figureMetadata[key];
+              return (
+                <tr key={key} className="align-top">
+                  <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">{label}</td>
+                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{metadata.unit}</td>
+                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{metadata.provenance}</td>
+                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{metadata.uncertainty}</td>
+                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{metadata.calculationId}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">
+                    {metadata.numericUncertainty === null
+                      ? 'Not defined'
+                      : `± ${measuredNumber(metadata.numericUncertainty.plusMinus, 3)} ${measuredUnit(metadata.numericUncertainty.unit)} · ${metadata.numericUncertainty.basis.replace(/_/g, ' ')}`}
+                  </td>
+                  <td className="px-4 py-3 text-xs leading-5 text-slate-600">{metadata.reason}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function MeasuredDemandSection({ measuredDemand }: { measuredDemand: MeasuredDemandProfile }) {
+  const figures = measuredDemand.figureMetadata;
+  const peak = measuredDemand.peakMeanFlowM3PerMin[0] ?? null;
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <SectionTitle
+        icon={<Gauge className="h-5 w-5" />}
+        title="Measured demand"
+        subtitle="Scientifically derived from the uploaded logger record by the approved backend model. Every figure keeps its backend unit, provenance and uncertainty; nothing is recalculated in the browser."
+      />
+
+      <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Primary measured figures</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <ScientificFigure label="Delivered volume" value={measuredDemand.deliveredVolumeM3} digits={0} metadata={figures.deliveredVolumeM3} tone="blue" />
+        <ScientificFigure label="Metered volume" value={measuredDemand.meteredVolumeM3} digits={0} metadata={figures.meteredVolumeM3} />
+        <ScientificFigure label="Volume-balance closure" value={measuredDemand.volumeBalanceClosure} digits={6} metadata={figures.volumeBalanceClosure} />
+        <ScientificFigure label="Supported duration" value={measuredDemand.supportedDurationSeconds} digits={3} metadata={figures.supportedDurationSeconds} />
+        <ScientificFigure label="Mean flow" value={measuredDemand.meanFlowM3PerMin} digits={3} metadata={figures.meanFlowM3PerMin} tone="blue" />
+        <ScientificFigure label="Flow P50" value={measuredDemand.flowP50M3PerMin} digits={3} metadata={figures.flowP50M3PerMin} />
+        <ScientificFigure label="Flow P90" value={measuredDemand.flowP90M3PerMin} digits={3} metadata={figures.flowP90M3PerMin} />
+        <ScientificFigure
+          label="Peak rolling mean flow"
+          value={peak === null ? null : peak.value}
+          digits={3}
+          metadata={figures.peakMeanFlowM3PerMin}
+        />
+        <ScientificFigure label="Mean pressure" value={measuredDemand.meanPressureBarG} digits={3} metadata={figures.meanPressureBarG} />
+      </div>
+      <div className="mt-3 rounded-xl bg-slate-50 p-4">
+        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Peak rolling mean flow by window</p>
+        {measuredDemand.peakMeanFlowM3PerMin.length === 0 ? (
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            {MEASURED_DEMAND_UNAVAILABLE_LABEL} · {figures.peakMeanFlowM3PerMin.reason}
+          </p>
+        ) : (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {measuredDemand.peakMeanFlowM3PerMin.map(item => (
+              <span key={item.windowMinutes} className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700">
+                <strong>{measuredNumber(item.windowMinutes, 0)} {measuredUnit(figures.peakMeanFlowWindowMinutes.unit)}</strong>
+                {' · '}
+                {measuredNumber(item.value, 3)} {measuredUnit(figures.peakMeanFlowM3PerMin.unit)}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <p className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-500">Flowing and cut-off behaviour</p>
+      <div className="mt-3">
+        <CutOffStatusCard measuredDemand={measuredDemand} />
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <ScientificFigure label="Flowing duration" value={measuredDemand.flowingDurationSeconds} digits={3} metadata={figures.flowingDurationSeconds} />
+        <ScientificFigure label="Non-flowing duration" value={measuredDemand.nonFlowingDurationSeconds} digits={3} metadata={figures.nonFlowingDurationSeconds} />
+        <ScientificFigure label="Flowing fraction" value={measuredDemand.flowingFraction} digits={6} metadata={figures.flowingFraction} />
+        <ScientificFigure label="Mean flow while flowing" value={measuredDemand.meanFlowWhileFlowingM3PerMin} digits={3} metadata={figures.meanFlowWhileFlowingM3PerMin} />
+        <ScientificFigure label="Mean pressure while flowing" value={measuredDemand.meanPressureWhileFlowingBarG} digits={3} metadata={figures.meanPressureWhileFlowingBarG} />
+        <ScientificFigure
+          label="Configured low-flow cut-off"
+          value={measuredDemand.lowFlowCutOffM3PerMin}
+          digits={3}
+          metadata={figures.lowFlowCutOffM3PerMin}
+        />
+        <ScientificFigure
+          label="Observed minimum positive flow"
+          value={measuredDemand.observedMinimumNonZeroFlowM3PerMin}
+          digits={3}
+          metadata={figures.observedMinimumNonZeroFlowM3PerMin}
+        />
+        <Metric
+          label="Reported zero flow"
+          value={measuredDemand.reportedZeroFlowLabel}
+          detail="A reported zero flow observation means below cut-off, not proven zero consumption."
+        />
+      </div>
+
+      <p className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-500">Record and scientific details</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <ScientificFigure label="Record duration" value={measuredDemand.recordDurationDays} digits={3} metadata={figures.recordDurationDays} />
+        <Metric
+          label="Coverage confidence"
+          value={confidenceLabels[measuredDemand.confidence]}
+          detail="Backend confidence classification for this measured-demand profile."
+          tone={measuredDemand.confidence === 'measured' ? 'green' : 'amber'}
+        />
+        <ScientificFigure label="Annualisation factor" value={measuredDemand.annualisationFactor} digits={8} metadata={figures.annualisationFactor} />
+      </div>
+      <div className="mt-3 rounded-xl bg-slate-50 p-4">
+        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Analysed source</p>
+        <dl className="mt-2 grid gap-1 text-xs text-slate-600 sm:grid-cols-[11rem_1fr] sm:gap-x-4">
+          <dt className="font-semibold">Source filename</dt>
+          <dd className="break-all font-mono text-slate-800">{measuredDemand.source.sourceFilename}</dd>
+          <dt className="mt-1 font-semibold sm:mt-0">Source SHA-256</dt>
+          <dd className="break-all font-mono text-slate-800" title={measuredDemand.source.sourceSha256}>
+            {measuredDemand.source.sourceSha256}
+          </dd>
+        </dl>
+      </div>
+      <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Figure provenance and calculation identifiers</p>
+      <MeasuredDemandTechnicalTable figureMetadata={figures} />
+    </section>
   );
 }
 
@@ -652,6 +929,8 @@ export function BouwaLoggerLocalApp() {
                 ))}
               </div>
             </section>
+
+            <MeasuredDemandSection measuredDemand={analysis.measuredDemand} />
 
             <section>
               <SectionTitle

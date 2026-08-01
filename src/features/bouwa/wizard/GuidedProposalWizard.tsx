@@ -29,6 +29,8 @@ import { WizardAnswerField } from './components/WizardAnswerField';
 import { WizardEvidenceGroups } from './components/WizardEvidenceGroups';
 import { WizardReadinessStrip } from './components/WizardReadinessSummary';
 import { WizardFooter, WizardShell } from './components/WizardShell';
+import { DocumentsScreen } from './steps/DocumentsScreen';
+import { ManualBasisStep } from './steps/ManualBasisStep';
 import { ProposalTypeStep } from './steps/ProposalTypeStep';
 import { ReviewStep } from './steps/ReviewStep';
 import { UploadAuditStep } from './steps/UploadAuditStep';
@@ -48,20 +50,34 @@ import type { WizardDraftView, WizardStep, WizardStepId } from './wizardTypes';
 type Screen =
   | { kind: 'proposal_type' }
   | { kind: 'upload' }
+  | { kind: 'documents' }
   | { kind: 'review' }
+  | { kind: 'manual_basis'; fields: WizardFieldView[] }
   | { kind: 'fields'; fields: WizardFieldView[] };
 
 function screensForStep(
   step: WizardStep,
   formModel: AuditIntakeFormModel,
   readiness: AuditReadinessAssessment,
+  fileParsed: boolean,
 ): Screen[] {
   if (step.id === 'proposal_type') return [{ kind: 'proposal_type' }];
   if (step.id === 'review') return [{ kind: 'review' }];
-  const pages = stepPages(stepFieldViews(step, formModel, readiness)).map(
-    page => ({ kind: 'fields', fields: page.fields }) as Screen,
-  );
+  const pages = stepPages(
+    stepFieldViews(step, formModel, readiness, fileParsed),
+  ).map(page => ({ kind: 'fields', fields: page.fields }) as Screen);
   if (step.id === 'upload_audit') return [{ kind: 'upload' }, ...pages];
+  if (step.id === 'manual_basis')
+    return [
+      {
+        kind: 'manual_basis',
+        fields: pages[0]?.kind === 'fields' ? pages[0].fields : [],
+      },
+      ...pages.slice(1),
+    ];
+  // The documents belong with the questions whose evidence they are, and the
+  // tariff and investment answers are the last ones asked before the review.
+  if (step.id === 'tariff_investment') return [...pages, { kind: 'documents' }];
   return pages;
 }
 
@@ -103,19 +119,18 @@ export function GuidedProposalWizard({
   const step = steps[stepIndex] ?? steps[0];
 
   const screens = useMemo(
-    () => screensForStep(step, formModel, view.readiness),
-    [step, formModel, view.readiness],
+    () => screensForStep(step, formModel, view.readiness, view.draft.fileParsed),
+    [step, formModel, view.readiness, view.draft.fileParsed],
   );
   const safePage = clampPageIndex(pageIndex, screens.length);
   const screen = screens[safePage];
 
-  const outstanding =
-    screen?.kind === 'fields'
-      ? outstandingOnScreen(
-          screen.fields,
-          path => readAnswerAtPath(intake, path)?.state ?? null,
-        )
-      : [];
+  const screenFields =
+    screen === undefined || !('fields' in screen) ? [] : screen.fields;
+  const outstanding = outstandingOnScreen(
+    screenFields,
+    path => readAnswerAtPath(intake, path)?.state ?? null,
+  );
 
   const typeIncomplete =
     screen?.kind === 'proposal_type' &&
@@ -184,7 +199,8 @@ export function GuidedProposalWizard({
     const previousPageCount =
       previous === undefined
         ? 1
-        : screensForStep(previous, formModel, view.readiness).length;
+        : screensForStep(previous, formModel, view.readiness, view.draft.fileParsed)
+            .length;
     const move = moveBack(
       {
         stepIndex,
@@ -314,6 +330,24 @@ export function GuidedProposalWizard({
             disabled={!mayEdit}
             busy={busy}
             onUpload={draft.uploadSource}
+          />
+        ) : screen.kind === 'manual_basis' ? (
+          <ManualBasisStep
+            manualBasis={view.draft.manualBasis}
+            fields={screen.fields}
+            intake={intake}
+            disabled={!mayEdit}
+            onAnswer={draft.answer}
+          />
+        ) : screen.kind === 'documents' ? (
+          <DocumentsScreen
+            draft={view.draft}
+            formModel={formModel}
+            disabled={!mayEdit}
+            busy={busy}
+            onUpload={(file, options) =>
+              draft.uploadDocument(file, { evidenceType: options.evidenceType })
+            }
           />
         ) : screen.kind === 'review' ? (
           <ReviewStep

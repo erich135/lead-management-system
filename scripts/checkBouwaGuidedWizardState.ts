@@ -130,6 +130,7 @@ const views = stepFieldViews(
       status({ code: 'AUDIT.TEST.C' }),
     ],
   }),
+  true,
 );
 
 assert.deepEqual(
@@ -139,6 +140,40 @@ assert.deepEqual(
 );
 assert.equal(views[0].sourceDerived, true);
 assert.equal(views[1].sourceDerived, false);
+
+/* A source-derived question is only the file's to answer once a file was read. */
+
+const periodStep = step({
+  id: 'upload_audit',
+  fieldCodes: ['AUDIT.PERIOD.START'],
+  sourceDerivedFieldCodes: ['AUDIT.PERIOD.START'],
+});
+const periodModel = formModel({
+  fields: [field({ code: 'AUDIT.PERIOD.START', path: 'identity.auditStartDate' })],
+});
+const periodReadiness = readiness({
+  fieldStatuses: [status({ code: 'AUDIT.PERIOD.START', section: 'identity' })],
+});
+
+const beforeParse = stepFieldViews(periodStep, periodModel, periodReadiness, false);
+assert.equal(
+  beforeParse[0].sourceDerived,
+  false,
+  'the period may be entered before the record arrives',
+);
+assert.equal(
+  outstandingOnScreen(beforeParse, () => null).length,
+  1,
+  'and while it can be entered, a blank one holds the step',
+);
+
+const afterParse = stepFieldViews(periodStep, periodModel, periodReadiness, true);
+assert.equal(afterParse[0].sourceDerived, true);
+assert.equal(
+  outstandingOnScreen(afterParse, () => null).length,
+  0,
+  'a value only the file can state never holds a user on a screen',
+);
 
 /* A step longer than a screen is paged, never lengthened. */
 

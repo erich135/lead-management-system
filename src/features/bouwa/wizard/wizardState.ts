@@ -42,17 +42,24 @@ export interface WizardPage {
  * The questions a step shows, in the step's own order, limited to those the
  * backend still considers applicable. A question the answers have made
  * irrelevant is never asked.
+ *
+ * A source-derived question is only locked once a file has actually been read.
+ * The audit period may be entered before the record arrives; from the moment
+ * one is parsed, the file's own dates stand and the box stops being a box.
  */
 export function stepFieldViews(
   step: WizardStep,
   formModel: AuditIntakeFormModel,
   readiness: AuditReadinessAssessment,
+  fileParsed = false,
 ): WizardFieldView[] {
   const fieldsByCode = new Map(formModel.fields.map(entry => [entry.code, entry]));
   const statusByCode = new Map(
     readiness.fieldStatuses.map(status => [status.code, status]),
   );
-  const sourceDerived = new Set(step.sourceDerivedFieldCodes);
+  const sourceDerived = new Set(
+    fileParsed ? step.sourceDerivedFieldCodes : [],
+  );
   const views: WizardFieldView[] = [];
   for (const code of step.fieldCodes) {
     const status = statusByCode.get(code);
@@ -106,6 +113,9 @@ export function outstandingOnScreen(
   answerStateAt: (path: string) => IntakeAnswerState | null,
 ): WizardFieldView[] {
   return fields.filter(entry => {
+    // A locked value is the file's to state. It can never hold a user's step,
+    // because there is nothing they could do about it on this screen.
+    if (entry.sourceDerived) return false;
     if (entry.status.status === 'invalid') return true;
     if (entry.status.status !== 'missing') return false;
     const state = answerStateAt(entry.field.path);

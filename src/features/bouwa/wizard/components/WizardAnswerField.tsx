@@ -143,10 +143,13 @@ export function WizardAnswerField({
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
         {view.sourceDerived ? (
-          <p className="flex items-center gap-1.5 rounded-md bg-slate-50 px-2.5 py-1.5 text-sm text-slate-700">
-            <Lock className="h-3.5 w-3.5 text-slate-400" />
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md bg-slate-50 px-2.5 py-1.5 text-sm text-slate-700">
+            <Lock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
             <span className="font-mono text-xs">
               {lockedText ?? inputTextForAnswer(stored) ?? '—'}
+            </span>
+            <span className="text-[11px] text-slate-500">
+              Detected from the uploaded file
             </span>
           </p>
         ) : field.valueKind === 'selection' ? (

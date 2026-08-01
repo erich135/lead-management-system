@@ -109,6 +109,23 @@ Supporting documents — tariff invoices, datasheets, part-load curves, quotatio
 — are attached on the tariff and evidence step. Each one is stored with its own
 hash and stays with the proposal.
 
+### The instrument that took the measurement
+
+The logger and sensor step offers the audit-equipment catalogue: the loggers and
+sensors ARS actually audits with. Search for the instrument by make, model or
+serial number and choose it, and the wizard fills what the catalogue records —
+the make, the model, the serial number, the measuring range, the reference basis
+its readings are stated on, the configured cutoff and the calibration. Where the
+instrument was fitted on this particular site is still asked, because that is a
+fact about the visit rather than about the instrument.
+
+If the instrument is not there, choose **Not listed — add equipment**. It is
+added to the shared catalogue rather than to this one proposal, so the next
+audit that uses it finds it. The catalogue refuses details that cannot be true:
+a range whose maximum is below its minimum, a range without a unit, and a
+reference basis the instrument cannot report on. Adding equipment needs
+permission to manage Bouwa evidence; reading the catalogue does not.
+
 ---
 
 ## 6. Readiness stages

@@ -173,6 +173,46 @@ export interface WizardConflict {
   current: WizardDraftView | null;
 }
 
+/* The instruments an audit is measured with. */
+
+export type WizardEquipmentType =
+  | 'flow_logger'
+  | 'flow_sensor'
+  | 'pressure_sensor'
+  | 'temperature_sensor';
+
+export interface WizardEquipmentRange {
+  minimum: number;
+  maximum: number;
+  unit: string;
+}
+
+export interface WizardEquipment {
+  equipmentId: string;
+  equipmentType: WizardEquipmentType;
+  manufacturer: string;
+  model: string;
+  serialNumber: string | null;
+  hardwareVersion: string | null;
+  softwareVersion: string | null;
+  configurationVersion: string | null;
+  measuringRange: WizardEquipmentRange | null;
+  referenceBasis: string | null;
+  configuredLowFlowCutoffM3PerMin: number | null;
+  calibrationDate: string | null;
+  calibrationCertificateReference: string | null;
+  evidenceReference: string | null;
+  notes: string | null;
+  isActive: boolean;
+}
+
+/** What the catalogue says an instrument of this type may state. */
+export interface WizardEquipmentTypeOption {
+  id: WizardEquipmentType;
+  label: string;
+  permittedBases: string[];
+}
+
 export const PROPOSAL_TYPE_LABELS: Record<WizardProposalType, string> = {
   air_audit: 'Air Audit Proposal',
   manual: 'Manual Proposal',

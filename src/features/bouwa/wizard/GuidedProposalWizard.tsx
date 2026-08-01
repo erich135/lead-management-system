@@ -21,6 +21,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowLeft } from 'lucide-react';
 
 import { readAnswerAtPath } from '../auditIntakeState';
+
 import type {
   AuditIntakeFormModel,
   AuditReadinessAssessment,
@@ -35,6 +36,13 @@ import {
   existingMachineEntries,
   proposedMachineEntries,
 } from './machineSelection';
+import { EquipmentPicker } from './components/EquipmentPicker';
+import {
+  answeredTextForCode,
+  EQUIPMENT_CODE_PREFIX,
+  EQUIPMENT_TYPE_BY_SECTION,
+  equipmentIntakeEntries,
+} from './equipmentSelection';
 import { WizardAnswerField } from './components/WizardAnswerField';
 import { WizardEvidenceGroups } from './components/WizardEvidenceGroups';
 import { WizardReadinessStrip } from './components/WizardReadinessSummary';
@@ -58,7 +66,12 @@ import {
   stepPages,
   type WizardFieldView,
 } from './wizardState';
-import type { WizardDraftView, WizardStep, WizardStepId } from './wizardTypes';
+import type {
+  WizardDraftView,
+  WizardEquipmentType,
+  WizardStep,
+  WizardStepId,
+} from './wizardTypes';
 
 type Screen =
   | { kind: 'proposal_type' }
@@ -69,12 +82,22 @@ type Screen =
   | { kind: 'manual_basis'; fields: WizardFieldView[] }
   | { kind: 'existing_machine'; fields: WizardFieldView[] }
   | { kind: 'proposed_machine'; fields: WizardFieldView[] }
+  | {
+      kind: 'equipment';
+      equipmentType: WizardEquipmentType;
+      fields: WizardFieldView[];
+    }
   | { kind: 'fields'; fields: WizardFieldView[] };
 
 function fieldScreens(fields: WizardFieldView[]): Screen[] {
   return stepPages(fields).map(
     page => ({ kind: 'fields', fields: page.fields }) as Screen,
   );
+}
+
+/** The same, but no questions means no screen rather than an empty one. */
+function moreFieldScreens(fields: WizardFieldView[]): Screen[] {
+  return fields.length === 0 ? [] : fieldScreens(fields);
 }
 
 function screensForStep(
@@ -103,6 +126,30 @@ function screensForStep(
     { kind, fields: pages[0]?.kind === 'fields' ? pages[0].fields.slice(0, 3) : [] },
     ...fieldScreens(all.slice(3)),
   ];
+
+  // Each instrument is offered from the catalogue where its own questions
+  // start, so the picker is next to the answers it fills rather than at the
+  // top of a step that asks about four different instruments.
+  if (step.id === 'logger_sensors') {
+    const screens: Screen[] = [];
+    for (const group of fieldGroups(all, formModel.sections)) {
+      const equipmentType = EQUIPMENT_TYPE_BY_SECTION[group.section];
+      const offersPicker =
+        equipmentType !== undefined &&
+        group.fields.some(view => view.field.code.endsWith('.MANUFACTURER'));
+      if (!offersPicker) {
+        screens.push(...moreFieldScreens(group.fields));
+        continue;
+      }
+      screens.push({
+        kind: 'equipment',
+        equipmentType,
+        fields: group.fields.slice(0, 3),
+      });
+      screens.push(...moreFieldScreens(group.fields.slice(3)));
+    }
+    return screens.length === 0 ? pages : screens;
+  }
 
   if (step.id === 'upload_audit') return [{ kind: 'upload' }, ...pages];
   if (step.id === 'manual_basis')
@@ -444,6 +491,40 @@ export function GuidedProposalWizard({
               }
               disabled={!mayEdit}
               onSelect={spec => draft.answerMany(proposedMachineEntries(spec))}
+            />
+            <div className="space-y-2">
+              {screen.fields.map(fieldView => (
+                <WizardAnswerField
+                  key={fieldView.field.code}
+                  view={fieldView}
+                  intake={intake}
+                  disabled={!mayEdit}
+                  onAnswer={draft.answer}
+                />
+              ))}
+            </div>
+          </div>
+        ) : screen.kind === 'equipment' ? (
+          <div className="space-y-3">
+            <EquipmentPicker
+              equipmentType={screen.equipmentType}
+              formFields={formModel.fields}
+              chosenSerial={answeredTextForCode(
+                formModel.fields,
+                `${EQUIPMENT_CODE_PREFIX[screen.equipmentType]}.SERIAL_NUMBER`,
+                path => readAnswerAtPath(intake, path),
+              )}
+              chosenModel={answeredTextForCode(
+                formModel.fields,
+                `${EQUIPMENT_CODE_PREFIX[screen.equipmentType]}.MODEL`,
+                path => readAnswerAtPath(intake, path),
+              )}
+              disabled={!mayEdit}
+              onSelect={equipment =>
+                draft.answerMany(
+                  equipmentIntakeEntries(equipment, formModel.fields),
+                )
+              }
             />
             <div className="space-y-2">
               {screen.fields.map(fieldView => (

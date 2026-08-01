@@ -15,6 +15,9 @@ import type {
   WizardConflict,
   WizardDraftSummary,
   WizardDraftView,
+  WizardEquipment,
+  WizardEquipmentType,
+  WizardEquipmentTypeOption,
   WizardProposalType,
   WizardManualBasis,
   WizardStep,
@@ -244,6 +247,39 @@ export async function uploadWizardDocument(
     },
   );
   return (await requireOk(response)) as unknown as WizardDraftView;
+}
+
+export async function listAuditEquipment(params?: {
+  equipmentType?: WizardEquipmentType;
+  search?: string;
+}): Promise<{
+  equipment: WizardEquipment[];
+  equipmentTypes: WizardEquipmentTypeOption[];
+}> {
+  const query = new URLSearchParams();
+  if (params?.equipmentType) query.set('type', params.equipmentType);
+  if (params?.search) query.set('search', params.search);
+  const suffix = query.toString() === '' ? '' : `?${query.toString()}`;
+  const body = await requestJson(`/equipment${suffix}`);
+  return {
+    equipment: (body.equipment as WizardEquipment[]) ?? [],
+    equipmentTypes: (body.equipmentTypes as WizardEquipmentTypeOption[]) ?? [],
+  };
+}
+
+/**
+ * Adds an instrument to the catalogue. What is sent is what the user stated;
+ * the backend refuses anything it cannot be true, rather than this side
+ * guessing which of the details are safe to keep.
+ */
+export async function addAuditEquipment(
+  equipment: Record<string, unknown>,
+): Promise<WizardEquipment> {
+  const body = await requestJson('/equipment', {
+    method: 'POST',
+    body: JSON.stringify(equipment),
+  });
+  return body.equipment as WizardEquipment;
 }
 
 /** The authenticated download URL for the stored source file. */

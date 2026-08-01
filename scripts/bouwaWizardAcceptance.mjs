@@ -417,12 +417,34 @@ async function airAudit(browser, viewport) {
   await measureFit(page, scope, 'step 1');
   await shot(page, `${viewport.name}-air-1-proposal-type`);
 
+  // The instruments the audit was taken with come from the shared catalogue
+  // rather than being described from memory on every proposal.
+  let equipmentScreens = 0;
   const walk = await walkToReview(page, scope, {
     onScreen: async (target, where) => {
+      const picker = target.locator('[data-testid="bouwa-equipment-picker"]');
+      if ((await picker.count()) > 0) {
+        equipmentScreens += 1;
+        if (equipmentScreens === 1) {
+          record(
+            scope,
+            'the instrument is offered from the audit-equipment catalogue',
+            /audit-equipment catalogue/i.test(await picker.first().innerText()),
+            where.title,
+          );
+          await shot(target, `${viewport.name}-air-4-equipment`);
+        }
+      }
       await measureFit(target, scope, `step ${where.step} (${where.title})`);
     },
   });
 
+  record(
+    scope,
+    'the logger and the flow sensor are both offered from the catalogue',
+    equipmentScreens >= 2,
+    `${equipmentScreens} screens offered a catalogue`,
+  );
   record(scope, 'the audit was created from the uploaded file', walk.uploaded === true);
   record(scope, 'the customer and site were chosen from ARS', walk.chose === true);
 
@@ -545,6 +567,12 @@ async function manualProposal(browser, viewport) {
         !/upload/i.test(where.title) &&
           ((await target.locator('input[type="file"]').count()) === 0 ||
             /supporting document/i.test(text)),
+        where.title,
+      );
+      record(
+        scope,
+        `step ${where.step} does not ask which instrument measured it`,
+        (await target.locator('[data-testid="bouwa-equipment-picker"]').count()) === 0,
         where.title,
       );
       await measureFit(target, scope, `step ${where.step} (${where.title})`);

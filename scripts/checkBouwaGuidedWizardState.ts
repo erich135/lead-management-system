@@ -24,6 +24,12 @@ import {
 } from '../src/features/bouwa/wizard/machineSelection.ts';
 import { siteCandidates } from '../src/features/bouwa/wizard/customerSiteSelection.ts';
 import {
+  answeredTextForCode,
+  EQUIPMENT_TYPE_BY_SECTION,
+  equipmentAnswersByCode,
+  equipmentIntakeEntries,
+} from '../src/features/bouwa/wizard/equipmentSelection.ts';
+import {
   conceptForField,
   WIZARD_CONCEPTS,
 } from '../src/features/bouwa/wizard/wizardHelp.ts';
@@ -34,7 +40,10 @@ import type {
   AuditReadinessAssessment,
   IntakeAnswer,
 } from '../src/features/bouwa/auditIntakeTypes.ts';
-import type { WizardStep } from '../src/features/bouwa/wizard/wizardTypes.ts';
+import type {
+  WizardEquipment,
+  WizardStep,
+} from '../src/features/bouwa/wizard/wizardTypes.ts';
 
 function answer(state: IntakeAnswer<unknown>['state']): IntakeAnswer<unknown> {
   return { state, value: null, note: null };
@@ -678,5 +687,177 @@ assert.deepEqual(
   [],
   'where ARS evidences no site, none is offered rather than one invented',
 );
+
+/* A catalogued instrument fills what the catalogue records about it. */
+
+const sensorFields: AuditFormField[] = [
+  field({ code: 'AUDIT.FLOW_SENSOR.MANUFACTURER', path: 'flowSensor.manufacturer' }),
+  field({ code: 'AUDIT.FLOW_SENSOR.MODEL', path: 'flowSensor.model' }),
+  field({ code: 'AUDIT.FLOW_SENSOR.SERIAL_NUMBER', path: 'flowSensor.serialNumber' }),
+  field({
+    code: 'AUDIT.FLOW_SENSOR.RANGE_MINIMUM',
+    path: 'flowSensor.measuringRangeMinimumM3PerMin',
+  }),
+  field({
+    code: 'AUDIT.FLOW_SENSOR.RANGE_MAXIMUM',
+    path: 'flowSensor.measuringRangeMaximumM3PerMin',
+  }),
+  field({
+    code: 'AUDIT.FLOW_SENSOR.CONFIGURED_LOW_FLOW_CUTOFF',
+    path: 'flowSensor.configuredLowFlowCutOffM3PerMin',
+  }),
+  field({
+    code: 'AUDIT.FLOW_SENSOR.FLOW_REFERENCE_BASIS',
+    path: 'flowSensor.flowReferenceBasis',
+  }),
+  field({
+    code: 'AUDIT.FLOW_SENSOR.INSTALLATION_POSITION',
+    path: 'flowSensor.installationPosition',
+  }),
+];
+
+function equipment(
+  overrides: Partial<WizardEquipment>,
+): WizardEquipment {
+  return {
+    equipmentId: 'eq-1',
+    equipmentType: 'flow_sensor',
+    manufacturer: 'CS Instruments',
+    model: 'VA 570',
+    serialNumber: 'CS-99120',
+    hardwareVersion: null,
+    softwareVersion: null,
+    configurationVersion: null,
+    measuringRange: { minimum: 0.2, maximum: 12, unit: 'm³/min' },
+    referenceBasis: 'free_air_delivery',
+    configuredLowFlowCutoffM3PerMin: 0.15,
+    calibrationDate: '2026-02-11',
+    calibrationCertificateReference: 'CAL-7781',
+    evidenceReference: null,
+    notes: null,
+    isActive: true,
+    ...overrides,
+  };
+}
+
+const sensorEntries = new Map(
+  equipmentIntakeEntries(equipment({}), sensorFields),
+);
+
+assert.equal(sensorEntries.get('flowSensor.manufacturer')?.value, 'CS Instruments');
+assert.equal(sensorEntries.get('flowSensor.serialNumber')?.value, 'CS-99120');
+assert.equal(
+  sensorEntries.get('flowSensor.measuringRangeMaximumM3PerMin')?.value,
+  12,
+);
+assert.equal(
+  sensorEntries.get('flowSensor.configuredLowFlowCutOffM3PerMin')?.value,
+  0.15,
+);
+assert.equal(
+  sensorEntries.get('flowSensor.flowReferenceBasis')?.value,
+  'free_air_delivery',
+);
+assert.equal(
+  sensorEntries.has('flowSensor.installationPosition'),
+  false,
+  'where the instrument was fitted is a fact about the site visit, not the instrument',
+);
+
+/* A range in the wrong unit answers nothing rather than being converted. */
+
+const barRange = new Map(
+  equipmentIntakeEntries(
+    equipment({ measuringRange: { minimum: 0, maximum: 16, unit: 'bar' } }),
+    sensorFields,
+  ),
+);
+assert.equal(
+  barRange.has('flowSensor.measuringRangeMaximumM3PerMin'),
+  false,
+  'a pressure range states nothing about a flow range',
+);
+assert.equal(barRange.get('flowSensor.manufacturer')?.value, 'CS Instruments');
+
+/* A logger answers under the logger codes, and has no flow basis to state. */
+
+const loggerCodes = [
+  ...equipmentAnswersByCode(
+    equipment({ equipmentType: 'flow_logger', configurationVersion: 'cfg-4' }),
+  ).keys(),
+];
+assert.ok(loggerCodes.includes('AUDIT.LOGGER.MANUFACTURER'));
+assert.ok(loggerCodes.includes('AUDIT.LOGGER.CONFIGURATION_VERSION'));
+assert.equal(
+  loggerCodes.some(code => code.includes('FLOW_REFERENCE_BASIS')),
+  false,
+  'a logger is not the instrument that states the flow basis',
+);
+assert.equal(
+  loggerCodes.some(code => code.includes('RANGE_')),
+  false,
+  'the catalogue states no unit a logger measures in',
+);
+
+/* Nothing empty is ever recorded as an answer. */
+
+const sparse = equipmentAnswersByCode(
+  equipment({
+    serialNumber: '   ',
+    calibrationDate: null,
+    referenceBasis: null,
+    configuredLowFlowCutoffM3PerMin: null,
+  }),
+);
+assert.equal(sparse.has('AUDIT.FLOW_SENSOR.SERIAL_NUMBER'), false);
+assert.equal(sparse.has('AUDIT.FLOW_SENSOR.CALIBRATION_DATE'), false);
+assert.equal(sparse.has('AUDIT.FLOW_SENSOR.FLOW_REFERENCE_BASIS'), false);
+assert.equal(
+  sparse.has('AUDIT.FLOW_SENSOR.CONFIGURED_LOW_FLOW_CUTOFF'),
+  false,
+  'no configured cutoff is not a cutoff of zero',
+);
+
+/* A cutoff of zero is a stated cutoff and must survive. */
+
+assert.equal(
+  equipmentAnswersByCode(
+    equipment({ configuredLowFlowCutoffM3PerMin: 0 }),
+  ).get('AUDIT.FLOW_SENSOR.CONFIGURED_LOW_FLOW_CUTOFF'),
+  0,
+);
+
+/* Only an outright answer marks a catalogue entry as the one in use. */
+
+const sensorAnswers = new Map<string, IntakeAnswer<unknown>>([
+  ['flowSensor.serialNumber', { state: 'answered', value: 'CS-99120', note: null }],
+  [
+    'flowSensor.model',
+    { state: 'unknown_confirmation_required', value: null, note: null },
+  ],
+]);
+const sensorAnswerAt = (path: string) => sensorAnswers.get(path) ?? null;
+
+assert.equal(
+  answeredTextForCode(
+    sensorFields,
+    'AUDIT.FLOW_SENSOR.SERIAL_NUMBER',
+    sensorAnswerAt,
+  ),
+  'CS-99120',
+);
+assert.equal(
+  answeredTextForCode(sensorFields, 'AUDIT.FLOW_SENSOR.MODEL', sensorAnswerAt),
+  null,
+  '"unknown" is a refusal to state a value, not a value',
+);
+assert.equal(
+  answeredTextForCode(sensorFields, 'AUDIT.LOGGER.MODEL', sensorAnswerAt),
+  null,
+);
+
+assert.equal(EQUIPMENT_TYPE_BY_SECTION.logger, 'flow_logger');
+assert.equal(EQUIPMENT_TYPE_BY_SECTION.pressure_sensor, 'pressure_sensor');
+assert.equal(EQUIPMENT_TYPE_BY_SECTION.identity, undefined);
 
 console.log('Bouwa guided-wizard state checks passed.');

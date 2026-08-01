@@ -475,6 +475,53 @@ for (const wiredContract of [
 ])
   requireText(intakeState, wiredContract, `${intakeLabel} Step 14 input`);
 
+// Evidence that has not arrived. The answer's state and the document's state
+// are reported separately, and a dependency the form cannot close says so.
+const evidenceLabel = 'blocked evidence workflow';
+
+requireText(intakePanel, 'OutstandingEvidenceWorkspace', evidenceLabel);
+requireText(intakePanel, 'IntakeChangeTrail', evidenceLabel);
+requireText(
+  intakePanel,
+  'readiness.unavailableDependencies.map',
+  `${evidenceLabel} unavailable dependency`,
+);
+requireText(
+  intakePanel,
+  'Completing this form will not release it',
+  `${evidenceLabel} honest unavailable dependency`,
+);
+requireText(
+  intakePanel,
+  "confirmationStatus: 'requested'",
+  `${evidenceLabel} tracked document starts unconfirmed`,
+);
+for (const evidenceContract of [
+  'row.answerStatus',
+  'row.documentStatus',
+  'row.requiredDocuments',
+  'row.blockedOutputs',
+  'row.responsiblePerson',
+  'row.expectedConfirmationDate',
+])
+  requireText(intakePanel, evidenceContract, `${evidenceLabel} field`);
+for (const stateContract of [
+  'outstandingEvidenceRows',
+  'intakeChangeRows',
+  'No document referenced',
+  'blocker.evidenceStatus',
+  'blocker.fieldStatus',
+])
+  requireText(intakeState, stateContract, `${evidenceLabel} state helper`);
+
+// A document that has merely been referenced must never be presented as one
+// that has been confirmed.
+forbidText(
+  intakePanel,
+  "confirmationStatus: 'confirmed'",
+  `${evidenceLabel} client-confirmed document`,
+);
+
 // The intake form describes controlled answers. It must never carry its own
 // option lists, its own stage rules, or any scientific arithmetic. Prose in a
 // comment is not code, so comments are removed before the arithmetic checks.

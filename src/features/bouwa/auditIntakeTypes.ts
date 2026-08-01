@@ -36,6 +36,14 @@ export type AuditReadinessStage =
   | 'engineering_comparison_ready'
   | 'commercial_proposal_ready';
 
+export interface AuditIntakeHistoryEntry {
+  at: string;
+  by: string | null;
+  source: 'operator_edit' | 'parsed_logger_source';
+  changedFieldCodes: string[];
+  changedEvidenceIds: string[];
+}
+
 export type AuditIntakeSection =
   | 'identity'
   | 'logger'
@@ -45,6 +53,7 @@ export type AuditIntakeSection =
   | 'existing_machine'
   | 'proposed_machine'
   | 'operating_conditions'
+  | 'site_conditions'
   | 'tariff'
   | 'investment';
 
@@ -59,6 +68,7 @@ export type AuditOutputId =
   | 'annualised_demand'
   | 'existing_machine_energy_model'
   | 'proposed_machine_energy_model'
+  | 'site_corrected_capacity'
   | 'engineering_comparison'
   | 'annual_electricity_cost'
   | 'monetary_saving'
@@ -106,6 +116,25 @@ export interface AuditExternalEvidenceBlocker {
   dependentOutputs: AuditOutputId[];
   responsiblePerson: string | null;
   expectedConfirmationDate: string | null;
+  fieldStatus: AuditFieldStatusCode;
+  evidenceId: string | null;
+  evidenceStatus: AuditEvidenceConfirmationStatus | null;
+  notes: string | null;
+}
+
+/**
+ * A gap the form cannot close, because the calculation that would consume the
+ * evidence does not exist yet. Presented apart from the ordinary blockers so
+ * an operator does not keep hunting for a document that would change nothing.
+ */
+export interface AuditUnavailableDependency {
+  code: string;
+  label: string;
+  reason: string;
+  blockedOutputs: AuditOutputId[];
+  requiredEvidence: string[];
+  intakeFieldCodes: string[];
+  clearableByIntake: false;
 }
 
 export interface AuditComparisonCheck {
@@ -135,6 +164,7 @@ export interface AuditReadinessAssessment {
   comparison: AuditLikeForLikeComparison;
   annualOperatingHours: number | null;
   externalEvidenceBlockers: AuditExternalEvidenceBlocker[];
+  unavailableDependencies: AuditUnavailableDependency[];
 }
 
 export type AuditEvidenceConfirmationStatus =
@@ -242,6 +272,7 @@ export interface AuditIntakeState {
   intake: AuditIntakeDocument;
   readiness: AuditReadinessAssessment;
   scientificInputs: ResolvedScientificInputs;
+  history: AuditIntakeHistoryEntry[];
 }
 
 export type AuditFieldValueKind =

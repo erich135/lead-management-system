@@ -5,6 +5,8 @@ import {
   answerFromInput,
   auditIntakeSectionViews,
   inputTextForAnswer,
+  intakeChangeRows,
+  outstandingEvidenceRows,
   mayApplyAuditIntakeSave,
   nextAuditIntakeSave,
   readAnswerAtPath,
@@ -344,5 +346,127 @@ assert.equal(
   rowFor('Existing machine declared power').provenance,
   'User input',
 );
+
+/* Outstanding evidence separates the answer's state from the document's */
+
+const evidenceFormModel: AuditIntakeFormModel = {
+  ...formModel,
+  evidenceTypes: [
+    { value: 'production_schedule', label: 'Production schedule' },
+    { value: 'site_altitude_record', label: 'Site altitude record' },
+  ],
+  evidenceStatuses: [
+    { value: 'requested', label: 'Requested' },
+    { value: 'confirmed', label: 'Confirmed' },
+  ],
+};
+
+const evidenceReadiness = {
+  fieldStatuses: [
+    status({
+      code: 'AUDIT.OPERATING.REPRESENTATIVE_EVIDENCE',
+      label: 'Production schedule reference',
+    }),
+  ],
+  blockedOutputs: [
+    {
+      outputId: 'annualised_demand',
+      label: 'Annualised demand',
+      requiredStage: 'measured_audit_ready',
+      blockingFieldCodes: [],
+      reasons: ['Waiting on the schedule.'],
+    },
+  ],
+  externalEvidenceBlockers: [
+    {
+      code: 'AUDIT.OPERATING.REPRESENTATIVE_EVIDENCE',
+      label: 'Production schedule reference',
+      whyItMatters: 'A year scaled from a week rests on it.',
+      requiredEvidence: ['production_schedule'],
+      dependentOutputs: ['annualised_demand'],
+      responsiblePerson: 'Named Person',
+      expectedConfirmationDate: '2026-09-30',
+      fieldStatus: 'confirmed',
+      evidenceId: 'ev-1',
+      evidenceStatus: 'requested',
+      notes: 'Requested from the plant manager.',
+    },
+    {
+      code: 'AUDIT.SITE.ALTITUDE',
+      label: 'Site altitude',
+      whyItMatters: 'Air density falls with altitude.',
+      requiredEvidence: ['site_altitude_record'],
+      dependentOutputs: [],
+      responsiblePerson: null,
+      expectedConfirmationDate: null,
+      fieldStatus: 'missing',
+      evidenceId: null,
+      evidenceStatus: null,
+      notes: null,
+    },
+  ],
+  unavailableDependencies: [],
+} as unknown as AuditReadinessAssessment;
+
+const outstanding = outstandingEvidenceRows(
+  evidenceReadiness,
+  evidenceFormModel,
+);
+assert.equal(outstanding.length, 2);
+assert.deepEqual(
+  outstanding.map(row => row.code),
+  ['AUDIT.OPERATING.REPRESENTATIVE_EVIDENCE', 'AUDIT.SITE.ALTITUDE'],
+  'the backend order is preserved',
+);
+assert.equal(
+  outstanding[0].answerStatus,
+  'Confirmed',
+  'a confirmed answer resting on an unconfirmed document is still confirmed',
+);
+assert.equal(outstanding[0].documentStatus, 'Requested');
+assert.deepEqual(outstanding[0].requiredDocuments, ['Production schedule']);
+assert.deepEqual(outstanding[0].blockedOutputs, ['Annualised demand']);
+assert.equal(outstanding[0].responsiblePerson, 'Named Person');
+assert.equal(outstanding[0].expectedConfirmationDate, '2026-09-30');
+
+assert.equal(outstanding[1].answerStatus, 'Not answered');
+assert.equal(
+  outstanding[1].documentStatus,
+  'No document referenced',
+  'an absent document must not read as a confirmed one',
+);
+assert.equal(outstanding[1].evidenceId, null);
+assert.deepEqual(outstanding[1].blockedOutputs, []);
+
+/* The change trail reads newest first, in the operator's own words */
+
+const trail = intakeChangeRows(
+  [
+    {
+      at: '2026-08-01T08:00:00.000Z',
+      by: 'operator-a',
+      source: 'parsed_logger_source',
+      changedFieldCodes: ['AUDIT.OPERATING.REPRESENTATIVE_EVIDENCE'],
+      changedEvidenceIds: [],
+    },
+    {
+      at: '2026-08-01T09:00:00.000Z',
+      by: null,
+      source: 'operator_edit',
+      changedFieldCodes: [],
+      changedEvidenceIds: ['ev-1'],
+    },
+  ],
+  evidenceReadiness,
+);
+
+assert.equal(trail.length, 2);
+assert.equal(trail[0].at, '2026-08-01T09:00:00.000Z', 'newest first');
+assert.equal(trail[0].by, 'Unattributed');
+assert.equal(trail[0].source, 'Operator edit');
+assert.deepEqual(trail[0].changes, ['Document ev-1']);
+assert.equal(trail[1].source, 'Logger file parsed');
+assert.deepEqual(trail[1].changes, ['Production schedule reference']);
+assert.deepEqual(intakeChangeRows([], evidenceReadiness), []);
 
 process.stdout.write('Bouwa audit-intake state checks passed.\n');

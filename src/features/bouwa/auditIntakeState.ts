@@ -16,6 +16,7 @@ import type {
   AuditFormSection,
   AuditIntakeDocument,
   AuditIntakeFormModel,
+  AuditIntakeHistoryEntry,
   AuditReadinessAssessment,
   AuditReadinessStage,
   IntakeAnswer,
@@ -253,6 +254,96 @@ export function wiredInputRows(
     ),
     wiredRow('Representative period', inputs.representativePeriod),
   ];
+}
+
+export interface OutstandingEvidenceRow {
+  code: string;
+  label: string;
+  whyItMatters: string;
+  /** The state of the answer, which is not the state of the document. */
+  answerStatus: string;
+  documentStatus: string;
+  requiredDocuments: string[];
+  blockedOutputs: string[];
+  responsiblePerson: string | null;
+  expectedConfirmationDate: string | null;
+  notes: string | null;
+  /** Null where no document of an accepted type has been referenced yet. */
+  evidenceId: string | null;
+}
+
+/**
+ * The outstanding-evidence list, in the backend's order. The document status is
+ * kept separate from the answer status because a confirmed answer resting on a
+ * document nobody has produced is the case this workflow exists to expose.
+ */
+export function outstandingEvidenceRows(
+  readiness: AuditReadinessAssessment,
+  formModel: AuditIntakeFormModel,
+): OutstandingEvidenceRow[] {
+  const documentLabel = new Map(
+    formModel.evidenceTypes.map(option => [option.value, option.label]),
+  );
+  const statusLabel = new Map(
+    formModel.evidenceStatuses.map(option => [option.value, option.label]),
+  );
+  const outputLabel = new Map(
+    readiness.blockedOutputs.map(output => [output.outputId, output.label]),
+  );
+  return readiness.externalEvidenceBlockers.map(blocker => ({
+    code: blocker.code,
+    label: blocker.label,
+    whyItMatters: blocker.whyItMatters,
+    answerStatus: FIELD_STATUS_LABELS[blocker.fieldStatus] ?? blocker.fieldStatus,
+    documentStatus:
+      blocker.evidenceStatus === null
+        ? 'No document referenced'
+        : (statusLabel.get(blocker.evidenceStatus) ?? blocker.evidenceStatus),
+    requiredDocuments: blocker.requiredEvidence.map(
+      type => documentLabel.get(type) ?? type,
+    ),
+    blockedOutputs: blocker.dependentOutputs.map(
+      outputId => outputLabel.get(outputId) ?? outputId,
+    ),
+    responsiblePerson: blocker.responsiblePerson,
+    expectedConfirmationDate: blocker.expectedConfirmationDate,
+    notes: blocker.notes,
+    evidenceId: blocker.evidenceId,
+  }));
+}
+
+export interface IntakeChangeRow {
+  at: string;
+  by: string;
+  source: string;
+  changes: string[];
+}
+
+const HISTORY_SOURCE_LABELS: Record<string, string> = {
+  operator_edit: 'Operator edit',
+  parsed_logger_source: 'Logger file parsed',
+};
+
+/**
+ * The change trail, newest first, with field codes resolved to the labels the
+ * operator saw when answering them.
+ */
+export function intakeChangeRows(
+  history: readonly AuditIntakeHistoryEntry[],
+  readiness: AuditReadinessAssessment,
+): IntakeChangeRow[] {
+  const fieldLabel = new Map(
+    readiness.fieldStatuses.map(status => [status.code, status.label]),
+  );
+  return [...history].reverse().map(entry => ({
+    at: entry.at,
+    by: entry.by === null ? 'Unattributed' : entry.by,
+    source: HISTORY_SOURCE_LABELS[entry.source] ?? entry.source,
+    changes: [
+      ...entry.changedFieldCodes.map(code => fieldLabel.get(code) ?? code),
+      ...entry.changedEvidenceIds.map(id => `Document ${id}`),
+    ],
+  }));
 }
 
 export interface AuditIntakeSaveIdentity {

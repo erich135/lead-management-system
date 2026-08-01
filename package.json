@@ -9,6 +9,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "test:bouwa-acceptance": "node scripts/bouwaBrowserAcceptance.mjs",
     "test:bouwa-contracts": "node scripts/checkBouwaLocalUiContracts.mjs",
     "test:bouwa-intake": "set \"TS_NODE_PROJECT=tsconfig.app.json\" && node --loader ts-node/esm/transpile-only scripts/checkBouwaAuditIntakeState.ts",
     "test:bouwa-provenance": "set \"TS_NODE_PROJECT=tsconfig.app.json\" && node --loader ts-node/esm/transpile-only scripts/checkBouwaProvenancePresentation.ts",

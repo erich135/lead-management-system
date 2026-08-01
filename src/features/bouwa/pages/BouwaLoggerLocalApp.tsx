@@ -35,6 +35,7 @@ import type {
 import type { LocalSession, ProposalMode } from '../proposalLocalTypes';
 import { ProposalReadinessWorkspace } from '../components/ProposalReadinessWorkspace';
 import { LocalIdentityLogin } from '../components/LocalIdentityLogin';
+import { BouwaAuditIntakePanel } from '../components/BouwaAuditIntakePanel';
 
 type SummaryTab = 'hourly' | 'daily' | 'isoWeekly';
 const BOUWA_LOCAL_MAX_CSV_BYTES_FALLBACK = 20 * 1024 * 1024;
@@ -864,6 +865,15 @@ export function BouwaLoggerLocalApp() {
             </div>
           )}
         </section>
+
+        {proposalContext && (
+          <BouwaAuditIntakePanel
+            session={session}
+            proposalRecordId={proposalContext.proposalRecordId}
+            parsedSourceToken={analysis ? analysis.inputFile.sha256 : null}
+            onSessionExpired={handleSessionExpired}
+          />
+        )}
           </>
         )}
 

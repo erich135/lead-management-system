@@ -17,6 +17,10 @@ const fieldEditor = read(
 );
 const login = read('src/features/bouwa/components/LocalIdentityLogin.tsx');
 const loggerLocalTypes = read('src/features/bouwa/loggerLocalTypes.ts');
+const intakePanel = read(
+  'src/features/bouwa/components/BouwaAuditIntakePanel.tsx',
+);
+const intakeState = read('src/features/bouwa/auditIntakeState.ts');
 
 function requireText(source, text, label) {
   if (!source.includes(text))
@@ -365,5 +369,116 @@ for (const formulaToken of [
     formulaToken,
     `${measuredDemandUiLabel} frontend scientific formula`,
   );
+
+const intakeLabel = 'mandatory audit intake';
+
+requireText(page, '<BouwaAuditIntakePanel', intakeLabel);
+requireText(page, 'parsedSourceToken', `${intakeLabel} reload after a parse`);
+
+for (const contract of [
+  '/api/bouwa-local/intake/form',
+  '/api/bouwa-local/intake',
+  'Authorization: `Bearer ${session.token}`',
+  'onSessionExpired()',
+  'mayApplyAuditIntakeSave',
+  'nextAuditIntakeSave',
+])
+  requireText(intakePanel, contract, `${intakeLabel} local service contract`);
+
+for (const answerState of [
+  'unknown_confirmation_required',
+  'not_applicable',
+  'not_listed_add_new',
+])
+  requireText(
+    intakeState,
+    `${answerState}:`,
+    `${intakeLabel} controlled answer state`,
+  );
+
+requireText(
+  intakePanel,
+  'field.permittedAnswerStates.map',
+  `${intakeLabel} backend-supplied answer states`,
+);
+requireText(
+  intakePanel,
+  'field.options.map',
+  `${intakeLabel} backend-supplied option list`,
+);
+requireText(
+  intakePanel,
+  'readiness.blockedOutputs.map',
+  `${intakeLabel} blocked outputs`,
+);
+requireText(
+  intakePanel,
+  'output.reasons',
+  `${intakeLabel} blocked-output reasons`,
+);
+requireText(
+  intakePanel,
+  'readiness.stageEligibility.map',
+  `${intakeLabel} stage eligibility`,
+);
+requireText(
+  intakePanel,
+  'readiness.externalEvidenceBlockers',
+  `${intakeLabel} outstanding evidence`,
+);
+requireText(intakePanel, 'status.message', `${intakeLabel} backend field message`);
+requireText(
+  intakePanel,
+  'status.whyItMatters',
+  `${intakeLabel} reason a field is required`,
+);
+requireText(
+  intakePanel,
+  'status.dependentOutputs',
+  `${intakeLabel} outputs a field blocks`,
+);
+requireText(
+  intakePanel,
+  'SERVER_OWNED_FIELD_CODES',
+  `${intakeLabel} server-owned provenance`,
+);
+
+// The intake form describes controlled answers. It must never carry its own
+// option lists, its own stage rules, or any scientific arithmetic. Prose in a
+// comment is not code, so comments are removed before the arithmetic checks.
+const withoutComments = source =>
+  source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+const intakePanelCode = withoutComments(intakePanel);
+const intakeStateCode = withoutComments(intakeState);
+
+for (const forbidden of [
+  'free_air_delivery',
+  'standard_volumetric',
+  'measured_package_electrical_input',
+  'variable_speed_drive',
+  'representative_normal_operation',
+  '8760',
+  '8784',
+  'Math.',
+  ' * ',
+  ' / ',
+  'toFixed(',
+  '?? 0',
+  '|| 0',
+])
+  forbidText(intakePanelCode, forbidden, `${intakeLabel} backend authority`);
+
+for (const forbidden of [
+  '8760',
+  '8784',
+  'Math.',
+  ' * ',
+  ' / ',
+  'toFixed(',
+  '?? 0',
+  '|| 0',
+])
+  forbidText(intakeStateCode, forbidden, `${intakeLabel} state authority`);
 
 process.stdout.write('Bouwa local UI contracts passed.\n');

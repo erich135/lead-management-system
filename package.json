@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test:bouwa-contracts": "node scripts/checkBouwaLocalUiContracts.mjs",
+    "test:bouwa-intake": "set \"TS_NODE_PROJECT=tsconfig.app.json\" && node --loader ts-node/esm/transpile-only scripts/checkBouwaAuditIntakeState.ts",
     "test:bouwa-state": "set \"TS_NODE_PROJECT=tsconfig.app.json\" && node --loader ts-node/esm/transpile-only scripts/checkBouwaProposalEditorState.ts",
     "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },

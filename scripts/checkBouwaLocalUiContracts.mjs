@@ -631,4 +631,118 @@ forbidText(
   'workspace local-only identity',
 );
 
+// The proposal builder used to run a second scientific pipeline in the browser.
+// The accepted backend is the only calculation authority, so the builder may
+// hold inputs and historical evidence, and nothing else. These checks fail if a
+// replaced calculation finds its way back onto the screen.
+const wizardLabel = 'proposal builder backend authority';
+const wizard = read(
+  'src/features/bouwa/components/BouwaNewProposalWizard.tsx',
+);
+const wizardCode = withoutComments(wizard);
+const proposalInputs = read(
+  'src/features/bouwa/calculations/proposalCalculationState.ts',
+);
+const proposalInputsCode = withoutComments(proposalInputs);
+const resultAuthority = read(
+  'src/features/bouwa/components/BouwaResultAuthority.tsx',
+);
+
+// The orchestrator that produced savings, payback and return in the browser.
+for (const retired of [
+  'calculateProposal',
+  'ProposalCalculationResults',
+  'calcFirstPrinciplesAnnualCost',
+  'calcFirstPrinciplesSavings',
+  'calcFirstPrinciplesPerformance',
+  'resolveEffectiveInputPower',
+  'applyFirstPrinciplesSiteCorrection',
+  'applyApprovedFadLoss',
+  'calcRoi',
+]) {
+  forbidText(wizardCode, retired, `${wizardLabel} retired calculation`);
+  forbidText(
+    proposalInputsCode,
+    retired,
+    'proposal input model retired calculation',
+  );
+}
+
+// The engines themselves survive as comparison evidence. The input model must
+// simply stop importing them.
+for (const engine of [
+  './altitudeCorrection',
+  './compressorPerformance',
+  './energyCostEngine',
+  './roiEngine',
+  './tariffEngine',
+]) {
+  const importedAtRuntime = new RegExp(
+    `^import\\s+(?!type\\b)[^;]*from '${engine.replace('.', '\\.')}'`,
+    'm',
+  );
+  if (importedAtRuntime.test(proposalInputsCode))
+    throw new Error(
+      `The proposal input model must not import the ${engine} engine at runtime.`,
+    );
+}
+
+// Retained as required comparison evidence by section O.3. Altitude correction
+// stays here too: CALC-049 has no accepted implementation, so the frontend
+// version remains legacy evidence and must not drive a customer result.
+for (const evidence of [
+  'src/features/bouwa/calculations/validationEngine.ts',
+  'src/features/bouwa/calculations/altitudeCorrection.ts',
+  'src/features/bouwa/calculations/compressorPerformance.ts',
+  'src/features/bouwa/calculations/energyCostEngine.ts',
+  'src/features/bouwa/calculations/roiEngine.ts',
+  'src/features/bouwa/calculations/tariffEngine.ts',
+  'src/features/bouwa/calculations/ingrainReferenceScenario.ts',
+  'src/features/bouwa/calculations/elementSixReferenceScenario.ts',
+])
+  if (!fs.existsSync(path.join(root, evidence)))
+    throw new Error(`Comparison evidence ${evidence} must be retained.`);
+
+// The draft optimiser applied a 14% VSD credit with no accepted derivation.
+if (
+  fs.existsSync(
+    path.join(root, 'src/features/bouwa/calculations/optimiserEngine.ts'),
+  )
+)
+  throw new Error(
+    'The draft optimiser engine and its unsupported VSD credit must stay retired.',
+  );
+
+// The workbook PDF is retired rather than deleted, so the guard is that nothing
+// calls it.
+requireText(wizard, 'function generateProposalPDF(', `${wizardLabel} PDF`);
+if (/generateProposalPDF\s*\(/.test(wizardCode.replace(/function generateProposalPDF\s*\(/, '')))
+  throw new Error(
+    'The workbook PDF generator must not be called: it publishes savings and a VSD credit the backend never released.',
+  );
+
+// Every step that used to print a result now says where results come from.
+requireText(wizard, '<BackendOwnedOutputs', `${wizardLabel} notice`);
+requireText(
+  wizard,
+  '<HistoricalWorkbookEvidence',
+  `${wizardLabel} evidence banner`,
+);
+requireText(
+  resultAuthority,
+  'Produced by the accepted backend, not by this screen',
+  'backend authority notice wording',
+);
+requireText(
+  resultAuthority,
+  'Historical workbook figures — comparison evidence only',
+  'workbook evidence banner wording',
+);
+for (const arithmetic of [' * ', ' / ', ' - ', 'toFixed'])
+  forbidText(
+    withoutComments(resultAuthority),
+    arithmetic,
+    'backend authority notice arithmetic',
+  );
+
 process.stdout.write('Bouwa local UI contracts passed.\n');

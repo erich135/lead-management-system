@@ -1,17 +1,17 @@
 /**
- * Frontend-only editable proposal inputs and calculation orchestration.
- * Historical workbook values seed comparison scenarios; active outputs are
- * calculated only through controlled first-principles helpers.
+ * Editable proposal inputs, and nothing else.
+ *
+ * This module used to orchestrate a second scientific pipeline in the browser:
+ * electrical input resolution, specific power, energy per cubic metre, annual
+ * energy and cost, saving, payback and return. The accepted backend owns all of
+ * those, and it releases each one only when the audit evidence it depends on is
+ * present, so a browser copy could only ever disagree or answer where the
+ * backend had deliberately declined to. The orchestration is retired; what
+ * remains is the editing surface for the values an operator types in, together
+ * with the reference values and provenance each one carries.
  */
 
-import { applyApprovedFadLoss, applyFirstPrinciplesSiteCorrection } from './altitudeCorrection';
-import {
-  calcFirstPrinciplesPerformance, resolveEffectiveInputPower,
-  type PowerBasis,
-} from './compressorPerformance';
-import { calcFirstPrinciplesAnnualCost, calcFirstPrinciplesSavings } from './energyCostEngine';
-import { calcRoi } from './roiEngine';
-import { ftToM } from './unitConversions';
+import type { PowerBasis } from './compressorPerformance';
 
 export type ProposalInputSource =
   | 'reference' | 'workbook' | 'audit' | 'logger' | 'manual'
@@ -20,7 +20,6 @@ export type ProposalInputSource =
 export type ProposalReviewStatus = 'draft' | 'requires_review' | 'confirmed';
 export type ProposalScenarioId = 'ingrain' | 'element-six';
 export type CorrectionMethod = 'approved_loss' | 'standard_atmosphere_screening' | 'none_requires_review';
-export type ProposalCalculationStatus = 'complete' | 'requires_review' | 'incomplete';
 
 export interface EditableCalculationValue {
   key: string;
@@ -129,124 +128,4 @@ export function readNumericInput(inputs: ProposalCalculationInputs, key: string)
   if (!inputValue || inputValue.value.trim() === '') return null;
   const parsed = Number(inputValue.value.replace(/,/g, '').trim());
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-export interface ProposalCalculationResults {
-  status: ProposalCalculationStatus;
-  messages: string[];
-  existingElectricalInputKw: number | null;
-  proposedElectricalInputKw: number | null;
-  existingM3Hour: number | null;
-  proposedM3Hour: number | null;
-  proposedCorrectedFad: number | null;
-  correctionLossPct: number | null;
-  existingSpecificPower: number | null;
-  proposedSpecificPower: number | null;
-  existingEnergyPerM3: number | null;
-  proposedEnergyPerM3: number | null;
-  existingCostPerM3: number | null;
-  proposedCostPerM3: number | null;
-  existingAnnualEnergyKwh: number | null;
-  proposedAnnualEnergyKwh: number | null;
-  annualEnergySavingKwh: number | null;
-  existingAnnualCost: number | null;
-  proposedAnnualCost: number | null;
-  annualSaving: number | null;
-  savingPct: number | null;
-  netInvestment: number | null;
-  roiPct: number | null;
-  paybackMonths: number | null;
-}
-
-export function calculateProposal(inputs: ProposalCalculationInputs): ProposalCalculationResults {
-  const n = (key: string) => readNumericInput(inputs, key);
-  const messages: string[] = [];
-  let requiresReview = Object.values(inputs).some(value => value.reviewStatus === 'requires_review');
-
-  const existingPower = resolveEffectiveInputPower(
-    n('existingKw'), inputs.existingPowerBasis.value as PowerBasis, n('existingMotorEfficiency'),
-  );
-  const proposedPower = resolveEffectiveInputPower(
-    n('proposedKw'), inputs.proposedPowerBasis.value as PowerBasis, n('proposedMotorEfficiency'),
-  );
-  if (existingPower.status !== 'complete') messages.push(`Existing machine: ${existingPower.note}`);
-  if (proposedPower.status !== 'complete') messages.push(`Proposed machine: ${proposedPower.note}`);
-  requiresReview ||= existingPower.status === 'requires-review' || proposedPower.status === 'requires-review';
-
-  const seaLevelFad = n('proposedSeaLevelFadM3Min');
-  const correctionMethod = inputs.correctionMethod.value as CorrectionMethod;
-  const altitudeValue = n('altitudeM');
-  const altitudeM = altitudeValue === null ? null : inputs.altitudeUnit.value === 'ft' ? ftToM(altitudeValue) : inputs.altitudeUnit.value === 'm' ? altitudeValue : null;
-  const approvedLossPct = n('altitudeLossPct');
-  const ambientTempC = n('ambientTempC');
-  const correction = correctionMethod === 'approved_loss'
-    ? (seaLevelFad === null || approvedLossPct === null ? null : applyApprovedFadLoss(seaLevelFad, approvedLossPct))
-    : correctionMethod === 'standard_atmosphere_screening'
-      ? (seaLevelFad === null || altitudeM === null || ambientTempC === null ? null : applyFirstPrinciplesSiteCorrection(seaLevelFad, altitudeM, ambientTempC))
-      : null;
-  if (!correction) messages.push(correctionMethod === 'none_requires_review' ? 'Site correction method requires review.' : 'Site correction inputs are missing or invalid.');
-  if (correctionMethod === 'standard_atmosphere_screening') requiresReview = true;
-
-  const tariffRate = n('blendedRate');
-  if (tariffRate === null || tariffRate < 0) messages.push('Blended tariff rate is missing or invalid.');
-  const annualHours = n('annualOperatingHours');
-  if (annualHours === null || annualHours <= 0) messages.push('Annual operating hours are missing or invalid.');
-
-  const existingFad = n('existingFadM3Min');
-  const existingPerformance = existingPower.electricalInputKw === null || existingFad === null
-    ? null : calcFirstPrinciplesPerformance(existingPower.electricalInputKw, existingFad, tariffRate);
-  const proposedPerformance = proposedPower.electricalInputKw === null || !correction
-    ? null : calcFirstPrinciplesPerformance(proposedPower.electricalInputKw, correction.correctedFadM3Min, tariffRate);
-  if (!existingPerformance) messages.push('Existing delivered FAD is missing or invalid.');
-  if (!proposedPerformance && correction) messages.push('Proposed performance inputs are incomplete.');
-
-  const existingAnnual = existingPower.electricalInputKw !== null && annualHours !== null && tariffRate !== null
-    ? calcFirstPrinciplesAnnualCost(existingPower.electricalInputKw, annualHours, tariffRate) : null;
-  const proposedAnnual = proposedPower.electricalInputKw !== null && annualHours !== null && tariffRate !== null
-    ? calcFirstPrinciplesAnnualCost(proposedPower.electricalInputKw, annualHours, tariffRate) : null;
-  const savings = existingAnnual && proposedAnnual
-    ? calcFirstPrinciplesSavings(existingAnnual.annualEnergyKwh, proposedAnnual.annualEnergyKwh, existingAnnual.annualEnergyCostR, proposedAnnual.annualEnergyCostR)
-    : null;
-
-  const commercialValues = ['unitPrice', 'quantity', 'buyBack', 'installation', 'refurbishment', 'otherCosts'].map(n);
-  const roiCandidate = savings && commercialValues.every(value => value !== null) && savings.annualCostSavingR > 0
-    ? calcRoi({
-        unitPriceR: commercialValues[0]!, quantity: commercialValues[1]!, buyBackR: commercialValues[2]!,
-        refurbishmentR: commercialValues[4]!, otherCostsR: commercialValues[3]! + commercialValues[5]!,
-        annualSavingR: savings.annualCostSavingR, vatExcluded: inputs.vatTreatment.value.toLowerCase() === 'excluded',
-      })
-    : null;
-  const roi = roiCandidate && roiCandidate.netInitialInvestmentR > 0 ? roiCandidate : null;
-  if (!commercialValues.every(value => value !== null)) messages.push('ROI commercial inputs are incomplete.');
-  if (savings && savings.annualCostSavingR <= 0) messages.push('Annual saving is not positive; ROI and payback are not applicable.');
-  if (roiCandidate && roiCandidate.netInitialInvestmentR <= 0) messages.push('Net investment is not positive; ROI and payback are not applicable.');
-
-  const incomplete = existingPower.status === 'incomplete' || proposedPower.status === 'incomplete' || !correction || !existingPerformance || !proposedPerformance || !existingAnnual || !proposedAnnual || !savings;
-  const status: ProposalCalculationStatus = incomplete ? 'incomplete' : requiresReview ? 'requires_review' : 'complete';
-
-  return {
-    status, messages,
-    existingElectricalInputKw: existingPower.electricalInputKw,
-    proposedElectricalInputKw: proposedPower.electricalInputKw,
-    existingM3Hour: existingPerformance?.outputM3PerHour ?? null,
-    proposedM3Hour: proposedPerformance?.outputM3PerHour ?? null,
-    proposedCorrectedFad: correction?.correctedFadM3Min ?? null,
-    correctionLossPct: correction?.lossPct ?? null,
-    existingSpecificPower: existingPerformance?.kwPerM3Min ?? null,
-    proposedSpecificPower: proposedPerformance?.kwPerM3Min ?? null,
-    existingEnergyPerM3: existingPerformance?.kwhPerM3 ?? null,
-    proposedEnergyPerM3: proposedPerformance?.kwhPerM3 ?? null,
-    existingCostPerM3: existingPerformance?.costPerM3 ?? null,
-    proposedCostPerM3: proposedPerformance?.costPerM3 ?? null,
-    existingAnnualEnergyKwh: existingAnnual?.annualEnergyKwh ?? null,
-    proposedAnnualEnergyKwh: proposedAnnual?.annualEnergyKwh ?? null,
-    annualEnergySavingKwh: savings?.annualEnergySavingKwh ?? null,
-    existingAnnualCost: existingAnnual?.annualEnergyCostR ?? null,
-    proposedAnnualCost: proposedAnnual?.annualEnergyCostR ?? null,
-    annualSaving: savings?.annualCostSavingR ?? null,
-    savingPct: savings?.savingPct ?? null,
-    netInvestment: roi?.netInitialInvestmentR ?? null,
-    roiPct: roi?.roiPct ?? null,
-    paybackMonths: roi?.paybackMonths ?? null,
-  };
 }

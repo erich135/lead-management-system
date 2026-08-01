@@ -62,6 +62,12 @@ export interface WizardDraftController {
   busy: boolean;
   mayEdit: boolean;
   answer: (path: string, value: IntakeAnswer<unknown>) => void;
+  /**
+   * Several answers as one change. Choosing a customer or a machine fills more
+   * than one question, and those answers belong in the same save: half a
+   * selection stored is worse than none.
+   */
+  answerMany: (entries: readonly [string, IntakeAnswer<unknown>][]) => void;
   setProposalType: (type: WizardProposalType) => void;
   setManualBasis: (basis: WizardManualBasis) => void;
   setCustomer: (customer: NonNullable<WizardSaveRequest['customer']>) => void;
@@ -87,6 +93,8 @@ export function useWizardDraft(initial: WizardDraftView): WizardDraftController 
   const [conflict, setConflict] = useState<WizardConflict | null>(null);
   const [busy, setBusy] = useState(false);
 
+  /** What is on screen, readable without waiting for a render. */
+  const held = useRef<AuditIntakeDocument>(initial.draft.intake);
   const pending = useRef<PendingChange>({});
   const inFlight = useRef(false);
   /** While a conflict is unresolved, autosave stops: retrying would only fail again. */
@@ -103,13 +111,22 @@ export function useWizardDraft(initial: WizardDraftView): WizardDraftController 
     };
   }, []);
 
-  const adopt = useCallback((next: WizardDraftView) => {
-    revision.current = next.draft.revision;
-    setView(next);
-    // Only take the server's answers when nothing local is waiting to be sent,
-    // so a slow response cannot undo what was typed while it was in flight.
-    if (Object.keys(pending.current).length === 0) setIntake(next.draft.intake);
+  const applyIntake = useCallback((next: AuditIntakeDocument) => {
+    held.current = next;
+    setIntake(next);
   }, []);
+
+  const adopt = useCallback(
+    (next: WizardDraftView) => {
+      revision.current = next.draft.revision;
+      setView(next);
+      // Only take the server's answers when nothing local is waiting to be sent,
+      // so a slow response cannot undo what was typed while it was in flight.
+      if (Object.keys(pending.current).length === 0)
+        applyIntake(next.draft.intake);
+    },
+    [applyIntake],
+  );
 
   const send = useCallback(async (): Promise<boolean> => {
     if (inFlight.current) return true;
@@ -165,15 +182,22 @@ export function useWizardDraft(initial: WizardDraftView): WizardDraftController 
     [send],
   );
 
+  const answerMany = useCallback(
+    (entries: readonly [string, IntakeAnswer<unknown>][]) => {
+      let next = held.current;
+      for (const [path, value] of entries)
+        next = writeAnswerAtPath(next, path, value);
+      applyIntake(next);
+      queue({ intake: next });
+    },
+    [applyIntake, queue],
+  );
+
   const answer = useCallback(
     (path: string, value: IntakeAnswer<unknown>) => {
-      setIntake(current => {
-        const next = writeAnswerAtPath(current, path, value);
-        queue({ intake: next });
-        return next;
-      });
+      answerMany([[path, value]]);
     },
-    [queue],
+    [answerMany],
   );
 
   const setProposalType = useCallback(
@@ -247,7 +271,9 @@ export function useWizardDraft(initial: WizardDraftView): WizardDraftController 
         );
         if (!mounted.current) return true;
         adopt(next);
-        setIntake(next.draft.intake);
+        // A parse rewrites the answers the file owns, so what the server holds
+        // after an upload always wins over what was on screen before it.
+        applyIntake(next.draft.intake);
         setSaveState({ kind: 'saved', at: next.draft.updatedAt });
         return true;
       } catch (error: unknown) {
@@ -270,7 +296,7 @@ export function useWizardDraft(initial: WizardDraftView): WizardDraftController 
         if (mounted.current) setBusy(false);
       }
     },
-    [adopt, flush, view.draft.draftId],
+    [adopt, applyIntake, flush, view.draft.draftId],
   );
 
   const uploadDocument = useCallback(
@@ -318,13 +344,13 @@ export function useWizardDraft(initial: WizardDraftView): WizardDraftController 
       revision.current = next.draft.revision;
       conflictOpen.current = false;
       setView(next);
-      setIntake(next.draft.intake);
+      applyIntake(next.draft.intake);
       setConflict(null);
       setSaveState({ kind: 'clean' });
     } finally {
       if (mounted.current) setBusy(false);
     }
-  }, [view.draft.draftId]);
+  }, [applyIntake, view.draft.draftId]);
 
   /** Takes the newer stored version, discarding the refused local change. */
   const keepServerVersion = useCallback(() => {
@@ -336,10 +362,10 @@ export function useWizardDraft(initial: WizardDraftView): WizardDraftController 
     revision.current = conflict.current.draft.revision;
     conflictOpen.current = false;
     setView(conflict.current);
-    setIntake(conflict.current.draft.intake);
+    applyIntake(conflict.current.draft.intake);
     setConflict(null);
     setSaveState({ kind: 'clean' });
-  }, [conflict, reloadFromServer]);
+  }, [applyIntake, conflict, reloadFromServer]);
 
   /** Keeps what is on screen and re-quotes the stored revision to save over it. */
   const dismissConflict = useCallback(() => {
@@ -357,6 +383,7 @@ export function useWizardDraft(initial: WizardDraftView): WizardDraftController 
     busy,
     mayEdit: view.mayEdit !== false && view.draft.status === 'draft',
     answer,
+    answerMany,
     setProposalType,
     setManualBasis,
     setCustomer,

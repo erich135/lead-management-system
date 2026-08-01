@@ -17,6 +17,11 @@ import {
   unresolvedFields,
   WIZARD_FIELDS_PER_PAGE,
 } from '../src/features/bouwa/wizard/wizardState.ts';
+import {
+  existingMachineEntries,
+  proposedMachineEntries,
+} from '../src/features/bouwa/wizard/machineSelection.ts';
+import { siteCandidates } from '../src/features/bouwa/wizard/customerSiteSelection.ts';
 import type {
   AuditFieldStatus,
   AuditFormField,
@@ -486,6 +491,131 @@ assert.equal(
     readinessSummary: { stageLabel: 'File parsed', outstandingQuestionCount: 7 },
   }),
   'File parsed · 7 outstanding',
+);
+
+/* A machine selection fills what the source states, and nothing else. */
+
+const existing = new Map(
+  existingMachineEntries({
+    _id: 'machine-1',
+    make: ' Atlas Copco ',
+    model: 'GA 30',
+    serialNumber: 'API-664321',
+    currentLocation: 'Plant 2',
+  } as Parameters<typeof existingMachineEntries>[0]),
+);
+
+assert.equal(existing.get('existingMachine.manufacturer')?.value, 'Atlas Copco');
+assert.equal(existing.get('existingMachine.model')?.value, 'GA 30');
+assert.equal(existing.get('existingMachine.serialNumber')?.value, 'API-664321');
+assert.equal(existing.get('existingMachine.arsMachineId')?.value, 'machine-1');
+assert.equal(
+  existing.get('existingMachine.selectionMode')?.value,
+  'existing_catalog_machine',
+);
+for (const invented of [
+  'existingMachine.ratedFadM3PerMin',
+  'existingMachine.packageInputPowerKw',
+  'existingMachine.powerBasis',
+  'existingMachine.controlMethod',
+]) {
+  assert.equal(
+    existing.has(invented),
+    false,
+    `the ARS register does not state ${invented} and must not fill it`,
+  );
+}
+
+const proposed = new Map(
+  proposedMachineEntries({
+    _id: 'spec-1',
+    manufacturer: 'Kaeser',
+    modelName: 'ASD 40',
+    ratedCapacityM3Min: 4.1,
+    packageInputKw: 22.5,
+    motorKw: 22,
+    speedControl: 'VSD',
+  } as Parameters<typeof proposedMachineEntries>[0]),
+);
+
+assert.equal(proposed.get('proposedMachine.ratedFadM3PerMin')?.value, 4.1);
+assert.equal(
+  proposed.get('proposedMachine.packageInputPowerKw')?.value,
+  22.5,
+  'the published package figure is preferred over the motor rating',
+);
+assert.equal(
+  proposed.get('proposedMachine.powerBasis')?.value,
+  'manufacturer_package_input',
+);
+assert.equal(
+  proposed.get('proposedMachine.controlMethod')?.value,
+  'variable_speed_drive',
+);
+assert.equal(
+  proposed.has('proposedMachine.flowReferenceBasis'),
+  false,
+  'the spec library does not state the flow basis, so it stays a question',
+);
+
+/* Where only a motor rating exists, the basis says so rather than claiming a
+   package measurement. */
+const motorOnly = new Map(
+  proposedMachineEntries({
+    _id: 'spec-2',
+    manufacturer: 'Kaeser',
+    motorKw: 30,
+  } as Parameters<typeof proposedMachineEntries>[0]),
+);
+assert.equal(motorOnly.get('proposedMachine.packageInputPowerKw')?.value, 30);
+assert.equal(
+  motorOnly.get('proposedMachine.powerBasis')?.value,
+  'motor_nameplate_rating',
+);
+
+/* A fixed-speed library entry does not say whether it modulates or unloads,
+   and those are different machines to model. */
+const fixedSpeed = new Map(
+  proposedMachineEntries({
+    _id: 'spec-3',
+    manufacturer: 'Kaeser',
+    speedControl: 'FIXED_SPEED',
+  } as Parameters<typeof proposedMachineEntries>[0]),
+);
+assert.equal(fixedSpeed.has('proposedMachine.controlMethod'), false);
+
+/* The site list offers what ARS evidences and nothing it does not. */
+
+const sites = siteCandidates(
+  { customerId: 'c1', customerName: 'Acme', address: ' 14 Mill Road ' },
+  [
+    { _id: 'm1', currentLocation: 'Plant 2' },
+    { _id: 'm2', currentLocation: 'plant 2' },
+    { _id: 'm3', currentLocation: '   ' },
+    { _id: 'm4', currentLocation: '14 Mill Road' },
+  ] as Parameters<typeof siteCandidates>[1],
+);
+
+assert.deepEqual(
+  sites.map(site => [site.siteName, site.origin]),
+  [
+    ['14 Mill Road', 'customer_address'],
+    ['Plant 2', 'machine_location'],
+  ],
+  'the address and each distinct machine location appear once each',
+);
+assert.equal(
+  sites[1].address,
+  null,
+  'a machine location is a place name, not an address ARS has verified',
+);
+assert.deepEqual(
+  siteCandidates(
+    { customerId: 'c1', customerName: 'Acme', address: null },
+    [] as Parameters<typeof siteCandidates>[1],
+  ),
+  [],
+  'where ARS evidences no site, none is offered rather than one invented',
 );
 
 console.log('Bouwa guided-wizard state checks passed.');

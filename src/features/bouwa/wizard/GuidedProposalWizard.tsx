@@ -25,10 +25,22 @@ import type {
   AuditIntakeFormModel,
   AuditReadinessAssessment,
 } from '../auditIntakeTypes';
+import { getMachinesByCustomer } from '../../../lib/api';
+import type { Machine } from '../../../lib/api';
+import {
+  ExistingMachinePicker,
+  ProposedMachinePicker,
+} from './components/MachinePickers';
+import {
+  existingMachineEntries,
+  proposedMachineEntries,
+} from './machineSelection';
 import { WizardAnswerField } from './components/WizardAnswerField';
 import { WizardEvidenceGroups } from './components/WizardEvidenceGroups';
 import { WizardReadinessStrip } from './components/WizardReadinessSummary';
 import { WizardFooter, WizardShell } from './components/WizardShell';
+import { CUSTOMER_SITE_SELECTOR_CODES } from './customerSiteSelection';
+import { CustomerSiteStep } from './steps/CustomerSiteStep';
 import { DocumentsScreen } from './steps/DocumentsScreen';
 import { ManualBasisStep } from './steps/ManualBasisStep';
 import { ProposalTypeStep } from './steps/ProposalTypeStep';
@@ -52,8 +64,17 @@ type Screen =
   | { kind: 'upload' }
   | { kind: 'documents' }
   | { kind: 'review' }
+  | { kind: 'customer_site'; fields: WizardFieldView[] }
   | { kind: 'manual_basis'; fields: WizardFieldView[] }
+  | { kind: 'existing_machine'; fields: WizardFieldView[] }
+  | { kind: 'proposed_machine'; fields: WizardFieldView[] }
   | { kind: 'fields'; fields: WizardFieldView[] };
+
+function fieldScreens(fields: WizardFieldView[]): Screen[] {
+  return stepPages(fields).map(
+    page => ({ kind: 'fields', fields: page.fields }) as Screen,
+  );
+}
 
 function screensForStep(
   step: WizardStep,
@@ -63,9 +84,25 @@ function screensForStep(
 ): Screen[] {
   if (step.id === 'proposal_type') return [{ kind: 'proposal_type' }];
   if (step.id === 'review') return [{ kind: 'review' }];
-  const pages = stepPages(
-    stepFieldViews(step, formModel, readiness, fileParsed),
-  ).map(page => ({ kind: 'fields', fields: page.fields }) as Screen);
+  const all = stepFieldViews(step, formModel, readiness, fileParsed);
+
+  if (step.id === 'customer_site') {
+    // The four questions the selectors answer are never shown as boxes, and
+    // what remains of the identity section shares the selectors' screen.
+    const remaining = all.filter(
+      view => !CUSTOMER_SITE_SELECTOR_CODES.includes(view.field.code),
+    );
+    const identity = remaining.filter(view => view.status.section === 'identity');
+    const rest = remaining.filter(view => view.status.section !== 'identity');
+    return [{ kind: 'customer_site', fields: identity }, ...fieldScreens(rest)];
+  }
+
+  const pages = fieldScreens(all);
+  const withPicker = (kind: 'existing_machine' | 'proposed_machine'): Screen[] => [
+    { kind, fields: pages[0]?.kind === 'fields' ? pages[0].fields.slice(0, 3) : [] },
+    ...fieldScreens(all.slice(3)),
+  ];
+
   if (step.id === 'upload_audit') return [{ kind: 'upload' }, ...pages];
   if (step.id === 'manual_basis')
     return [
@@ -75,6 +112,8 @@ function screensForStep(
       },
       ...pages.slice(1),
     ];
+  if (step.id === 'existing_system') return withPicker('existing_machine');
+  if (step.id === 'proposed_solution') return withPicker('proposed_machine');
   // The documents belong with the questions whose evidence they are, and the
   // tariff and investment answers are the last ones asked before the review.
   if (step.id === 'tariff_investment') return [...pages, { kind: 'documents' }];
@@ -102,6 +141,29 @@ export function GuidedProposalWizard({
   const [pageIndex, setPageIndex] = useState(view.draft.currentPageIndex);
   const [hint, setHint] = useState('');
   const [leaving, setLeaving] = useState(false);
+  /** The machines ARS holds against the chosen customer, once one is chosen. */
+  const [customerMachines, setCustomerMachines] = useState<Machine[]>([]);
+
+  // A resumed proposal already has its customer, and the machine step needs
+  // that customer's machines whether or not the selector screen was visited.
+  const customerId = view.draft.customer.customerId;
+  useEffect(() => {
+    if (customerId === null) {
+      setCustomerMachines([]);
+      return;
+    }
+    let live = true;
+    getMachinesByCustomer(customerId)
+      .then(response => {
+        if (live) setCustomerMachines(response.machines ?? []);
+      })
+      .catch(() => {
+        if (live) setCustomerMachines([]);
+      });
+    return () => {
+      live = false;
+    };
+  }, [customerId]);
 
   // The backend decides which steps a proposal type has. Changing the type can
   // therefore remove the step being shown, and the backend says where to land.
@@ -331,6 +393,65 @@ export function GuidedProposalWizard({
             busy={busy}
             onUpload={draft.uploadSource}
           />
+        ) : screen.kind === 'customer_site' ? (
+          <CustomerSiteStep
+            customer={view.draft.customer}
+            fields={screen.fields}
+            intake={intake}
+            disabled={!mayEdit}
+            onAnswer={draft.answer}
+            onAnswerMany={draft.answerMany}
+            onLinkCustomer={draft.setCustomer}
+            onMachinesLoaded={setCustomerMachines}
+          />
+        ) : screen.kind === 'existing_machine' ? (
+          <div className="space-y-3">
+            <ExistingMachinePicker
+              machines={customerMachines}
+              customerChosen={view.draft.customer.customerId !== null}
+              selectedMachineId={
+                (readAnswerAtPath(intake, 'existingMachine.arsMachineId')
+                  ?.value as string) ?? null
+              }
+              disabled={!mayEdit}
+              onSelect={machine =>
+                draft.answerMany(existingMachineEntries(machine))
+              }
+            />
+            <div className="space-y-2">
+              {screen.fields.map(fieldView => (
+                <WizardAnswerField
+                  key={fieldView.field.code}
+                  view={fieldView}
+                  intake={intake}
+                  disabled={!mayEdit}
+                  onAnswer={draft.answer}
+                />
+              ))}
+            </div>
+          </div>
+        ) : screen.kind === 'proposed_machine' ? (
+          <div className="space-y-3">
+            <ProposedMachinePicker
+              selectedSpecId={
+                (readAnswerAtPath(intake, 'proposedMachine.arsMachineId')
+                  ?.value as string) ?? null
+              }
+              disabled={!mayEdit}
+              onSelect={spec => draft.answerMany(proposedMachineEntries(spec))}
+            />
+            <div className="space-y-2">
+              {screen.fields.map(fieldView => (
+                <WizardAnswerField
+                  key={fieldView.field.code}
+                  view={fieldView}
+                  intake={intake}
+                  disabled={!mayEdit}
+                  onAnswer={draft.answer}
+                />
+              ))}
+            </div>
+          </div>
         ) : screen.kind === 'manual_basis' ? (
           <ManualBasisStep
             manualBasis={view.draft.manualBasis}

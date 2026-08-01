@@ -104,7 +104,12 @@ export function WizardAnswerField({
   );
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+    <div
+      data-testid="wizard-field"
+      data-field-code={field.code}
+      data-answer-state={stored?.state ?? 'unanswered'}
+      className="rounded-lg border border-slate-200 bg-white px-3 py-2.5"
+    >
       <div className="flex items-start justify-between gap-3">
         <label
           htmlFor={controlId}

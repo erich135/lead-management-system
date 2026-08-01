@@ -149,8 +149,17 @@ export function useWizardDraft(initial: WizardDraftView): WizardDraftController 
     } catch (error: unknown) {
       inFlight.current = false;
       // The change was not stored, so it goes back on the queue rather than
-      // being lost. Nothing on screen is discarded.
-      pending.current = { ...change, ...pending.current };
+      // being lost. Nothing on screen is discarded, and the customer link is
+      // put back together rather than half-replaced.
+      const customer =
+        change.customer === undefined && pending.current.customer === undefined
+          ? undefined
+          : { ...(change.customer ?? {}), ...(pending.current.customer ?? {}) };
+      pending.current = {
+        ...change,
+        ...pending.current,
+        ...(customer ? { customer } : {}),
+      };
       if (!mounted.current) return false;
       if (error instanceof WizardRequestError && error.conflict !== null) {
         conflictOpen.current = true;
@@ -169,7 +178,15 @@ export function useWizardDraft(initial: WizardDraftView): WizardDraftController 
 
   const queue = useCallback(
     (change: PendingChange) => {
-      pending.current = { ...pending.current, ...change };
+      // The customer link arrives a piece at a time — the customer first, then
+      // the site — and the pieces belong to one link. Replacing the queued
+      // patch instead of merging it would send the site and forget who it
+      // belongs to.
+      const customer =
+        change.customer === undefined
+          ? pending.current.customer
+          : { ...(pending.current.customer ?? {}), ...change.customer };
+      pending.current = { ...pending.current, ...change, ...(customer ? { customer } : {}) };
       setSaveState(current =>
         current.kind === 'conflict' ? current : { kind: 'dirty' },
       );

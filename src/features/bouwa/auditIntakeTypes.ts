@@ -96,6 +96,8 @@ export interface AuditStageEligibility {
   stage: AuditReadinessStage;
   label: string;
   eligible: boolean;
+  /** False where the proposal type has no such stage, as a manual proposal has no measurement. */
+  applicable: boolean;
   blockingFieldCodes: string[];
   reasons: string[];
 }
@@ -304,10 +306,17 @@ export interface AuditFormSection {
   description: string;
 }
 
+export interface AuditOutputDefinition {
+  id: AuditOutputId;
+  label: string;
+  requiredStage: AuditReadinessStage;
+}
+
 export interface AuditIntakeFormModel {
   intakeSchemaVersion: string;
   sections: AuditFormSection[];
   fields: AuditFormField[];
   evidenceTypes: AuditSelectionOption[];
   evidenceStatuses: AuditSelectionOption[];
+  outputs: AuditOutputDefinition[];
 }

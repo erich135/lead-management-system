@@ -659,11 +659,29 @@ requireText(
   '<BouwaLoggerLocalApp connection={connection} />',
   'authenticated workflow page reuses the accepted workspace',
 );
+// The detailed workspace is still the only place the engineering interface
+// comes from, but it is no longer the module's default screen. The guided
+// wizard is what a user lands on, and the workspace is reached from inside a
+// proposal as Advanced Technical Review.
+const guidedPage = read(
+  'src/features/bouwa/wizard/BouwaGuidedProposalPage.tsx',
+);
 requireText(
   moduleShell,
-  '<BouwaAirAuditWorkflowPage />',
-  'authenticated Bouwa module workflow tab',
+  '<BouwaGuidedProposalPage />',
+  'authenticated Bouwa module default workflow',
 );
+requireText(
+  guidedPage,
+  '<BouwaAirAuditWorkflowPage />',
+  'Advanced Technical Review reuses the accepted workspace',
+);
+for (const forbidden of ['<BouwaAirAuditWorkflowPage />', '<BouwaNewProposalWizard />'])
+  forbidText(
+    withoutComments(moduleShell),
+    forbidden,
+    'Bouwa module single active workflow',
+  );
 requireText(
   page,
   'connection.actor.displayName',

@@ -16,7 +16,14 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
-export type BouwaTopNav = 'dashboard' | 'air-audit' | 'new-proposal' | 'drafts' | 'spec-library' | 'templates';
+export type BouwaTopNav =
+  | 'proposals'
+  | 'dashboard'
+  | 'air-audit'
+  | 'new-proposal'
+  | 'drafts'
+  | 'spec-library'
+  | 'templates';
 
 interface BouwaDashboardProps {
   onNavigate: (view: BouwaTopNav, extra?: string) => void;

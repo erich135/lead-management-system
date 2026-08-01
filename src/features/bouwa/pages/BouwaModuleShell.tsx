@@ -28,19 +28,21 @@
  */
 
 import { useState } from 'react';
-import { Activity, Cpu, ChevronRight, Wind, FileText, Database, LayoutDashboard, FolderOpen } from 'lucide-react';
+import { Cpu, ChevronRight, FileText, Database, FolderOpen } from 'lucide-react';
 
-import { BouwaAirAuditWorkflowPage } from './BouwaAirAuditWorkflowPage';
-import { BouwaDashboard }          from '../components/BouwaDashboard';
-import { BouwaNewProposalWizard }  from '../components/BouwaNewProposalWizard';
-import { BouwaDraftProposalsList } from '../components/BouwaDraftProposalsList';
 import { BouwaSpecLibraryPage }    from '../components/BouwaSpecLibraryPage';
 import { BouwaTemplatesPage }      from '../components/BouwaTemplatesPage';
+import { BouwaGuidedProposalPage } from '../wizard/BouwaGuidedProposalPage';
 
 import type { BouwaTopNav }        from '../components/BouwaDashboard';
 
 // ---------------------------------------------------------------------------
 // Nav definition
+//
+// One workflow. Proposals are created and continued in the guided wizard, and
+// the detailed engineering interface is opened from inside a proposal as
+// Advanced Technical Review rather than sitting beside the workflow as a second
+// way of doing the same job.
 // ---------------------------------------------------------------------------
 
 interface NavItem {
@@ -50,10 +52,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { key: 'dashboard',    label: 'Dashboard',               icon: <LayoutDashboard className="w-4 h-4" /> },
-  { key: 'air-audit',    label: 'Air Audit Workflow',      icon: <Activity        className="w-4 h-4" /> },
-  { key: 'new-proposal', label: 'New Proposal',            icon: <Wind            className="w-4 h-4" /> },
-  { key: 'drafts',       label: 'Draft Proposals',         icon: <FolderOpen      className="w-4 h-4" /> },
+  { key: 'proposals',    label: 'Proposals',               icon: <FolderOpen      className="w-4 h-4" /> },
   { key: 'spec-library', label: 'Machine Spec Library',    icon: <Database        className="w-4 h-4" /> },
   { key: 'templates',    label: 'Templates & Assumptions', icon: <FileText        className="w-4 h-4" /> },
 ];
@@ -104,7 +103,7 @@ function Breadcrumb({ view }: { view: BouwaTopNav }) {
 // ---------------------------------------------------------------------------
 
 export function BouwaModuleShell() {
-  const [view, setView] = useState<BouwaTopNav>('dashboard');
+  const [view, setView] = useState<BouwaTopNav>('proposals');
 
   function navigate(v: BouwaTopNav) {
     setView(v);
@@ -113,33 +112,20 @@ export function BouwaModuleShell() {
 
   function renderView() {
     switch (view) {
-      case 'dashboard':
-        return <BouwaDashboard onNavigate={navigate} />;
-      case 'air-audit':
-        return <BouwaAirAuditWorkflowPage />;
-      case 'new-proposal':
-        return <BouwaNewProposalWizard />;
-      case 'drafts':
-        return (
-          <BouwaDraftProposalsList
-            onNewProposal={() => navigate('new-proposal')}
-            onOpenProposal={() => navigate('new-proposal')}
-          />
-        );
       case 'spec-library':
         return <BouwaSpecLibraryPage />;
       case 'templates':
         return <BouwaTemplatesPage />;
       default:
-        return <BouwaDashboard onNavigate={navigate} />;
+        return <BouwaGuidedProposalPage />;
     }
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4">
+    <div className="mx-auto max-w-6xl space-y-3">
       <Breadcrumb view={view} />
       <TopNav active={view} onChange={navigate} />
-      <div className="pt-2">{renderView()}</div>
+      <div className="pt-1">{renderView()}</div>
     </div>
   );
 }

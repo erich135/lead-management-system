@@ -23,8 +23,11 @@ import type {
 } from '../auditIntakeTypes';
 import type { WizardDraft, WizardSourceFact, WizardStep } from './wizardTypes';
 
-/** Questions per card. Chosen so a card and its footer fit 1366 x 768. */
-export const WIZARD_FIELDS_PER_PAGE = 5;
+/**
+ * Questions per card. Chosen so a card and its footer fit 1366 x 768, where a
+ * question that carries a note under it is about ninety pixels tall.
+ */
+export const WIZARD_FIELDS_PER_PAGE = 4;
 
 export interface WizardFieldView {
   status: AuditFieldStatus;
@@ -81,6 +84,39 @@ export function stepPages(fields: WizardFieldView[]): WizardPage[] {
       fields: fields.slice(start, start + WIZARD_FIELDS_PER_PAGE),
     });
   return pages;
+}
+
+export interface WizardFieldGroup {
+  section: AuditIntakeSection;
+  label: string;
+  fields: WizardFieldView[];
+}
+
+/**
+ * The questions on a screen under the heading they belong to, in the order they
+ * were asked. "Unit price" and "Quantity" mean nothing on their own; under
+ * "Electricity tariff" they mean what they say. Consecutive runs are kept
+ * separate rather than gathered, so the heading always describes the questions
+ * directly beneath it.
+ */
+export function fieldGroups(
+  fields: WizardFieldView[],
+  sections: readonly { id: AuditIntakeSection; label: string }[],
+): WizardFieldGroup[] {
+  const labels = new Map(sections.map(section => [section.id, section.label]));
+  const groups: WizardFieldGroup[] = [];
+  for (const field of fields) {
+    const section = field.status.section;
+    const last = groups[groups.length - 1];
+    if (last !== undefined && last.section === section) last.fields.push(field);
+    else
+      groups.push({
+        section,
+        label: labels.get(section) ?? section,
+        fields: [field],
+      });
+  }
+  return groups;
 }
 
 export function clampPageIndex(index: number, pageCount: number): number {

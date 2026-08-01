@@ -26,6 +26,7 @@ import type {
   IntakeAnswer,
   IntakeAnswerState,
 } from '../../auditIntakeTypes';
+import { conceptForField } from '../wizardHelp';
 import type { WizardFieldView } from '../wizardState';
 
 const STATE_BUTTON_LABELS: Partial<Record<IntakeAnswerState, string>> = {
@@ -80,6 +81,7 @@ export function WizardAnswerField({
 
   const text = draft ?? inputTextForAnswer(stored);
   const locked = view.sourceDerived || disabled;
+  const concept = conceptForField(field.code);
   const controlId = `wizard-field-${field.code.replace(/[^A-Za-z0-9]/g, '-')}`;
 
   function commitText(raw: string) {
@@ -141,9 +143,15 @@ export function WizardAnswerField({
       </div>
 
       {helpOpen ? (
-        <p className="mt-1.5 rounded-md bg-slate-50 px-2.5 py-2 text-xs leading-relaxed text-slate-600">
-          {status.whyItMatters}
-        </p>
+        <div className="mt-1.5 space-y-1.5 rounded-md bg-slate-50 px-2.5 py-2 text-xs leading-relaxed text-slate-600">
+          <p>{status.whyItMatters}</p>
+          {concept === null ? null : (
+            <p>
+              <span className="font-medium text-slate-700">{concept.title}. </span>
+              {concept.body}
+            </p>
+          )}
+        </div>
       ) : null}
 
       <div className="mt-2 flex flex-wrap items-center gap-2">

@@ -767,6 +767,17 @@ async function resumeAfterRestart(browser) {
 
 async function main() {
   fs.mkdirSync(OUTPUT, { recursive: true });
+  // A screenshot from a previous run is worse than no screenshot: it shows a
+  // screen that no longer exists and invites a conclusion about code that has
+  // since changed. The resume phase keeps what the create phase left.
+  if (PHASE !== 'resume')
+    for (const file of fs.readdirSync(OUTPUT))
+      if (file.endsWith('.png'))
+        try {
+          fs.rmSync(path.join(OUTPUT, file));
+        } catch {
+          process.stdout.write(`  note: could not remove the old ${file}\n`);
+        }
   const { chromium } = resolvePlaywright();
   const browser = await chromium.launch({ channel: CHANNEL });
   try {

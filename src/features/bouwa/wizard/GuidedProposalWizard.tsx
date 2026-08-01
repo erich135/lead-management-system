@@ -49,6 +49,7 @@ import { UploadAuditStep } from './steps/UploadAuditStep';
 import { useWizardDraft } from './useWizardDraft';
 import {
   clampPageIndex,
+  fieldGroups,
   hasUnsavedWork,
   moveBack,
   moveForward,
@@ -301,9 +302,13 @@ export function GuidedProposalWizard({
         pageCounter={pageCounter}
         saveState={saveState}
         header={
-          <div className="mt-2 border-t border-slate-100 pt-2">
-            <WizardReadinessStrip readiness={view.readiness} />
-          </div>
+          // The review sets out the same four stages in full, and one readiness
+          // system means saying it once.
+          screen?.kind === 'review' ? null : (
+            <div className="mt-2 border-t border-slate-100 pt-2">
+              <WizardReadinessStrip readiness={view.readiness} />
+            </div>
+          )
         }
         banner={
           conflict === null ? (
@@ -496,15 +501,24 @@ export function GuidedProposalWizard({
             />
           </div>
         ) : (
-          <div className="space-y-2">
-            {screen.fields.map(fieldView => (
-              <WizardAnswerField
-                key={fieldView.field.code}
-                view={fieldView}
-                intake={intake}
-                disabled={!mayEdit}
-                onAnswer={draft.answer}
-              />
+          <div className="space-y-3">
+            {fieldGroups(screen.fields, formModel.sections).map(group => (
+              <div key={`${group.section}-${group.fields[0]?.field.code}`}>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {group.label}
+                </h3>
+                <div className="space-y-2">
+                  {group.fields.map(fieldView => (
+                    <WizardAnswerField
+                      key={fieldView.field.code}
+                      view={fieldView}
+                      intake={intake}
+                      disabled={!mayEdit}
+                      onAnswer={draft.answer}
+                    />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}

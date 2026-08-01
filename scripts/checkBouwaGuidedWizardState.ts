@@ -5,6 +5,7 @@ import {
   clampPageIndex,
   draftReadinessLabel,
   evidenceGroups,
+  fieldGroups,
   hasUnsavedWork,
   isFinalScreen,
   moveBack,
@@ -22,6 +23,10 @@ import {
   proposedMachineEntries,
 } from '../src/features/bouwa/wizard/machineSelection.ts';
 import { siteCandidates } from '../src/features/bouwa/wizard/customerSiteSelection.ts';
+import {
+  conceptForField,
+  WIZARD_CONCEPTS,
+} from '../src/features/bouwa/wizard/wizardHelp.ts';
 import type {
   AuditFieldStatus,
   AuditFormField,
@@ -201,6 +206,62 @@ assert.equal(
   'no question is lost when a step is paged',
 );
 assert.equal(stepPages([]).length, 1, 'a step with nothing to ask still has a screen');
+
+/* Questions carry the heading of the section they belong to. */
+
+const groupViews = stepFieldViews(
+  step({ fieldCodes: ['AUDIT.T.ONE', 'AUDIT.T.TWO', 'AUDIT.I.ONE'] }),
+  formModel({
+    fields: [
+      field({ code: 'AUDIT.T.ONE', path: 'tariff.one' }),
+      field({ code: 'AUDIT.T.TWO', path: 'tariff.two' }),
+      field({ code: 'AUDIT.I.ONE', path: 'investment.one' }),
+    ],
+  }),
+  readiness({
+    fieldStatuses: [
+      status({ code: 'AUDIT.T.ONE', section: 'tariff' }),
+      status({ code: 'AUDIT.T.TWO', section: 'tariff' }),
+      status({ code: 'AUDIT.I.ONE', section: 'investment' }),
+    ],
+  }),
+);
+const sectionGroups = fieldGroups(groupViews, [
+  { id: 'tariff', label: 'Electricity tariff' },
+  { id: 'investment', label: 'Investment' },
+]);
+assert.equal(sectionGroups.length, 2);
+assert.equal(sectionGroups[0].label, 'Electricity tariff');
+assert.equal(sectionGroups[0].fields.length, 2);
+assert.equal(sectionGroups[1].label, 'Investment');
+assert.deepEqual(
+  fieldGroups(groupViews, []).map(group => group.label),
+  ['tariff', 'investment'],
+  'a section with no stated label is named by its identifier rather than left blank',
+);
+assert.equal(fieldGroups([], []).length, 0);
+
+/* Contextual help: the specific explanation wins over the general one. */
+
+assert.equal(
+  conceptForField('AUDIT.FLOW_SENSOR.FLOW_REFERENCE_BASIS')?.title,
+  'Flow reference basis',
+);
+assert.equal(
+  conceptForField('AUDIT.EXISTING_MACHINE.CONTROL_METHOD')?.title,
+  'Control method',
+);
+assert.equal(
+  conceptForField('AUDIT.PROPOSED_MACHINE.CONTROL_METHOD')?.title,
+  'Why a VSD curve is required',
+  'the proposed machine is where the part-load evidence is needed',
+);
+assert.equal(conceptForField('AUDIT.IDENTITY.CUSTOMER_NAME'), null);
+for (const concept of WIZARD_CONCEPTS)
+  assert.ok(
+    concept.body.length > 80 && !/\bassume\b/i.test(concept.body),
+    `${concept.title} explains rather than excuses`,
+  );
 
 assert.equal(clampPageIndex(-1, 3), 0);
 assert.equal(clampPageIndex(9, 3), 2);

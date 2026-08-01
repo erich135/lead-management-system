@@ -8,7 +8,7 @@
  */
 
 import {
-  Wind, FileText, Plus, ArrowRight, ChevronRight, Cpu,
+  Activity, Wind, FileText, Plus, ArrowRight, ChevronRight, Cpu,
   BarChart3, CheckCircle2, Zap,
 } from 'lucide-react';
 
@@ -16,7 +16,7 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
-export type BouwaTopNav = 'dashboard' | 'new-proposal' | 'drafts' | 'spec-library' | 'templates';
+export type BouwaTopNav = 'dashboard' | 'air-audit' | 'new-proposal' | 'drafts' | 'spec-library' | 'templates';
 
 interface BouwaDashboardProps {
   onNavigate: (view: BouwaTopNav, extra?: string) => void;
@@ -102,8 +102,15 @@ export function BouwaDashboard({ onNavigate }: BouwaDashboardProps) {
           </div>
           <div className="flex flex-col gap-3 shrink-0 w-full sm:w-auto">
             <button
-              onClick={() => onNavigate('new-proposal')}
+              onClick={() => onNavigate('air-audit')}
               className="flex items-center justify-center gap-2 px-6 py-3 bg-white text-ars-primary font-bold rounded-xl hover:bg-white/90 transition shadow text-sm"
+            >
+              <Activity className="w-5 h-5" />
+              Start a measured air audit
+            </button>
+            <button
+              onClick={() => onNavigate('new-proposal')}
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-white/20 text-white font-bold rounded-xl hover:bg-white/30 transition text-sm border border-white/30"
             >
               <Plus className="w-5 h-5" />
               New Air Audit Proposal

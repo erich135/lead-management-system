@@ -40,7 +40,11 @@ import type {
   IntakeAnswerState,
   ResolvedScientificInputs,
 } from '../auditIntakeTypes';
-import type { LocalSession } from '../proposalLocalTypes';
+import {
+  workflowHeaders,
+  workflowUrl,
+  type BouwaWorkflowConnection,
+} from '../workflowConnection';
 
 const SAVE_DEBOUNCE_MS = 400;
 
@@ -54,7 +58,7 @@ const SERVER_OWNED_FIELD_CODES = [
 ];
 
 interface BouwaAuditIntakePanelProps {
-  session: LocalSession;
+  connection: BouwaWorkflowConnection;
   proposalRecordId: string;
   /** Changes whenever a new logger export has been parsed. */
   parsedSourceToken: string | null;
@@ -63,17 +67,17 @@ interface BouwaAuditIntakePanelProps {
 }
 
 async function intakeRequest<T>(
-  url: string,
-  session: LocalSession,
+  path: string,
+  connection: BouwaWorkflowConnection,
   onSessionExpired: () => void,
   init?: RequestInit,
 ): Promise<T> {
-  const response = await fetch(url, {
+  const response = await fetch(workflowUrl(connection, path), {
     ...init,
-    headers: {
-      ...(init?.headers as Record<string, string> | undefined),
-      Authorization: `Bearer ${session.token}`,
-    },
+    headers: workflowHeaders(
+      connection,
+      init?.headers as Record<string, string> | undefined,
+    ),
   });
   const payload = (await response.json()) as T | { error?: string };
   if (response.status === 401) onSessionExpired();
@@ -81,8 +85,8 @@ async function intakeRequest<T>(
     throw new Error(
       'error' in (payload as { error?: string })
         ? ((payload as { error?: string }).error ??
-          'The local audit-intake service rejected the request.')
-        : 'The local audit-intake service rejected the request.',
+          'The audit-intake service rejected the request.')
+        : 'The audit-intake service rejected the request.',
     );
   return payload as T;
 }
@@ -837,7 +841,7 @@ function EvidencePanel({
 }
 
 export function BouwaAuditIntakePanel({
-  session,
+  connection,
   proposalRecordId,
   parsedSourceToken,
   onSessionExpired,
@@ -871,8 +875,8 @@ export function BouwaAuditIntakePanel({
   useEffect(() => {
     let current = true;
     intakeRequest<AuditIntakeFormModel>(
-      '/api/bouwa-local/intake/form',
-      session,
+      '/intake/form',
+      connection,
       onSessionExpired,
     )
       .then(value => {
@@ -889,13 +893,13 @@ export function BouwaAuditIntakePanel({
     return () => {
       current = false;
     };
-  }, [onSessionExpired, session]);
+  }, [connection, onSessionExpired]);
 
   useEffect(() => {
     let current = true;
     intakeRequest<AuditIntakeState>(
-      `/api/bouwa-local/intake?proposalRecordId=${encodeURIComponent(proposalRecordId)}`,
-      session,
+      `/intake?proposalRecordId=${encodeURIComponent(proposalRecordId)}`,
+      connection,
       onSessionExpired,
     )
       .then(value => {
@@ -912,7 +916,13 @@ export function BouwaAuditIntakePanel({
     return () => {
       current = false;
     };
-  }, [applyState, onSessionExpired, parsedSourceToken, proposalRecordId, session]);
+  }, [
+    applyState,
+    connection,
+    onSessionExpired,
+    parsedSourceToken,
+    proposalRecordId,
+  ]);
 
   useEffect(() => {
     if (intake === null) return;
@@ -927,8 +937,8 @@ export function BouwaAuditIntakePanel({
     const timer = setTimeout(() => {
       setSaving(true);
       intakeRequest<AuditIntakeState>(
-        '/api/bouwa-local/intake',
-        session,
+        '/intake',
+        connection,
         onSessionExpired,
         {
           method: 'POST',
@@ -957,7 +967,13 @@ export function BouwaAuditIntakePanel({
         .finally(() => setSaving(false));
     }, SAVE_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [intake, onReadinessChange, onSessionExpired, proposalRecordId, session]);
+  }, [
+    connection,
+    intake,
+    onReadinessChange,
+    onSessionExpired,
+    proposalRecordId,
+  ]);
 
   const sectionViews = useMemo(() => {
     if (!formModel || !state) return [];

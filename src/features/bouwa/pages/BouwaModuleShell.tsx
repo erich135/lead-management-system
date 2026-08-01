@@ -28,8 +28,9 @@
  */
 
 import { useState } from 'react';
-import { Cpu, ChevronRight, Wind, FileText, Database, LayoutDashboard, FolderOpen } from 'lucide-react';
+import { Activity, Cpu, ChevronRight, Wind, FileText, Database, LayoutDashboard, FolderOpen } from 'lucide-react';
 
+import { BouwaAirAuditWorkflowPage } from './BouwaAirAuditWorkflowPage';
 import { BouwaDashboard }          from '../components/BouwaDashboard';
 import { BouwaNewProposalWizard }  from '../components/BouwaNewProposalWizard';
 import { BouwaDraftProposalsList } from '../components/BouwaDraftProposalsList';
@@ -50,6 +51,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard',    label: 'Dashboard',               icon: <LayoutDashboard className="w-4 h-4" /> },
+  { key: 'air-audit',    label: 'Air Audit Workflow',      icon: <Activity        className="w-4 h-4" /> },
   { key: 'new-proposal', label: 'New Proposal',            icon: <Wind            className="w-4 h-4" /> },
   { key: 'drafts',       label: 'Draft Proposals',         icon: <FolderOpen      className="w-4 h-4" /> },
   { key: 'spec-library', label: 'Machine Spec Library',    icon: <Database        className="w-4 h-4" /> },
@@ -113,6 +115,8 @@ export function BouwaModuleShell() {
     switch (view) {
       case 'dashboard':
         return <BouwaDashboard onNavigate={navigate} />;
+      case 'air-audit':
+        return <BouwaAirAuditWorkflowPage />;
       case 'new-proposal':
         return <BouwaNewProposalWizard />;
       case 'drafts':

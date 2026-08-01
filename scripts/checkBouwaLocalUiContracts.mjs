@@ -32,6 +32,11 @@ function forbidText(source, text, label) {
     throw new Error(`${label} contract must not contain '${text}'.`);
 }
 
+// Prose in a comment is not code, so comments are removed before any check that
+// looks for arithmetic.
+const withoutComments = source =>
+  source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
 requireText(
   page,
   '20 * 1024 * 1024',
@@ -365,7 +370,7 @@ for (const formulaToken of [
   'annualise',
 ])
   forbidText(
-    measuredDemandUi,
+    withoutComments(measuredDemandUi),
     formulaToken,
     `${measuredDemandUiLabel} frontend scientific formula`,
   );
@@ -376,14 +381,15 @@ requireText(page, '<BouwaAuditIntakePanel', intakeLabel);
 requireText(page, 'parsedSourceToken', `${intakeLabel} reload after a parse`);
 
 for (const contract of [
-  '/api/bouwa-local/intake/form',
-  '/api/bouwa-local/intake',
-  'Authorization: `Bearer ${session.token}`',
+  "'/intake/form'",
+  "'/intake'",
+  'workflowUrl(connection',
+  'workflowHeaders(',
   'onSessionExpired()',
   'mayApplyAuditIntakeSave',
   'nextAuditIntakeSave',
 ])
-  requireText(intakePanel, contract, `${intakeLabel} local service contract`);
+  requireText(intakePanel, contract, `${intakeLabel} service contract`);
 
 for (const answerState of [
   'unknown_confirmation_required',
@@ -523,11 +529,7 @@ forbidText(
 );
 
 // The intake form describes controlled answers. It must never carry its own
-// option lists, its own stage rules, or any scientific arithmetic. Prose in a
-// comment is not code, so comments are removed before the arithmetic checks.
-const withoutComments = source =>
-  source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-
+// option lists, its own stage rules, or any scientific arithmetic.
 const intakePanelCode = withoutComments(intakePanel);
 const intakeStateCode = withoutComments(intakeState);
 
@@ -559,5 +561,74 @@ for (const forbidden of [
   '|| 0',
 ])
   forbidText(intakeStateCode, forbidden, `${intakeLabel} state authority`);
+
+// The same workspace serves the development service and the authenticated ARS
+// module. Only the connection differs, and the acting role must come from the
+// backend: a role derived in the browser would offer transitions the accepted
+// role matrix then refuses.
+const connectionLabel = 'workflow connection';
+const workflowConnection = read('src/features/bouwa/workflowConnection.ts');
+const authenticatedPage = read(
+  'src/features/bouwa/pages/BouwaAirAuditWorkflowPage.tsx',
+);
+const moduleShell = read('src/features/bouwa/pages/BouwaModuleShell.tsx');
+
+requireText(
+  workflowConnection,
+  "LOCAL_WORKFLOW_BASE_PATH = '/api/bouwa-local'",
+  `${connectionLabel} development mount`,
+);
+requireText(
+  workflowConnection,
+  "/api/bouwa/workflow",
+  `${connectionLabel} authenticated mount`,
+);
+for (const forbidden of ['bouwa.approveFormula', 'technical_approver'])
+  forbidText(
+    withoutComments(workflowConnection),
+    forbidden,
+    `${connectionLabel} role authority`,
+  );
+for (const forbidden of [
+  'bouwa.approveFormula',
+  'technical_approver',
+  'data_entry_user',
+])
+  forbidText(
+    withoutComments(authenticatedPage),
+    forbidden,
+    'authenticated workflow page role authority',
+  );
+
+requireText(
+  authenticatedPage,
+  '/session',
+  'authenticated workflow page backend-resolved actor',
+);
+requireText(
+  authenticatedPage,
+  'getAuthToken()',
+  'authenticated workflow page ARS token',
+);
+requireText(
+  authenticatedPage,
+  '<BouwaLoggerLocalApp connection={connection} />',
+  'authenticated workflow page reuses the accepted workspace',
+);
+requireText(
+  moduleShell,
+  '<BouwaAirAuditWorkflowPage />',
+  'authenticated Bouwa module workflow tab',
+);
+requireText(
+  page,
+  'connection.actor.displayName',
+  'workspace actor from the connection',
+);
+forbidText(
+  withoutComments(page),
+  'session.identity',
+  'workspace local-only identity',
+);
 
 process.stdout.write('Bouwa local UI contracts passed.\n');

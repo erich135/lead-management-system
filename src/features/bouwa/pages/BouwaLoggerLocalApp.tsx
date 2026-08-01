@@ -36,6 +36,13 @@ import type { LocalSession, ProposalMode } from '../proposalLocalTypes';
 import { ProposalReadinessWorkspace } from '../components/ProposalReadinessWorkspace';
 import { LocalIdentityLogin } from '../components/LocalIdentityLogin';
 import { BouwaAuditIntakePanel } from '../components/BouwaAuditIntakePanel';
+import {
+  LOCAL_WORKFLOW_BASE_PATH,
+  localWorkflowConnection,
+  workflowHeaders,
+  workflowUrl,
+  type BouwaWorkflowConnection,
+} from '../workflowConnection';
 
 type SummaryTab = 'hourly' | 'daily' | 'isoWeekly';
 const BOUWA_LOCAL_MAX_CSV_BYTES_FALLBACK = 20 * 1024 * 1024;
@@ -598,7 +605,18 @@ function MeasuredDemandSection({ measuredDemand }: { measuredDemand: MeasuredDem
   );
 }
 
-export function BouwaLoggerLocalApp() {
+export interface BouwaLoggerWorkspaceProps {
+  /**
+   * Supplied by the authenticated ARS mount, where the signed-in user is
+   * already known. Omitted on the development route, where the operator signs
+   * in against the local identity registry instead.
+   */
+  connection?: BouwaWorkflowConnection | null;
+}
+
+export function BouwaLoggerLocalApp({
+  connection: authenticatedConnection = null,
+}: BouwaLoggerWorkspaceProps = {}) {
   const [health, setHealth] = useState<LocalHealth | null>(null);
   const [serviceError, setServiceError] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -607,14 +625,21 @@ export function BouwaLoggerLocalApp() {
   const [busy, setBusy] = useState(false);
   const [summaryTab, setSummaryTab] = useState<SummaryTab>('hourly');
   const [proposalMode, setProposalMode] = useState<ProposalMode>('logger_analysis');
-  const [session, setSession] = useState<LocalSession | null>(null);
+  const [localSession, setLocalSession] = useState<LocalSession | null>(null);
   const [proposalContext, setProposalContext] = useState<{
     proposalRecordId: string;
     proposalId: string;
     settingsVersion: number;
   } | null>(null);
+  const connection = useMemo(
+    () =>
+      authenticatedConnection ??
+      (localSession ? localWorkflowConnection(localSession) : null),
+    [authenticatedConnection, localSession],
+  );
+  const basePath = connection?.basePath ?? LOCAL_WORKFLOW_BASE_PATH;
   const handleSessionExpired = useCallback(() => {
-    setSession(null);
+    setLocalSession(null);
     setProposalContext(null);
     setAnalysis(null);
   }, []);
@@ -631,9 +656,12 @@ export function BouwaLoggerLocalApp() {
 
   useEffect(() => {
     let current = true;
-    fetch('/api/bouwa-local/health')
+    fetch(
+      `${basePath}/health`,
+      connection ? { headers: workflowHeaders(connection) } : undefined,
+    )
       .then(async response => {
-        if (!response.ok) throw new Error('Local parser service is not ready.');
+        if (!response.ok) throw new Error('The parser service is not ready.');
         return response.json() as Promise<LocalHealth>;
       })
       .then(value => {
@@ -643,13 +671,18 @@ export function BouwaLoggerLocalApp() {
         }
       })
       .catch(() => {
-        if (current) setServiceError('Start the local Bouwa parser service on 127.0.0.1:4310, then refresh this page.');
+        if (current)
+          setServiceError(
+            authenticatedConnection
+              ? 'The Bouwa parser service did not respond. Try again, and tell your administrator if it continues.'
+              : 'Start the local Bouwa parser service on 127.0.0.1:4310, then refresh this page.',
+          );
       });
     return () => { current = false; };
-  }, []);
+  }, [authenticatedConnection, basePath, connection]);
 
   async function analyse() {
-    if (!selectedFile || !session || !proposalContext) {
+    if (!selectedFile || !connection || !proposalContext) {
       setError('Select an untouched DS400 semicolon CSV export first.');
       return;
     }
@@ -657,24 +690,23 @@ export function BouwaLoggerLocalApp() {
     setError('');
     setAnalysis(null);
     try {
-      const response = await fetch('/api/bouwa-local/analyse', {
+      const response = await fetch(workflowUrl(connection, '/analyse'), {
         method: 'POST',
-        headers: {
+        headers: workflowHeaders(connection, {
           'Content-Type': 'application/octet-stream',
-          Authorization: `Bearer ${session.token}`,
           'X-Bouwa-Filename': encodeURIComponent(selectedFile.name),
           'X-Bouwa-Proposal-Record-Id': proposalContext.proposalRecordId,
           'X-Bouwa-Proposal-Id': proposalContext.proposalId,
           'X-Bouwa-Settings-Version': String(
             proposalContext.settingsVersion + 1,
           ),
-        },
+        }),
         body: selectedFile,
       });
       const payload = await response.json() as BouwaLocalAnalysis | { error?: string };
       if (response.status === 401) {
-        setSession(null);
-        throw new Error('The local session expired. Sign in again.');
+        handleSessionExpired();
+        throw new Error('The session expired. Sign in again.');
       }
       if (!response.ok) throw new Error('error' in payload ? payload.error : 'The file was rejected.');
       setAnalysis(payload as BouwaLocalAnalysis);
@@ -700,9 +732,25 @@ export function BouwaLoggerLocalApp() {
   const periods = analysis?.summaries[summaryTab] ?? [];
   const flowPressureStats = analysis?.rawStatistics.filter(item => item.channelId === 'flow' || item.channelId === 'pressure') ?? [];
 
+  // Embedded in the module shell the workspace is one tab among several, so it
+  // keeps its own header but not the page chrome around it.
+  const embedded = authenticatedConnection !== null;
+
   return (
-    <div className="min-h-screen bg-[#f4f7fa] text-slate-800">
-      <header className="border-b border-slate-200 bg-white">
+    <div
+      className={
+        embedded
+          ? 'text-slate-800'
+          : 'min-h-screen bg-[#f4f7fa] text-slate-800'
+      }
+    >
+      <header
+        className={
+          embedded
+            ? 'rounded-2xl border border-slate-200 bg-white'
+            : 'border-b border-slate-200 bg-white'
+        }
+      >
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-4 lg:px-8">
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-ars-primary text-white">
@@ -718,49 +766,59 @@ export function BouwaLoggerLocalApp() {
               <HardDrive className="h-3.5 w-3.5" /> Memory only
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1.5 font-semibold text-blue-700">
-              <ShieldCheck className="h-3.5 w-3.5" /> Localhost
+              <ShieldCheck className="h-3.5 w-3.5" />{' '}
+              {authenticatedConnection ? 'Signed in to ARS' : 'Localhost'}
             </span>
             <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-semibold ${
               health ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
             }`}>
               <Server className="h-3.5 w-3.5" /> {health ? 'Parser ready' : 'Parser offline'}
             </span>
-            {session && (
-              <>
-                <span className="rounded-full bg-slate-100 px-3 py-1.5 font-semibold text-slate-700">
-                  {session.identity.displayName} · {session.identity.role.replace(/_/g, ' ')}
-                </span>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      await fetch('/api/bouwa-local/auth/logout', {
-                        method: 'POST',
-                        headers: { Authorization: `Bearer ${session.token}` },
-                      });
-                    } catch {
-                      setServiceError(
-                        'The browser discarded the local session; the server token will expire automatically.',
-                      );
-                    } finally {
-                      setSession(null);
-                      setAnalysis(null);
-                      setProposalContext(null);
-                    }
-                  }}
-                  className="inline-flex items-center gap-1 rounded-full border border-slate-300 px-3 py-1.5 font-semibold text-slate-700"
-                >
-                  <LogOut className="h-3.5 w-3.5" /> Sign out
-                </button>
-              </>
+            {connection && (
+              <span className="rounded-full bg-slate-100 px-3 py-1.5 font-semibold text-slate-700">
+                {connection.actor.displayName} ·{' '}
+                {connection.actor.role.replace(/_/g, ' ')}
+              </span>
+            )}
+            {localSession && (
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await fetch(`${LOCAL_WORKFLOW_BASE_PATH}/auth/logout`, {
+                      method: 'POST',
+                      headers: {
+                        Authorization: `Bearer ${localSession.token}`,
+                      },
+                    });
+                  } catch {
+                    setServiceError(
+                      'The browser discarded the local session; the server token will expire automatically.',
+                    );
+                  } finally {
+                    setLocalSession(null);
+                    setAnalysis(null);
+                    setProposalContext(null);
+                  }
+                }}
+                className="inline-flex items-center gap-1 rounded-full border border-slate-300 px-3 py-1.5 font-semibold text-slate-700"
+              >
+                <LogOut className="h-3.5 w-3.5" /> Sign out
+              </button>
             )}
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl space-y-6 px-5 py-7 lg:px-8">
-        {!session ? (
-          <LocalIdentityLogin onAuthenticated={setSession} />
+      <main
+        className={
+          embedded
+            ? 'mx-auto max-w-7xl space-y-6 py-6'
+            : 'mx-auto max-w-7xl space-y-6 px-5 py-7 lg:px-8'
+        }
+      >
+        {!connection ? (
+          <LocalIdentityLogin onAuthenticated={setLocalSession} />
         ) : (
           <>
         <ProposalReadinessWorkspace
@@ -774,7 +832,7 @@ export function BouwaLoggerLocalApp() {
             }
           }}
           loggerAnalysis={analysis}
-          session={session}
+          connection={connection}
           onSessionExpired={handleSessionExpired}
           onProposalContextChange={handleProposalContextChange}
         />
@@ -788,11 +846,12 @@ export function BouwaLoggerLocalApp() {
                 Approved DS400 parser · engineering-safe output
               </div>
               <h2 className="mt-4 max-w-2xl text-3xl font-semibold leading-tight">
-                Validate an untouched logger export without production infrastructure.
+                Validate an untouched logger export.
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-blue-100">
-                The selected file stays on this computer, is parsed in memory through the canonical Phase 4E parser,
-                and is never written to MongoDB or uploaded to a cloud service.
+                {authenticatedConnection
+                  ? 'The file is parsed in memory by the ARS backend through the canonical Phase 4E parser. It is held for this session only, is never written to MongoDB, and is never uploaded to a cloud service.'
+                  : 'The selected file stays on this computer, is parsed in memory through the canonical Phase 4E parser, and is never written to MongoDB or uploaded to a cloud service.'}
               </p>
             </div>
             <div className="rounded-2xl border border-white/20 bg-white/10 p-5 backdrop-blur">
@@ -868,7 +927,7 @@ export function BouwaLoggerLocalApp() {
 
         {proposalContext && (
           <BouwaAuditIntakePanel
-            session={session}
+            connection={connection}
             proposalRecordId={proposalContext.proposalRecordId}
             parsedSourceToken={analysis ? analysis.inputFile.sha256 : null}
             onSessionExpired={handleSessionExpired}

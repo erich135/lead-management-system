@@ -23,6 +23,13 @@ import type {
   ResolvedInput,
   ResolvedScientificInputs,
 } from '../src/features/bouwa/auditIntakeTypes.ts';
+import {
+  arsWorkflowBasePath,
+  arsWorkflowConnection,
+  localWorkflowConnection,
+  workflowHeaders,
+  workflowUrl,
+} from '../src/features/bouwa/workflowConnection.ts';
 
 function unanswered(): IntakeAnswer<unknown> {
   return { state: 'unanswered', value: null, note: null };
@@ -468,5 +475,59 @@ assert.deepEqual(trail[0].changes, ['Document ev-1']);
 assert.equal(trail[1].source, 'Logger file parsed');
 assert.deepEqual(trail[1].changes, ['Production schedule reference']);
 assert.deepEqual(intakeChangeRows([], evidenceReadiness), []);
+
+/* One workspace, two mounts: only the connection differs */
+
+const localConnection = localWorkflowConnection({
+  token: 'local-token',
+  expiresAt: '2026-08-01T12:00:00.000Z',
+  identity: { id: 'entry', displayName: 'Data Entry', role: 'data_entry_user' },
+});
+assert.equal(localConnection.basePath, '/api/bouwa-local');
+assert.equal(localConnection.deployment, 'local_development');
+assert.equal(
+  workflowUrl(localConnection, '/intake/form'),
+  '/api/bouwa-local/intake/form',
+);
+
+assert.equal(
+  arsWorkflowBasePath('http://localhost:5000/'),
+  'http://localhost:5000/api/bouwa/workflow',
+  'a trailing slash must not double up',
+);
+
+const arsConnection = arsWorkflowConnection(
+  arsWorkflowBasePath('http://localhost:5000'),
+  'ars-token',
+  {
+    deployment: 'authenticated_ars_route',
+    actor: {
+      id: 'user-1',
+      displayName: 'Thandi Approver',
+      role: 'technical_approver',
+    },
+  },
+);
+assert.equal(
+  workflowUrl(arsConnection, '/intake'),
+  'http://localhost:5000/api/bouwa/workflow/intake',
+);
+assert.equal(
+  arsConnection.actor.role,
+  'technical_approver',
+  'the role comes from the backend, never from the browser',
+);
+assert.deepEqual(
+  workflowHeaders(arsConnection, { 'Content-Type': 'application/json' }),
+  {
+    'Content-Type': 'application/json',
+    Authorization: 'Bearer ars-token',
+  },
+);
+assert.deepEqual(
+  workflowHeaders(arsConnection, { Authorization: 'Bearer forged' }),
+  { Authorization: 'Bearer ars-token' },
+  'a caller cannot override the connection token',
+);
 
 process.stdout.write('Bouwa audit-intake state checks passed.\n');

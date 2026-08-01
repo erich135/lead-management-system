@@ -14,7 +14,6 @@ import type {
   ProposalField,
   ProposalFieldUpdate,
   EvidenceRecordLink,
-  LocalSession,
   ProposalMode,
   ProposalPackage,
   ProposalRole,
@@ -39,6 +38,11 @@ import {
   type EvaluationRequestIdentity,
   type FocusRequest,
 } from '../proposalEditorState';
+import {
+  workflowHeaders,
+  workflowUrl,
+  type BouwaWorkflowConnection,
+} from '../workflowConnection';
 
 type WorkspaceTab = 'readiness' | 'inputs' | 'settings' | 'outputs' | 'workflow';
 
@@ -87,24 +91,24 @@ function downloadText(name: string, content: string, type = 'text/plain;charset=
 }
 
 async function api<T>(
-  url: string,
-  session: LocalSession,
+  path: string,
+  connection: BouwaWorkflowConnection,
   onSessionExpired: () => void,
   init?: RequestInit,
 ): Promise<T> {
-  const response = await fetch(url, {
+  const response = await fetch(workflowUrl(connection, path), {
     ...init,
-    headers: {
-      ...(init?.headers as Record<string, string> | undefined),
-      Authorization: `Bearer ${session.token}`,
-    },
+    headers: workflowHeaders(
+      connection,
+      init?.headers as Record<string, string> | undefined,
+    ),
   });
   const payload = await response.json() as T | { error?: string };
   if (response.status === 401) onSessionExpired();
   if (!response.ok) {
     throw new Error('error' in (payload as { error?: string })
       ? (payload as { error?: string }).error
-      : 'The local proposal service rejected the request.');
+      : 'The proposal service rejected the request.');
   }
   return payload as T;
 }
@@ -136,14 +140,14 @@ export function ProposalReadinessWorkspace({
   mode,
   onModeChange,
   loggerAnalysis,
-  session,
+  connection,
   onSessionExpired,
   onProposalContextChange,
 }: {
   mode: ProposalMode;
   onModeChange: (mode: ProposalMode) => void;
   loggerAnalysis: BouwaLocalAnalysis | null;
-  session: LocalSession;
+  connection: BouwaWorkflowConnection;
   onSessionExpired: () => void;
   onProposalContextChange: (value: {
     proposalRecordId: string;
@@ -185,8 +189,8 @@ export function ProposalReadinessWorkspace({
     () => proposal ? overlayDerivedEvaluation(proposal, evaluation) : null,
     [evaluation, proposal],
   );
-  const actor = session.identity.displayName;
-  const role = session.identity.role;
+  const actor = connection.actor.displayName;
+  const role = connection.actor.role;
   const pendingAnalysis =
     !!loggerAnalysis &&
     proposal?.analysisLink?.analysisId !== loggerAnalysis.attestation.analysisId;
@@ -199,8 +203,8 @@ export function ProposalReadinessWorkspace({
     let current = true;
     setBusy(true);
     api<ProposalPackage>(
-      `/api/bouwa-local/proposal/template?mode=${mode}`,
-      session,
+      `/proposal/template?mode=${mode}`,
+      connection,
       onSessionExpired,
     )
       .then(value => {
@@ -216,7 +220,7 @@ export function ProposalReadinessWorkspace({
     return () => { current = false; };
     // A mode change intentionally creates a fresh local package.
      
-  }, [mode, onSessionExpired, session]);
+  }, [connection, mode, onSessionExpired]);
 
   useEffect(() => {
     onProposalContextChange(
@@ -244,7 +248,7 @@ export function ProposalReadinessWorkspace({
     setEvaluation(null);
     setEvaluationInProgress(true);
     const timer = window.setTimeout(() => {
-      api<ProposalEvaluation>('/api/bouwa-local/proposal/evaluate', session, onSessionExpired, {
+      api<ProposalEvaluation>('/proposal/evaluate', connection, onSessionExpired, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(proposal),
@@ -276,7 +280,7 @@ export function ProposalReadinessWorkspace({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [onSessionExpired, proposal, session]);
+  }, [connection, onSessionExpired, proposal]);
 
   function updateField(collection: 'inputs' | 'engineeringSettings', next: ProposalField) {
     setProposal(previous => previous ? {
@@ -326,8 +330,8 @@ export function ProposalReadinessWorkspace({
     setBusy(true);
     try {
       const next = await api<ProposalPackage>(
-        '/api/bouwa-local/proposal/settings-version',
-        session,
+        '/proposal/settings-version',
+        connection,
         onSessionExpired,
         {
         method: 'POST',
@@ -370,8 +374,8 @@ export function ProposalReadinessWorkspace({
     setBusy(true);
     try {
       const next = await api<ProposalPackage>(
-        '/api/bouwa-local/proposal/transition',
-        session,
+        '/proposal/transition',
+        connection,
         onSessionExpired,
         {
         method: 'POST',
@@ -409,8 +413,8 @@ export function ProposalReadinessWorkspace({
     setBusy(true);
     try {
       const next = await api<ProposalPackage>(
-        '/api/bouwa-local/proposal/acknowledge',
-        session,
+        '/proposal/acknowledge',
+        connection,
         onSessionExpired,
         {
           method: 'POST',
@@ -443,8 +447,8 @@ export function ProposalReadinessWorkspace({
     setBusy(true);
     try {
       const link = await api<EvidenceRecordLink>(
-        '/api/bouwa-local/evidence',
-        session,
+        '/evidence',
+        connection,
         onSessionExpired,
         {
           method: 'POST',
@@ -522,8 +526,8 @@ export function ProposalReadinessWorkspace({
     setBusy(true);
     try {
       const next = await api<ProposalPackage>(
-        '/api/bouwa-local/proposal/value-verification',
-        session,
+        '/proposal/value-verification',
+        connection,
         onSessionExpired,
         {
           method: 'POST',
@@ -553,8 +557,8 @@ export function ProposalReadinessWorkspace({
     try {
       const result = proposal.mode === 'logger_analysis'
         ? await api<{ reportText: string }>(
-            '/api/bouwa-local/proposal/combined-report',
-            session,
+            '/proposal/combined-report',
+            connection,
             onSessionExpired,
             {
               method: 'POST',
@@ -582,8 +586,8 @@ export function ProposalReadinessWorkspace({
     setBusy(true);
     try {
       const next = await api<ProposalPackage>(
-        '/api/bouwa-local/proposal/import',
-        session,
+        '/proposal/import',
+        connection,
         onSessionExpired,
         {
         method: 'POST',

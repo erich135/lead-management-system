@@ -27,11 +27,16 @@ import type {
   MeasuredDemandProfile,
   PeriodSummary,
   RawStatistics,
-  ScientificCalculationProvenance,
   ScientificFigureMetadata,
-  ScientificUncertainty,
   Trend,
 } from '../loggerLocalTypes';
+import {
+  describeFigure,
+  describeNumericUncertainty,
+  measuredNumber,
+  measuredUnit,
+  MEASURED_DEMAND_UNAVAILABLE_LABEL,
+} from '../measuredFigurePresentation';
 import type { LocalSession, ProposalMode } from '../proposalLocalTypes';
 import { ProposalReadinessWorkspace } from '../components/ProposalReadinessWorkspace';
 import { LocalIdentityLogin } from '../components/LocalIdentityLogin';
@@ -337,34 +342,6 @@ function DisabledCard({ capability }: { capability: DisabledCapability }) {
   );
 }
 
-const MEASURED_DEMAND_UNAVAILABLE_LABEL = 'Unavailable';
-
-const measuredNumber = (value: number, digits: number) =>
-  value.toLocaleString('en-ZA', {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
-
-const measuredUnit = (unit: string) => unit.replace('m3', 'm³');
-
-const provenanceLabels: Record<ScientificCalculationProvenance, string> = {
-  exact_mathematics: 'Exact calculation',
-  established_engineering: 'Established engineering',
-  manufacturer_specification: 'Manufacturer-derived',
-  approved_assumption: 'Approved assumption',
-  business_input: 'Business input',
-  user_input: 'User input',
-};
-
-const uncertaintyLabels: Record<ScientificUncertainty, string> = {
-  measured: 'Measured',
-  derived_exact: 'Exact calculation',
-  derived_manufacturer: 'Manufacturer-derived',
-  estimated: 'Estimated',
-  estimated_from_short_record: 'Estimated from short record',
-  unavailable: 'Unavailable',
-};
-
 const confidenceLabels: Record<MeasuredDemandProfile['confidence'], string> = {
   measured: 'Measured',
   estimated_from_short_record: 'Estimated from short record',
@@ -406,19 +383,16 @@ function ScientificFigure({
   metadata: ScientificFigureMetadata;
   tone?: CardTone;
 }) {
+  const figure = describeFigure(value, metadata, digits);
   return (
     <div className={`rounded-xl border p-4 ${cardTones[tone]}`}>
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-semibold text-slate-900">
-        {value === null
-          ? MEASURED_DEMAND_UNAVAILABLE_LABEL
-          : `${measuredNumber(value, digits)} ${measuredUnit(metadata.unit)}`}
-      </p>
+      <p className="mt-1 text-xl font-semibold text-slate-900">{figure.text}</p>
       <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-        {uncertaintyLabels[metadata.uncertainty]} · {provenanceLabels[metadata.provenance]} · {metadata.calculationId}
+        {figure.detail}
       </p>
-      {value === null && (
-        <p className="mt-1 text-xs leading-5 text-slate-500">{metadata.reason}</p>
+      {figure.reason !== null && (
+        <p className="mt-1 text-xs leading-5 text-slate-500">{figure.reason}</p>
       )}
     </div>
   );
@@ -486,9 +460,7 @@ function MeasuredDemandTechnicalTable({ figureMetadata }: { figureMetadata: Meas
                   <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{metadata.uncertainty}</td>
                   <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">{metadata.calculationId}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-700">
-                    {metadata.numericUncertainty === null
-                      ? 'Not defined'
-                      : `± ${measuredNumber(metadata.numericUncertainty.plusMinus, 3)} ${measuredUnit(metadata.numericUncertainty.unit)} · ${metadata.numericUncertainty.basis.replace(/_/g, ' ')}`}
+                    {describeNumericUncertainty(metadata)}
                   </td>
                   <td className="px-4 py-3 text-xs leading-5 text-slate-600">{metadata.reason}</td>
                 </tr>

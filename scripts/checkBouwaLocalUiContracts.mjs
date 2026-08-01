@@ -219,34 +219,54 @@ for (const commercialOutput of commercialOutputs)
 
 const measuredDemandUiLabel = 'measured-demand screen';
 const measuredDemandUi = page.slice(
-  page.indexOf('const MEASURED_DEMAND_UNAVAILABLE_LABEL'),
+  page.indexOf('const confidenceLabels'),
   page.indexOf('export function BouwaLoggerLocalApp'),
 );
 if (!measuredDemandUi)
   throw new Error('The measured-demand presentation block is missing.');
 
+// How a figure is worded is a pure decision and lives outside the screen, so
+// the Step 15 rules can be asserted directly against it.
+const presentationLabel = 'measured-figure presentation';
+const presentation = read('src/features/bouwa/measuredFigurePresentation.ts');
+
 requireText(page, 'analysis.measuredDemand', 'rendered measured-demand response');
 requireText(page, '<MeasuredDemandSection', 'measured-demand section');
 
 for (const nullCheck of [
-  'value === null',
-  'measuredDemand.lowFlowCutOffM3PerMin === null',
+  'value !== null && Number.isFinite(value)',
   'metadata.numericUncertainty === null',
+])
+  requireText(presentation, nullCheck, `${presentationLabel} explicit null check`);
+for (const nullCheck of [
+  'measuredDemand.lowFlowCutOffM3PerMin === null',
   'peak === null',
 ])
   requireText(measuredDemandUi, nullCheck, `${measuredDemandUiLabel} explicit null check`);
 
 requireText(
-  measuredDemandUi,
-  "const MEASURED_DEMAND_UNAVAILABLE_LABEL = 'Unavailable';",
-  `${measuredDemandUiLabel} unavailable label`,
+  presentation,
+  "export const MEASURED_DEMAND_UNAVAILABLE_LABEL = 'Unavailable';",
+  `${presentationLabel} unavailable label`,
 );
 requireText(
-  measuredDemandUi,
+  presentation,
   'MEASURED_DEMAND_UNAVAILABLE_LABEL',
-  `${measuredDemandUiLabel} unavailable rendering`,
+  `${presentationLabel} unavailable rendering`,
 );
-requireText(measuredDemandUi, 'metadata.reason', `${measuredDemandUiLabel} backend reason`);
+requireText(
+  presentation,
+  'reason: available ? null : metadata.reason',
+  `${presentationLabel} backend reason`,
+);
+requireText(
+  presentation,
+  'minimumFractionDigits: digits',
+  `${presentationLabel} valid-zero formatting`,
+);
+requireText(measuredDemandUi, 'describeFigure(value, metadata, digits)', `${measuredDemandUiLabel} backend-worded figure`);
+requireText(measuredDemandUi, 'figure.reason', `${measuredDemandUiLabel} backend reason`);
+requireText(measuredDemandUi, 'metadata.reason', `${measuredDemandUiLabel} technical-table reason`);
 requireText(measuredDemandUi, 'cutOff.reason', `${measuredDemandUiLabel} cut-off reason`);
 requireText(
   measuredDemandUi,
@@ -258,12 +278,6 @@ requireText(
   'figures.peakMeanFlowM3PerMin.reason',
   `${measuredDemandUiLabel} peak rolling-mean reason`,
 );
-requireText(
-  measuredDemandUi,
-  'minimumFractionDigits: digits',
-  `${measuredDemandUiLabel} valid-zero formatting`,
-);
-
 for (const truthinessTrap of [
   'value ? ',
   'value ?\n',
@@ -277,11 +291,11 @@ for (const truthinessTrap of [
   "'-'",
   'parseFloat(',
 ])
-  forbidText(
-    measuredDemandUi,
-    truthinessTrap,
-    `${measuredDemandUiLabel} valid-zero preservation`,
-  );
+  for (const [source, label] of [
+    [measuredDemandUi, measuredDemandUiLabel],
+    [presentation, presentationLabel],
+  ])
+    forbidText(source, truthinessTrap, `${label} valid-zero preservation`);
 
 requireText(measuredDemandUi, "'Cutoff confirmed'", `${measuredDemandUiLabel} confirmed cut-off state`);
 requireText(measuredDemandUi, "'Cutoff not confirmed'", `${measuredDemandUiLabel} unconfirmed cut-off state`);
@@ -347,8 +361,38 @@ requireText(
 );
 requireText(measuredDemandUi, 'metadata.provenance', `${measuredDemandUiLabel} provenance`);
 requireText(measuredDemandUi, 'metadata.uncertainty', `${measuredDemandUiLabel} uncertainty`);
-requireText(measuredDemandUi, 'provenanceLabels[metadata.provenance]', `${measuredDemandUiLabel} provenance label`);
-requireText(measuredDemandUi, 'uncertaintyLabels[metadata.uncertainty]', `${measuredDemandUiLabel} uncertainty label`);
+requireText(
+  presentation,
+  'PROVENANCE_LABELS[metadata.provenance]',
+  `${presentationLabel} provenance label`,
+);
+requireText(
+  presentation,
+  'UNCERTAINTY_LABELS[metadata.uncertainty]',
+  `${presentationLabel} uncertainty label`,
+);
+requireText(presentation, 'metadata.calculationId', `${presentationLabel} calculation identifier`);
+// Every class the backend can send must have a word on screen, and rank 7 is
+// not one the released contract can carry.
+for (const provenanceClass of [
+  'exact_mathematics',
+  'established_engineering',
+  'manufacturer_specification',
+  'approved_assumption',
+  'business_input',
+  'user_input',
+])
+  requireText(presentation, `${provenanceClass}:`, `${presentationLabel} provenance vocabulary`);
+for (const uncertaintyClass of [
+  'measured',
+  'derived_exact',
+  'derived_manufacturer',
+  'estimated',
+  'estimated_from_short_record',
+  'unavailable',
+])
+  requireText(presentation, `${uncertaintyClass}:`, `${presentationLabel} uncertainty vocabulary`);
+forbidText(presentation, 'comparison_evidence', `${presentationLabel} released provenance`);
 requireText(measuredDemandUi, 'metadata.calculationId', `${measuredDemandUiLabel} calculation identifier`);
 requireText(
   measuredDemandUi,

@@ -659,12 +659,15 @@ requireText(
   '<BouwaLoggerLocalApp connection={connection} />',
   'authenticated workflow page reuses the accepted workspace',
 );
-// The detailed workspace is still the only place the engineering interface
-// comes from, but it is no longer the module's default screen. The guided
-// wizard is what a user lands on, and the workspace is reached from inside a
-// proposal as Advanced Technical Review.
+// The guided wizard is what a user lands on. Advanced Technical Review is the
+// backend's full assessment of the proposal being worked on, and the standalone
+// workspace remains reachable from it as its own tool — but neither sits beside
+// the workflow as a second way of doing the same job.
 const guidedPage = read(
   'src/features/bouwa/wizard/BouwaGuidedProposalPage.tsx',
+);
+const technicalReview = read(
+  'src/features/bouwa/wizard/AdvancedTechnicalReview.tsx',
 );
 requireText(
   moduleShell,
@@ -673,9 +676,30 @@ requireText(
 );
 requireText(
   guidedPage,
-  '<BouwaAirAuditWorkflowPage />',
-  'Advanced Technical Review reuses the accepted workspace',
+  '<AdvancedTechnicalReview',
+  'Advanced Technical Review is reached from inside a proposal',
 );
+requireText(
+  guidedPage,
+  '<BouwaAirAuditWorkflowPage />',
+  'the standalone workspace remains reachable',
+);
+// The review reports the backend's assessment. A number worked out here would
+// be a second calculation engine wearing a technical badge.
+for (const forbidden of ['Math.', 'toFixed('])
+  forbidText(
+    withoutComments(technicalReview),
+    forbidden,
+    'Advanced Technical Review reports rather than calculates',
+  );
+for (const required of [
+  'readiness.stageEligibility',
+  'readiness.blockedOutputs',
+  'readiness.fieldStatuses',
+  'draft.sourceFile.sha256',
+  'draft.intakeHistory',
+])
+  requireText(technicalReview, required, 'Advanced Technical Review content');
 for (const forbidden of ['<BouwaAirAuditWorkflowPage />', '<BouwaNewProposalWizard />'])
   forbidText(
     withoutComments(moduleShell),

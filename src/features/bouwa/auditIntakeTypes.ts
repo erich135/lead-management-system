@@ -139,15 +139,27 @@ export interface AuditUnavailableDependency {
   clearableByIntake: false;
 }
 
+/**
+ * One basis the two machines are compared on. The backend names the field and
+ * the reason code; there is no opaque identifier, and there was never one to
+ * read.
+ */
 export interface AuditComparisonCheck {
-  id: string;
+  field: string;
   status: string;
+  unit: string | null;
+  existingValue: number | string | null;
+  proposedValue: number | string | null;
+  reasonCode: string;
   message: string;
 }
 
 export interface AuditLikeForLikeComparison {
+  status: string;
   eligible: boolean;
   checks: AuditComparisonCheck[];
+  reasonCodes: string[];
+  messages: string[];
   blockedOutputs: string[];
 }
 

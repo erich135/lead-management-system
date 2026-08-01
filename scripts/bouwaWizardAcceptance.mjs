@@ -442,9 +442,47 @@ async function airAudit(browser, viewport) {
     scope,
     'the technical detail is behind Advanced Technical Review, not on the page',
     /Advanced Technical Review/i.test(review) &&
-      !/Mandatory audit intake/i.test(review),
+      !/Mandatory audit intake/i.test(review) &&
+      !/AUDIT\.[A-Z_]+\./.test(review),
   );
   await shot(page, `${viewport.name}-air-2-review`);
+
+  // Advanced Technical Review: the same proposal, told in full.
+  await page.getByRole('button', { name: /Advanced Technical Review/i }).click();
+  const technical = page.locator('[data-testid="bouwa-technical-review"]');
+  await technical.waitFor({ timeout: 30000 }).catch(() => undefined);
+  const detail = (await technical.count()) > 0 ? await technical.innerText() : '';
+  record(
+    scope,
+    'the technical review opens on the proposal that was being worked on',
+    detail.includes(reference),
+    reference,
+  );
+  record(
+    scope,
+    'it states the field codes the ordinary screens keep out of the way',
+    /AUDIT\.[A-Z_]+\./.test(detail),
+  );
+  record(
+    scope,
+    'it states the hash of the untouched source, recorded rather than typed',
+    /[0-9a-f]{64}/.test(detail),
+  );
+  record(
+    scope,
+    'it lists the stages, the blocked outputs and the change trail',
+    /Stage eligibility/i.test(detail) &&
+      /Outputs —/i.test(detail) &&
+      /Change trail/i.test(detail),
+  );
+  await shot(page, `${viewport.name}-air-3-technical-review`);
+  await page.getByRole('button', { name: 'Back to the proposal' }).first().click();
+  await page.locator('[data-testid="bouwa-wizard"]').waitFor({ timeout: 30000 });
+  record(
+    scope,
+    'closing the technical review returns to the proposal, not to the list',
+    (await page.locator('[data-testid="bouwa-wizard"]').count()) > 0,
+  );
 
   if (walk.typed.length > 0)
     process.stdout.write(`  note: typed synthetic values for ${walk.typed.join(', ')}\n`);

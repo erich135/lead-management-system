@@ -16,6 +16,7 @@ import { AlertTriangle, ArrowLeft, Loader2 } from 'lucide-react';
 
 import type { AuditIntakeFormModel } from '../auditIntakeTypes';
 import { BouwaAirAuditWorkflowPage } from '../pages/BouwaAirAuditWorkflowPage';
+import { AdvancedTechnicalReview } from './AdvancedTechnicalReview';
 import { DraftProposalsPage } from './DraftProposalsPage';
 import { GuidedProposalWizard } from './GuidedProposalWizard';
 import { fetchWizardDraft, fetchWizardFormModel } from './wizardApi';
@@ -25,7 +26,8 @@ type Mode =
   | { kind: 'list' }
   | { kind: 'opening'; draftId: string }
   | { kind: 'wizard'; view: WizardDraftView }
-  | { kind: 'technical'; draftId: string };
+  | { kind: 'technical'; view: WizardDraftView }
+  | { kind: 'workspace'; draftId: string };
 
 export function BouwaGuidedProposalPage() {
   const [formModel, setFormModel] = useState<AuditIntakeFormModel | null>(null);
@@ -51,11 +53,11 @@ export function BouwaGuidedProposalPage() {
     };
   }, []);
 
-  const open = useCallback((draftId: string) => {
+  const openAs = useCallback((draftId: string, kind: 'wizard' | 'technical') => {
     setProblem('');
     setMode({ kind: 'opening', draftId });
     fetchWizardDraft(draftId)
-      .then(view => setMode({ kind: 'wizard', view }))
+      .then(view => setMode({ kind, view }))
       .catch((reason: unknown) => {
         setProblem(
           reason instanceof Error
@@ -65,6 +67,11 @@ export function BouwaGuidedProposalPage() {
         setMode({ kind: 'list' });
       });
   }, []);
+
+  const open = useCallback(
+    (draftId: string) => openAs(draftId, 'wizard'),
+    [openAs],
+  );
 
   if (problem !== '' && mode.kind === 'list')
     return (
@@ -86,6 +93,21 @@ export function BouwaGuidedProposalPage() {
 
   if (mode.kind === 'technical')
     return (
+      <AdvancedTechnicalReview
+        view={mode.view}
+        formModel={formModel}
+        onBack={() => open(mode.view.draft.draftId)}
+        onOpenLegacyWorkspace={() =>
+          setMode({ kind: 'workspace', draftId: mode.view.draft.draftId })
+        }
+      />
+    );
+
+  // The standalone engineering workspace is preserved and reachable, but it is
+  // its own tool with its own upload: it is not this proposal, and saying so
+  // plainly is better than letting it look like this proposal's detail.
+  if (mode.kind === 'workspace')
+    return (
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button
@@ -97,8 +119,8 @@ export function BouwaGuidedProposalPage() {
             Back to the proposal
           </button>
           <p className="text-xs text-slate-500">
-            Advanced Technical Review — the full engineering interface. This screen
-            scrolls; the guided workflow does not.
+            Standalone air-audit workspace. It holds its own working copy and does
+            not read or write the saved proposal.
           </p>
         </div>
         <BouwaAirAuditWorkflowPage />
@@ -119,7 +141,9 @@ export function BouwaGuidedProposalPage() {
         initialView={mode.view}
         formModel={formModel}
         onExit={() => setMode({ kind: 'list' })}
-        onOpenTechnicalReview={draftId => setMode({ kind: 'technical', draftId })}
+        // Read back from the backend rather than handing over what is on
+        // screen: the technical review is an inspection of what is stored.
+        onOpenTechnicalReview={draftId => openAs(draftId, 'technical')}
       />
     );
 

@@ -474,9 +474,15 @@ export function GuidedProposalWizard({
           <ReviewStep
             readiness={view.readiness}
             formModel={formModel}
-            onOpenTechnicalReview={() =>
-              onOpenTechnicalReview(view.draft.draftId)
-            }
+            onOpenTechnicalReview={() => {
+              // The review reads the stored draft, so anything outstanding is
+              // stored first rather than being absent from what it reports.
+              void draft
+                .flush({ currentStepId: step.id, currentPageIndex: safePage })
+                .then(saved => {
+                  if (saved) onOpenTechnicalReview(view.draft.draftId);
+                });
+            }}
           />
         ) : screen.fields.length === 0 ? (
           <div className="space-y-3">

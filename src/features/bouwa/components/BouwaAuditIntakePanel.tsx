@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   ClipboardList,
+  Gauge,
   HelpCircle,
   Lock,
   Plus,
@@ -19,6 +20,7 @@ import {
   mayApplyAuditIntakeSave,
   nextAuditIntakeSave,
   readAnswerAtPath,
+  wiredInputRows,
   writeAnswerAtPath,
   type AuditIntakeFieldView,
   type AuditIntakeSaveIdentity,
@@ -31,6 +33,7 @@ import type {
   AuditIntakeState,
   AuditReadinessAssessment,
   IntakeAnswerState,
+  ResolvedScientificInputs,
 } from '../auditIntakeTypes';
 import type { LocalSession } from '../proposalLocalTypes';
 
@@ -252,6 +255,86 @@ function IntakeFieldRow({
       )}
       <p className="mt-1 font-mono text-[10px] text-slate-400">{status.code}</p>
     </div>
+  );
+}
+
+function WiredInputsPanel({
+  inputs,
+}: {
+  inputs: ResolvedScientificInputs;
+}) {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 rounded-lg bg-blue-50 p-2 text-ars-primary">
+          <Gauge className="h-5 w-5" />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900">
+            Inputs the calculation will use
+          </h3>
+          <p className="mt-0.5 text-sm leading-6 text-slate-500">
+            The backend resolves these from the answers above. An answer that
+            does not appear here has not reached the scientific model, and the
+            reason it has not is shown beside it.
+          </p>
+        </div>
+      </div>
+      <dl className="mt-4 grid gap-3 md:grid-cols-2">
+        {wiredInputRows(inputs).map(row => (
+          <div
+            key={row.label}
+            className={`rounded-xl border p-4 ${
+              row.confirmed
+                ? 'border-emerald-200 bg-emerald-50/50'
+                : 'border-slate-200 bg-slate-50'
+            }`}
+          >
+            <dt className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              {row.label}
+            </dt>
+            <dd className="mt-1 text-sm font-semibold text-slate-900">
+              {row.confirmed ? row.text : 'Not wired'}
+            </dd>
+            {row.provenance !== null && (
+              <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-700">
+                {row.provenance}
+              </p>
+            )}
+            {!row.confirmed && (
+              <p className="mt-1 text-xs leading-5 text-slate-600">
+                {row.reason}
+              </p>
+            )}
+          </div>
+        ))}
+      </dl>
+      {inputs.annualOperatingHours.confirmed &&
+        inputs.annualOperatingHours.approver !== null && (
+          <p className="mt-3 text-xs leading-5 text-slate-600">
+            Annual hours approved by {inputs.annualOperatingHours.approver}.
+          </p>
+        )}
+      {inputs.proposedPartLoadCurveRequired &&
+        inputs.proposedPartLoadCurvePointCount === 0 && (
+          <p className="mt-3 text-xs leading-5 text-amber-800">
+            The proposed machine is variable speed and no manufacturer part-load
+            table has been supplied, so no variable-speed saving may be released.
+          </p>
+        )}
+      {!inputs.tariff.confirmed && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Tariff not confirmed
+          </p>
+          <ul className="mt-1 space-y-1 text-xs leading-5 text-slate-600">
+            {inputs.tariff.reasons.slice(0, 3).map(reason => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -864,6 +947,8 @@ export function BouwaAuditIntakePanel({
         locked={false}
         onChange={next => setIntake({ ...intake, evidence: next })}
       />
+
+      <WiredInputsPanel inputs={state.scientificInputs} />
 
       <ReadinessSummary
         readiness={state.readiness}

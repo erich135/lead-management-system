@@ -20,6 +20,8 @@ import type {
   AuditReadinessStage,
   IntakeAnswer,
   IntakeAnswerState,
+  ResolvedInput,
+  ResolvedScientificInputs,
 } from './auditIntakeTypes';
 
 export const ANSWER_STATE_LABELS: Record<IntakeAnswerState, string> = {
@@ -173,6 +175,84 @@ export function auditIntakeSectionViews(
       confirmedCount: fields.filter(entry => entry.status.confirmed).length,
     };
   });
+}
+
+export const PROVENANCE_LABELS: Record<string, string> = {
+  exact_mathematics: 'Exact mathematics',
+  established_engineering: 'Established engineering',
+  manufacturer_specification: 'Manufacturer specification',
+  approved_assumption: 'Approved assumption',
+  business_input: 'Business input',
+  user_input: 'User input',
+};
+
+export interface WiredInputRow {
+  label: string;
+  /** The resolved value as text, or an empty string when nothing was wired. */
+  text: string;
+  provenance: string | null;
+  confirmed: boolean;
+  reason: string;
+}
+
+function wiredText(value: unknown, unit: string): string {
+  if (value === null || value === undefined) return '';
+  if (unit === '') return String(value);
+  return `${String(value)} ${unit}`;
+}
+
+function wiredRow(
+  label: string,
+  input: ResolvedInput<unknown>,
+  unit = '',
+): WiredInputRow {
+  return {
+    label,
+    text: wiredText(input.value, unit),
+    provenance:
+      input.provenance === null
+        ? null
+        : (PROVENANCE_LABELS[input.provenance] ?? input.provenance),
+    confirmed: input.confirmed,
+    reason: input.reason,
+  };
+}
+
+/**
+ * What the backend would actually calculate with, in the backend's own words.
+ * Showing this beside the answers is the only way an operator can tell a
+ * confirmed answer that reached the model from one that was rejected on the way.
+ */
+export function wiredInputRows(
+  inputs: ResolvedScientificInputs,
+): WiredInputRow[] {
+  return [
+    wiredRow('Annual operating hours', inputs.annualOperatingHours, 'h/y'),
+    wiredRow('Measured flow-reference basis', inputs.measuredFlowReferenceBasis),
+    wiredRow('Measured pressure basis', inputs.measuredPressureBasis),
+    wiredRow('Configured low-flow cut-off', inputs.lowFlowCutOff, 'm³/min'),
+    wiredRow(
+      'Existing machine discharge pressure',
+      inputs.existingMachine.dischargePressureBarG,
+      'bar(g)',
+    ),
+    wiredRow(
+      'Existing machine declared power',
+      inputs.existingMachine.declaredPowerKw,
+      'kW',
+    ),
+    wiredRow(
+      'Proposed machine discharge pressure',
+      inputs.proposedMachine.dischargePressureBarG,
+      'bar(g)',
+    ),
+    wiredRow(
+      'Proposed machine declared power',
+      inputs.proposedMachine.declaredPowerKw,
+      'kW',
+    ),
+    wiredRow('Representative period', inputs.representativePeriod),
+  ];
 }
 
 export interface AuditIntakeSaveIdentity {

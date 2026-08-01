@@ -443,6 +443,38 @@ requireText(
   `${intakeLabel} server-owned provenance`,
 );
 
+// Step 14. The panel shows what the backend resolved, never what the answers
+// look like as though they had been resolved.
+requireText(
+  intakePanel,
+  'state.scientificInputs',
+  `${intakeLabel} wired scientific inputs`,
+);
+requireText(
+  intakePanel,
+  'wiredInputRows(inputs)',
+  `${intakeLabel} wired input rows`,
+);
+requireText(
+  intakePanel,
+  'row.confirmed ? row.text',
+  `${intakeLabel} unwired input withheld`,
+);
+requireText(intakePanel, 'row.reason', `${intakeLabel} unwired input reason`);
+requireText(
+  intakeState,
+  'input.confirmed',
+  `${intakeLabel} backend confirmation of a wired input`,
+);
+for (const wiredContract of [
+  'inputs.annualOperatingHours',
+  'inputs.measuredFlowReferenceBasis',
+  'inputs.measuredPressureBasis',
+  'inputs.lowFlowCutOff',
+  'inputs.representativePeriod',
+])
+  requireText(intakeState, wiredContract, `${intakeLabel} Step 14 input`);
+
 // The intake form describes controlled answers. It must never carry its own
 // option lists, its own stage rules, or any scientific arithmetic. Prose in a
 // comment is not code, so comments are removed before the arithmetic checks.

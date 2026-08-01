@@ -165,6 +165,75 @@ export interface AuditIntakeDocument {
   [section: string]: unknown;
 }
 
+export type ScientificProvenance =
+  | 'exact_mathematics'
+  | 'established_engineering'
+  | 'manufacturer_specification'
+  | 'approved_assumption'
+  | 'business_input'
+  | 'user_input';
+
+/**
+ * One Step 14 input as the backend resolved it. `value` is null whenever
+ * `confirmed` is false, so the panel never has to decide for itself whether a
+ * figure may be shown as wired.
+ */
+export interface ResolvedInput<TValue> {
+  fieldCode: string;
+  value: TValue | null;
+  confirmed: boolean;
+  provenance: ScientificProvenance | null;
+  reason: string;
+}
+
+export interface ResolvedAnnualOperatingHours extends ResolvedInput<number> {
+  status: string | null;
+  approver: string | null;
+  evidenceReference: string | null;
+}
+
+export interface ResolvedMachineComparisonBasis {
+  dischargePressureBarG: number | null;
+  flowReferenceBasis: string | null;
+}
+
+export interface ResolvedMachineInputs {
+  dischargePressureBarG: ResolvedInput<number>;
+  ratedFadM3PerMin: ResolvedInput<number>;
+  flowReferenceBasis: ResolvedInput<string>;
+  declaredPowerKw: ResolvedInput<number>;
+  powerBasis: string;
+  motorEfficiency: ResolvedInput<number>;
+  reviewRequired: boolean;
+  electricalInput: {
+    declaredPowerKw: number | null;
+    powerBasis: string;
+    motorEfficiency: number | null;
+  };
+}
+
+export interface ResolvedScientificInputs {
+  annualOperatingHours: ResolvedAnnualOperatingHours;
+  logger: {
+    channelBasis: { flow: string; pressure: string };
+    lowFlowCutOffM3PerMin: number | null;
+  };
+  measuredFlowReferenceBasis: ResolvedInput<string>;
+  measuredPressureBasis: ResolvedInput<string>;
+  lowFlowCutOff: ResolvedInput<number>;
+  existingMachine: ResolvedMachineInputs;
+  proposedMachine: ResolvedMachineInputs;
+  comparison: {
+    existing: ResolvedMachineComparisonBasis;
+    proposed: ResolvedMachineComparisonBasis;
+  };
+  representativePeriod: ResolvedInput<string>;
+  proposedPartLoadCurveRequired: boolean;
+  proposedPartLoadCurvePointCount: number;
+  tariff: { confirmed: boolean; reasons: string[] };
+  measuredDemand: { annualOperatingHours: number | null };
+}
+
 export interface AuditIntakeState {
   proposalRecordId: string;
   fileParsed: boolean;
@@ -172,6 +241,7 @@ export interface AuditIntakeState {
   updatedBy: string | null;
   intake: AuditIntakeDocument;
   readiness: AuditReadinessAssessment;
+  scientificInputs: ResolvedScientificInputs;
 }
 
 export type AuditFieldValueKind =

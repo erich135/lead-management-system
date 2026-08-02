@@ -28,6 +28,15 @@ import {
 import type { WizardSpecRecord } from '../src/features/bouwa/wizard/wizardTypes.ts';
 import { answerCitations } from '../src/features/bouwa/wizard/answerCitations.ts';
 import {
+  TARIFF_DEPENDENT_FIGURES,
+  TARIFF_ROUTE_OPTIONS,
+  nextCascadeStep,
+  tariffDetailLines,
+  tariffRateLines,
+  tariffResultLine,
+  tariffSnapshotLine,
+} from '../src/features/bouwa/wizard/tariffSelection.ts';
+import {
   CUSTOMER_SITE_SELECTOR_CODES,
   NO_FORMAL_SITE_RECORD,
   siteCandidates,
@@ -1237,6 +1246,172 @@ assert.equal(
   answerCitations(citationModel, citationStatuses, citationAnswerAt, {}).length,
   0,
   'a proposal that cited nothing shows no citation table at all',
+);
+
+/* ------------------------------------------------------------------ *
+ * The tariff cascade
+ * ------------------------------------------------------------------ */
+
+assert.equal(
+  nextCascadeStep({}, {}),
+  'supplier',
+  'a rep is asked who bills the site before anything else',
+);
+assert.equal(
+  nextCascadeStep(
+    { supplier: 'Eskom' },
+    { customerCategory: [{ value: 'Large power user', count: 12 }] },
+  ),
+  'voltageCategory',
+  'a step with only one possible answer is not put to the user',
+);
+assert.equal(
+  nextCascadeStep(
+    { supplier: 'Eskom' },
+    {
+      customerCategory: [
+        { value: 'Large power user', count: 12 },
+        { value: 'Rural', count: 4 },
+      ],
+    },
+  ),
+  'customerCategory',
+  'a step with a real choice is asked',
+);
+assert.equal(
+  nextCascadeStep(
+    {
+      supplier: 'Eskom',
+      customerCategory: 'Large power user',
+      voltageCategory: '>=500V & <66kV',
+      transmissionZone: '<=300 km',
+    },
+    {},
+  ),
+  null,
+  'once the register is narrowed to its own terms there is nothing left to ask',
+);
+
+const tariffRecord = {
+  recordId: 'megaflex-2026',
+  tariffKey: 'eskom::megaflex',
+  recordVersion: 1,
+  status: 'active',
+  supplier: 'Eskom',
+  supplierType: 'national_utility',
+  supplierTypeLabel: 'National utility',
+  province: null,
+  tariffName: 'Megaflex <=300 km <66kV',
+  tariffCode: null,
+  direction: 'supply',
+  customerCategory: 'Large power user',
+  voltageCategory: '>=500V & <66kV',
+  transmissionZone: '<=300 km',
+  energyChargeType: 'time_of_use',
+  currency: 'ZAR',
+  vatBasis: 'not_published',
+  effectiveFrom: '2026-04-01',
+  effectiveTo: '2027-04-01',
+  tariffYearLabel: '2026/27',
+  periods: [
+    {
+      periodStart: '2026-04-01',
+      periodEnd: '2027-04-01',
+      standardRateRandPerKwh: 1.4,
+      peakRateRandPerKwh: null,
+      offPeakRateRandPerKwh: null,
+      fixedMonthlyChargeRand: null,
+      demandChargeRand: null,
+      demandChargeBaseUnit: null,
+    },
+  ],
+  confirmationStatus: 'published_not_confirmed',
+  source: {
+    sourceType: 'retained_tariff_register',
+    sourceDocumentId: 'register-1',
+    sourceTitle: 'Retained tariff register',
+    sourceOrganisation: 'Eskom',
+    sourceUrl: null,
+    sourceDate: null,
+    sourceFileName: null,
+    sourceSha256: null,
+    sourceNotes: null,
+  },
+  summary: 'Eskom Megaflex · time of use',
+  absentPublishedValues: [],
+  unsupportedOutputs: [],
+} as unknown as Parameters<typeof tariffDetailLines>[0];
+
+assert.equal(
+  tariffResultLine(tariffRecord),
+  'Eskom · Megaflex <=300 km <66kV · <=300 km · 2026/27',
+  'a tariff reads as its supplier, name, zone and determination year',
+);
+
+const tariffLines = new Map(
+  tariffDetailLines(tariffRecord).map(line => [line.label, line.value]),
+);
+assert.equal(
+  tariffLines.get('Tariff code'),
+  'Not stated by the source',
+  'a value the register did not print says so, rather than reading blank',
+);
+assert.equal(
+  tariffLines.get('VAT basis'),
+  'Not stated by the source — confirm from the bill',
+  'a missing VAT basis is a question, not an assumption of excluding VAT',
+);
+assert.equal(tariffLines.get('Supply authority'), 'National utility');
+
+const rateLines = tariffRateLines(tariffRecord.periods);
+assert.equal(rateLines.length, 1, 'only the rates the source published appear');
+assert.equal(rateLines[0]?.value, 'R 1.4000 / kWh');
+assert.deepEqual(
+  tariffRateLines([
+    {
+      periodStart: '2026-04-01',
+      periodEnd: '2027-04-01',
+      standardRateRandPerKwh: null,
+      peakRateRandPerKwh: null,
+      offPeakRateRandPerKwh: null,
+      fixedMonthlyChargeRand: null,
+      demandChargeRand: null,
+      demandChargeBaseUnit: null,
+    },
+  ]),
+  [],
+  'a determination with no published rate shows none, rather than zero',
+);
+
+assert.equal(
+  tariffSnapshotLine({
+    values: {
+      supplier: 'Eskom',
+      tariffName: 'Megaflex <=300 km <66kV',
+      tariffYearLabel: '2026/27',
+      effectiveFrom: '2026-04-01',
+      effectiveTo: '2027-04-01',
+      periods: [],
+    },
+  } as unknown as Parameters<typeof tariffSnapshotLine>[0]),
+  'Eskom · Megaflex <=300 km <66kV · 2026/27',
+);
+
+assert.deepEqual(
+  TARIFF_DEPENDENT_FIGURES,
+  [
+    'Annual electricity cost',
+    'Rand saving',
+    'Simple payback',
+    'Return on investment',
+  ],
+  'what a missing tariff costs the proposal is named in the customer’s language',
+);
+assert.equal(
+  TARIFF_ROUTE_OPTIONS.filter(option => option.id === 'not_available_yet')
+    .length,
+  1,
+  '"not available yet" is offered as a real answer rather than a dead end',
 );
 
 console.log('Bouwa guided-wizard state checks passed.');

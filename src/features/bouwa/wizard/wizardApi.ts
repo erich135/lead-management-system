@@ -29,6 +29,12 @@ import type {
   WizardSpecRecord,
   WizardStep,
   WizardStepId,
+  WizardTariffComparisonResult,
+  WizardTariffFacetField,
+  WizardTariffFacetValue,
+  WizardTariffRecord,
+  WizardTariffRoute,
+  WizardTariffSelectionResult,
 } from './wizardTypes';
 import type { AuditIntakeDocument, AuditIntakeFormModel } from '../auditIntakeTypes';
 
@@ -457,6 +463,99 @@ export async function listInstalledMachines(params: {
     sites: (body.sites as string[]) ?? [],
     noneRegistered: body.noneRegistered === true,
   };
+}
+
+/* ------------------------------------------------------------------ *
+ * The tariff library
+ * ------------------------------------------------------------------ */
+
+export interface TariffLibraryQuery {
+  supplier?: string;
+  customerCategory?: string;
+  voltageCategory?: string;
+  transmissionZone?: string;
+  province?: string;
+  search?: string;
+  effectiveOn?: string;
+  limit?: number;
+}
+
+export async function searchTariffLibrary(
+  query: TariffLibraryQuery = {},
+): Promise<WizardTariffRecord[]> {
+  const body = await requestJson(`/tariff-library${queryString({ ...query })}`);
+  return (body.records as WizardTariffRecord[]) ?? [];
+}
+
+/**
+ * The choices at one step of the cascade, each with the number of tariffs
+ * behind it, so a rep is never offered a narrowing that leads nowhere.
+ */
+export async function tariffLibraryFacet(
+  facet: WizardTariffFacetField,
+  query: TariffLibraryQuery = {},
+): Promise<WizardTariffFacetValue[]> {
+  const body = await requestJson(
+    `/tariff-library/facets${queryString({ ...query, facet })}`,
+  );
+  return (body.values as WizardTariffFacetValue[]) ?? [];
+}
+
+export async function fetchTariffRecord(recordId: string): Promise<{
+  record: WizardTariffRecord;
+  otherYears: WizardTariffRecord[];
+  history: WizardTariffRecord[];
+}> {
+  const body = await requestJson(
+    `/tariff-library/${encodeURIComponent(recordId)}`,
+  );
+  return {
+    record: body.record as WizardTariffRecord,
+    otherYears: (body.otherYears as WizardTariffRecord[]) ?? [],
+    history: (body.history as WizardTariffRecord[]) ?? [],
+  };
+}
+
+/**
+ * Costs the proposal on a determination, or records that the bill has not
+ * arrived. As with machines, the browser names the record and the server
+ * decides what it answers.
+ */
+export async function selectWizardTariff(
+  draftId: string,
+  request: {
+    revision: number;
+    route?: WizardTariffRoute;
+    tariffRecordId?: string;
+    evidenceReference?: string | null;
+    clear?: true;
+  },
+): Promise<WizardTariffSelectionResult> {
+  const body = await requestJson(
+    `/drafts/${encodeURIComponent(draftId)}/tariff-selection`,
+    { method: 'POST', body: JSON.stringify(request) },
+  );
+  return body as unknown as WizardTariffSelectionResult;
+}
+
+export async function compareWizardTariff(
+  draftId: string,
+): Promise<WizardTariffComparisonResult> {
+  const body = await requestJson(
+    `/drafts/${encodeURIComponent(draftId)}/tariff-comparison`,
+  );
+  return body as unknown as WizardTariffComparisonResult;
+}
+
+export async function updateWizardTariff(
+  draftId: string,
+  revision: number,
+): Promise<WizardDraftView> {
+  const body = await requestJson(
+    `/drafts/${encodeURIComponent(draftId)}/tariff-update`,
+    { method: 'POST', body: JSON.stringify({ revision }) },
+  );
+  return body as unknown as WizardDraftView;
 }
 
 /**

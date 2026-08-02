@@ -191,6 +191,126 @@ export interface WizardMachineComparisonResult {
   } | null;
 }
 
+/* ------------------------------------------------------------------ *
+ * The tariff library
+ * ------------------------------------------------------------------ */
+
+export type WizardTariffRoute =
+  | 'customer_bill_supplied'
+  | 'previously_confirmed_for_customer'
+  | 'searched_tariff_library'
+  | 'not_available_yet';
+
+export type WizardTariffFacetField =
+  | 'supplier'
+  | 'customerCategory'
+  | 'voltageCategory'
+  | 'transmissionZone'
+  | 'province';
+
+export interface WizardTariffFacetValue {
+  value: string;
+  count: number;
+}
+
+export interface WizardTariffSource {
+  sourceType: string;
+  sourceDocumentId: string;
+  sourceTitle: string;
+  sourceOrganisation: string;
+  sourceUrl: string | null;
+  sourceDate: string | null;
+  sourceFileName: string | null;
+  sourceSha256: string | null;
+  sourceNotes: string | null;
+}
+
+export interface WizardTariffPeriod {
+  periodStart: string;
+  periodEnd: string;
+  standardRateRandPerKwh: number | null;
+  peakRateRandPerKwh: number | null;
+  offPeakRateRandPerKwh: number | null;
+  fixedMonthlyChargeRand: number | null;
+  demandChargeRand: number | null;
+  demandChargeBaseUnit: string | null;
+  [field: string]: unknown;
+}
+
+export interface WizardTariffRecord {
+  recordId: string;
+  tariffKey: string;
+  recordVersion: number;
+  status: 'active' | 'superseded';
+  supplier: string;
+  supplierType: string;
+  supplierTypeLabel: string;
+  province: string | null;
+  tariffName: string;
+  tariffCode: string | null;
+  direction: string;
+  customerCategory: string | null;
+  voltageCategory: string | null;
+  transmissionZone: string | null;
+  energyChargeType: string;
+  currency: string;
+  vatBasis: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  tariffYearLabel: string;
+  periods: WizardTariffPeriod[];
+  confirmationStatus: string;
+  source: WizardTariffSource;
+  summary: string;
+  absentPublishedValues: string[];
+  unsupportedOutputs: string[];
+}
+
+export interface WizardTariffSnapshot {
+  recordId: string;
+  recordVersion: number;
+  tariffKey: string;
+  contentFingerprint: string;
+  source: WizardTariffSource;
+  values: {
+    supplier: string;
+    tariffName: string;
+    tariffYearLabel: string;
+    effectiveFrom: string;
+    effectiveTo: string | null;
+    periods: WizardTariffPeriod[];
+    [field: string]: unknown;
+  };
+  route: WizardTariffRoute;
+  evidenceReference: string | null;
+  takenAt: string;
+  takenByUserId: string;
+}
+
+export interface WizardTariffSelection {
+  route: WizardTariffRoute | null;
+  snapshot: WizardTariffSnapshot | null;
+}
+
+export interface WizardTariffSelectionResult extends WizardDraftView {
+  populated: string[];
+  notPublished: string[];
+}
+
+export interface WizardTariffComparisonResult {
+  held: boolean;
+  latest: WizardTariffRecord | null;
+  comparison: {
+    recordId: string;
+    quotedVersion: number;
+    latestVersion: number;
+    unchanged: boolean;
+    changes: { field: string; quotedValue: unknown; latestValue: unknown }[];
+    quotedSource: string;
+    latestSource: string;
+  } | null;
+}
+
 export interface WizardDraft {
   draftId: string;
   schemaVersion: string;
@@ -208,6 +328,7 @@ export interface WizardDraft {
   /** Where each answered value came from, keyed by the answer's intake path. */
   answerProvenance: Record<string, WizardAnswerProvenance>;
   machineSelections: WizardMachineSelections;
+  tariffSelection: WizardTariffSelection;
   fileParsed: boolean;
   sourceFile: WizardSourceFile | null;
   attachments: WizardAttachment[];

@@ -32,7 +32,9 @@ import {
   restoreWizardAnswer,
   saveWizardDraft,
   selectWizardMachine,
+  selectWizardTariff,
   updateWizardMachine,
+  updateWizardTariff,
   uploadWizardDocument,
   uploadWizardSource,
   type WizardSaveRequest,
@@ -46,6 +48,8 @@ import type {
   WizardManualBasis,
   WizardProposalType,
   WizardStepId,
+  WizardTariffRoute,
+  WizardTariffSelectionResult,
 } from './wizardTypes';
 
 /** How long a user may pause before what they have entered is saved for them. */
@@ -102,6 +106,18 @@ export interface WizardDraftController {
   ) => Promise<boolean>;
   restoreAnswer: (path: string) => Promise<boolean>;
   updateMachineToLatest: (role: WizardMachineRole) => Promise<boolean>;
+  /**
+   * Costs the proposal on a determination, or records that the bill has not
+   * arrived yet. Handled the same way as a machine, and for the same reason:
+   * what a published register says is decided in one place.
+   */
+  selectTariff: (
+    choice:
+      | { route: WizardTariffRoute; tariffRecordId: string; evidenceReference?: string | null }
+      | { route: 'not_available_yet' }
+      | { clear: true },
+  ) => Promise<WizardTariffSelectionResult | null>;
+  updateTariffToLatest: () => Promise<boolean>;
   uploadSource: (file: File) => Promise<boolean>;
   uploadDocument: (
     file: File,
@@ -398,6 +414,37 @@ export function useWizardDraft(initial: WizardDraftView): WizardDraftController 
     [command, view.draft.draftId],
   );
 
+  const selectTariff = useCallback(
+    (
+      choice:
+        | {
+            route: WizardTariffRoute;
+            tariffRecordId: string;
+            evidenceReference?: string | null;
+          }
+        | { route: 'not_available_yet' }
+        | { clear: true },
+    ) =>
+      command(
+        () =>
+          selectWizardTariff(view.draft.draftId, {
+            revision: revision.current,
+            ...choice,
+          }),
+        'That tariff was not accepted.',
+      ),
+    [command, view.draft.draftId],
+  );
+
+  const updateTariffToLatest = useCallback(
+    async (): Promise<boolean> =>
+      (await command(
+        () => updateWizardTariff(view.draft.draftId, revision.current),
+        'The proposal was not moved to the newer tariff.',
+      )) !== null,
+    [command, view.draft.draftId],
+  );
+
   const uploadSource = useCallback(
     async (file: File): Promise<boolean> => {
       if (!(await flush())) return false;
@@ -532,6 +579,8 @@ export function useWizardDraft(initial: WizardDraftView): WizardDraftController 
     overrideAnswer,
     restoreAnswer,
     updateMachineToLatest,
+    selectTariff,
+    updateTariffToLatest,
     uploadSource,
     uploadDocument,
     reloadFromServer,

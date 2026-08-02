@@ -33,6 +33,7 @@ import {
   ProposedMachinePicker,
 } from './components/MachinePickers';
 import { MachineEvidencePanel } from './components/MachineEvidencePanel';
+import { TariffPicker } from './components/TariffPicker';
 import { EquipmentPicker } from './components/EquipmentPicker';
 import {
   answeredTextForCode,
@@ -80,6 +81,7 @@ type Screen =
   | { kind: 'manual_basis'; fields: WizardFieldView[] }
   | { kind: 'existing_machine'; fields: WizardFieldView[] }
   | { kind: 'proposed_machine'; fields: WizardFieldView[] }
+  | { kind: 'tariff'; fields: WizardFieldView[] }
   | {
       kind: 'equipment';
       equipmentType: WizardEquipmentType;
@@ -169,7 +171,17 @@ function screensForStep(
   if (step.id === 'proposed_solution') return withPicker('proposed_machine');
   // The documents belong with the questions whose evidence they are, and the
   // tariff and investment answers are the last ones asked before the review.
-  if (step.id === 'tariff_investment') return [...pages, { kind: 'documents' }];
+  // The tariff is chosen from the register rather than described, so its
+  // questions sit under the selector that answers them.
+  if (step.id === 'tariff_investment') {
+    const tariff = all.filter(view => view.status.section === 'tariff');
+    const rest = all.filter(view => view.status.section !== 'tariff');
+    return [
+      { kind: 'tariff', fields: tariff },
+      ...fieldScreens(rest),
+      { kind: 'documents' },
+    ];
+  }
   return pages;
 }
 
@@ -558,6 +570,35 @@ export function GuidedProposalWizard({
             />
             <MachineEvidencePanel
               snapshot={view.draft.machineSelections?.proposedMachine ?? null}
+            />
+            <div className="space-y-2">
+              {screen.fields.map(fieldView => (
+                <WizardAnswerField
+                  key={fieldView.field.code}
+                  view={fieldView}
+                  intake={intake}
+                  disabled={!mayEdit}
+                  {...answering}
+                />
+              ))}
+            </div>
+          </div>
+        ) : screen.kind === 'tariff' ? (
+          <div className="space-y-3">
+            <TariffPicker
+              snapshot={view.draft.tariffSelection?.snapshot ?? null}
+              route={view.draft.tariffSelection?.route ?? null}
+              disabled={!mayEdit}
+              onChoose={(record, route) =>
+                void draft.selectTariff({
+                  route,
+                  tariffRecordId: record.recordId,
+                })
+              }
+              onUnavailable={() =>
+                void draft.selectTariff({ route: 'not_available_yet' })
+              }
+              onClear={() => void draft.selectTariff({ clear: true })}
             />
             <div className="space-y-2">
               {screen.fields.map(fieldView => (

@@ -22,12 +22,14 @@ import {
   readAnswerAtPath,
 } from '../../auditIntakeState';
 import type {
+  AuditFormField,
   AuditIntakeDocument,
   IntakeAnswer,
   IntakeAnswerState,
 } from '../../auditIntakeTypes';
 import { conceptForField } from '../wizardHelp';
 import type { WizardFieldView } from '../wizardState';
+import { ANSWER_ORIGIN_LABELS } from '../wizardTypes';
 
 const STATE_BUTTON_LABELS: Partial<Record<IntakeAnswerState, string>> = {
   unknown_confirmation_required: 'Unknown',
@@ -57,6 +59,18 @@ const STATUS_TEXT: Record<string, string> = {
   not_required: 'Not required',
 };
 
+/** A value as a person reads it, rather than as the intake stores it. */
+function describeValue(field: AuditFormField, value: unknown): string {
+  if (value === null || value === undefined) return 'Not published';
+  if (Array.isArray(value))
+    return `${value.length} point${value.length === 1 ? '' : 's'}`;
+  if (field.valueKind === 'selection') {
+    const option = field.options.find(entry => entry.value === value);
+    return option?.label ?? String(value);
+  }
+  return String(value);
+}
+
 export interface WizardAnswerFieldProps {
   view: WizardFieldView;
   intake: AuditIntakeDocument;
@@ -64,6 +78,12 @@ export interface WizardAnswerFieldProps {
   /** The value the file stated, where this field was filled in from a parse. */
   lockedText?: string | null;
   onAnswer: (path: string, answer: IntakeAnswer<unknown>) => void;
+  /**
+   * Restates a value a source published. Absent where the screen has no way to
+   * record a reason, in which case a source-backed value is simply shown.
+   */
+  onOverride?: (path: string, answer: unknown, reason: string) => void;
+  onRestore?: (path: string) => void;
 }
 
 export function WizardAnswerField({
@@ -72,14 +92,29 @@ export function WizardAnswerField({
   disabled,
   lockedText,
   onAnswer,
+  onOverride,
+  onRestore,
 }: WizardAnswerFieldProps) {
-  const { field, status } = view;
+  const { field, status, provenance } = view;
   const stored = readAnswerAtPath(intake, field.path);
   const [draft, setDraft] = useState<string | null>(null);
   const [problem, setProblem] = useState('');
   const [helpOpen, setHelpOpen] = useState(false);
+  const [changing, setChanging] = useState(false);
+  const [reason, setReason] = useState('');
 
   const text = draft ?? inputTextForAnswer(stored);
+  /**
+   * A value a source published is shown rather than offered for typing. Not
+   * because a rep is untrusted, but because a figure quietly typed over a
+   * manufacturer's is indistinguishable afterwards from the manufacturer's own,
+   * and the proposal has to be able to tell a reader which it is.
+   */
+  const fromSource =
+    provenance !== null &&
+    (provenance.origin === 'populated_from_source' ||
+      provenance.origin === 'changed_for_this_proposal') &&
+    onOverride !== undefined;
   const locked = view.sourceDerived || disabled;
   const concept = conceptForField(field.code);
   const controlId = `wizard-field-${field.code.replace(/[^A-Za-z0-9]/g, '-')}`;
@@ -154,8 +189,75 @@ export function WizardAnswerField({
         </div>
       ) : null}
 
+      {provenance === null ? null : (
+        <div
+          data-testid="wizard-field-provenance"
+          data-origin={provenance.origin}
+          className={`mt-1.5 rounded-md px-2.5 py-1.5 text-[11px] leading-relaxed ${
+            provenance.origin === 'changed_for_this_proposal'
+              ? 'bg-amber-50 text-amber-900'
+              : 'bg-slate-50 text-slate-600'
+          }`}
+        >
+          <span className="font-medium">
+            {ANSWER_ORIGIN_LABELS[provenance.origin]}
+          </span>
+          {' — '}
+          {provenance.sourceLabel}
+          {provenance.sourceRecordVersion === null
+            ? null
+            : ` (record version ${provenance.sourceRecordVersion})`}
+          {provenance.origin === 'changed_for_this_proposal' ? (
+            <span className="mt-0.5 block">
+              Published value {describeValue(field, provenance.sourceValue)}.
+              {provenance.reason === null ? null : ` ${provenance.reason}.`}
+              {provenance.byName === null ? null : ` ${provenance.byName}.`}
+            </span>
+          ) : null}
+          {provenance.origin === 'not_published_by_source' ? (
+            <span className="mt-0.5 block">
+              This source states nothing for this field, so it remains a question.
+            </span>
+          ) : null}
+        </div>
+      )}
+
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        {view.sourceDerived ? (
+        {fromSource ? (
+          <>
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md bg-slate-50 px-2.5 py-1.5 text-sm text-slate-700">
+              <Lock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+              <span className="font-mono text-xs">
+                {inputTextForAnswer(stored) || '—'}
+              </span>
+            </p>
+            {disabled || changing ? null : (
+              <button
+                type="button"
+                onClick={() => {
+                  setDraft(inputTextForAnswer(stored));
+                  setReason('');
+                  setChanging(true);
+                }}
+                className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Change for this proposal
+              </button>
+            )}
+            {provenance?.origin === 'changed_for_this_proposal' &&
+            !disabled &&
+            !changing &&
+            onRestore !== undefined ? (
+              <button
+                type="button"
+                onClick={() => onRestore(field.path)}
+                className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Restore published value
+              </button>
+            ) : null}
+          </>
+        ) : view.sourceDerived ? (
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md bg-slate-50 px-2.5 py-1.5 text-sm text-slate-700">
             <Lock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
             <span className="font-mono text-xs">
@@ -204,7 +306,7 @@ export function WizardAnswerField({
           />
         )}
 
-        {view.sourceDerived
+        {view.sourceDerived || fromSource
           ? null
           : stateButtons.map(state => {
               const active = stored?.state === state;
@@ -225,6 +327,76 @@ export function WizardAnswerField({
               );
             })}
       </div>
+
+      {changing && onOverride !== undefined ? (
+        <div
+          data-testid="wizard-field-override"
+          className="mt-2 space-y-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2"
+        >
+          <p className="text-[11px] leading-relaxed text-amber-900">
+            The published value stays on the proposal beside yours, and both
+            appear in Advanced Technical Review. A reason is required.
+          </p>
+          {field.valueKind === 'selection' ? (
+            <select
+              value={draft ?? ''}
+              onChange={event => setDraft(event.target.value)}
+              className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm"
+            >
+              <option value="">Choose…</option>
+              {field.options.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              value={draft ?? ''}
+              placeholder={field.unit ?? ''}
+              onChange={event => setDraft(event.target.value)}
+              className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm"
+            />
+          )}
+          <input
+            value={reason}
+            placeholder="Why this proposal states something else"
+            onChange={event => setReason(event.target.value)}
+            className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm"
+          />
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={reason.trim() === ''}
+              onClick={() => {
+                const outcome = answerFromInput(field, draft ?? '');
+                if ('problem' in outcome) {
+                  setProblem(outcome.problem);
+                  return;
+                }
+                setProblem('');
+                setChanging(false);
+                setDraft(null);
+                onOverride(field.path, outcome.answer.value, reason.trim());
+              }}
+              className="rounded-md bg-amber-600 px-2.5 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+            >
+              Record this change
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setChanging(false);
+                setDraft(null);
+                setProblem('');
+              }}
+              className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {problem === '' ? null : (
         <p className="mt-1.5 text-xs text-rose-600">{problem}</p>

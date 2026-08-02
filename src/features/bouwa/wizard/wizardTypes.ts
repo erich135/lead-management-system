@@ -88,6 +88,109 @@ export interface WizardReadinessSummary {
   evaluatedAt: string;
 }
 
+/**
+ * Where one answer came from.
+ *
+ * The origin is the distinction a rep needs and the form alone cannot show: a
+ * blank because Atlas Copco published nothing reads exactly like a blank
+ * because nobody has got to it yet, and only one of those is the rep's problem.
+ */
+export type WizardAnswerOrigin =
+  | 'populated_from_source'
+  | 'not_published_by_source'
+  | 'changed_for_this_proposal';
+
+export type WizardAnswerSourceKind =
+  | 'machine_spec_library'
+  | 'ars_machine_register'
+  | 'ars_customer_record'
+  | 'tariff_library'
+  | 'logger_source_file';
+
+export const ANSWER_ORIGIN_LABELS: Record<WizardAnswerOrigin, string> = {
+  populated_from_source: 'Populated from source',
+  not_published_by_source: 'Not published by source',
+  changed_for_this_proposal: 'Changed for this proposal',
+};
+
+export const ANSWER_SOURCE_KIND_LABELS: Record<WizardAnswerSourceKind, string> = {
+  machine_spec_library: 'Machine Specification Library',
+  ars_machine_register: 'ARS machine register',
+  ars_customer_record: 'ARS customer record',
+  tariff_library: 'Tariff library',
+  logger_source_file: 'Uploaded logger file',
+};
+
+export interface WizardAnswerProvenance {
+  origin: WizardAnswerOrigin;
+  sourceKind: WizardAnswerSourceKind;
+  sourceLabel: string;
+  sourceRecordId: string | null;
+  sourceRecordVersion: number | null;
+  sourceDocumentId: string | null;
+  /** What the source stated, kept whatever the proposal now says. */
+  sourceValue: unknown;
+  reason: string | null;
+  byUserId: string | null;
+  byName: string | null;
+  at: string;
+}
+
+export type WizardMachineRole = 'existingMachine' | 'proposedMachine';
+
+/** The library record a proposal quotes, exactly as it read when chosen. */
+export interface WizardSpecSnapshot {
+  recordId: string;
+  recordVersion: number;
+  libraryKey: string;
+  contentFingerprint: string;
+  source: WizardSpecSource;
+  values: Record<string, unknown>;
+  takenAt: string;
+  takenByUserId: string;
+}
+
+export interface WizardMachineSelections {
+  existingMachine: WizardSpecSnapshot | null;
+  proposedMachine: WizardSpecSnapshot | null;
+  installedMachine: {
+    machineId: string;
+    label: string;
+    selectedAt: string;
+    selectedByUserId: string;
+  } | null;
+}
+
+export interface WizardMachineSelectionResult extends WizardDraftView {
+  /** Intake paths the chosen source answered. */
+  populated: string[];
+  /** Intake paths the chosen source was consulted for and left unanswered. */
+  notPublished: string[];
+}
+
+export interface WizardSpecValueChange {
+  field: string;
+  quotedValue: unknown;
+  latestValue: unknown;
+}
+
+export interface WizardMachineComparisonResult {
+  role: WizardMachineRole;
+  held: boolean;
+  latest: WizardSpecRecord | null;
+  explanation?: string;
+  comparison: {
+    upToDate: boolean;
+    quotedVersion: number;
+    latestVersion: number;
+    changes: WizardSpecValueChange[];
+    conflictingOverrides: string[];
+    quotedSource: string;
+    latestSource: string;
+    locallyAnswered: string[];
+  } | null;
+}
+
 export interface WizardDraft {
   draftId: string;
   schemaVersion: string;
@@ -102,6 +205,9 @@ export interface WizardDraft {
   completedStepIds: WizardStepId[];
   intake: AuditIntakeDocument;
   intakeHistory: AuditIntakeHistoryEntry[];
+  /** Where each answered value came from, keyed by the answer's intake path. */
+  answerProvenance: Record<string, WizardAnswerProvenance>;
+  machineSelections: WizardMachineSelections;
   fileParsed: boolean;
   sourceFile: WizardSourceFile | null;
   attachments: WizardAttachment[];

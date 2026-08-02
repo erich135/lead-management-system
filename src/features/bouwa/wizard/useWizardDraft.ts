@@ -28,7 +28,11 @@ import type { AuditIntakeDocument, IntakeAnswer } from '../auditIntakeTypes';
 import {
   WizardRequestError,
   fetchWizardDraft,
+  overrideWizardAnswer,
+  restoreWizardAnswer,
   saveWizardDraft,
+  selectWizardMachine,
+  updateWizardMachine,
   uploadWizardDocument,
   uploadWizardSource,
   type WizardSaveRequest,
@@ -37,6 +41,8 @@ import type { WizardSaveState } from './wizardState';
 import type {
   WizardConflict,
   WizardDraftView,
+  WizardMachineRole,
+  WizardMachineSelectionResult,
   WizardManualBasis,
   WizardProposalType,
   WizardStepId,
@@ -76,6 +82,26 @@ export interface WizardDraftController {
     currentStepId: WizardStepId;
     currentPageIndex: number;
   }) => Promise<boolean>;
+  /**
+   * Chooses the machine the proposal is about. The server fills the fields the
+   * source can answer and returns the draft as it now stands, so nothing here
+   * needs its own view of what a manufacturer published.
+   */
+  selectMachine: (
+    role: WizardMachineRole,
+    choice:
+      | { specRecordId: string }
+      | { installedMachineId: string }
+      | { clear: true },
+  ) => Promise<WizardMachineSelectionResult | null>;
+  /** Restates one source-backed value, with the reason for restating it. */
+  overrideAnswer: (
+    path: string,
+    answer: unknown,
+    reason: string,
+  ) => Promise<boolean>;
+  restoreAnswer: (path: string) => Promise<boolean>;
+  updateMachineToLatest: (role: WizardMachineRole) => Promise<boolean>;
   uploadSource: (file: File) => Promise<boolean>;
   uploadDocument: (
     file: File,
@@ -275,6 +301,103 @@ export function useWizardDraft(initial: WizardDraftView): WizardDraftController 
     [send],
   );
 
+  /**
+   * Runs a command that rewrites answers on the server.
+   *
+   * Anything outstanding is saved first, because the command quotes a revision
+   * and a queued keystroke would spend it. What comes back always wins over
+   * what was on screen: the server has just decided which questions the source
+   * answers, and a local copy of the old answers is exactly the disagreement
+   * this whole arrangement exists to prevent.
+   */
+  const command = useCallback(
+    async <T extends WizardDraftView>(
+      work: () => Promise<T>,
+      failure: string,
+    ): Promise<T | null> => {
+      if (!(await flush())) return null;
+      setBusy(true);
+      setSaveState({ kind: 'saving' });
+      try {
+        const next = await work();
+        if (!mounted.current) return next;
+        adopt(next);
+        applyIntake(next.draft.intake);
+        setSaveState({ kind: 'saved', at: next.draft.updatedAt });
+        return next;
+      } catch (error: unknown) {
+        if (!mounted.current) return null;
+        if (error instanceof WizardRequestError && error.conflict !== null) {
+          conflictOpen.current = true;
+          setConflict(error.conflict);
+          setSaveState({ kind: 'conflict', message: error.message });
+          return null;
+        }
+        setSaveState({
+          kind: 'failed',
+          message: error instanceof Error ? error.message : failure,
+        });
+        return null;
+      } finally {
+        if (mounted.current) setBusy(false);
+      }
+    },
+    [adopt, applyIntake, flush],
+  );
+
+  const selectMachine = useCallback(
+    (
+      role: WizardMachineRole,
+      choice:
+        | { specRecordId: string }
+        | { installedMachineId: string }
+        | { clear: true },
+    ) =>
+      command(
+        () =>
+          selectWizardMachine(view.draft.draftId, {
+            revision: revision.current,
+            role,
+            ...choice,
+          }),
+        'That machine was not accepted.',
+      ),
+    [command, view.draft.draftId],
+  );
+
+  const overrideAnswer = useCallback(
+    async (path: string, answer: unknown, reason: string): Promise<boolean> =>
+      (await command(
+        () =>
+          overrideWizardAnswer(view.draft.draftId, {
+            revision: revision.current,
+            path,
+            answer,
+            reason,
+          }),
+        'That change was not accepted.',
+      )) !== null,
+    [command, view.draft.draftId],
+  );
+
+  const restoreAnswer = useCallback(
+    async (path: string): Promise<boolean> =>
+      (await command(
+        () => restoreWizardAnswer(view.draft.draftId, revision.current, path),
+        'The published value was not restored.',
+      )) !== null,
+    [command, view.draft.draftId],
+  );
+
+  const updateMachineToLatest = useCallback(
+    async (role: WizardMachineRole): Promise<boolean> =>
+      (await command(
+        () => updateWizardMachine(view.draft.draftId, revision.current, role),
+        'The proposal was not moved to the newer machine data.',
+      )) !== null,
+    [command, view.draft.draftId],
+  );
+
   const uploadSource = useCallback(
     async (file: File): Promise<boolean> => {
       if (!(await flush())) return false;
@@ -405,6 +528,10 @@ export function useWizardDraft(initial: WizardDraftView): WizardDraftController 
     setManualBasis,
     setCustomer,
     flush,
+    selectMachine,
+    overrideAnswer,
+    restoreAnswer,
+    updateMachineToLatest,
     uploadSource,
     uploadDocument,
     reloadFromServer,

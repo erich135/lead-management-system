@@ -15,9 +15,17 @@
 import { useState } from 'react';
 import { ArrowLeft, ChevronDown, ChevronRight } from 'lucide-react';
 
+import { readAnswerAtPath } from '../auditIntakeState';
 import type { AuditFieldStatus, AuditIntakeFormModel } from '../auditIntakeTypes';
+import {
+  answerCitations,
+  citedValue,
+  type AnswerCitation,
+} from './answerCitations';
 import { formatSavedAt } from './wizardState';
 import {
+  ANSWER_ORIGIN_LABELS,
+  ANSWER_SOURCE_KIND_LABELS,
   MANUAL_BASIS_LABELS,
   PROPOSAL_TYPE_LABELS,
   type WizardDraftView,
@@ -83,6 +91,58 @@ function Facts({ rows }: { rows: [string, string][] }) {
   );
 }
 
+function CitationRow({ entry }: { entry: AnswerCitation }) {
+  const { provenance } = entry;
+  const changed = provenance.origin === 'changed_for_this_proposal';
+  return (
+    <li
+      className="px-3 py-2 text-xs"
+      data-testid="bouwa-review-provenance-row"
+      data-origin={provenance.origin}
+      data-path={entry.path}
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className="font-mono text-[11px] text-slate-500">{entry.code}</span>
+        <span className={changed ? 'text-amber-800' : 'text-slate-600'}>
+          {ANSWER_ORIGIN_LABELS[provenance.origin]}
+        </span>
+      </div>
+      <p className="mt-0.5 text-slate-800">{entry.label}</p>
+      <dl className="mt-1 grid gap-x-6 gap-y-1 sm:grid-cols-2">
+        <div className="flex gap-2">
+          <dt className="shrink-0 text-slate-500">Source stated</dt>
+          <dd className="break-all font-mono text-slate-800">
+            {citedValue(provenance.sourceValue)}
+          </dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="shrink-0 text-slate-500">This proposal</dt>
+          <dd
+            className={`break-all font-mono ${changed ? 'text-amber-900' : 'text-slate-800'}`}
+          >
+            {entry.proposalValue}
+          </dd>
+        </div>
+      </dl>
+      <p className="mt-1 text-slate-600">
+        {ANSWER_SOURCE_KIND_LABELS[provenance.sourceKind]} — {provenance.sourceLabel}
+        {provenance.sourceRecordVersion === null
+          ? ''
+          : ` (record version ${provenance.sourceRecordVersion})`}
+        {provenance.sourceDocumentId === null
+          ? ''
+          : ` · ${provenance.sourceDocumentId}`}
+      </p>
+      {changed ? (
+        <p className="mt-0.5 text-amber-900">
+          {provenance.reason ?? 'No reason recorded'} —{' '}
+          {provenance.byName ?? 'unknown user'}, {formatSavedAt(provenance.at)}
+        </p>
+      ) : null}
+    </li>
+  );
+}
+
 function FieldRow({ field }: { field: AuditFieldStatus }) {
   return (
     <li className="px-3 py-2 text-xs">
@@ -130,6 +190,12 @@ export function AdvancedTechnicalReview({
 }) {
   const { draft, readiness, sourceFacts } = view;
   const [allFields, setAllFields] = useState(false);
+  const citations = answerCitations(
+    formModel,
+    readiness.fieldStatuses,
+    path => readAnswerAtPath(draft.intake, path),
+    draft.answerProvenance,
+  );
   const fields = allFields
     ? readiness.fieldStatuses
     : readiness.fieldStatuses.filter(
@@ -374,6 +440,25 @@ export function AdvancedTechnicalReview({
               ))}
             </ul>
           )}
+        </Section>
+      )}
+
+      {citations.length === 0 ? null : (
+        <Section
+          title={`Where each answer came from — ${citations.length} cited`}
+          subtitle="Every answer a source filled in, what that source stated, and what this proposal says instead."
+          defaultOpen={citations.some(
+            entry => entry.provenance.origin === 'changed_for_this_proposal',
+          )}
+        >
+          <ul
+            data-testid="bouwa-review-provenance"
+            className="divide-y divide-slate-100 rounded-lg border border-slate-200"
+          >
+            {citations.map(entry => (
+              <CitationRow key={entry.path} entry={entry} />
+            ))}
+          </ul>
         </Section>
       )}
 

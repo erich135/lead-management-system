@@ -32,10 +32,6 @@ import {
   ExistingMachinePicker,
   ProposedMachinePicker,
 } from './components/MachinePickers';
-import {
-  installedMachineEntries,
-  specLibraryEntries,
-} from './machineSelection';
 import { EquipmentPicker } from './components/EquipmentPicker';
 import {
   answeredTextForCode,
@@ -67,6 +63,7 @@ import {
   type WizardFieldView,
 } from './wizardState';
 import type {
+  WizardAnswerProvenance,
   WizardDraftView,
   WizardEquipmentType,
   WizardStep,
@@ -105,10 +102,17 @@ function screensForStep(
   formModel: AuditIntakeFormModel,
   readiness: AuditReadinessAssessment,
   fileParsed: boolean,
+  answerProvenance: Record<string, WizardAnswerProvenance>,
 ): Screen[] {
   if (step.id === 'proposal_type') return [{ kind: 'proposal_type' }];
   if (step.id === 'review') return [{ kind: 'review' }];
-  const all = stepFieldViews(step, formModel, readiness, fileParsed);
+  const all = stepFieldViews(
+    step,
+    formModel,
+    readiness,
+    fileParsed,
+    answerProvenance,
+  );
 
   if (step.id === 'customer_site') {
     // The four questions the selectors answer are never shown as boxes, and
@@ -189,22 +193,24 @@ export function GuidedProposalWizard({
   const [pageIndex, setPageIndex] = useState(view.draft.currentPageIndex);
   const [hint, setHint] = useState('');
   const [leaving, setLeaving] = useState(false);
-  /**
-   * The library record chosen to describe the installed machine. The ARS
-   * register says what the machine is called; the library says what it does,
-   * and the two are chosen separately because a registered machine may have no
-   * library record and a library record may describe a machine ARS has never
-   * seen.
-   */
-  const [selectedExistingSpecId, setSelectedExistingSpecId] = useState<
-    string | null
-  >(null);
 
-  const customerId = view.draft.customer.customerId;
-  useEffect(() => {
-    // Changing customer invalidates a machine chosen for the previous one.
-    setSelectedExistingSpecId(null);
-  }, [customerId]);
+  /**
+   * What every question needs to be answered, and what a source-backed question
+   * additionally needs: a way to restate the value with a reason, and a way to
+   * put the source's own figure back.
+   */
+  const answering = useMemo(
+    () => ({
+      onAnswer: draft.answer,
+      onOverride: (path: string, value: unknown, reason: string) => {
+        void draft.overrideAnswer(path, value, reason);
+      },
+      onRestore: (path: string) => {
+        void draft.restoreAnswer(path);
+      },
+    }),
+    [draft.answer, draft.overrideAnswer, draft.restoreAnswer],
+  );
 
   /**
    * The customer picker reports the machines it saw so it can offer their
@@ -231,8 +237,21 @@ export function GuidedProposalWizard({
   const step = steps[stepIndex] ?? steps[0];
 
   const screens = useMemo(
-    () => screensForStep(step, formModel, view.readiness, view.draft.fileParsed),
-    [step, formModel, view.readiness, view.draft.fileParsed],
+    () =>
+      screensForStep(
+        step,
+        formModel,
+        view.readiness,
+        view.draft.fileParsed,
+        view.draft.answerProvenance ?? {},
+      ),
+    [
+      step,
+      formModel,
+      view.readiness,
+      view.draft.fileParsed,
+      view.draft.answerProvenance,
+    ],
   );
   const safePage = clampPageIndex(pageIndex, screens.length);
   const screen = screens[safePage];
@@ -311,8 +330,13 @@ export function GuidedProposalWizard({
     const previousPageCount =
       previous === undefined
         ? 1
-        : screensForStep(previous, formModel, view.readiness, view.draft.fileParsed)
-            .length;
+        : screensForStep(
+            previous,
+            formModel,
+            view.readiness,
+            view.draft.fileParsed,
+            view.draft.answerProvenance ?? {},
+          ).length;
     const move = moveBack(
       {
         stepIndex,
@@ -467,15 +491,20 @@ export function GuidedProposalWizard({
                 (readAnswerAtPath(intake, 'existingMachine.arsMachineId')
                   ?.value as string) ?? null
               }
-              selectedSpecId={selectedExistingSpecId}
+              selectedSpecId={
+                view.draft.machineSelections?.existingMachine?.recordId ?? null
+              }
               disabled={!mayEdit}
               onSelectInstalled={machine =>
-                draft.answerMany(installedMachineEntries(machine))
+                void draft.selectMachine('existingMachine', {
+                  installedMachineId: machine.machineId,
+                })
               }
-              onSelectSpec={record => {
-                setSelectedExistingSpecId(record.recordId);
-                draft.answerMany(specLibraryEntries(record, 'existingMachine'));
-              }}
+              onSelectSpec={record =>
+                void draft.selectMachine('existingMachine', {
+                  specRecordId: record.recordId,
+                })
+              }
               onUnknown={() =>
                 draft.answer('existingMachine.selectionMode', {
                   state: 'unknown_confirmation_required',
@@ -491,7 +520,7 @@ export function GuidedProposalWizard({
                   view={fieldView}
                   intake={intake}
                   disabled={!mayEdit}
-                  onAnswer={draft.answer}
+                  {...answering}
                 />
               ))}
             </div>
@@ -500,12 +529,13 @@ export function GuidedProposalWizard({
           <div className="space-y-3">
             <ProposedMachinePicker
               selectedRecordId={
-                (readAnswerAtPath(intake, 'proposedMachine.arsMachineId')
-                  ?.value as string) ?? null
+                view.draft.machineSelections?.proposedMachine?.recordId ?? null
               }
               disabled={!mayEdit}
               onSelect={record =>
-                draft.answerMany(specLibraryEntries(record, 'proposedMachine'))
+                void draft.selectMachine('proposedMachine', {
+                  specRecordId: record.recordId,
+                })
               }
               onNotListed={() =>
                 draft.answer('proposedMachine.selectionMode', {
@@ -529,7 +559,7 @@ export function GuidedProposalWizard({
                   view={fieldView}
                   intake={intake}
                   disabled={!mayEdit}
-                  onAnswer={draft.answer}
+                  {...answering}
                 />
               ))}
             </div>
@@ -563,7 +593,7 @@ export function GuidedProposalWizard({
                   view={fieldView}
                   intake={intake}
                   disabled={!mayEdit}
-                  onAnswer={draft.answer}
+                  {...answering}
                 />
               ))}
             </div>
@@ -625,7 +655,7 @@ export function GuidedProposalWizard({
                       view={fieldView}
                       intake={intake}
                       disabled={!mayEdit}
-                      onAnswer={draft.answer}
+                      {...answering}
                     />
                   ))}
                 </div>

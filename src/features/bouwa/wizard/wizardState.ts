@@ -21,7 +21,12 @@ import type {
   AuditReadinessStage,
   IntakeAnswerState,
 } from '../auditIntakeTypes';
-import type { WizardDraft, WizardSourceFact, WizardStep } from './wizardTypes';
+import type {
+  WizardAnswerProvenance,
+  WizardDraft,
+  WizardSourceFact,
+  WizardStep,
+} from './wizardTypes';
 
 /**
  * Questions per card. Chosen so a card and its footer fit 1366 x 768, where a
@@ -34,6 +39,12 @@ export interface WizardFieldView {
   field: AuditFormField;
   /** True where the value came from the uploaded file and may not be typed over. */
   sourceDerived: boolean;
+  /**
+   * Where the answer came from, where a source supplied it. Null means nobody
+   * has cited a source for this question, which is the ordinary case for
+   * something a person simply knows and types.
+   */
+  provenance: WizardAnswerProvenance | null;
 }
 
 export interface WizardPage {
@@ -55,6 +66,7 @@ export function stepFieldViews(
   formModel: AuditIntakeFormModel,
   readiness: AuditReadinessAssessment,
   fileParsed = false,
+  answerProvenance: Record<string, WizardAnswerProvenance> = {},
 ): WizardFieldView[] {
   const fieldsByCode = new Map(formModel.fields.map(entry => [entry.code, entry]));
   const statusByCode = new Map(
@@ -69,7 +81,12 @@ export function stepFieldViews(
     const field = fieldsByCode.get(code);
     if (!status || !field) continue;
     if (!status.applicable) continue;
-    views.push({ status, field, sourceDerived: sourceDerived.has(code) });
+    views.push({
+      status,
+      field,
+      sourceDerived: sourceDerived.has(code),
+      provenance: answerProvenance[field.path] ?? null,
+    });
   }
   return views;
 }

@@ -19,6 +19,9 @@ import type {
   WizardEquipmentType,
   WizardEquipmentTypeOption,
   WizardInstalledMachine,
+  WizardMachineComparisonResult,
+  WizardMachineRole,
+  WizardMachineSelectionResult,
   WizardProposalType,
   WizardManualBasis,
   WizardSpecEquipmentType,
@@ -173,6 +176,82 @@ export async function saveWizardDraft(
     method: 'PUT',
     body: JSON.stringify(request),
   });
+  return body as unknown as WizardDraftView;
+}
+
+/**
+ * Choosing the machine a proposal is about.
+ *
+ * The browser does not fill the fields itself. It says which record was
+ * chosen, and the server answers with the draft as it now stands, so what a
+ * source published is decided once rather than agreed between two codebases.
+ */
+export async function selectWizardMachine(
+  draftId: string,
+  request: {
+    revision: number;
+    role: WizardMachineRole;
+    specRecordId?: string;
+    installedMachineId?: string;
+    clear?: true;
+  },
+): Promise<WizardMachineSelectionResult> {
+  const body = await requestJson(
+    `/drafts/${encodeURIComponent(draftId)}/machine-selection`,
+    { method: 'POST', body: JSON.stringify(request) },
+  );
+  return body as unknown as WizardMachineSelectionResult;
+}
+
+/** Restates one value the source published, with the reason it was restated. */
+export async function overrideWizardAnswer(
+  draftId: string,
+  request: {
+    revision: number;
+    path: string;
+    answer: unknown;
+    reason: string;
+  },
+): Promise<WizardDraftView> {
+  const body = await requestJson(
+    `/drafts/${encodeURIComponent(draftId)}/answer-override`,
+    { method: 'POST', body: JSON.stringify(request) },
+  );
+  return body as unknown as WizardDraftView;
+}
+
+/** Puts the source's own figure back. */
+export async function restoreWizardAnswer(
+  draftId: string,
+  revision: number,
+  path: string,
+): Promise<WizardDraftView> {
+  const body = await requestJson(
+    `/drafts/${encodeURIComponent(draftId)}/answer-override`,
+    { method: 'POST', body: JSON.stringify({ revision, path, restore: true }) },
+  );
+  return body as unknown as WizardDraftView;
+}
+
+export async function compareWizardMachine(
+  draftId: string,
+  role: WizardMachineRole,
+): Promise<WizardMachineComparisonResult> {
+  const body = await requestJson(
+    `/drafts/${encodeURIComponent(draftId)}/machine-comparison?role=${role}`,
+  );
+  return body as unknown as WizardMachineComparisonResult;
+}
+
+export async function updateWizardMachine(
+  draftId: string,
+  revision: number,
+  role: WizardMachineRole,
+): Promise<WizardDraftView> {
+  const body = await requestJson(
+    `/drafts/${encodeURIComponent(draftId)}/machine-update`,
+    { method: 'POST', body: JSON.stringify({ revision, role }) },
+  );
   return body as unknown as WizardDraftView;
 }
 

@@ -19,12 +19,12 @@ import {
   WIZARD_FIELDS_PER_PAGE,
 } from '../src/features/bouwa/wizard/wizardState.ts';
 import {
-  existingMachineEntries,
-  installedMachineEntries,
-  proposedMachineEntries,
-  specLibraryEntries,
-  specLibraryPartLoadPoints,
+  absenceCaution,
+  sourceReference,
+  specModelName,
 } from '../src/features/bouwa/wizard/machineSelection.ts';
+import type { WizardSpecRecord } from '../src/features/bouwa/wizard/wizardTypes.ts';
+import { answerCitations } from '../src/features/bouwa/wizard/answerCitations.ts';
 import { siteCandidates } from '../src/features/bouwa/wizard/customerSiteSelection.ts';
 import {
   answeredTextForCode,
@@ -566,102 +566,16 @@ assert.equal(
   'File parsed · 7 outstanding',
 );
 
-/* A machine selection fills what the source states, and nothing else. */
-
-const existing = new Map(
-  existingMachineEntries({
-    _id: 'machine-1',
-    make: ' Atlas Copco ',
-    model: 'GA 30',
-    serialNumber: 'API-664321',
-    currentLocation: 'Plant 2',
-  } as Parameters<typeof existingMachineEntries>[0]),
-);
-
-assert.equal(existing.get('existingMachine.manufacturer')?.value, 'Atlas Copco');
-assert.equal(existing.get('existingMachine.model')?.value, 'GA 30');
-assert.equal(existing.get('existingMachine.serialNumber')?.value, 'API-664321');
-assert.equal(existing.get('existingMachine.arsMachineId')?.value, 'machine-1');
-assert.equal(
-  existing.get('existingMachine.selectionMode')?.value,
-  'existing_catalog_machine',
-);
-for (const invented of [
-  'existingMachine.ratedFadM3PerMin',
-  'existingMachine.packageInputPowerKw',
-  'existingMachine.powerBasis',
-  'existingMachine.controlMethod',
-]) {
-  assert.equal(
-    existing.has(invented),
-    false,
-    `the ARS register does not state ${invented} and must not fill it`,
-  );
-}
-
-const proposed = new Map(
-  proposedMachineEntries({
-    _id: 'spec-1',
-    manufacturer: 'Kaeser',
-    modelName: 'ASD 40',
-    ratedCapacityM3Min: 4.1,
-    packageInputKw: 22.5,
-    motorKw: 22,
-    speedControl: 'VSD',
-  } as Parameters<typeof proposedMachineEntries>[0]),
-);
-
-assert.equal(proposed.get('proposedMachine.ratedFadM3PerMin')?.value, 4.1);
-assert.equal(
-  proposed.get('proposedMachine.packageInputPowerKw')?.value,
-  22.5,
-  'the published package figure is preferred over the motor rating',
-);
-assert.equal(
-  proposed.get('proposedMachine.powerBasis')?.value,
-  'manufacturer_package_input',
-);
-assert.equal(
-  proposed.get('proposedMachine.controlMethod')?.value,
-  'variable_speed_drive',
-);
-assert.equal(
-  proposed.has('proposedMachine.flowReferenceBasis'),
-  false,
-  'the spec library does not state the flow basis, so it stays a question',
-);
-
-/* Where only a motor rating exists, the basis says so rather than claiming a
-   package measurement. */
-const motorOnly = new Map(
-  proposedMachineEntries({
-    _id: 'spec-2',
-    manufacturer: 'Kaeser',
-    motorKw: 30,
-  } as Parameters<typeof proposedMachineEntries>[0]),
-);
-assert.equal(motorOnly.get('proposedMachine.packageInputPowerKw')?.value, 30);
-assert.equal(
-  motorOnly.get('proposedMachine.powerBasis')?.value,
-  'motor_nameplate_rating',
-);
-
-/* A fixed-speed library entry does not say whether it modulates or unloads,
-   and those are different machines to model. */
-const fixedSpeed = new Map(
-  proposedMachineEntries({
-    _id: 'spec-3',
-    manufacturer: 'Kaeser',
-    speedControl: 'FIXED_SPEED',
-  } as Parameters<typeof proposedMachineEntries>[0]),
-);
-assert.equal(fixedSpeed.has('proposedMachine.controlMethod'), false);
-
 /* ------------------------------------------------------------------ *
- * The specification library fills what its source published, and stops
+ * Citing a machine, and showing where each answer came from
+ *
+ * Which questions a library record answers is decided by the server and is
+ * proved by the backend suite. What is checked here is the part the browser
+ * still owns: how a source reads on the page, and whether a rep can tell a
+ * manufacturer's figure from a rep's own.
  * ------------------------------------------------------------------ */
 
-type SpecRecord = Parameters<typeof specLibraryEntries>[0];
+type SpecRecord = WizardSpecRecord;
 
 /** A record holding nothing but the identity fields every record has. */
 function bareRecord(overrides: Partial<SpecRecord> = {}): SpecRecord {
@@ -711,177 +625,155 @@ function bareRecord(overrides: Partial<SpecRecord> = {}): SpecRecord {
   } as SpecRecord;
 }
 
-const fullSheet = new Map(
-  specLibraryEntries(
-    bareRecord({
-      compressorType: 'rotary_screw_oil_injected',
-      controlMethod: 'variable_speed_drive',
-      ratedPressureBarG: 8.6,
-      ratedFadM3PerMin: 9.06,
-      flowReferenceBasis: 'free_air_delivery',
-      packageInputPowerKw: 55,
-      motorShaftPowerKw: 52,
-      motorEfficiencyFraction: 0.94,
-      specificPowerKwPerM3PerMin: 6.07,
-      vsdMinimumFlowM3PerMin: 2.1,
-      vsdMaximumFlowM3PerMin: 9.06,
-    }),
-    'proposedMachine',
-  ),
-);
-
-assert.equal(fullSheet.get('proposedMachine.manufacturer')?.value, 'Atlas Copco');
-assert.equal(fullSheet.get('proposedMachine.model')?.value, 'GA55-125AP');
+/* A source is cited by title and organisation, and a version is preferred to a
+   date, because two sheets a month apart are told apart by their version. */
 assert.equal(
-  fullSheet.get('proposedMachine.ratedDischargePressureBarG')?.value,
-  8.6,
-);
-assert.equal(fullSheet.get('proposedMachine.ratedFadM3PerMin')?.value, 9.06);
-assert.equal(
-  fullSheet.get('proposedMachine.ratedFlowReferenceBasis')?.value,
-  'free_air_delivery',
-  'where the source states the basis it is carried across rather than re-asked',
-);
-assert.equal(fullSheet.get('proposedMachine.motorEfficiency')?.value, 0.94);
-assert.equal(
-  fullSheet.get('proposedMachine.specificPowerKwPerM3PerMin')?.value,
-  6.07,
-);
-assert.equal(fullSheet.get('proposedMachine.vsdMinimumFlowM3PerMin')?.value, 2.1);
-assert.equal(
-  fullSheet.get('proposedMachine.powerBasis')?.value,
-  'manufacturer_package_input',
-  'a published package figure is recorded as a package figure',
-);
-assert.equal(
-  fullSheet.get('proposedMachine.manufacturerSource')?.value,
+  sourceReference(bareRecord()),
   'GA55 CAGI data sheet — Atlas Copco',
-  'the source is cited automatically rather than retyped',
 );
-
-/* A directory line publishes four values. It must fill four, not twelve. */
-const directoryLine = new Map(
-  specLibraryEntries(
+assert.equal(
+  sourceReference(
     bareRecord({
-      ratedPressureBarG: 8.6,
-      ratedFadM3PerMin: 9.06,
       source: {
         ...bareRecord().source,
-        sourceType: 'cagi_directory',
         sourceTitle: 'CAGI rotary directory',
         sourceOrganisation: 'Compressed Air and Gas Institute',
         sourceVersion: '8-23',
+        sourceDate: '2023-08-01',
       },
     }),
-    'proposedMachine',
   ),
-);
-
-assert.equal(directoryLine.get('proposedMachine.ratedFadM3PerMin')?.value, 9.06);
-for (const unpublished of [
-  'proposedMachine.controlMethod',
-  'proposedMachine.machineType',
-  'proposedMachine.ratedFlowReferenceBasis',
-  'proposedMachine.packageInputPowerKw',
-  'proposedMachine.powerBasis',
-  'proposedMachine.motorEfficiency',
-  'proposedMachine.specificPowerKwPerM3PerMin',
-]) {
-  assert.equal(
-    directoryLine.has(unpublished),
-    false,
-    `the directory does not publish ${unpublished} and must leave it a question`,
-  );
-}
-assert.equal(
-  directoryLine.get('proposedMachine.manufacturerSource')?.value,
   'CAGI rotary directory — Compressed Air and Gas Institute — version 8-23',
 );
 
-/* Where only a shaft rating exists the basis says so rather than claiming a
-   package measurement, because the two are not interchangeable in the model. */
-const shaftOnly = new Map(
-  specLibraryEntries(
-    bareRecord({ motorShaftPowerKw: 30 }),
-    'proposedMachine',
-  ),
-);
-assert.equal(shaftOnly.get('proposedMachine.packageInputPowerKw')?.value, 30);
+/* The variant is part of what the machine is called: the library files GA55
+   and GA55 FF apart, and the wizard asks for one model. */
+assert.equal(specModelName(bareRecord()), 'GA55-125AP');
 assert.equal(
-  shaftOnly.get('proposedMachine.powerBasis')?.value,
-  'motor_nameplate_rating',
-);
-
-/* The variant is part of what the machine is called. */
-assert.equal(
-  new Map(
-    specLibraryEntries(
-      bareRecord({ modelVariant: 'FF' }),
-      'proposedMachine',
-    ),
-  ).get('proposedMachine.model')?.value,
+  specModelName(bareRecord({ modelVariant: 'FF' })),
   'GA55-125AP FF',
 );
 
-/* The same record fills the installed machine, with the fields that only an
-   installed machine has. */
-const asInstalled = new Map(
-  specLibraryEntries(
-    bareRecord({ packageInputPowerKw: 55, motorShaftPowerKw: 52 }),
-    'existingMachine',
-  ),
-);
-assert.equal(asInstalled.get('existingMachine.motorNameplatePowerKw')?.value, 52);
+/* A thin record stays choosable, and says what choosing it will cost. */
+assert.equal(absenceCaution(bareRecord()), null);
 assert.equal(
-  asInstalled.get('existingMachine.manufacturerEvidenceReference')?.value,
-  'GA55 CAGI data sheet — Atlas Copco',
-);
-assert.equal(
-  asInstalled.has('existingMachine.specificPowerKwPerM3PerMin'),
-  false,
-  'the installed machine has no specific-power field to fill',
-);
-
-/* A part-load curve is carried only where the source published one. */
-assert.deepEqual(specLibraryPartLoadPoints(bareRecord()), []);
-assert.deepEqual(
-  specLibraryPartLoadPoints(
+  absenceCaution(
     bareRecord({
-      partLoadPoints: [{ flowM3PerMin: 4.5, packageInputPowerKw: 31 }],
+      absentPublishedValues: ['Package input power', 'Control method'],
     }),
   ),
-  [{ flowM3PerMin: 4.5, packageInputPowerKw: 31 }],
+  'Not published: Package input power, Control method.',
 );
 
-/* The ARS register states identity, never performance. */
-const installed = new Map(
-  installedMachineEntries({
-    machineId: 'ars-machine-7',
-    manufacturer: ' Atlas Copco ',
-    model: 'GA55-125AP',
-    machineType: 'Compressor',
-    serialNumber: ' API-660-123 ',
-    assetNumber: 'A-1001',
-    location: 'Plant 1',
-    ownership: 'customer',
-    label: 'Atlas Copco GA55-125AP · serial API-660-123 · Plant 1',
-  }),
+/* ------------------------------------------------------------------ *
+ * A question shows where its answer came from
+ * ------------------------------------------------------------------ */
+
+const provenanceStep = {
+  id: 'proposed_solution',
+  fieldCodes: [
+    'AUDIT.PROPOSED_MACHINE.RATED_FAD',
+    'AUDIT.PROPOSED_MACHINE.MOTOR_EFFICIENCY',
+    'AUDIT.PROPOSED_MACHINE.RATED_PRESSURE',
+  ],
+  sourceDerivedFieldCodes: [],
+} as unknown as Parameters<typeof stepFieldViews>[0];
+
+const provenanceModel = {
+  sections: [],
+  fields: [
+    {
+      code: 'AUDIT.PROPOSED_MACHINE.RATED_FAD',
+      path: 'proposedMachine.ratedFadM3PerMin',
+      valueKind: 'number',
+      unit: 'm³/min',
+      options: [],
+      permittedAnswerStates: ['answered'],
+    },
+    {
+      code: 'AUDIT.PROPOSED_MACHINE.MOTOR_EFFICIENCY',
+      path: 'proposedMachine.motorEfficiency',
+      valueKind: 'number',
+      unit: 'fraction',
+      options: [],
+      permittedAnswerStates: ['answered'],
+    },
+    {
+      code: 'AUDIT.PROPOSED_MACHINE.RATED_PRESSURE',
+      path: 'proposedMachine.ratedDischargePressureBarG',
+      valueKind: 'number',
+      unit: 'bar(g)',
+      options: [],
+      permittedAnswerStates: ['answered'],
+    },
+  ],
+} as unknown as Parameters<typeof stepFieldViews>[1];
+
+const provenanceReadiness = {
+  fieldStatuses: provenanceModel.fields.map(field => ({
+    code: field.code,
+    applicable: true,
+    status: 'confirmed',
+    section: 'proposed_machine',
+    label: field.code,
+    whyItMatters: '',
+    message: '',
+  })),
+} as unknown as Parameters<typeof stepFieldViews>[2];
+
+const fromSource = {
+  origin: 'populated_from_source' as const,
+  sourceKind: 'machine_spec_library' as const,
+  sourceLabel: 'GA55 CAGI data sheet — Atlas Copco',
+  sourceRecordId: 'record-1',
+  sourceRecordVersion: 1,
+  sourceDocumentId: 'doc-1',
+  sourceValue: 9.06,
+  reason: null,
+  byUserId: 'user-rep',
+  byName: 'Rae Rep',
+  at: '2026-08-01T09:00:00.000Z',
+};
+
+const provenanceViews = stepFieldViews(
+  provenanceStep,
+  provenanceModel,
+  provenanceReadiness,
+  false,
+  {
+    'proposedMachine.ratedFadM3PerMin': fromSource,
+    'proposedMachine.motorEfficiency': {
+      ...fromSource,
+      origin: 'not_published_by_source',
+      sourceValue: null,
+    },
+  },
 );
-assert.equal(installed.get('existingMachine.manufacturer')?.value, 'Atlas Copco');
-assert.equal(installed.get('existingMachine.serialNumber')?.value, 'API-660-123');
-assert.equal(installed.get('existingMachine.arsMachineId')?.value, 'ars-machine-7');
-for (const invented of [
-  'existingMachine.ratedFadM3PerMin',
-  'existingMachine.packageInputPowerKw',
-  'existingMachine.controlMethod',
-  'existingMachine.machineType',
-]) {
-  assert.equal(
-    installed.has(invented),
-    false,
-    `the ARS register does not state ${invented} and must not fill it`,
-  );
-}
+
+const byPath = new Map(
+  provenanceViews.map(view => [view.field.path, view.provenance]),
+);
+
+assert.equal(
+  byPath.get('proposedMachine.ratedFadM3PerMin')?.origin,
+  'populated_from_source',
+  'a value the manufacturer published says so on the question itself',
+);
+assert.equal(
+  byPath.get('proposedMachine.ratedFadM3PerMin')?.sourceValue,
+  9.06,
+  'the published figure travels with the question, so a change can show both',
+);
+assert.equal(
+  byPath.get('proposedMachine.motorEfficiency')?.origin,
+  'not_published_by_source',
+  'a gap the manufacturer left is distinguished from one the rep left',
+);
+assert.equal(
+  byPath.get('proposedMachine.ratedDischargePressureBarG'),
+  null,
+  'a question nobody cited a source for carries no provenance at all',
+);
 
 /* The site list offers what ARS evidences and nothing it does not. */
 
@@ -1088,5 +980,97 @@ assert.equal(
 assert.equal(EQUIPMENT_TYPE_BY_SECTION.logger, 'flow_logger');
 assert.equal(EQUIPMENT_TYPE_BY_SECTION.pressure_sensor, 'pressure_sensor');
 assert.equal(EQUIPMENT_TYPE_BY_SECTION.identity, undefined);
+
+/* ------------------------------------------------------------------ *
+ * Advanced Technical Review states both figures
+ *
+ * A rep may restate a manufacturer's value, and the proposal has to be able to
+ * show a reader what was published and what this proposal says instead. That is
+ * the whole reason an override carries a reason and a name.
+ * ------------------------------------------------------------------ */
+
+const citationModel = {
+  sections: [],
+  fields: [
+    {
+      code: 'AUDIT.PROPOSED_MACHINE.RATED_FAD',
+      path: 'proposedMachine.ratedFadM3PerMin',
+      valueKind: 'number',
+      unit: 'm³/min',
+      options: [],
+      permittedAnswerStates: ['answered'],
+    },
+    {
+      code: 'AUDIT.PROPOSED_MACHINE.MOTOR_EFFICIENCY',
+      path: 'proposedMachine.motorEfficiency',
+      valueKind: 'number',
+      unit: 'fraction',
+      options: [],
+      permittedAnswerStates: ['answered'],
+    },
+  ],
+  outputs: [],
+} as unknown as AuditIntakeFormModel;
+
+const citationStatuses: AuditFieldStatus[] = [
+  status({
+    code: 'AUDIT.PROPOSED_MACHINE.RATED_FAD',
+    label: 'Proposed rated free air delivery',
+  }),
+  status({
+    code: 'AUDIT.PROPOSED_MACHINE.MOTOR_EFFICIENCY',
+    label: 'Proposed motor efficiency',
+  }),
+];
+
+const citationAnswers = new Map<string, IntakeAnswer<unknown>>([
+  [
+    'proposedMachine.ratedFadM3PerMin',
+    { state: 'answered', value: 8.5, note: null },
+  ],
+  ['proposedMachine.motorEfficiency', { state: 'missing', value: null, note: null }],
+]);
+const citationAnswerAt = (path: string) => citationAnswers.get(path) ?? null;
+
+const cited = answerCitations(citationModel, citationStatuses, citationAnswerAt, {
+  'proposedMachine.ratedFadM3PerMin': {
+    ...fromSource,
+    origin: 'changed_for_this_proposal',
+    sourceValue: 9.06,
+    reason: 'Site altitude derating agreed with Atlas Copco',
+  },
+  'proposedMachine.motorEfficiency': {
+    ...fromSource,
+    origin: 'not_published_by_source',
+    sourceValue: null,
+  },
+});
+
+assert.equal(
+  cited[0]?.code,
+  'AUDIT.PROPOSED_MACHINE.RATED_FAD',
+  'a restated value is met before an agreed one, because it is what a reviewer came for',
+);
+assert.equal(cited[0]?.label, 'Proposed rated free air delivery');
+assert.equal(
+  cited[0]?.provenance.sourceValue,
+  9.06,
+  'what the manufacturer published survives the change',
+);
+assert.equal(
+  cited[0]?.proposalValue,
+  '8.5',
+  'and what this proposal says stands beside it',
+);
+assert.equal(
+  cited[1]?.proposalValue,
+  'Not answered',
+  'a gap the source left is still a gap, and is not dressed up as a value',
+);
+assert.equal(
+  answerCitations(citationModel, citationStatuses, citationAnswerAt, {}).length,
+  0,
+  'a proposal that cited nothing shows no citation table at all',
+);
 
 console.log('Bouwa guided-wizard state checks passed.');

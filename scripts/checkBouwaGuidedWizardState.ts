@@ -20,6 +20,8 @@ import {
 } from '../src/features/bouwa/wizard/wizardState.ts';
 import {
   absenceCaution,
+  machineEvidenceLines,
+  machineEvidenceLink,
   sourceReference,
   specModelName,
 } from '../src/features/bouwa/wizard/machineSelection.ts';
@@ -761,6 +763,52 @@ assert.equal(
     }),
   ),
   'Not published: Package input power, Control method.',
+);
+
+/* ------------------------------------------------------------------ *
+ * The manufacturer evidence is shown, never asked for
+ * ------------------------------------------------------------------ */
+
+function snapshotOf(source: Partial<WizardSpecRecord['source']> = {}) {
+  return {
+    recordId: 'rec-1',
+    recordVersion: 1,
+    libraryKey: 'atlas-copco|ga55-125ap',
+    contentFingerprint: 'abc',
+    source: { ...bareRecord().source, ...source },
+    values: {},
+    takenAt: '2026-08-01T00:00:00.000Z',
+    takenByUserId: 'user-1',
+  } as unknown as Parameters<typeof machineEvidenceLines>[0];
+}
+
+/* The rep reads the document the figures actually came from, in the words a
+   customer would recognise rather than the code the library files it under. */
+assert.deepEqual(machineEvidenceLines(snapshotOf()), [
+  { label: 'Source type', value: 'CAGI verified data sheet' },
+  { label: 'Document', value: 'GA55 CAGI data sheet' },
+  { label: 'Published by', value: 'Atlas Copco' },
+  { label: 'Version or date', value: 'No version or date published' },
+]);
+
+/* A version identifies a sheet where a date cannot: two sheets a month apart
+   carry the same year. The page is offered where the source gave one. */
+assert.deepEqual(
+  machineEvidenceLines(
+    snapshotOf({ sourceVersion: '8-23', sourcePageReference: 'p. 4' }),
+  ).slice(3),
+  [
+    { label: 'Version or date', value: 'Version 8-23' },
+    { label: 'Page', value: 'p. 4' },
+  ],
+);
+
+/* A directory line held only on disk has nowhere to send anybody, and a dead
+   "View document" link is worse than none. */
+assert.equal(machineEvidenceLink(snapshotOf()), null);
+assert.equal(
+  machineEvidenceLink(snapshotOf({ sourceUrl: 'https://example.org/ga55.pdf' })),
+  'https://example.org/ga55.pdf',
 );
 
 /* ------------------------------------------------------------------ *

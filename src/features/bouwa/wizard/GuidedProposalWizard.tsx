@@ -32,6 +32,7 @@ import {
   ExistingMachinePicker,
   ProposedMachinePicker,
 } from './components/MachinePickers';
+import { MachineEvidencePanel } from './components/MachineEvidencePanel';
 import { EquipmentPicker } from './components/EquipmentPicker';
 import {
   answeredTextForCode,
@@ -513,6 +514,9 @@ export function GuidedProposalWizard({
                 })
               }
             />
+            <MachineEvidencePanel
+              snapshot={view.draft.machineSelections?.existingMachine ?? null}
+            />
             <div className="space-y-2">
               {screen.fields.map(fieldView => (
                 <WizardAnswerField
@@ -551,6 +555,9 @@ export function GuidedProposalWizard({
                   note: null,
                 })
               }
+            />
+            <MachineEvidencePanel
+              snapshot={view.draft.machineSelections?.proposedMachine ?? null}
             />
             <div className="space-y-2">
               {screen.fields.map(fieldView => (

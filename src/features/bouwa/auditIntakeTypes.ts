@@ -303,11 +303,31 @@ export interface AuditSelectionOption {
   label: string;
 }
 
+/**
+ * How a person enters a value the intake stores in another unit.
+ *
+ * Nobody reads a thermometer in kelvin and nobody writes a motor efficiency as
+ * 0.92, so the backend states the unit to ask for and the conversion between
+ * the two. The browser does the arithmetic to keep the box responsive; the
+ * backend does it again and refuses a value that could only have arrived
+ * unconverted, so a mistake here cannot reach the energy model.
+ */
+export type AuditEntryConversion = 'celsius_to_kelvin' | 'percent_to_fraction';
+
+export interface AuditFieldEntry {
+  unit: string;
+  conversion: AuditEntryConversion;
+  minimum: number;
+  maximum: number;
+  decimals: number;
+}
+
 export interface AuditFormField {
   code: string;
   path: string;
   valueKind: AuditFieldValueKind;
   unit: string | null;
+  entry: AuditFieldEntry | null;
   options: AuditSelectionOption[];
   permittedAnswerStates: IntakeAnswerState[];
 }

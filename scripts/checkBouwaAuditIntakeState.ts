@@ -4,12 +4,16 @@ import {
   answerForState,
   answerFromInput,
   auditIntakeSectionViews,
+  displayUnit,
+  enteredFromStored,
+  enteredTextForAnswer,
   inputTextForAnswer,
   intakeChangeRows,
   outstandingEvidenceRows,
   mayApplyAuditIntakeSave,
   nextAuditIntakeSave,
   readAnswerAtPath,
+  storedFromEntered,
   wiredInputRows,
   writeAnswerAtPath,
 } from '../src/features/bouwa/auditIntakeState.ts';
@@ -54,6 +58,7 @@ function field(overrides: Partial<AuditFormField>): AuditFormField {
     path: 'identity.customerName',
     valueKind: 'text',
     unit: null,
+    entry: null,
     options: [],
     permittedAnswerStates: ['answered', 'unknown_confirmation_required'],
     ...overrides,
@@ -108,6 +113,94 @@ assert.deepEqual(answerFromInput(integerField, '2'), {
   answer: { state: 'answered', value: 2, note: null },
 });
 assert.ok('problem' in answerFromInput(integerField, '2.5'));
+
+/* ------------------------------------------------------------------ *
+ * A person types the unit they know, and the intake keeps the unit the
+ * science needs
+ *
+ * These two conversions are the whole difference between a usable proposal and
+ * a nonsensical one, so they are checked as exact equalities. The backend
+ * refuses the unconverted value independently; this proves the browser never
+ * sends it.
+ * ------------------------------------------------------------------ */
+
+const celsiusField = field({
+  path: 'siteConditions.ambientTemperatureK',
+  valueKind: 'number',
+  unit: 'K',
+  entry: {
+    unit: '°C',
+    conversion: 'celsius_to_kelvin',
+    minimum: -50,
+    maximum: 60,
+    decimals: 2,
+  },
+});
+
+assert.deepEqual(answerFromInput(celsiusField, '25'), {
+  answer: { state: 'answered', value: 298.15, note: null },
+});
+assert.equal(storedFromEntered('celsius_to_kelvin', 25), 298.15);
+assert.equal(
+  enteredFromStored('celsius_to_kelvin', 298.15),
+  25,
+  'a stored kelvin value comes back to the box as the celsius the rep typed',
+);
+assert.equal(
+  enteredTextForAnswer(celsiusField, {
+    state: 'answered',
+    value: 298.15,
+    note: null,
+  }),
+  '25',
+);
+assert.equal(
+  displayUnit(celsiusField),
+  '°C',
+  'the box is labelled with the unit asked for, not the unit stored',
+);
+assert.ok(
+  'problem' in answerFromInput(celsiusField, '95'),
+  'a temperature outside the band a compressor could be drawing is refused here too',
+);
+assert.deepEqual(answerFromInput(celsiusField, ''), { answer: unanswered() });
+
+const percentField = field({
+  path: 'proposedMachine.motorEfficiency',
+  valueKind: 'number',
+  unit: 'fraction',
+  entry: {
+    unit: '%',
+    conversion: 'percent_to_fraction',
+    minimum: 1,
+    maximum: 100,
+    decimals: 2,
+  },
+});
+
+assert.deepEqual(answerFromInput(percentField, '85'), {
+  answer: { state: 'answered', value: 0.85, note: null },
+});
+assert.deepEqual(answerFromInput(percentField, '92.4'), {
+  answer: { state: 'answered', value: 0.924, note: null },
+});
+assert.equal(enteredTextForAnswer(percentField, {
+  state: 'answered',
+  value: 0.85,
+  note: null,
+}), '85');
+assert.equal(displayUnit(percentField), '%');
+assert.ok(
+  'problem' in answerFromInput(percentField, '850'),
+  'a nonsense efficiency is refused before it reaches the draft',
+);
+
+/* A field with no entry unit is untouched by any of this. */
+assert.equal(displayUnit(numberField), null);
+assert.equal(
+  enteredTextForAnswer(numberField, { state: 'answered', value: 0.35, note: null }),
+  '0.35',
+);
 
 /* A selection may only take a listed value */
 

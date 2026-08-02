@@ -25,7 +25,12 @@ import {
 } from '../src/features/bouwa/wizard/machineSelection.ts';
 import type { WizardSpecRecord } from '../src/features/bouwa/wizard/wizardTypes.ts';
 import { answerCitations } from '../src/features/bouwa/wizard/answerCitations.ts';
-import { siteCandidates } from '../src/features/bouwa/wizard/customerSiteSelection.ts';
+import {
+  CUSTOMER_SITE_SELECTOR_CODES,
+  NO_FORMAL_SITE_RECORD,
+  siteCandidates,
+  siteOriginStatement,
+} from '../src/features/bouwa/wizard/customerSiteSelection.ts';
 import {
   answeredTextForCode,
   EQUIPMENT_TYPE_BY_SECTION,
@@ -807,6 +812,26 @@ assert.deepEqual(
   ),
   [],
   'where ARS evidences no site, none is offered rather than one invented',
+);
+
+/* And the site record question is answered honestly rather than left blank. */
+
+assert.equal(
+  siteOriginStatement('customer_address'),
+  'From the ARS customer address',
+);
+assert.equal(
+  siteOriginStatement('machine_location'),
+  'From a machine location on the ARS register',
+);
+assert.equal(
+  siteOriginStatement('typed_for_this_proposal'),
+  'Typed for this proposal',
+);
+assert.equal(NO_FORMAL_SITE_RECORD, 'No formal ARS site record');
+assert.ok(
+  CUSTOMER_SITE_SELECTOR_CODES.includes('AUDIT.IDENTITY.SITE_ID'),
+  'the site record is settled by the picker, so it is never shown as a box for a rep to type an identifier into',
 );
 
 /* A catalogued instrument fills what the catalogue records about it. */

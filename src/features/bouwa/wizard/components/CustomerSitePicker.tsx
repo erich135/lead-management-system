@@ -11,11 +11,16 @@ import { Building2, Check, Loader2, MapPin, Search, X } from 'lucide-react';
 
 import { getCustomers, getMachinesByCustomer } from '../../../../lib/api';
 import type { Customer, Machine } from '../../../../lib/api';
-import { siteCandidates } from '../customerSiteSelection';
+import {
+  NO_FORMAL_SITE_RECORD,
+  siteCandidates,
+  siteOriginStatement,
+} from '../customerSiteSelection';
 import type {
   ChosenCustomer,
   ChosenSite,
   SiteCandidate,
+  SiteOrigin,
 } from '../customerSiteSelection';
 
 const SEARCH_DEBOUNCE_MS = 250;
@@ -46,6 +51,13 @@ export function CustomerSitePicker({
   const [problem, setProblem] = useState('');
   const [candidates, setCandidates] = useState<SiteCandidate[]>([]);
   const [typedSite, setTypedSite] = useState('');
+  /* Where the saved site came from is read back off the list rather than
+     stored, so a reopened proposal says the same thing it said when chosen. */
+  const chosenOrigin: SiteOrigin | null =
+    siteName === null || candidates.length === 0
+      ? null
+      : (candidates.find(candidate => candidate.siteName === siteName)?.origin ??
+        'typed_for_this_proposal');
   const chosen = useRef<ChosenCustomer | null>(
     customerId === null || customerName === null
       ? null
@@ -182,10 +194,17 @@ export function CustomerSitePicker({
         ) : (
           <>
             {siteName === null ? null : (
-              <p className="mt-1 flex items-center gap-2 text-sm text-slate-700">
-                <Check className="h-3.5 w-3.5 text-emerald-600" />
-                {siteName}
-              </p>
+              <div className="mt-1" data-testid="bouwa-chosen-site">
+                <p className="flex items-center gap-2 text-sm text-slate-700">
+                  <Check className="h-3.5 w-3.5 text-emerald-600" />
+                  {siteName}
+                </p>
+                <p className="mt-0.5 pl-5 text-[11px] text-slate-500">
+                  {chosenOrigin === null
+                    ? NO_FORMAL_SITE_RECORD
+                    : `${siteOriginStatement(chosenOrigin)} — ${NO_FORMAL_SITE_RECORD}`}
+                </p>
+              </div>
             )}
             <div className="mt-2 flex flex-wrap gap-1.5">
               {candidates.map(candidate => (
@@ -198,6 +217,7 @@ export function CustomerSitePicker({
                       siteId: null,
                       siteName: candidate.siteName,
                       address: candidate.address,
+                      origin: candidate.origin,
                     })
                   }
                   className={`rounded-md border px-2.5 py-1.5 text-xs ${
@@ -232,6 +252,7 @@ export function CustomerSitePicker({
                     siteId: null,
                     siteName: typedSite.trim(),
                     address: null,
+                    origin: 'typed_for_this_proposal',
                   });
                   setTypedSite('');
                 }}
@@ -241,8 +262,8 @@ export function CustomerSitePicker({
               </button>
             </div>
             <p className="mt-1.5 text-[11px] text-slate-500">
-              ARS holds no site register, so a site typed here is stored by name
-              only. Give your own site reference below if there is one.
+              ARS holds no site register, so a site is stored by name and by
+              where that name came from. No site identifier is invented for it.
             </p>
           </>
         )}

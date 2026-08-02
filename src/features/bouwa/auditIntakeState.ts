@@ -10,6 +10,13 @@
  * draft rather than becoming one.
  */
 
+/* The extension is explicit because this module is also loaded directly by the
+   check scripts under Node's ESM resolver, which does not guess one. */
+import {
+  enteredFromStored,
+  entryProblem,
+  storedFromEntered,
+} from './auditFieldEntry.ts';
 import type {
   AuditFieldStatus,
   AuditFormField,
@@ -93,6 +100,13 @@ export function writeAnswerAtPath(
  * Text that cannot be read as the field's kind is rejected so the draft stays
  * visible instead of being stored as an answer.
  */
+/** The unit shown beside a control: what is asked for, not what is stored. */
+export function displayUnit(field: AuditFormField): string | null {
+  return field.entry?.unit ?? field.unit;
+}
+
+export { enteredFromStored, entryProblem, storedFromEntered };
+
 export function answerFromInput(
   field: AuditFormField,
   raw: string,
@@ -109,6 +123,17 @@ export function answerFromInput(
       return { problem: 'Enter a number. Leave the box empty if it is not known.' };
     if (field.valueKind === 'integer' && !Number.isInteger(value))
       return { problem: 'Enter a whole number.' };
+    if (field.entry !== null) {
+      const problem = entryProblem(field.entry, value);
+      if (problem !== null) return { problem };
+      return {
+        answer: {
+          state: 'answered',
+          value: storedFromEntered(field.entry.conversion, value),
+          note: null,
+        },
+      };
+    }
     return { answer: { state: 'answered', value, note: null } };
   }
 
@@ -128,7 +153,7 @@ export function answerForState(state: IntakeAnswerState): IntakeAnswer<unknown> 
   return { state, value: null, note: null };
 }
 
-/** The text a control should show for a stored answer. */
+/** The text a control should show for a stored answer, in the stored unit. */
 export function inputTextForAnswer(answer: IntakeAnswer<unknown> | null): string {
   if (answer === null) return '';
   if (answer.state !== 'answered') return '';
@@ -136,6 +161,22 @@ export function inputTextForAnswer(answer: IntakeAnswer<unknown> | null): string
   if (typeof answer.value === 'number') return String(answer.value);
   if (typeof answer.value === 'string') return answer.value;
   return '';
+}
+
+/**
+ * The text a control should show, in the unit the field is entered in.
+ *
+ * A stored 298.15 K comes back to the box as 25, so a rep who reopens a
+ * proposal sees the number they typed rather than the one the engine kept.
+ */
+export function enteredTextForAnswer(
+  field: AuditFormField,
+  answer: IntakeAnswer<unknown> | null,
+): string {
+  if (field.entry === null) return inputTextForAnswer(answer);
+  if (answer === null || answer.state !== 'answered') return '';
+  if (typeof answer.value !== 'number') return '';
+  return String(enteredFromStored(field.entry.conversion, answer.value));
 }
 
 export interface AuditIntakeFieldView {

@@ -66,6 +66,14 @@ export function CustomerSiteStep({
     onLinkCustomer({ siteId: site.siteId, siteName: site.siteName });
     const entries: [string, IntakeAnswer<unknown>][] = [
       ['identity.siteName', answered(site.siteName)],
+      /* ARS keeps no site register, so the record question is answered "not
+         listed" rather than being left for a rep to invent an identifier in. */
+      [
+        'identity.siteId',
+        site.siteId === null
+          ? { state: 'not_listed_add_new', value: null, note: null }
+          : answered(site.siteId),
+      ],
     ];
     if (site.address !== null && site.address.trim() !== '')
       entries.push(['identity.physicalAddress', answered(site.address.trim())]);

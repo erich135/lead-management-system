@@ -606,6 +606,25 @@ for (const forbidden of [
 ])
   forbidText(intakeStateCode, forbidden, `${intakeLabel} state authority`);
 
+// Two unit conversions are allowed in the browser, and only in the one module
+// that exists to hold them. Their definitions are fixed rather than scientific,
+// and the backend refuses an unconverted value regardless — but the arithmetic
+// is quarantined here so nothing else can start doing sums beside it.
+const entryLabel = 'audit field entry units';
+const fieldEntry = read('src/features/bouwa/auditFieldEntry.ts');
+const fieldEntryCode = withoutComments(fieldEntry);
+
+for (const required of [
+  'KELVIN_AT_ZERO_CELSIUS = 273.15',
+  "conversion === 'celsius_to_kelvin'",
+  'storedFromEntered',
+  'enteredFromStored',
+])
+  requireText(fieldEntryCode, required, entryLabel);
+
+for (const forbidden of ['8760', '8784', 'toFixed(', '?? 0', '|| 0', 'fetch('])
+  forbidText(fieldEntryCode, forbidden, `${entryLabel} scope`);
+
 // The same workspace serves the development service and the authenticated ARS
 // module. Only the connection differs, and the acting role must come from the
 // backend: a role derived in the browser would offer transitions the accepted

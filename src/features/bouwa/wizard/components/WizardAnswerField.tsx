@@ -18,6 +18,9 @@ import { HelpCircle, Lock } from 'lucide-react';
 import {
   answerForState,
   answerFromInput,
+  displayUnit,
+  enteredFromStored,
+  enteredTextForAnswer,
   inputTextForAnswer,
   readAnswerAtPath,
 } from '../../auditIntakeState';
@@ -68,6 +71,8 @@ function describeValue(field: AuditFormField, value: unknown): string {
     const option = field.options.find(entry => entry.value === value);
     return option?.label ?? String(value);
   }
+  if (field.entry !== null && typeof value === 'number')
+    return `${enteredFromStored(field.entry.conversion, value)} ${field.entry.unit}`;
   return String(value);
 }
 
@@ -103,7 +108,8 @@ export function WizardAnswerField({
   const [changing, setChanging] = useState(false);
   const [reason, setReason] = useState('');
 
-  const text = draft ?? inputTextForAnswer(stored);
+  const text = draft ?? enteredTextForAnswer(field, stored);
+  const unit = displayUnit(field);
   /**
    * A value a source published is shown rather than offered for typing. Not
    * because a rep is untrusted, but because a figure quietly typed over a
@@ -153,8 +159,8 @@ export function WizardAnswerField({
           className="text-sm font-medium leading-snug text-slate-800"
         >
           {status.label}
-          {field.unit === null ? null : (
-            <span className="ml-1 font-normal text-slate-500">({field.unit})</span>
+          {unit === null ? null : (
+            <span className="ml-1 font-normal text-slate-500">({unit})</span>
           )}
         </label>
         <div className="flex shrink-0 items-center gap-1.5">
@@ -228,14 +234,17 @@ export function WizardAnswerField({
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md bg-slate-50 px-2.5 py-1.5 text-sm text-slate-700">
               <Lock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
               <span className="font-mono text-xs">
-                {inputTextForAnswer(stored) || '—'}
+                {enteredTextForAnswer(field, stored) || '—'}
               </span>
+              {unit === null ? null : (
+                <span className="text-[11px] text-slate-500">{unit}</span>
+              )}
             </p>
             {disabled || changing ? null : (
               <button
                 type="button"
                 onClick={() => {
-                  setDraft(inputTextForAnswer(stored));
+                  setDraft(enteredTextForAnswer(field, stored));
                   setReason('');
                   setChanging(true);
                 }}
@@ -299,7 +308,7 @@ export function WizardAnswerField({
                 : undefined
             }
             value={text}
-            placeholder={field.unit === null ? '' : field.unit}
+            placeholder={unit ?? ''}
             onChange={event => setDraft(event.target.value)}
             onBlur={event => commitText(event.target.value)}
             className="min-w-[16rem] flex-1 rounded-md border border-slate-300 px-2.5 py-1.5 text-sm disabled:bg-slate-100"
@@ -353,7 +362,7 @@ export function WizardAnswerField({
           ) : (
             <input
               value={draft ?? ''}
-              placeholder={field.unit ?? ''}
+              placeholder={unit ?? ''}
               onChange={event => setDraft(event.target.value)}
               className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm"
             />

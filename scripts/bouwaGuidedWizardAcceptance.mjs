@@ -347,8 +347,22 @@ async function main() {
       'no field code or intake path is shown to a rep',
     );
     check(
-      review.includes('Preview proposal') || review.includes('Save and close'),
-      'the last button says what it will actually do',
+      review.includes('Preview proposal') &&
+        !review.includes('there is no proposal to preview'),
+      'the last button offers the proposal rather than denying there is one',
+    );
+    check(
+      lower.split('preliminary. this proposal is an early indication').length <=
+        2,
+      'the level a proposal rests on is stated once, not twice over',
+    );
+    check(
+      !review.includes('so results are not stored against a duplicate'),
+      'the guidance for a question is not repeated beside the button that opens it',
+    );
+    check(
+      review.split('No logger record was measured').length <= 2,
+      'what a manual proposal never measures is explained once',
     );
 
     process.stdout.write('Opening the proposal preview\n');

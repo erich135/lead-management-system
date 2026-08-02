@@ -103,14 +103,29 @@ export function reviewTriage(
         pageIndex: where.pageIndex,
       });
     }
-    const blocker: ReviewBlocker = {
+    if (fixes.length > 0) {
+      // The backend's reason names the first missing field and then explains
+      // why that field is asked for. Both are already on this row: the fields
+      // are the buttons beneath, and the explanation belongs beside the
+      // question rather than here. What is left to say is how far off the
+      // figure is.
+      triage.outstanding.push({
+        outputId: output.outputId,
+        label: output.label,
+        reason:
+          fixes.length === 1
+            ? 'One question stands between this proposal and this figure.'
+            : `${fixes.length} questions stand between this proposal and this figure.`,
+        fixes,
+      });
+      continue;
+    }
+    triage.waiting.push({
       outputId: output.outputId,
       label: output.label,
       reason,
       fixes,
-    };
-    if (fixes.length > 0) triage.outstanding.push(blocker);
-    else triage.waiting.push(blocker);
+    });
   }
 
   return triage;
@@ -122,18 +137,29 @@ export function reviewTriage(
  * It said "Save & Finish", which was untrue twice over: nothing was finished,
  * and what happened was that the proposal closed. The answers are saved as they
  * are given, so the honest thing the button can offer at the end is a look at
- * the proposal that has been built — and where there is no proposal to look at,
- * it says so and closes instead.
+ * the proposal that has been built.
+ *
+ * It once closed instead wherever no figure had been released, on the reasoning
+ * that there was nothing to preview. That is no longer true. A proposal with no
+ * released figure still names the customer, the machines and the price, and
+ * states on its face what it is waiting on, which is worth more in front of a
+ * customer than a rep with nothing to show. The button now offers the proposal
+ * whenever there is one to open and says which of the three it is.
  */
 export function finishActionLabel(
   triage: ReviewTriage,
   canPreview: boolean,
 ): { label: string; detail: string } {
-  if (!canPreview || triage.available.length === 0)
+  if (!canPreview)
     return {
       label: 'Save and close',
+      detail: 'Your answers are already saved.',
+    };
+  if (triage.available.length === 0)
+    return {
+      label: 'Preview proposal',
       detail:
-        'Nothing can be released yet, so there is no proposal to preview. Your answers are already saved.',
+        'No figure has been released yet. The proposal reads as preliminary: what has been captured so far, and what it is still waiting on.',
     };
   if (triage.outstanding.length === 0)
     return {

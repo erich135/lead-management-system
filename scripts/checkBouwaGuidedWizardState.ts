@@ -80,6 +80,7 @@ import {
   EVIDENCE_LEVEL_TONE,
   evidenceLevelSteps,
   nextLevelSentence,
+  statementBody,
 } from '../src/features/bouwa/wizard/evidenceLevelPresentation.ts';
 import type {
   AuditFieldStatus,
@@ -1564,8 +1565,33 @@ assert.equal(
       'Simple payback: no price',
     ]),
   ),
-  'To reach commercially_complete: Annual electricity cost: no confirmed tariff and 1 more like it',
+  'To reach commercially_complete: no confirmed tariff, and 1 more like it.',
   'a rep is told the first thing standing in the way, and how many follow',
+);
+assert.equal(
+  nextLevelSentence(
+    levelAssessment('preliminary', 'engineering', [
+      'Engineering comparison: Customer record has not been answered. Links this audit to the existing ARS customer record.',
+      'Proposed-machine model: Customer record has not been answered. Links this audit to the existing ARS customer record.',
+    ]),
+  ),
+  'To reach engineering: Customer record has not been answered.',
+  'the guidance behind a question is left on the question, and one gap is counted once',
+);
+const named = {
+  ...levelAssessment('preliminary', 'engineering', []),
+  label: 'Preliminary',
+  statement: 'Preliminary. It rests on what has been answered so far.',
+};
+assert.equal(
+  statementBody(named),
+  'It rests on what has been answered so far.',
+  'the level is not named twice where a badge already carries it',
+);
+assert.equal(
+  statementBody({ ...named, statement: 'It rests on what was answered.' }),
+  'It rests on what was answered.',
+  'a statement that does not open with the level is left as the server wrote it',
 );
 assert.equal(
   nextLevelSentence(levelAssessment('commercially_complete', null, [])),
@@ -1689,6 +1715,15 @@ assert.deepEqual(
   ['site_corrected_capacity'],
   'a figure waiting on a calculation nobody has accepted is not the rep’s to fix',
 );
+assert.match(
+  triaged.outstanding[0]?.reason ?? '',
+  /^One question stands/,
+  'an outstanding figure says how far off it is, and lets the buttons name the questions',
+);
+assert.ok(
+  !(triaged.outstanding[0]?.reason ?? '').includes('so results are not stored'),
+  'the guidance for a question is not repeated beside the button that opens it',
+);
 assert.deepEqual(
   triaged.outstanding[0]?.fixes.map(fix => ({
     code: fix.code,
@@ -1715,13 +1750,24 @@ assert.equal(
   'Save and close',
   'without a preview to open, the button does not promise one',
 );
+const nothingReleased = finishActionLabel(
+  { available: [], outstanding: [], waiting: [], notApplicable: [] },
+  true,
+);
 assert.equal(
-  finishActionLabel(
-    { available: [], outstanding: [], waiting: [], notApplicable: [] },
-    true,
-  ).label,
-  'Save and close',
-  'a proposal that can release nothing has nothing to preview',
+  nothingReleased.label,
+  'Preview proposal',
+  'a proposal with no released figure is still a proposal a rep can show',
+);
+assert.match(
+  nothingReleased.detail,
+  /preliminary/i,
+  'the rep is told what kind of document they are about to open',
+);
+assert.equal(
+  finishActionLabel(triaged, false).detail,
+  'Your answers are already saved.',
+  'where no preview can be opened, the button promises nothing about one',
 );
 
 /* ------------------------------------------------------------------ *

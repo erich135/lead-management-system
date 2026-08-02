@@ -13,6 +13,7 @@ import {
   EVIDENCE_LEVEL_TONE,
   evidenceLevelSteps,
   nextLevelSentence,
+  statementBody,
 } from '../evidenceLevelPresentation';
 import type { WizardEvidenceLevelAssessment } from '../wizardTypes';
 
@@ -41,7 +42,11 @@ export function EvidenceLevelBadge({
         <ShieldCheck className="h-4 w-4" />
         {EVIDENCE_LEVEL_SHORT[assessment.level]}
       </p>
-      <p className="mt-1 text-[11px] leading-relaxed">{assessment.statement}</p>
+      {/* The level is on the line above, so the statement is shown without the
+          name it opens with. */}
+      <p className="mt-1 text-[11px] leading-relaxed">
+        {statementBody(assessment)}
+      </p>
       <ol className="mt-2 flex flex-wrap gap-1">
         {evidenceLevelSteps(assessment).map(entry => (
           <li

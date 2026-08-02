@@ -77,7 +77,11 @@ export function WizardReadinessPanel({
                     : 'text-amber-700'
               }`}
             >
-              {line.state}
+              {/* The reason a stage does not apply is the same sentence for
+                  every stage it does not apply to, and it is already stated
+                  once above. Repeating it here filled the column with the
+                  same paragraph twice. */}
+              {line.applicable ? line.state : 'Not applicable'}
             </span>
           </div>
           {line.nextActions.length === 0 || !line.applicable ? null : (

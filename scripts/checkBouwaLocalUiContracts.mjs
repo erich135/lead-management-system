@@ -625,6 +625,30 @@ for (const required of [
 for (const forbidden of ['8760', '8784', 'toFixed(', '?? 0', '|| 0', 'fetch('])
   forbidText(fieldEntryCode, forbidden, `${entryLabel} scope`);
 
+// A question shows what it means, why it is asked and what an answer looks
+// like. The backend code that identifies it belongs to Advanced Technical
+// Review, where somebody is looking for it, and nowhere a rep can see.
+const answerFieldLabel = 'guided wizard question';
+const answerField = read(
+  'src/features/bouwa/wizard/components/WizardAnswerField.tsx',
+);
+
+for (const required of [
+  'status.whyItMatters',
+  'leadSentence(',
+  'acceptedFormat(',
+  'wizard-field-lead',
+  'wizard-field-format',
+])
+  requireText(answerField, required, answerFieldLabel);
+
+for (const shown of ['>{field.code}<', '{field.code}</span>', '{status.code}'])
+  forbidText(
+    withoutComments(answerField),
+    shown,
+    `${answerFieldLabel} hides its backend field code`,
+  );
+
 // The same workspace serves the development service and the authenticated ARS
 // module. Only the connection differs, and the acting role must come from the
 // backend: a role derived in the browser would offer transitions the accepted

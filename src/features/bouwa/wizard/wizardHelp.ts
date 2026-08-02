@@ -95,6 +95,99 @@ export const WIZARD_CONCEPTS: WizardConcept[] = [
   },
 ];
 
+/* ------------------------------------------------------------------ *
+ * The three things a question owes the person answering it
+ *
+ * What it means, why Bouwa wants it, and what an acceptable answer looks like.
+ * The backend already says why. The meaning is above, for the ideas that need
+ * one. The third is below, and is worked out from the field's own shape rather
+ * than written two hundred times — a box that takes a temperature in °C can say
+ * so without anybody hand-writing the sentence.
+ * ------------------------------------------------------------------ */
+
+/** Examples for the few fields whose format a unit alone does not convey. */
+const FORMAT_EXAMPLES: { match: string; example: string }[] = [
+  {
+    match: 'IDENTITY.GPS_REFERENCE',
+    example: 'Decimal degrees, latitude first. For example -26.204103, 28.047305',
+  },
+  {
+    match: 'SOURCE_LOGGER_SHA256',
+    example: 'Recorded from the uploaded file. Never typed',
+  },
+  {
+    match: 'SERIAL_NUMBER',
+    example: 'As printed on the machine plate. For example APF123456',
+  },
+  {
+    match: 'CALIBRATION_CERTIFICATE',
+    example: 'The certificate reference. For example CERT-2026-0142',
+  },
+  {
+    match: 'TARIFF_YEAR',
+    example: 'The tariff year the schedule was published for. For example 2026',
+  },
+  {
+    match: 'VSD_TURNDOWN',
+    example: 'The lowest flow the drive holds, as a share of full flow',
+  },
+];
+
+const VALUE_KIND_FORMATS: Record<string, string> = {
+  date: 'A calendar date, chosen from the picker',
+  long_text: 'A short description in your own words',
+  selection: 'Choose one of the listed values',
+  integer: 'A whole number',
+  sha256: 'Recorded from the uploaded file. Never typed',
+};
+
+export interface WizardFieldShape {
+  code: string;
+  valueKind: string;
+  unit: string | null;
+  entry: { unit: string; minimum: number; maximum: number } | null;
+}
+
+/**
+ * What an acceptable answer looks like, in one line.
+ *
+ * A number says its unit and, where the field has one, the range it must fall
+ * in — so a person meets the limit before the validation does.
+ */
+export function acceptedFormat(field: WizardFieldShape): string | null {
+  const written = FORMAT_EXAMPLES.filter(entry =>
+    field.code.includes(entry.match),
+  ).sort((left, right) => right.match.length - left.match.length)[0];
+  if (written !== undefined) return written.example;
+
+  if (field.valueKind === 'number' || field.valueKind === 'integer') {
+    const unit = field.entry?.unit ?? field.unit;
+    const range =
+      field.entry === null
+        ? ''
+        : ` between ${field.entry.minimum} and ${field.entry.maximum}`;
+    const kind = field.valueKind === 'integer' ? 'A whole number' : 'A number';
+    return unit === null ? `${kind}${range}` : `${kind}${range}, in ${unit}`;
+  }
+
+  return VALUE_KIND_FORMATS[field.valueKind] ?? null;
+}
+
+/**
+ * The one line kept visible beside a question.
+ *
+ * The backend's reason is written for an engineer reading the whole paragraph.
+ * A person filling a form in reads the first clause of it, so that is what
+ * stays on the screen and the rest waits behind the question mark.
+ */
+export function leadSentence(whyItMatters: string): string {
+  const text = whyItMatters.trim();
+  if (text === '') return '';
+  const stop = /[.;](\s|$)/.exec(text);
+  if (stop === null) return text;
+  return `${text.slice(0, stop.index)}.`;
+}
+
 export function conceptForField(code: string): WizardConcept | null {
   // The most specific match wins, so the proposed machine's control method is
   // explained by the VSD note rather than the general one.

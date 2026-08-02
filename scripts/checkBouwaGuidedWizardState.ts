@@ -38,7 +38,9 @@ import {
   equipmentIntakeEntries,
 } from '../src/features/bouwa/wizard/equipmentSelection.ts';
 import {
+  acceptedFormat,
   conceptForField,
+  leadSentence,
   WIZARD_CONCEPTS,
 } from '../src/features/bouwa/wizard/wizardHelp.ts';
 import type {
@@ -279,6 +281,97 @@ for (const concept of WIZARD_CONCEPTS)
     concept.body.length > 80 && !/\bassume\b/i.test(concept.body),
     `${concept.title} explains rather than excuses`,
   );
+
+/* ------------------------------------------------------------------ *
+ * Every question says what it means, why it is asked, and what an
+ * acceptable answer looks like
+ *
+ * The reason comes from the backend and is written for an engineer reading the
+ * whole paragraph. What stays on the screen is its first clause; the rest waits
+ * behind the question mark, and the accepted format sits beside the box.
+ * ------------------------------------------------------------------ */
+
+assert.equal(
+  leadSentence(
+    'The density correction is a function of ambient temperature as well as pressure; a winter morning and a summer afternoon are not the same intake condition.',
+  ),
+  'The density correction is a function of ambient temperature as well as pressure.',
+  'the visible helper is one clause, not the whole engineering paragraph',
+);
+assert.equal(
+  leadSentence('Fixes where the temperature was measured.'),
+  'Fixes where the temperature was measured.',
+  'a reason that is already one sentence is left exactly as written',
+);
+assert.equal(leadSentence('   '), '');
+
+/* A number states its unit, and its limits where it has them, before a rep
+   discovers them by being refused. */
+assert.equal(
+  acceptedFormat({
+    code: 'AUDIT.SITE.AMBIENT_TEMPERATURE',
+    valueKind: 'number',
+    unit: 'K',
+    entry: { unit: '°C', minimum: -50, maximum: 60 },
+  }),
+  'A number between -50 and 60, in °C',
+);
+assert.equal(
+  acceptedFormat({
+    code: 'AUDIT.FLOW_SENSOR.PIPE_DIAMETER_MM',
+    valueKind: 'number',
+    unit: 'mm',
+    entry: null,
+  }),
+  'A number, in mm',
+);
+assert.equal(
+  acceptedFormat({
+    code: 'AUDIT.TARIFF.TARIFF_YEAR',
+    valueKind: 'integer',
+    unit: null,
+    entry: null,
+  }),
+  'The tariff year the schedule was published for. For example 2026',
+  'a written example beats the shape of the field where one exists',
+);
+assert.equal(
+  acceptedFormat({
+    code: 'AUDIT.IDENTITY.GPS_REFERENCE',
+    valueKind: 'text',
+    unit: null,
+    entry: null,
+  }),
+  'Decimal degrees, latitude first. For example -26.204103, 28.047305',
+);
+assert.equal(
+  acceptedFormat({
+    code: 'AUDIT.TEMPERATURE_SENSOR.UNIT',
+    valueKind: 'selection',
+    unit: null,
+    entry: null,
+  }),
+  'Choose one of the listed values',
+);
+assert.equal(
+  acceptedFormat({
+    code: 'AUDIT.IDENTITY.AUDIT_START_DATE',
+    valueKind: 'date',
+    unit: null,
+    entry: null,
+  }),
+  'A calendar date, chosen from the picker',
+);
+assert.equal(
+  acceptedFormat({
+    code: 'AUDIT.IDENTITY.CUSTOMER_NAME',
+    valueKind: 'text',
+    unit: null,
+    entry: null,
+  }),
+  null,
+  'a name needs no format explaining to anybody',
+);
 
 assert.equal(clampPageIndex(-1, 3), 0);
 assert.equal(clampPageIndex(9, 3), 2);

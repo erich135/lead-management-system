@@ -30,7 +30,7 @@ import type {
   IntakeAnswer,
   IntakeAnswerState,
 } from '../../auditIntakeTypes';
-import { conceptForField } from '../wizardHelp';
+import { acceptedFormat, conceptForField, leadSentence } from '../wizardHelp';
 import type { WizardFieldView } from '../wizardState';
 import { ANSWER_ORIGIN_LABELS } from '../wizardTypes';
 
@@ -123,6 +123,8 @@ export function WizardAnswerField({
     onOverride !== undefined;
   const locked = view.sourceDerived || disabled;
   const concept = conceptForField(field.code);
+  const lead = leadSentence(status.whyItMatters);
+  const format = acceptedFormat(field);
   const controlId = `wizard-field-${field.code.replace(/[^A-Za-z0-9]/g, '-')}`;
 
   function commitText(raw: string) {
@@ -182,6 +184,25 @@ export function WizardAnswerField({
           </button>
         </div>
       </div>
+
+      {/* One line stays on the screen; the paragraph waits behind the question
+          mark. A person filling in a form reads the first clause either way. */}
+      {lead === '' ? null : (
+        <p
+          data-testid="wizard-field-lead"
+          className="mt-0.5 text-xs leading-relaxed text-slate-600"
+        >
+          {lead}
+        </p>
+      )}
+      {format === null ? null : (
+        <p
+          data-testid="wizard-field-format"
+          className="mt-0.5 text-[11px] text-slate-500"
+        >
+          {format}
+        </p>
+      )}
 
       {helpOpen ? (
         <div className="mt-1.5 space-y-1.5 rounded-md bg-slate-50 px-2.5 py-2 text-xs leading-relaxed text-slate-600">

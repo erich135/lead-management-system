@@ -727,6 +727,7 @@ export function GuidedProposalWizard({
         ) : screen.kind === 'review' ? (
           <ReviewStep
             readiness={view.readiness}
+            evidenceLevel={view.evidenceLevel}
             formModel={formModel}
             onOpenTechnicalReview={() => {
               // The review reads the stored draft, so anything outstanding is

@@ -18,17 +18,21 @@ import type {
   AuditIntakeFormModel,
   AuditReadinessAssessment,
 } from '../../auditIntakeTypes';
+import { EvidenceLevelBadge } from '../components/EvidenceLevelBadge';
 import { WizardEvidenceGroups } from '../components/WizardEvidenceGroups';
 import { WizardReadinessPanel } from '../components/WizardReadinessSummary';
+import type { WizardEvidenceLevelAssessment } from '../wizardTypes';
 
 export interface ReviewStepProps {
   readiness: AuditReadinessAssessment;
+  evidenceLevel: WizardEvidenceLevelAssessment;
   formModel: AuditIntakeFormModel;
   onOpenTechnicalReview: () => void;
 }
 
 export function ReviewStep({
   readiness,
+  evidenceLevel,
   formModel,
   onOpenTechnicalReview,
 }: ReviewStepProps) {
@@ -42,6 +46,13 @@ export function ReviewStep({
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <div className="space-y-3">
+        <section>
+          <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            What this proposal rests on
+          </h3>
+          <EvidenceLevelBadge assessment={evidenceLevel} />
+        </section>
+
         <section>
           <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
             Readiness

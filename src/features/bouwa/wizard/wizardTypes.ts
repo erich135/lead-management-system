@@ -78,9 +78,37 @@ export interface WizardAttachment {
   supersededAt: string | null;
 }
 
+export type WizardEvidenceLevel =
+  | 'preliminary'
+  | 'engineering'
+  | 'audit_backed'
+  | 'commercially_complete';
+
+export interface WizardEvidenceLevelRequirement {
+  level: WizardEvidenceLevel;
+  label: string;
+  met: boolean;
+  outstandingOutputs: { outputId: string; label: string; reasons: string[] }[];
+  blockingFieldCodes: string[];
+}
+
+/** What the proposal rests on. Decided by the server, never by the rep. */
+export interface WizardEvidenceLevelAssessment {
+  level: WizardEvidenceLevel;
+  label: string;
+  statement: string;
+  levels: WizardEvidenceLevelRequirement[];
+  nextLevel: WizardEvidenceLevel | null;
+  nextLevelLabel: string | null;
+  toReachNextLevel: string[];
+  blockingFieldCodesForNextLevel: string[];
+}
+
 export interface WizardReadinessSummary {
   stage: AuditReadinessStage | null;
   stageLabel: string;
+  evidenceLevel: WizardEvidenceLevel;
+  evidenceLevelLabel: string;
   permittedOutputCount: number;
   blockedOutputCount: number;
   outstandingQuestionCount: number;
@@ -371,6 +399,7 @@ export interface WizardSourceFact {
 export interface WizardDraftView {
   draft: WizardDraft;
   readiness: AuditReadinessAssessment;
+  evidenceLevel: WizardEvidenceLevelAssessment;
   sourceFacts: WizardSourceFact[];
   steps: WizardStep[];
   stepPosition: number;

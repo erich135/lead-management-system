@@ -28,6 +28,7 @@ import {
   duplicateWizardDraft,
   listWizardDrafts,
 } from './wizardApi';
+import { EVIDENCE_LEVEL_TONE } from './evidenceLevelPresentation';
 import { draftReadinessLabel, formatSavedAt } from './wizardState';
 import {
   PROPOSAL_TYPE_LABELS,
@@ -207,6 +208,15 @@ export function DraftProposalsPage({ onOpen }: DraftProposalsPageProps) {
                       {summary.manualBasis === null
                         ? ''
                         : ` · ${MANUAL_BASIS_LABELS[summary.manualBasis]}`}
+                    </span>
+                    <span
+                      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                        EVIDENCE_LEVEL_TONE[
+                          summary.readinessSummary.evidenceLevel
+                        ]
+                      }`}
+                    >
+                      {summary.readinessSummary.evidenceLevelLabel}
                     </span>
                   </p>
                   <p className="mt-0.5 truncate text-sm text-slate-700">

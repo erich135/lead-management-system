@@ -60,6 +60,13 @@ import {
   priceUnavailable,
   rands,
 } from '../src/features/bouwa/wizard/investmentPresentation.ts';
+import {
+  EVIDENCE_LEVEL_ORDER,
+  EVIDENCE_LEVEL_SHORT,
+  EVIDENCE_LEVEL_TONE,
+  evidenceLevelSteps,
+  nextLevelSentence,
+} from '../src/features/bouwa/wizard/evidenceLevelPresentation.ts';
 import type {
   AuditFieldStatus,
   AuditFormField,
@@ -1505,6 +1512,69 @@ assert.deepEqual(
   PRICE_DEPENDENT_FIGURES,
   ['Net investment', 'Simple payback', 'Return on investment'],
   'what an unpriced proposal cannot state is named plainly',
+);
+
+/* ------------------------------------------------------------------ *
+ * The evidence level reads as a claim about evidence, never about accuracy
+ * ------------------------------------------------------------------ */
+
+function levelAssessment(
+  level: 'preliminary' | 'engineering' | 'audit_backed' | 'commercially_complete',
+  next: 'engineering' | 'audit_backed' | 'commercially_complete' | null,
+  reasons: string[],
+) {
+  return {
+    level,
+    label: level,
+    statement: 'Supplied by the server.',
+    levels: EVIDENCE_LEVEL_ORDER.map(entry => ({
+      level: entry,
+      label: entry,
+      met: EVIDENCE_LEVEL_ORDER.indexOf(entry) <= EVIDENCE_LEVEL_ORDER.indexOf(level),
+      outstandingOutputs: [],
+      blockingFieldCodes: [],
+    })),
+    nextLevel: next,
+    nextLevelLabel: next,
+    toReachNextLevel: reasons,
+    blockingFieldCodesForNextLevel: [],
+  } as Parameters<typeof nextLevelSentence>[0];
+}
+
+assert.equal(
+  nextLevelSentence(
+    levelAssessment('audit_backed', 'commercially_complete', [
+      'Annual electricity cost: no confirmed tariff',
+      'Simple payback: no price',
+    ]),
+  ),
+  'To reach commercially_complete: Annual electricity cost: no confirmed tariff and 1 more like it',
+  'a rep is told the first thing standing in the way, and how many follow',
+);
+assert.equal(
+  nextLevelSentence(levelAssessment('commercially_complete', null, [])),
+  null,
+  'a proposal at the top level is not nagged about a level above it',
+);
+
+for (const phrase of Object.values(EVIDENCE_LEVEL_SHORT))
+  assert.ok(
+    !/100 ?%|guarantee|exact/i.test(phrase),
+    `"${phrase}" must not claim accuracy`,
+  );
+assert.equal(
+  Object.keys(EVIDENCE_LEVEL_TONE).length,
+  EVIDENCE_LEVEL_ORDER.length,
+  'every level a proposal can hold has a way of being shown',
+);
+
+const strip = evidenceLevelSteps(
+  levelAssessment('engineering', 'audit_backed', ['Annualised demand: nothing logged']),
+);
+assert.deepEqual(
+  strip.map(entry => entry.held),
+  [false, true, false, false],
+  'the strip marks the level the proposal actually holds',
 );
 
 console.log('Bouwa guided-wizard state checks passed.');

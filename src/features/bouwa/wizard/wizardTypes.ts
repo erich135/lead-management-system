@@ -213,6 +213,107 @@ export interface WizardEquipmentTypeOption {
   permittedBases: string[];
 }
 
+/* ------------------------------------------------------------------ *
+ * The machine specification library
+ * ------------------------------------------------------------------ */
+
+export type WizardSpecEquipmentType =
+  | 'air_compressor'
+  | 'air_dryer'
+  | 'air_receiver'
+  | 'filtration'
+  | 'drain'
+  | 'reference_drawing'
+  | 'other';
+
+export interface WizardSpecSource {
+  sourceType: string;
+  sourceDocumentId: string;
+  sourceTitle: string;
+  sourceOrganisation: string;
+  sourceVersion: string | null;
+  sourceDate: string | null;
+  sourcePageReference: string | null;
+  sourceUrl: string | null;
+  sourceFileName: string | null;
+  sourceSha256: string | null;
+}
+
+export interface WizardSpecPartLoadPoint {
+  flowM3PerMin: number;
+  packageInputPowerKw: number;
+}
+
+/**
+ * One document's statement about one machine. Every rating is nullable
+ * because a null is what the library says when the source printed nothing,
+ * and that is a different thing from a zero.
+ */
+export interface WizardSpecRecord {
+  recordId: string;
+  recordVersion: number;
+  libraryKey: string;
+  manufacturer: string;
+  model: string;
+  modelVariant: string | null;
+  equipmentType: WizardSpecEquipmentType;
+  compressorType: string | null;
+  controlMethod: string | null;
+  ratedPressureBarG: number | null;
+  ratedFadM3PerMin: number | null;
+  flowReferenceBasis: string | null;
+  packageInputPowerKw: number | null;
+  motorShaftPowerKw: number | null;
+  motorEfficiencyFraction: number | null;
+  specificPowerKwPerM3PerMin: number | null;
+  vsdMinimumFlowM3PerMin: number | null;
+  vsdMaximumFlowM3PerMin: number | null;
+  partLoadPoints: WizardSpecPartLoadPoint[];
+  referenceAbsolutePressurePa: number | null;
+  referenceTemperatureK: number | null;
+  referenceHumidityBasis: string | null;
+  referenceStandardDefinition: string | null;
+  allowableAmbientMinimumC: number | null;
+  allowableAmbientMaximumC: number | null;
+  deratingTableStatus: string;
+  source: WizardSpecSource;
+  summary: string;
+  /** Values this record's source never published. */
+  absentPublishedValues: string[];
+  /** Outputs this record on its own cannot support. */
+  unsupportedOutputs: string[];
+}
+
+export type WizardSpecMatchOutcome =
+  | 'exact'
+  | 'candidates_require_confirmation'
+  | 'no_match';
+
+export interface WizardSpecCandidate extends WizardSpecRecord {
+  /** What separates this candidate from the others offered beside it. */
+  distinguishedBy: string[];
+}
+
+export interface WizardSpecMatch {
+  outcome: WizardSpecMatchOutcome;
+  explanation: string;
+  record: WizardSpecRecord | null;
+  candidates: WizardSpecCandidate[];
+}
+
+/** A machine ARS already holds on its register, without its internal identifier shown. */
+export interface WizardInstalledMachine {
+  machineId: string;
+  manufacturer: string;
+  model: string;
+  machineType: string | null;
+  serialNumber: string | null;
+  assetNumber: string | null;
+  location: string | null;
+  ownership: string | null;
+  label: string;
+}
+
 export const PROPOSAL_TYPE_LABELS: Record<WizardProposalType, string> = {
   air_audit: 'Air Audit Proposal',
   manual: 'Manual Proposal',

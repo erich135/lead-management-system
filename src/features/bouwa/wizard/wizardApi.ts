@@ -18,8 +18,12 @@ import type {
   WizardEquipment,
   WizardEquipmentType,
   WizardEquipmentTypeOption,
+  WizardInstalledMachine,
   WizardProposalType,
   WizardManualBasis,
+  WizardSpecEquipmentType,
+  WizardSpecMatch,
+  WizardSpecRecord,
   WizardStep,
   WizardStepId,
 } from './wizardTypes';
@@ -264,6 +268,115 @@ export async function listAuditEquipment(params?: {
   return {
     equipment: (body.equipment as WizardEquipment[]) ?? [],
     equipmentTypes: (body.equipmentTypes as WizardEquipmentTypeOption[]) ?? [],
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * The machine specification library
+ * ------------------------------------------------------------------ */
+
+export interface SpecLibraryQuery {
+  equipmentType?: WizardSpecEquipmentType;
+  search?: string;
+  manufacturer?: string;
+  controlMethod?: string;
+  minimumPressureBarG?: number;
+  maximumPressureBarG?: number;
+  minimumFadM3PerMin?: number;
+  maximumFadM3PerMin?: number;
+  minimumPowerKw?: number;
+  maximumPowerKw?: number;
+  limit?: number;
+}
+
+function queryString(params: Record<string, unknown>): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === '') continue;
+    query.set(key, String(value));
+  }
+  const rendered = query.toString();
+  return rendered === '' ? '' : `?${rendered}`;
+}
+
+/**
+ * Searches the library. The equipment type is always sent, so a compressor
+ * proposal cannot fall back to a search that would return dryers.
+ */
+export async function searchSpecLibrary(
+  query: SpecLibraryQuery = {},
+): Promise<WizardSpecRecord[]> {
+  const body = await requestJson(
+    `/spec-library${queryString({
+      ...query,
+      equipmentType: query.equipmentType ?? 'air_compressor',
+    })}`,
+  );
+  return (body.records as WizardSpecRecord[]) ?? [];
+}
+
+export async function listSpecLibraryManufacturers(
+  equipmentType: WizardSpecEquipmentType = 'air_compressor',
+): Promise<string[]> {
+  const body = await requestJson(
+    `/spec-library/manufacturers${queryString({ equipmentType })}`,
+  );
+  return (body.manufacturers as string[]) ?? [];
+}
+
+/**
+ * Asks the library what a named machine means. The answer is one record,
+ * several to choose between, or none; this never resolves the ambiguity on
+ * the user's behalf.
+ */
+export async function matchSpecLibrary(subject: {
+  manufacturer: string | null;
+  model: string | null;
+  modelVariant?: string | null;
+  ratedPressureBarG?: number | null;
+}): Promise<WizardSpecMatch> {
+  const body = await requestJson(
+    `/spec-library/match${queryString({
+      manufacturer: subject.manufacturer,
+      model: subject.model,
+      modelVariant: subject.modelVariant,
+      ratedPressureBarG: subject.ratedPressureBarG,
+    })}`,
+  );
+  return body as unknown as WizardSpecMatch;
+}
+
+export async function fetchSpecRecord(recordId: string): Promise<{
+  record: WizardSpecRecord;
+  alternativeSources: WizardSpecRecord[];
+  history: WizardSpecRecord[];
+}> {
+  const body = await requestJson(
+    `/spec-library/${encodeURIComponent(recordId)}`,
+  );
+  return {
+    record: body.record as WizardSpecRecord,
+    alternativeSources: (body.alternativeSources as WizardSpecRecord[]) ?? [],
+    history: (body.history as WizardSpecRecord[]) ?? [],
+  };
+}
+
+/** The machines ARS already holds for a customer, optionally at one site. */
+export async function listInstalledMachines(params: {
+  customerId: string;
+  site?: string;
+  search?: string;
+  limit?: number;
+}): Promise<{
+  machines: WizardInstalledMachine[];
+  sites: string[];
+  noneRegistered: boolean;
+}> {
+  const body = await requestJson(`/installed-machines${queryString(params)}`);
+  return {
+    machines: (body.machines as WizardInstalledMachine[]) ?? [],
+    sites: (body.sites as string[]) ?? [],
+    noneRegistered: body.noneRegistered === true,
   };
 }
 

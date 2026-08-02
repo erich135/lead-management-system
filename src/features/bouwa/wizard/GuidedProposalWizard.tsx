@@ -33,8 +33,8 @@ import {
   ProposedMachinePicker,
 } from './components/MachinePickers';
 import {
-  existingMachineEntries,
-  proposedMachineEntries,
+  installedMachineEntries,
+  specLibraryEntries,
 } from './machineSelection';
 import { EquipmentPicker } from './components/EquipmentPicker';
 import {
@@ -189,29 +189,31 @@ export function GuidedProposalWizard({
   const [pageIndex, setPageIndex] = useState(view.draft.currentPageIndex);
   const [hint, setHint] = useState('');
   const [leaving, setLeaving] = useState(false);
-  /** The machines ARS holds against the chosen customer, once one is chosen. */
-  const [customerMachines, setCustomerMachines] = useState<Machine[]>([]);
+  /**
+   * The library record chosen to describe the installed machine. The ARS
+   * register says what the machine is called; the library says what it does,
+   * and the two are chosen separately because a registered machine may have no
+   * library record and a library record may describe a machine ARS has never
+   * seen.
+   */
+  const [selectedExistingSpecId, setSelectedExistingSpecId] = useState<
+    string | null
+  >(null);
 
-  // A resumed proposal already has its customer, and the machine step needs
-  // that customer's machines whether or not the selector screen was visited.
   const customerId = view.draft.customer.customerId;
   useEffect(() => {
-    if (customerId === null) {
-      setCustomerMachines([]);
-      return;
-    }
-    let live = true;
-    getMachinesByCustomer(customerId)
-      .then(response => {
-        if (live) setCustomerMachines(response.machines ?? []);
-      })
-      .catch(() => {
-        if (live) setCustomerMachines([]);
-      });
-    return () => {
-      live = false;
-    };
+    // Changing customer invalidates a machine chosen for the previous one.
+    setSelectedExistingSpecId(null);
   }, [customerId]);
+
+  /**
+   * The customer picker reports the machines it saw so it can offer their
+   * locations as sites. The machine step reads the register itself, so nothing
+   * here needs to keep them.
+   */
+  const noteMachinesSeen = useCallback((_machines: readonly Machine[]) => {
+    /* the machine step reads the register directly */
+  }, []);
 
   // The backend decides which steps a proposal type has. Changing the type can
   // therefore remove the step being shown, and the backend says where to land.
@@ -454,20 +456,32 @@ export function GuidedProposalWizard({
             onAnswer={draft.answer}
             onAnswerMany={draft.answerMany}
             onLinkCustomer={draft.setCustomer}
-            onMachinesLoaded={setCustomerMachines}
+            onMachinesLoaded={noteMachinesSeen}
           />
         ) : screen.kind === 'existing_machine' ? (
           <div className="space-y-3">
             <ExistingMachinePicker
-              machines={customerMachines}
-              customerChosen={view.draft.customer.customerId !== null}
+              customerId={view.draft.customer.customerId}
+              siteName={view.draft.customer.siteName}
               selectedMachineId={
                 (readAnswerAtPath(intake, 'existingMachine.arsMachineId')
                   ?.value as string) ?? null
               }
+              selectedSpecId={selectedExistingSpecId}
               disabled={!mayEdit}
-              onSelect={machine =>
-                draft.answerMany(existingMachineEntries(machine))
+              onSelectInstalled={machine =>
+                draft.answerMany(installedMachineEntries(machine))
+              }
+              onSelectSpec={record => {
+                setSelectedExistingSpecId(record.recordId);
+                draft.answerMany(specLibraryEntries(record, 'existingMachine'));
+              }}
+              onUnknown={() =>
+                draft.answer('existingMachine.selectionMode', {
+                  state: 'unknown_confirmation_required',
+                  value: null,
+                  note: null,
+                })
               }
             />
             <div className="space-y-2">
@@ -485,12 +499,28 @@ export function GuidedProposalWizard({
         ) : screen.kind === 'proposed_machine' ? (
           <div className="space-y-3">
             <ProposedMachinePicker
-              selectedSpecId={
+              selectedRecordId={
                 (readAnswerAtPath(intake, 'proposedMachine.arsMachineId')
                   ?.value as string) ?? null
               }
               disabled={!mayEdit}
-              onSelect={spec => draft.answerMany(proposedMachineEntries(spec))}
+              onSelect={record =>
+                draft.answerMany(specLibraryEntries(record, 'proposedMachine'))
+              }
+              onNotListed={() =>
+                draft.answer('proposedMachine.selectionMode', {
+                  state: 'not_listed_add_new',
+                  value: null,
+                  note: null,
+                })
+              }
+              onUnknown={() =>
+                draft.answer('proposedMachine.selectionMode', {
+                  state: 'unknown_confirmation_required',
+                  value: null,
+                  note: null,
+                })
+              }
             />
             <div className="space-y-2">
               {screen.fields.map(fieldView => (

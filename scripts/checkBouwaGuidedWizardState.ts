@@ -20,7 +20,10 @@ import {
 } from '../src/features/bouwa/wizard/wizardState.ts';
 import {
   existingMachineEntries,
+  installedMachineEntries,
   proposedMachineEntries,
+  specLibraryEntries,
+  specLibraryPartLoadPoints,
 } from '../src/features/bouwa/wizard/machineSelection.ts';
 import { siteCandidates } from '../src/features/bouwa/wizard/customerSiteSelection.ts';
 import {
@@ -653,6 +656,232 @@ const fixedSpeed = new Map(
   } as Parameters<typeof proposedMachineEntries>[0]),
 );
 assert.equal(fixedSpeed.has('proposedMachine.controlMethod'), false);
+
+/* ------------------------------------------------------------------ *
+ * The specification library fills what its source published, and stops
+ * ------------------------------------------------------------------ */
+
+type SpecRecord = Parameters<typeof specLibraryEntries>[0];
+
+/** A record holding nothing but the identity fields every record has. */
+function bareRecord(overrides: Partial<SpecRecord> = {}): SpecRecord {
+  return {
+    recordId: 'record-1',
+    recordVersion: 1,
+    libraryKey: 'atlas-copco|ga55-125ap|v-none|p8.62',
+    manufacturer: 'Atlas Copco',
+    model: 'GA55-125AP',
+    modelVariant: null,
+    equipmentType: 'air_compressor',
+    compressorType: null,
+    controlMethod: null,
+    ratedPressureBarG: null,
+    ratedFadM3PerMin: null,
+    flowReferenceBasis: null,
+    packageInputPowerKw: null,
+    motorShaftPowerKw: null,
+    motorEfficiencyFraction: null,
+    specificPowerKwPerM3PerMin: null,
+    vsdMinimumFlowM3PerMin: null,
+    vsdMaximumFlowM3PerMin: null,
+    partLoadPoints: [],
+    referenceAbsolutePressurePa: null,
+    referenceTemperatureK: null,
+    referenceHumidityBasis: null,
+    referenceStandardDefinition: null,
+    allowableAmbientMinimumC: null,
+    allowableAmbientMaximumC: null,
+    deratingTableStatus: 'unknown',
+    source: {
+      sourceType: 'cagi_verified_datasheet',
+      sourceDocumentId: 'doc-1',
+      sourceTitle: 'GA55 CAGI data sheet',
+      sourceOrganisation: 'Atlas Copco',
+      sourceVersion: null,
+      sourceDate: null,
+      sourcePageReference: null,
+      sourceUrl: null,
+      sourceFileName: null,
+      sourceSha256: null,
+    },
+    summary: '9.06 m³/min · 8.6 bar(g)',
+    absentPublishedValues: [],
+    unsupportedOutputs: [],
+    ...overrides,
+  } as SpecRecord;
+}
+
+const fullSheet = new Map(
+  specLibraryEntries(
+    bareRecord({
+      compressorType: 'rotary_screw_oil_injected',
+      controlMethod: 'variable_speed_drive',
+      ratedPressureBarG: 8.6,
+      ratedFadM3PerMin: 9.06,
+      flowReferenceBasis: 'free_air_delivery',
+      packageInputPowerKw: 55,
+      motorShaftPowerKw: 52,
+      motorEfficiencyFraction: 0.94,
+      specificPowerKwPerM3PerMin: 6.07,
+      vsdMinimumFlowM3PerMin: 2.1,
+      vsdMaximumFlowM3PerMin: 9.06,
+    }),
+    'proposedMachine',
+  ),
+);
+
+assert.equal(fullSheet.get('proposedMachine.manufacturer')?.value, 'Atlas Copco');
+assert.equal(fullSheet.get('proposedMachine.model')?.value, 'GA55-125AP');
+assert.equal(
+  fullSheet.get('proposedMachine.ratedDischargePressureBarG')?.value,
+  8.6,
+);
+assert.equal(fullSheet.get('proposedMachine.ratedFadM3PerMin')?.value, 9.06);
+assert.equal(
+  fullSheet.get('proposedMachine.ratedFlowReferenceBasis')?.value,
+  'free_air_delivery',
+  'where the source states the basis it is carried across rather than re-asked',
+);
+assert.equal(fullSheet.get('proposedMachine.motorEfficiency')?.value, 0.94);
+assert.equal(
+  fullSheet.get('proposedMachine.specificPowerKwPerM3PerMin')?.value,
+  6.07,
+);
+assert.equal(fullSheet.get('proposedMachine.vsdMinimumFlowM3PerMin')?.value, 2.1);
+assert.equal(
+  fullSheet.get('proposedMachine.powerBasis')?.value,
+  'manufacturer_package_input',
+  'a published package figure is recorded as a package figure',
+);
+assert.equal(
+  fullSheet.get('proposedMachine.manufacturerSource')?.value,
+  'GA55 CAGI data sheet — Atlas Copco',
+  'the source is cited automatically rather than retyped',
+);
+
+/* A directory line publishes four values. It must fill four, not twelve. */
+const directoryLine = new Map(
+  specLibraryEntries(
+    bareRecord({
+      ratedPressureBarG: 8.6,
+      ratedFadM3PerMin: 9.06,
+      source: {
+        ...bareRecord().source,
+        sourceType: 'cagi_directory',
+        sourceTitle: 'CAGI rotary directory',
+        sourceOrganisation: 'Compressed Air and Gas Institute',
+        sourceVersion: '8-23',
+      },
+    }),
+    'proposedMachine',
+  ),
+);
+
+assert.equal(directoryLine.get('proposedMachine.ratedFadM3PerMin')?.value, 9.06);
+for (const unpublished of [
+  'proposedMachine.controlMethod',
+  'proposedMachine.machineType',
+  'proposedMachine.ratedFlowReferenceBasis',
+  'proposedMachine.packageInputPowerKw',
+  'proposedMachine.powerBasis',
+  'proposedMachine.motorEfficiency',
+  'proposedMachine.specificPowerKwPerM3PerMin',
+]) {
+  assert.equal(
+    directoryLine.has(unpublished),
+    false,
+    `the directory does not publish ${unpublished} and must leave it a question`,
+  );
+}
+assert.equal(
+  directoryLine.get('proposedMachine.manufacturerSource')?.value,
+  'CAGI rotary directory — Compressed Air and Gas Institute — version 8-23',
+);
+
+/* Where only a shaft rating exists the basis says so rather than claiming a
+   package measurement, because the two are not interchangeable in the model. */
+const shaftOnly = new Map(
+  specLibraryEntries(
+    bareRecord({ motorShaftPowerKw: 30 }),
+    'proposedMachine',
+  ),
+);
+assert.equal(shaftOnly.get('proposedMachine.packageInputPowerKw')?.value, 30);
+assert.equal(
+  shaftOnly.get('proposedMachine.powerBasis')?.value,
+  'motor_nameplate_rating',
+);
+
+/* The variant is part of what the machine is called. */
+assert.equal(
+  new Map(
+    specLibraryEntries(
+      bareRecord({ modelVariant: 'FF' }),
+      'proposedMachine',
+    ),
+  ).get('proposedMachine.model')?.value,
+  'GA55-125AP FF',
+);
+
+/* The same record fills the installed machine, with the fields that only an
+   installed machine has. */
+const asInstalled = new Map(
+  specLibraryEntries(
+    bareRecord({ packageInputPowerKw: 55, motorShaftPowerKw: 52 }),
+    'existingMachine',
+  ),
+);
+assert.equal(asInstalled.get('existingMachine.motorNameplatePowerKw')?.value, 52);
+assert.equal(
+  asInstalled.get('existingMachine.manufacturerEvidenceReference')?.value,
+  'GA55 CAGI data sheet — Atlas Copco',
+);
+assert.equal(
+  asInstalled.has('existingMachine.specificPowerKwPerM3PerMin'),
+  false,
+  'the installed machine has no specific-power field to fill',
+);
+
+/* A part-load curve is carried only where the source published one. */
+assert.deepEqual(specLibraryPartLoadPoints(bareRecord()), []);
+assert.deepEqual(
+  specLibraryPartLoadPoints(
+    bareRecord({
+      partLoadPoints: [{ flowM3PerMin: 4.5, packageInputPowerKw: 31 }],
+    }),
+  ),
+  [{ flowM3PerMin: 4.5, packageInputPowerKw: 31 }],
+);
+
+/* The ARS register states identity, never performance. */
+const installed = new Map(
+  installedMachineEntries({
+    machineId: 'ars-machine-7',
+    manufacturer: ' Atlas Copco ',
+    model: 'GA55-125AP',
+    machineType: 'Compressor',
+    serialNumber: ' API-660-123 ',
+    assetNumber: 'A-1001',
+    location: 'Plant 1',
+    ownership: 'customer',
+    label: 'Atlas Copco GA55-125AP · serial API-660-123 · Plant 1',
+  }),
+);
+assert.equal(installed.get('existingMachine.manufacturer')?.value, 'Atlas Copco');
+assert.equal(installed.get('existingMachine.serialNumber')?.value, 'API-660-123');
+assert.equal(installed.get('existingMachine.arsMachineId')?.value, 'ars-machine-7');
+for (const invented of [
+  'existingMachine.ratedFadM3PerMin',
+  'existingMachine.packageInputPowerKw',
+  'existingMachine.controlMethod',
+  'existingMachine.machineType',
+]) {
+  assert.equal(
+    installed.has(invented),
+    false,
+    `the ARS register does not state ${invented} and must not fill it`,
+  );
+}
 
 /* The site list offers what ARS evidences and nothing it does not. */
 

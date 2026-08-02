@@ -17,7 +17,15 @@
  * Review, which is where somebody goes to audit the work rather than to do it.
  */
 
-import { ArrowRight, CheckCircle2, Clock, Lock, Microscope, MinusCircle } from 'lucide-react';
+import {
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+  FileText,
+  Lock,
+  Microscope,
+  MinusCircle,
+} from 'lucide-react';
 
 import type {
   AuditIntakeFormModel,
@@ -42,6 +50,8 @@ export interface ReviewStepProps {
   onOpenTechnicalReview: () => void;
   /** Takes the user to the question that would release a figure. */
   onFixNow: (stepId: string, pageIndex: number) => void;
+  /** Opens the proposal as the customer would read it. */
+  onPreview?: () => void;
 }
 
 export function ReviewStep({
@@ -52,6 +62,7 @@ export function ReviewStep({
   fileParsed,
   onOpenTechnicalReview,
   onFixNow,
+  onPreview,
 }: ReviewStepProps) {
   const triage = reviewTriage(
     readiness,
@@ -67,6 +78,20 @@ export function ReviewStep({
             What this proposal rests on
           </h3>
           <EvidenceLevelBadge assessment={evidenceLevel} />
+          {/* A rep can read the proposal at any point. A preliminary document
+              is still a document: it says on its face what it rests on and
+              what it cannot state, which is more use in a conversation than
+              being told to come back when everything is confirmed. */}
+          {onPreview !== undefined && (
+            <button
+              type="button"
+              onClick={onPreview}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-ars-primary px-3 py-1.5 text-sm font-medium text-ars-primary hover:bg-blue-50"
+            >
+              <FileText className="h-4 w-4" />
+              Preview proposal
+            </button>
+          )}
         </section>
 
         <section>

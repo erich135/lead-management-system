@@ -14,9 +14,8 @@
 import type { WizardProposalDocument } from '../wizardTypes';
 import {
   addressBlock,
-  investmentAmount,
+  investmentRows,
   longDate,
-  totalRows,
 } from '../proposalDocumentPresentation';
 import { ARS_DEFAULT_HEADER } from '../../../../utils/arsJobCardHeaderDefaults';
 
@@ -94,7 +93,6 @@ function SectionTable({
 export function ProposalDocumentView({ document }: ProposalDocumentViewProps) {
   const investment = document.investment;
   const stated = document.figures.filter(figure => figure.available);
-  const unstated = document.figures.filter(figure => !figure.available);
 
   return (
     <article
@@ -136,18 +134,19 @@ export function ProposalDocumentView({ document }: ProposalDocumentViewProps) {
         </div>
       </header>
 
-      {document.preliminaryNotice !== null && (
+      {/* What the proposal rests on is said once. The preliminary notice and
+          the evidence-level statement carry the same warning in different
+          words, so a preliminary document shows the notice and every other
+          document shows the statement. */}
+      {document.preliminaryNotice !== null ? (
         <p className="mt-4 border-l-4 border-ars-secondary bg-amber-50 px-3 py-2 text-[10px] leading-relaxed text-amber-900">
           {document.preliminaryNotice}
         </p>
+      ) : (
+        <p className="mt-4 text-[10px] leading-relaxed text-gray-700">
+          {document.evidenceLevelStatement}
+        </p>
       )}
-
-      <p className="mt-4 text-[10px] leading-relaxed text-gray-700">
-        <span className="font-semibold text-ars-heading">
-          {document.evidenceLevelLabel}.
-        </span>{' '}
-        {document.evidenceLevelStatement}
-      </p>
 
       {stated.length > 0 && (
         <section className="mt-5 break-inside-avoid">
@@ -195,32 +194,18 @@ export function ProposalDocumentView({ document }: ProposalDocumentViewProps) {
           <>
             <table className="w-full text-[10px]">
               <tbody>
-                {investment.lines
-                  .filter(line => !line.notIncluded)
-                  .map(line => (
-                    <tr key={line.label}>
-                      <th
-                        scope="row"
-                        className="py-1 text-left font-normal text-gray-600"
-                      >
-                        {line.label}
-                      </th>
-                      <td className="py-1 text-right font-medium text-black">
-                        {investmentAmount(line)}
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-            <table className="mt-2 w-full border-t border-gray-300 text-[10px]">
-              <tbody>
-                {totalRows(document).map(row => (
-                  <tr key={row.label}>
+                {investmentRows(document).map(row => (
+                  <tr
+                    key={row.label}
+                    className={
+                      row.emphasis ? 'border-t border-gray-300' : undefined
+                    }
+                  >
                     <th
                       scope="row"
                       className={`py-1 text-left ${
                         row.emphasis
-                          ? 'font-bold text-black'
+                          ? 'pt-2 font-bold text-black'
                           : 'font-normal text-gray-600'
                       }`}
                     >
@@ -229,7 +214,7 @@ export function ProposalDocumentView({ document }: ProposalDocumentViewProps) {
                     <td
                       className={`py-1 text-right ${
                         row.emphasis
-                          ? 'text-[12px] font-bold text-ars-primary'
+                          ? 'pt-2 text-[12px] font-bold text-ars-primary'
                           : 'font-medium text-black'
                       }`}
                     >
@@ -264,17 +249,14 @@ export function ProposalDocumentView({ document }: ProposalDocumentViewProps) {
         </section>
       )}
 
-      {unstated.length > 0 && (
+      {document.limitations.length > 0 && (
         <section className="mt-5 break-inside-avoid">
           <h2 className="mb-1.5 border-b border-gray-300 pb-1 text-[11px] font-bold uppercase tracking-wide text-ars-heading">
             What this proposal does not state
           </h2>
           <ul className="space-y-1 text-[10px] text-gray-700">
-            {unstated.map(figure => (
-              <li key={figure.label}>
-                <span className="font-medium text-black">{figure.label}:</span>{' '}
-                {figure.unavailableReason}
-              </li>
+            {document.limitations.map(limitation => (
+              <li key={limitation}>{limitation}</li>
             ))}
           </ul>
         </section>

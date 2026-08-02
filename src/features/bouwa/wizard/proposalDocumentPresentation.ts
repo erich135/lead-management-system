@@ -76,11 +76,17 @@ export interface ProposalTotalRow {
 }
 
 /**
- * The totals block, in the order a reader adds them up. A total the proposal
- * cannot state is carried as the price statement instead of a figure, so the
- * block never shows a net investment of nothing.
+ * The investment, as one list a reader adds up.
+ *
+ * The equipment, each cost and each credit are named once and the net follows
+ * them. An earlier arrangement listed the costs and then repeated them as
+ * subtotals, which on a proposal with one cost and one credit printed the same
+ * two amounts twice and read as though it were charging for them twice.
+ *
+ * A net the proposal cannot state is carried by the price statement beneath
+ * the table rather than as a figure, so the block never totals to nothing.
  */
-export function totalRows(
+export function investmentRows(
   document: WizardProposalDocument,
 ): ProposalTotalRow[] {
   const investment = document.investment;
@@ -88,22 +94,23 @@ export function totalRows(
     return [
       { label: 'Net initial investment', amount: 'Not yet priced', emphasis: true },
     ];
+  const units =
+    investment.quantity !== null && investment.quantity > 1
+      ? ` (${investment.quantity} × ${rands(investment.unitPriceRand)})`
+      : '';
   return [
     {
-      label: 'Equipment',
+      label: `Equipment${units}`,
       amount: rands(investment.equipmentSubtotalRand),
       emphasis: false,
     },
-    {
-      label: 'Installation and related work',
-      amount: rands(investment.additionalCostsRand),
-      emphasis: false,
-    },
-    {
-      label: 'Credits',
-      amount: `− ${rands(investment.creditsRand)}`,
-      emphasis: false,
-    },
+    ...investment.lines
+      .filter(line => !line.notIncluded)
+      .map(line => ({
+        label: line.label,
+        amount: investmentAmount(line),
+        emphasis: false,
+      })),
     {
       label: 'Net initial investment',
       amount: rands(investment.netInitialInvestmentRand),

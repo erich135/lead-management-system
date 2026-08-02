@@ -26,8 +26,6 @@ import type {
   AuditIntakeFormModel,
   AuditReadinessAssessment,
 } from '../auditIntakeTypes';
-import { getMachinesByCustomer } from '../../../lib/api';
-import type { Machine } from '../../../lib/api';
 import {
   ExistingMachinePicker,
   ProposedMachinePicker,
@@ -245,7 +243,7 @@ export function GuidedProposalWizard({
    * locations as sites. The machine step reads the register itself, so nothing
    * here needs to keep them.
    */
-  const noteMachinesSeen = useCallback((_machines: readonly Machine[]) => {
+  const noteMachinesSeen = useCallback((): void => {
     /* the machine step reads the register directly */
   }, []);
 
@@ -762,6 +760,22 @@ export function GuidedProposalWizard({
             steps={steps}
             fileParsed={view.draft.fileParsed}
             onFixNow={fixNow}
+            onPreview={
+              onPreview === undefined
+                ? undefined
+                : () => {
+                    // The proposal is built from what is stored, so what is on
+                    // screen is saved before it is read back.
+                    void draft
+                      .flush({
+                        currentStepId: step.id,
+                        currentPageIndex: safePage,
+                      })
+                      .then(saved => {
+                        if (saved) onPreview(view.draft.draftId);
+                      });
+                  }
+            }
             onOpenTechnicalReview={() => {
               // The review reads the stored draft, so anything outstanding is
               // stored first rather than being absent from what it reports.

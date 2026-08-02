@@ -69,10 +69,10 @@ import {
   addressBlock,
   documentStatusLine,
   investmentAmount,
+  investmentRows,
   issueAction,
   longDate,
   proposalFilename,
-  totalRows,
 } from '../src/features/bouwa/wizard/proposalDocumentPresentation.ts';
 import {
   EVIDENCE_LEVEL_ORDER,
@@ -1783,11 +1783,42 @@ assert.deepEqual(
   'a site nobody named leaves no empty line on the letterhead',
 );
 
-const pricedTotals = totalRows(proposalDocument());
+const pricedTotals = investmentRows(
+  proposalDocument({
+    investment: {
+      ...proposalDocument().investment,
+      lines: [
+        {
+          label: 'Installation',
+          amountRand: 45000,
+          credit: false,
+          notIncluded: false,
+        },
+        {
+          label: 'Buy-back or trade-in credit',
+          amountRand: 60000,
+          credit: true,
+          notIncluded: false,
+        },
+        {
+          label: 'Piping and mechanical work',
+          amountRand: null,
+          credit: false,
+          notIncluded: true,
+        },
+      ],
+    },
+  }),
+);
 assert.deepEqual(
   pricedTotals.map(row => row.label),
-  ['Equipment', 'Installation and related work', 'Credits', 'Net initial investment'],
-  'the totals read in the order a customer adds them up',
+  [
+    `Equipment (2 × ${rands(400000)})`,
+    'Installation',
+    'Buy-back or trade-in credit',
+    'Net initial investment',
+  ],
+  'each cost and credit is named once, and the net follows them',
 );
 assert.ok(
   pricedTotals[2].amount.startsWith('−'),
@@ -1798,8 +1829,18 @@ assert.equal(
   rands(785000),
   'the printed total is the figure the backend supplied, unchanged',
 );
+assert.equal(
+  pricedTotals.filter(row => row.amount === rands(45000)).length,
+  1,
+  'a cost is never charged for twice by being listed and then subtotalled',
+);
+assert.deepEqual(
+  investmentRows(proposalDocument()).map(row => row.label),
+  [`Equipment (2 × ${rands(400000)})`, 'Net initial investment'],
+  'a proposal with no extra costs prints the equipment and the net, nothing else',
+);
 
-const unpriced = totalRows(
+const unpriced = investmentRows(
   proposalDocument({
     investment: {
       ...proposalDocument().investment,

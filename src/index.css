@@ -147,8 +147,11 @@
     visibility: hidden;
   }
 
-  .bouwa-proposal-print-root,
-  .bouwa-proposal-print-root * {
+  /* Both selectors carry the :has() prefix so that bringing the proposal back
+   * outranks the rule that hid everything, which is more specific than a bare
+   * class would be. */
+  body:has(.bouwa-proposal-print-root) .bouwa-proposal-print-root,
+  body:has(.bouwa-proposal-print-root) .bouwa-proposal-print-root * {
     visibility: visible;
   }
 

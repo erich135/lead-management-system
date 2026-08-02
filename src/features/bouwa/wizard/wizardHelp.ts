@@ -131,6 +131,14 @@ const FORMAT_EXAMPLES: { match: string; example: string }[] = [
     match: 'VSD_TURNDOWN',
     example: 'The lowest flow the drive holds, as a share of full flow',
   },
+  {
+    match: 'INVESTMENT.PRICE_SOURCE',
+    example: 'The quotation or price list the figure comes from. For example QUO-2026-0142',
+  },
+  {
+    match: 'INVESTMENT.ITEM_DESCRIPTION',
+    example: 'What the customer is buying, as it should read on the proposal',
+  },
 ];
 
 const VALUE_KIND_FORMATS: Record<string, string> = {

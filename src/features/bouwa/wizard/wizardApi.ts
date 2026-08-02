@@ -22,6 +22,7 @@ import type {
   WizardMachineComparisonResult,
   WizardMachineRole,
   WizardMachineSelectionResult,
+  WizardPriceSuggestion,
   WizardProposalType,
   WizardManualBasis,
   WizardSpecEquipmentType,
@@ -463,6 +464,16 @@ export async function listInstalledMachines(params: {
     sites: (body.sites as string[]) ?? [],
     noneRegistered: body.noneRegistered === true,
   };
+}
+
+/** Prices ARS has already quoted this customer, newest and closest first. */
+export async function fetchPriceSuggestions(
+  draftId: string,
+): Promise<WizardPriceSuggestion[]> {
+  const body = await requestJson(
+    `/drafts/${encodeURIComponent(draftId)}/price-suggestions`,
+  );
+  return (body.suggestions as WizardPriceSuggestion[]) ?? [];
 }
 
 /* ------------------------------------------------------------------ *

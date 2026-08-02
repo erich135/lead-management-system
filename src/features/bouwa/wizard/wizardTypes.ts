@@ -311,6 +311,20 @@ export interface WizardTariffComparisonResult {
   } | null;
 }
 
+/** A price ARS quoted this customer before, offered rather than applied. */
+export interface WizardPriceSuggestion {
+  draftId: string;
+  reference: string;
+  quotedAt: string;
+  quotedByName: string | null;
+  itemDescription: string | null;
+  unitPriceRand: number;
+  quantity: number | null;
+  machineLabel: string | null;
+  specRecordId: string | null;
+  sourceLabel: string;
+}
+
 export interface WizardDraft {
   draftId: string;
   schemaVersion: string;

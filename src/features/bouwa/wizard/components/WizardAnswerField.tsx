@@ -76,6 +76,14 @@ function describeValue(field: AuditFormField, value: unknown): string {
   return String(value);
 }
 
+/** A blank stepper starts at one, because none of something is not a proposal. */
+function stepBy(current: string, by: number): number {
+  const held = Number(current.trim());
+  const from = Number.isFinite(held) && current.trim() !== '' ? held : 0;
+  const next = Math.round(from) + by;
+  return next < 1 ? 1 : next;
+}
+
 export interface WizardAnswerFieldProps {
   view: WizardFieldView;
   intake: AuditIntakeDocument;
@@ -89,6 +97,12 @@ export interface WizardAnswerFieldProps {
    */
   onOverride?: (path: string, answer: unknown, reason: string) => void;
   onRestore?: (path: string) => void;
+  /**
+   * Offers plus and minus beside a whole-number field. Used where the answer is
+   * a count of things — how many machines — and typing is the slower way to say
+   * "one more".
+   */
+  stepper?: boolean;
 }
 
 export function WizardAnswerField({
@@ -99,6 +113,7 @@ export function WizardAnswerField({
   onAnswer,
   onOverride,
   onRestore,
+  stepper,
 }: WizardAnswerFieldProps) {
   const { field, status, provenance } = view;
   const stored = readAnswerAtPath(intake, field.path);
@@ -313,27 +328,54 @@ export function WizardAnswerField({
             ))}
           </select>
         ) : (
-          <input
-            id={controlId}
-            disabled={locked}
-            type={
-              field.valueKind === 'date'
-                ? 'date'
-                : field.valueKind === 'number' || field.valueKind === 'integer'
-                  ? 'text'
-                  : 'text'
-            }
-            inputMode={
-              field.valueKind === 'number' || field.valueKind === 'integer'
-                ? 'decimal'
-                : undefined
-            }
-            value={text}
-            placeholder={unit ?? ''}
-            onChange={event => setDraft(event.target.value)}
-            onBlur={event => commitText(event.target.value)}
-            className="min-w-[16rem] flex-1 rounded-md border border-slate-300 px-2.5 py-1.5 text-sm disabled:bg-slate-100"
-          />
+          <span className="flex min-w-[16rem] flex-1 items-center gap-1">
+            {stepper ? (
+              <button
+                type="button"
+                aria-label="One fewer"
+                disabled={locked}
+                onClick={() => commitText(String(stepBy(text, -1)))}
+                className="rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              >
+                −
+              </button>
+            ) : null}
+            <span className="relative flex-1">
+              {unit === 'R' ? (
+                <span className="pointer-events-none absolute left-2.5 top-1.5 text-sm text-slate-400">
+                  R
+                </span>
+              ) : null}
+              <input
+                id={controlId}
+                disabled={locked}
+                type={field.valueKind === 'date' ? 'date' : 'text'}
+                inputMode={
+                  field.valueKind === 'number' || field.valueKind === 'integer'
+                    ? 'decimal'
+                    : undefined
+                }
+                value={text}
+                placeholder={unit === 'R' ? '' : (unit ?? '')}
+                onChange={event => setDraft(event.target.value)}
+                onBlur={event => commitText(event.target.value)}
+                className={`w-full rounded-md border border-slate-300 py-1.5 pr-2.5 text-sm disabled:bg-slate-100 ${
+                  unit === 'R' ? 'pl-6' : 'pl-2.5'
+                }`}
+              />
+            </span>
+            {stepper ? (
+              <button
+                type="button"
+                aria-label="One more"
+                disabled={locked}
+                onClick={() => commitText(String(stepBy(text, 1)))}
+                className="rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              >
+                +
+              </button>
+            ) : null}
+          </span>
         )}
 
         {view.sourceDerived || fromSource

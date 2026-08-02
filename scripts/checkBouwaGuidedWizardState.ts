@@ -54,6 +54,12 @@ import {
   leadSentence,
   WIZARD_CONCEPTS,
 } from '../src/features/bouwa/wizard/wizardHelp.ts';
+import {
+  investmentRunningTotal,
+  PRICE_DEPENDENT_FIGURES,
+  priceUnavailable,
+  rands,
+} from '../src/features/bouwa/wizard/investmentPresentation.ts';
 import type {
   AuditFieldStatus,
   AuditFormField,
@@ -1412,6 +1418,93 @@ assert.equal(
     .length,
   1,
   '"not available yet" is offered as a real answer rather than a dead end',
+);
+
+/* ------------------------------------------------------------------ *
+ * The investment adds up on screen the way the backend adds it up
+ * ------------------------------------------------------------------ */
+
+function money(value: number | null): IntakeAnswer<unknown> {
+  return value === null
+    ? { state: 'unanswered', value: null, note: null }
+    : { state: 'answered', value, note: null };
+}
+
+const pricedAnswers = new Map<string, IntakeAnswer<unknown>>([
+  [
+    'investment.pricingStatus',
+    { state: 'answered', value: 'ars_quotation', note: null },
+  ],
+  ['investment.unitPriceRand', money(984810)],
+  ['investment.quantity', money(2)],
+  ['investment.installationRand', money(300000)],
+  ['investment.electricalWorkRand', money(158240)],
+  ['investment.buyBackRand', money(130000)],
+]);
+const pricedAnswerAt = (path: string) => pricedAnswers.get(path) ?? null;
+
+const running = investmentRunningTotal(pricedAnswerAt);
+assert.equal(
+  running.equipmentSubtotalRand,
+  1969620,
+  'the equipment subtotal is the unit price taken the number of times it is bought',
+);
+assert.equal(
+  running.additionalCostsRand,
+  458240,
+  'installation and electrical work are additions, not part of the machine price',
+);
+assert.equal(running.creditsRand, 130000, 'a buy-back comes off, never on');
+assert.equal(
+  running.netInitialInvestmentRand,
+  2297860,
+  'the running total matches what the backend schedule produces from the same figures',
+);
+assert.deepEqual(
+  running.notIncluded,
+  [
+    'Piping and mechanical work',
+    'Delivery',
+    'Commissioning',
+    'Refurbishment',
+    'Other approved costs',
+    'Discount',
+  ],
+  'a line left blank is reported as not included rather than counted as zero',
+);
+assert.equal(
+  investmentRunningTotal(path =>
+    path === 'investment.unitPriceRand' ? null : pricedAnswerAt(path),
+  ).netInitialInvestmentRand,
+  null,
+  'no net investment is shown while the price of the thing itself is unknown',
+);
+
+assert.equal(priceUnavailable(pricedAnswerAt), false);
+assert.equal(
+  priceUnavailable(() => ({
+    state: 'answered',
+    value: 'price_not_available_yet',
+    note: null,
+  })),
+  true,
+  'a rep who has no price yet is recognised, so the panel can say what waits on it',
+);
+assert.equal(
+  rands(2297860).replace(/[^\d]/g, ''),
+  '2297860',
+  'a rand figure is grouped for reading without losing or gaining a digit',
+);
+assert.ok(rands(2297860).startsWith('R'), 'money is shown as rands');
+assert.equal(
+  rands(null),
+  'Not entered yet',
+  'an unentered figure says so rather than reading as nothing owed',
+);
+assert.deepEqual(
+  PRICE_DEPENDENT_FIGURES,
+  ['Net investment', 'Simple payback', 'Return on investment'],
+  'what an unpriced proposal cannot state is named plainly',
 );
 
 console.log('Bouwa guided-wizard state checks passed.');

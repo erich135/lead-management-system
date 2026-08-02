@@ -34,6 +34,8 @@ import {
 } from './components/MachinePickers';
 import { MachineEvidencePanel } from './components/MachineEvidencePanel';
 import { TariffPicker } from './components/TariffPicker';
+import { InvestmentPanel } from './components/InvestmentPanel';
+import { fetchPriceSuggestions } from './wizardApi';
 import { EquipmentPicker } from './components/EquipmentPicker';
 import {
   answeredTextForCode,
@@ -68,6 +70,7 @@ import type {
   WizardAnswerProvenance,
   WizardDraftView,
   WizardEquipmentType,
+  WizardPriceSuggestion,
   WizardStep,
   WizardStepId,
 } from './wizardTypes';
@@ -82,6 +85,7 @@ type Screen =
   | { kind: 'existing_machine'; fields: WizardFieldView[] }
   | { kind: 'proposed_machine'; fields: WizardFieldView[] }
   | { kind: 'tariff'; fields: WizardFieldView[] }
+  | { kind: 'investment'; fields: WizardFieldView[] }
   | {
       kind: 'equipment';
       equipmentType: WizardEquipmentType;
@@ -175,9 +179,15 @@ function screensForStep(
   // questions sit under the selector that answers them.
   if (step.id === 'tariff_investment') {
     const tariff = all.filter(view => view.status.section === 'tariff');
-    const rest = all.filter(view => view.status.section !== 'tariff');
+    const investment = all.filter(view => view.status.section === 'investment');
+    const rest = all.filter(
+      view =>
+        view.status.section !== 'tariff' &&
+        view.status.section !== 'investment',
+    );
     return [
       { kind: 'tariff', fields: tariff },
+      { kind: 'investment', fields: investment },
       ...fieldScreens(rest),
       { kind: 'documents' },
     ];
@@ -268,6 +278,28 @@ export function GuidedProposalWizard({
   );
   const safePage = clampPageIndex(pageIndex, screens.length);
   const screen = screens[safePage];
+
+  // Earlier prices are only fetched where they are about to be offered, so an
+  // ordinary step never pays for a query about money.
+  const [priceSuggestions, setPriceSuggestions] = useState<
+    WizardPriceSuggestion[]
+  >([]);
+  const pricingScreen = screen?.kind === 'investment';
+  useEffect(() => {
+    if (!pricingScreen) return;
+    let live = true;
+    fetchPriceSuggestions(view.draft.draftId)
+      .then(found => {
+        if (live) setPriceSuggestions(found);
+      })
+      .catch(() => {
+        // A missing price history is not a reason to stop a rep pricing.
+        if (live) setPriceSuggestions([]);
+      });
+    return () => {
+      live = false;
+    };
+  }, [pricingScreen, view.draft.draftId]);
 
   const screenFields =
     screen === undefined || !('fields' in screen) ? [] : screen.fields;
@@ -612,6 +644,34 @@ export function GuidedProposalWizard({
               ))}
             </div>
           </div>
+        ) : screen.kind === 'investment' ? (
+          <InvestmentPanel
+            fields={screen.fields}
+            intake={intake}
+            disabled={!mayEdit}
+            suggestions={priceSuggestions}
+            onUseSuggestion={suggestion =>
+              draft.answerMany([
+                [
+                  'investment.unitPriceRand',
+                  {
+                    state: 'answered',
+                    value: suggestion.unitPriceRand,
+                    note: null,
+                  },
+                ],
+                [
+                  'investment.priceSourceReference',
+                  {
+                    state: 'answered',
+                    value: suggestion.sourceLabel,
+                    note: null,
+                  },
+                ],
+              ])
+            }
+            {...answering}
+          />
         ) : screen.kind === 'equipment' ? (
           <div className="space-y-3">
             <EquipmentPicker

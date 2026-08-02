@@ -19,6 +19,7 @@ import { BouwaAirAuditWorkflowPage } from '../pages/BouwaAirAuditWorkflowPage';
 import { AdvancedTechnicalReview } from './AdvancedTechnicalReview';
 import { DraftProposalsPage } from './DraftProposalsPage';
 import { GuidedProposalWizard } from './GuidedProposalWizard';
+import { ProposalPreviewPage } from './ProposalPreviewPage';
 import { fetchWizardDraft, fetchWizardFormModel } from './wizardApi';
 import type { WizardDraftView } from './wizardTypes';
 
@@ -27,6 +28,7 @@ type Mode =
   | { kind: 'opening'; draftId: string }
   | { kind: 'wizard'; view: WizardDraftView }
   | { kind: 'technical'; view: WizardDraftView }
+  | { kind: 'preview'; draftId: string }
   | { kind: 'workspace'; draftId: string };
 
 export function BouwaGuidedProposalPage() {
@@ -127,6 +129,17 @@ export function BouwaGuidedProposalPage() {
       </div>
     );
 
+  // The preview reads the document back from the backend rather than being
+  // handed what the wizard has in memory: what a customer is shown has to be
+  // built from what was saved, not from what is still on screen.
+  if (mode.kind === 'preview')
+    return (
+      <ProposalPreviewPage
+        draftId={mode.draftId}
+        onBack={() => open(mode.draftId)}
+      />
+    );
+
   if (mode.kind === 'opening')
     return (
       <p className="flex items-center gap-2 p-6 text-sm text-slate-500">
@@ -144,6 +157,7 @@ export function BouwaGuidedProposalPage() {
         // Read back from the backend rather than handing over what is on
         // screen: the technical review is an inspection of what is stored.
         onOpenTechnicalReview={draftId => openAs(draftId, 'technical')}
+        onPreview={draftId => setMode({ kind: 'preview', draftId })}
       />
     );
 

@@ -353,6 +353,97 @@ export interface WizardPriceSuggestion {
   sourceLabel: string;
 }
 
+/* ------------------------------------------------------------------ *
+ * The proposal document itself
+ * ------------------------------------------------------------------ */
+
+export interface WizardProposalLine {
+  label: string;
+  value: string;
+  source: string | null;
+}
+
+export interface WizardProposalSection {
+  id: string;
+  title: string;
+  lines: WizardProposalLine[];
+}
+
+/** A headline figure, and where the proposal may not state it, why not. */
+export interface WizardProposalFigure {
+  label: string;
+  available: boolean;
+  unavailableReason: string | null;
+}
+
+export interface WizardProposalInvestmentLine {
+  label: string;
+  amountRand: number | null;
+  credit: boolean;
+  notIncluded: boolean;
+}
+
+export interface WizardProposalEvidenceEntry {
+  title: string;
+  organisation: string | null;
+  reference: string | null;
+  date: string | null;
+  status: string;
+}
+
+export interface WizardProposalDocument {
+  reference: string;
+  version: number;
+  issuedAt: string | null;
+  issuedByName: string | null;
+  preparedByName: string;
+  preparedAt: string;
+  proposalTypeLabel: string;
+  evidenceLevel: WizardEvidenceLevel;
+  evidenceLevelLabel: string;
+  evidenceLevelStatement: string;
+  preliminaryNotice: string | null;
+  customerName: string;
+  siteName: string | null;
+  siteAddress: string | null;
+  sections: WizardProposalSection[];
+  figures: WizardProposalFigure[];
+  investment: {
+    itemDescription: string | null;
+    unitPriceRand: number | null;
+    quantity: number | null;
+    equipmentSubtotalRand: number | null;
+    lines: WizardProposalInvestmentLine[];
+    additionalCostsRand: number | null;
+    creditsRand: number | null;
+    netInitialInvestmentRand: number | null;
+    priceStatement: string;
+  };
+  evidence: WizardProposalEvidenceEntry[];
+  limitations: string[];
+  contentFingerprint: string;
+}
+
+/** A document that was issued. The content is rebuilt, never read back. */
+export interface WizardProposalDocumentVersion {
+  version: number;
+  issuedAt: string;
+  issuedByUserId: string;
+  issuedByName: string;
+  evidenceLevel: WizardEvidenceLevel;
+  contentFingerprint: string;
+  draftRevision: number;
+}
+
+export interface WizardProposalDocumentView {
+  draftId: string;
+  revision: number;
+  document: WizardProposalDocument;
+  versions: WizardProposalDocumentVersion[];
+  /** True where the last issued version no longer matches the answers. */
+  stale: boolean;
+}
+
 export interface WizardDraft {
   draftId: string;
   schemaVersion: string;

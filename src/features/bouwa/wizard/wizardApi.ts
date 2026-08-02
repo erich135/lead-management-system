@@ -23,6 +23,7 @@ import type {
   WizardMachineRole,
   WizardMachineSelectionResult,
   WizardPriceSuggestion,
+  WizardProposalDocumentView,
   WizardProposalType,
   WizardManualBasis,
   WizardSpecEquipmentType,
@@ -474,6 +475,35 @@ export async function fetchPriceSuggestions(
     `/drafts/${encodeURIComponent(draftId)}/price-suggestions`,
   );
   return (body.suggestions as WizardPriceSuggestion[]) ?? [];
+}
+
+/* ------------------------------------------------------------------ *
+ * The proposal document
+ * ------------------------------------------------------------------ */
+
+/**
+ * The document as the customer would read it.
+ *
+ * It is always rebuilt by the backend from the stored answers, so the preview
+ * cannot show one thing while the proposal says another.
+ */
+export async function fetchProposalDocument(
+  draftId: string,
+): Promise<WizardProposalDocumentView> {
+  return (await requestJson(
+    `/drafts/${encodeURIComponent(draftId)}/document`,
+  )) as unknown as WizardProposalDocumentView;
+}
+
+/** Records that this document was issued, at the revision it was issued from. */
+export async function issueProposalVersion(
+  draftId: string,
+  revision: number,
+): Promise<WizardProposalDocumentView> {
+  return (await requestJson(
+    `/drafts/${encodeURIComponent(draftId)}/document-versions`,
+    { method: 'POST', body: JSON.stringify({ revision }) },
+  )) as unknown as WizardProposalDocumentView;
 }
 
 /* ------------------------------------------------------------------ *

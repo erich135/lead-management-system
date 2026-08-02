@@ -66,6 +66,15 @@ import {
   reviewTriage,
 } from '../src/features/bouwa/wizard/reviewTriage.ts';
 import {
+  addressBlock,
+  documentStatusLine,
+  investmentAmount,
+  issueAction,
+  longDate,
+  proposalFilename,
+  totalRows,
+} from '../src/features/bouwa/wizard/proposalDocumentPresentation.ts';
+import {
   EVIDENCE_LEVEL_ORDER,
   EVIDENCE_LEVEL_SHORT,
   EVIDENCE_LEVEL_TONE,
@@ -81,6 +90,8 @@ import type {
 } from '../src/features/bouwa/auditIntakeTypes.ts';
 import type {
   WizardEquipment,
+  WizardProposalDocument,
+  WizardProposalDocumentVersion,
   WizardStep,
 } from '../src/features/bouwa/wizard/wizardTypes.ts';
 
@@ -1711,6 +1722,164 @@ assert.equal(
   ).label,
   'Save and close',
   'a proposal that can release nothing has nothing to preview',
+);
+
+/* ------------------------------------------------------------------ *
+ * The proposal as the customer reads it
+ * ------------------------------------------------------------------ */
+
+function proposalDocument(
+  overrides: Partial<WizardProposalDocument> = {},
+): WizardProposalDocument {
+  return {
+    reference: 'BW-2026-0001',
+    version: 0,
+    issuedAt: null,
+    issuedByName: null,
+    preparedByName: 'Erich Naude',
+    preparedAt: '2026-08-02T10:00:00.000Z',
+    proposalTypeLabel: 'Manual proposal',
+    evidenceLevel: 'preliminary',
+    evidenceLevelLabel: 'Preliminary',
+    evidenceLevelStatement: 'Some of what this rests on is not yet confirmed.',
+    preliminaryNotice: 'This document is preliminary.',
+    customerName: 'Kloof Engineering',
+    siteName: 'Kloof Works',
+    siteAddress: '14 Vlei Road, Germiston',
+    sections: [],
+    figures: [],
+    investment: {
+      itemDescription: 'Atlas Copco GA55 VSD+',
+      unitPriceRand: 400000,
+      quantity: 2,
+      equipmentSubtotalRand: 800000,
+      lines: [],
+      additionalCostsRand: 45000,
+      creditsRand: 60000,
+      netInitialInvestmentRand: 785000,
+      priceStatement: 'Priced from an ARS quotation.',
+    },
+    evidence: [],
+    limitations: [],
+    contentFingerprint: 'a'.repeat(64),
+    ...overrides,
+  } as WizardProposalDocument;
+}
+
+assert.equal(
+  proposalFilename(proposalDocument()),
+  'BW-2026-0001_draft.pdf',
+  'a proposal nobody has issued is not filed as though it were sent',
+);
+assert.equal(
+  proposalFilename(proposalDocument({ version: 3 })),
+  'BW-2026-0001_v3.pdf',
+  'two versions in one folder can be told apart without opening either',
+);
+
+assert.deepEqual(
+  addressBlock(proposalDocument({ siteName: null })),
+  ['Kloof Engineering', '14 Vlei Road, Germiston'],
+  'a site nobody named leaves no empty line on the letterhead',
+);
+
+const pricedTotals = totalRows(proposalDocument());
+assert.deepEqual(
+  pricedTotals.map(row => row.label),
+  ['Equipment', 'Installation and related work', 'Credits', 'Net initial investment'],
+  'the totals read in the order a customer adds them up',
+);
+assert.ok(
+  pricedTotals[2].amount.startsWith('−'),
+  'a credit is shown as coming off the price, not added to it',
+);
+assert.equal(
+  pricedTotals[3].amount,
+  rands(785000),
+  'the printed total is the figure the backend supplied, unchanged',
+);
+
+const unpriced = totalRows(
+  proposalDocument({
+    investment: {
+      ...proposalDocument().investment,
+      equipmentSubtotalRand: null,
+      additionalCostsRand: null,
+      creditsRand: null,
+      netInitialInvestmentRand: null,
+      priceStatement: 'No price has been obtained for this proposal yet.',
+    },
+  }),
+);
+assert.deepEqual(
+  unpriced.map(row => row.amount),
+  ['Not yet priced'],
+  'an unpriced proposal says so rather than printing a total of nothing',
+);
+
+assert.equal(
+  investmentAmount({
+    label: 'Piping and mechanical work',
+    amountRand: null,
+    credit: false,
+    notIncluded: true,
+  }),
+  'Not included',
+  'a line nobody priced is never printed as zero rand',
+);
+
+assert.match(
+  documentStatusLine(proposalDocument(), false),
+  /not been issued/,
+  'a preview says plainly that the customer has not seen it',
+);
+assert.match(
+  documentStatusLine(
+    proposalDocument({ version: 2, issuedAt: '2026-08-01T08:00:00.000Z' }),
+    true,
+  ),
+  /differs from what was sent/,
+  'a changed proposal warns that the issued document no longer matches',
+);
+
+const firstIssue = issueAction(proposalDocument(), [], false);
+assert.equal(firstIssue.label, 'Issue version 1');
+assert.equal(firstIssue.enabled, true);
+
+const issuedVersion = {
+  version: 1,
+  issuedAt: '2026-08-01T08:00:00.000Z',
+  issuedByUserId: 'user-1',
+  issuedByName: 'Erich Naude',
+  evidenceLevel: 'preliminary',
+  contentFingerprint: 'a'.repeat(64),
+  draftRevision: 4,
+} as WizardProposalDocumentVersion;
+
+const unchanged = issueAction(
+  proposalDocument({ version: 1 }),
+  [issuedVersion],
+  false,
+);
+assert.equal(
+  unchanged.enabled,
+  false,
+  'a second version that would say the same thing is not offered',
+);
+assert.equal(
+  issueAction(proposalDocument({ version: 1 }), [issuedVersion], true).label,
+  'Issue version 2',
+  'a changed proposal offers the next version by number',
+);
+
+assert.equal(
+  longDate('2026-08-02T10:00:00.000Z'),
+  new Date('2026-08-02T10:00:00.000Z').toLocaleDateString('en-ZA', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }),
+  'dates are written the way a South African reader writes them',
 );
 
 console.log('Bouwa guided-wizard state checks passed.');

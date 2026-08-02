@@ -108,6 +108,8 @@ export interface AuditBlockedOutput {
   requiredStage: AuditReadinessStage;
   blockingFieldCodes: string[];
   reasons: string[];
+  /** False where this kind of proposal never produces the output at all. */
+  applicableToProposalType: boolean;
 }
 
 export interface AuditExternalEvidenceBlocker {

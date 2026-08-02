@@ -1,18 +1,23 @@
 /**
- * The last step: what this proposal can release today, and what it cannot.
+ * The last step: what this proposal can say today, and what it cannot.
  *
- * Two lists, both from the backend. An available output is available because
- * every answer it rests on is confirmed. A blocked output names the reason it
- * is blocked, in the backend's words, and nothing here softens that: an output
- * is never shown as nearly ready, and a figure is never shown with a caveat.
+ * The page used to list every blocked output in one column. On a manual
+ * proposal that put "no logger export has been parsed" beside "the tariff has
+ * not been confirmed", as though a rep had forgotten to do both. One of them
+ * was never going to happen: a manual proposal has no logger.
+ *
+ * Three lists now, and the difference between them is who has to act. What is
+ * available. What this proposal still has to answer — each with the question
+ * named and a way to go straight to it. What is waiting on somebody else, or on
+ * a calculation ARS has not accepted yet. Anything the proposal type never
+ * produces is stated once, as not applicable, and is not a gap.
  *
  * The detailed technical account — every field code, every reason, provenance,
- * uncertainty, the change trail — is not on this screen. It is one click away
- * in Advanced Technical Review, which is where somebody goes to audit the work
- * rather than to do it.
+ * uncertainty, the change trail — is one click away in Advanced Technical
+ * Review, which is where somebody goes to audit the work rather than to do it.
  */
 
-import { CheckCircle2, Lock, Microscope } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Clock, Lock, Microscope, MinusCircle } from 'lucide-react';
 
 import type {
   AuditIntakeFormModel,
@@ -21,26 +26,37 @@ import type {
 import { EvidenceLevelBadge } from '../components/EvidenceLevelBadge';
 import { WizardEvidenceGroups } from '../components/WizardEvidenceGroups';
 import { WizardReadinessPanel } from '../components/WizardReadinessSummary';
-import type { WizardEvidenceLevelAssessment } from '../wizardTypes';
+import { reviewTriage, type ReviewFix } from '../reviewTriage';
+import { questionLocations } from '../wizardState';
+import type {
+  WizardEvidenceLevelAssessment,
+  WizardStep,
+} from '../wizardTypes';
 
 export interface ReviewStepProps {
   readiness: AuditReadinessAssessment;
   evidenceLevel: WizardEvidenceLevelAssessment;
   formModel: AuditIntakeFormModel;
+  steps: WizardStep[];
+  fileParsed: boolean;
   onOpenTechnicalReview: () => void;
+  /** Takes the user to the question that would release a figure. */
+  onFixNow: (stepId: string, pageIndex: number) => void;
 }
 
 export function ReviewStep({
   readiness,
   evidenceLevel,
   formModel,
+  steps,
+  fileParsed,
   onOpenTechnicalReview,
+  onFixNow,
 }: ReviewStepProps) {
-  const outputLabel = new Map(
-    formModel.outputs.map(output => [output.id, output.label]),
-  );
-  const permitted = readiness.permittedOutputs.map(
-    id => outputLabel.get(id) ?? id,
+  const triage = reviewTriage(
+    readiness,
+    formModel,
+    questionLocations(steps, formModel, readiness, fileParsed),
   );
 
   return (
@@ -55,28 +71,21 @@ export function ReviewStep({
 
         <section>
           <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Readiness
-          </h3>
-          <WizardReadinessPanel readiness={readiness} />
-        </section>
-
-        <section>
-          <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
             Available now
           </h3>
-          {permitted.length === 0 ? (
+          {triage.available.length === 0 ? (
             <p className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-600">
               Nothing can be released yet.
             </p>
           ) : (
             <ul className="flex flex-wrap gap-1.5">
-              {permitted.map(label => (
+              {triage.available.map(output => (
                 <li
-                  key={label}
+                  key={output.outputId}
                   className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800"
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" />
-                  {label}
+                  {output.label}
                 </li>
               ))}
             </ul>
@@ -85,34 +94,102 @@ export function ReviewStep({
 
         <section>
           <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Blocked until the answers arrive
+            Still to answer on this proposal
           </h3>
-          <ul className="space-y-1.5">
-            {readiness.blockedOutputs.slice(0, 6).map(output => (
-              <li
-                key={output.outputId}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"
-              >
-                <p className="flex items-center gap-1.5 text-sm font-medium text-slate-800">
-                  <Lock className="h-3.5 w-3.5 text-slate-400" />
-                  {output.label}
-                </p>
-                <p className="mt-0.5 text-slate-600">
-                  {output.reasons[0] ?? 'Waiting on outstanding answers.'}
-                </p>
-              </li>
-            ))}
-            {readiness.blockedOutputs.length > 6 ? (
-              <li className="px-1 text-xs text-slate-500">
-                and {readiness.blockedOutputs.length - 6} more, listed in full in
-                Advanced Technical Review
-              </li>
-            ) : null}
-          </ul>
+          {triage.outstanding.length === 0 ? (
+            <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800">
+              Nothing. Every question this proposal needs has been answered.
+            </p>
+          ) : (
+            <ul className="space-y-1.5">
+              {triage.outstanding.map(blocker => (
+                <li
+                  key={blocker.outputId}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"
+                >
+                  <p className="flex items-center gap-1.5 text-sm font-medium text-slate-800">
+                    <Lock className="h-3.5 w-3.5 text-slate-400" />
+                    {blocker.label}
+                  </p>
+                  <p className="mt-0.5 text-slate-600">{blocker.reason}</p>
+                  <ul className="mt-1.5 flex flex-wrap gap-1">
+                    {blocker.fixes.slice(0, 3).map(fix => (
+                      <li key={fix.code}>
+                        <FixNowButton fix={fix} onFixNow={onFixNow} />
+                      </li>
+                    ))}
+                    {blocker.fixes.length > 3 ? (
+                      <li className="self-center text-[11px] text-slate-500">
+                        and {blocker.fixes.length - 3} more
+                      </li>
+                    ) : null}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       </div>
 
       <div className="space-y-3">
+        {triage.waiting.length === 0 ? null : (
+          <section>
+            <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Waiting on something outside this form
+            </h3>
+            <ul className="space-y-1.5">
+              {triage.waiting.map(blocker => (
+                <li
+                  key={blocker.outputId}
+                  className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs"
+                >
+                  <p className="flex items-center gap-1.5 text-sm font-medium text-amber-900">
+                    <Clock className="h-3.5 w-3.5" />
+                    {blocker.label}
+                  </p>
+                  <p className="mt-0.5 text-amber-800">{blocker.reason}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {triage.notApplicable.length === 0 ? null : (
+          <section>
+            <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Not applicable to this proposal
+            </h3>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <ul className="space-y-1">
+                {triage.notApplicable.map(output => (
+                  <li
+                    key={output.outputId}
+                    className="flex items-start gap-1.5 text-xs text-slate-600"
+                  >
+                    <MinusCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <span>
+                      <span className="font-medium text-slate-700">
+                        {output.label}
+                      </span>{' '}
+                      — not applicable
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1.5 text-[11px] text-slate-500">
+                {triage.notApplicable[0]?.reason}
+              </p>
+            </div>
+          </section>
+        )}
+
+        <section>
+          <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Readiness
+          </h3>
+          <WizardReadinessPanel readiness={readiness} />
+        </section>
+
         <section>
           <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
             Outstanding evidence
@@ -139,5 +216,25 @@ export function ReviewStep({
         </button>
       </div>
     </div>
+  );
+}
+
+function FixNowButton({
+  fix,
+  onFixNow,
+}: {
+  fix: ReviewFix;
+  onFixNow: (stepId: string, pageIndex: number) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onFixNow(fix.stepId, fix.pageIndex)}
+      title={`${fix.label} — on ${fix.stepTitle}`}
+      className="inline-flex items-center gap-1 rounded-full border border-ars-primary bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-ars-primary hover:bg-blue-100"
+    >
+      {fix.label}
+      <ArrowRight className="h-3 w-3" />
+    </button>
   );
 }

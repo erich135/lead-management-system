@@ -11,6 +11,7 @@ import {
   moveBack,
   moveForward,
   outstandingOnScreen,
+  questionLocations,
   readinessLines,
   saveStateLabel,
   stepFieldViews,
@@ -60,6 +61,10 @@ import {
   priceUnavailable,
   rands,
 } from '../src/features/bouwa/wizard/investmentPresentation.ts';
+import {
+  finishActionLabel,
+  reviewTriage,
+} from '../src/features/bouwa/wizard/reviewTriage.ts';
 import {
   EVIDENCE_LEVEL_ORDER,
   EVIDENCE_LEVEL_SHORT,
@@ -1575,6 +1580,137 @@ assert.deepEqual(
   strip.map(entry => entry.held),
   [false, true, false, false],
   'the strip marks the level the proposal actually holds',
+);
+
+/* ------------------------------------------------------------------ *
+ * The review page separates what a rep can do from what they cannot
+ * ------------------------------------------------------------------ */
+
+const triageSteps: WizardStep[] = [
+  step({
+    id: 'tariff_investment',
+    title: 'Tariff and investment',
+    fieldCodes: ['AUDIT.TARIFF.SUPPLIER', 'AUDIT.INVESTMENT.UNIT_PRICE'],
+  }),
+];
+const triageModel = formModel({
+  fields: [
+    field({ code: 'AUDIT.TARIFF.SUPPLIER', path: 'tariff.supplier' }),
+    field({
+      code: 'AUDIT.INVESTMENT.UNIT_PRICE',
+      path: 'investment.unitPriceRand',
+    }),
+  ],
+  outputs: [
+    { id: 'engineering_comparison', label: 'Engineering comparison' },
+  ] as AuditIntakeFormModel['outputs'],
+});
+const triageReadiness = {
+  ...readiness({
+    fieldStatuses: [
+      status({ code: 'AUDIT.TARIFF.SUPPLIER', section: 'tariff', label: 'Supplier' }),
+      status({
+        code: 'AUDIT.INVESTMENT.UNIT_PRICE',
+        section: 'investment',
+        label: 'Unit price',
+      }),
+    ],
+  }),
+  permittedOutputs: ['engineering_comparison'],
+  blockedOutputs: [
+    {
+      outputId: 'measured_demand',
+      label: 'Measured demand',
+      requiredStage: 'measured_audit_ready',
+      blockingFieldCodes: [],
+      reasons: ['This is a manual proposal, so nothing was logged.'],
+      applicableToProposalType: false,
+    },
+    {
+      outputId: 'annual_electricity_cost',
+      label: 'Annual electricity cost',
+      requiredStage: 'commercial_proposal_ready',
+      blockingFieldCodes: ['AUDIT.TARIFF.SUPPLIER'],
+      reasons: ['Supplier has not been answered.'],
+      applicableToProposalType: true,
+    },
+    {
+      outputId: 'site_corrected_capacity',
+      label: 'Site-corrected capacity',
+      requiredStage: 'engineering_comparison_ready',
+      blockingFieldCodes: ['AUDIT.SITE.ALTITUDE'],
+      reasons: ['CALC-049 has no accepted production implementation.'],
+      applicableToProposalType: true,
+    },
+  ],
+} as unknown as Parameters<typeof reviewTriage>[0];
+
+const triageLocations = questionLocations(
+  triageSteps,
+  triageModel,
+  triageReadiness as unknown as AuditReadinessAssessment,
+  false,
+);
+assert.equal(
+  triageLocations.get('AUDIT.TARIFF.SUPPLIER')?.stepTitle,
+  'Tariff and investment',
+  'a question is located on the step that actually asks it',
+);
+
+const triaged = reviewTriage(
+  triageReadiness,
+  triageModel as unknown as Parameters<typeof reviewTriage>[1],
+  triageLocations,
+);
+
+assert.deepEqual(
+  triaged.notApplicable.map(entry => entry.outputId),
+  ['measured_demand'],
+  'a figure this kind of proposal never produces is not listed as a gap',
+);
+assert.deepEqual(
+  triaged.outstanding.map(entry => entry.outputId),
+  ['annual_electricity_cost'],
+  'only a figure the rep can release from a question they can reach is outstanding',
+);
+assert.deepEqual(
+  triaged.waiting.map(entry => entry.outputId),
+  ['site_corrected_capacity'],
+  'a figure waiting on a calculation nobody has accepted is not the rep’s to fix',
+);
+assert.deepEqual(
+  triaged.outstanding[0]?.fixes.map(fix => ({
+    code: fix.code,
+    stepId: fix.stepId,
+    pageIndex: fix.pageIndex,
+  })),
+  [
+    {
+      code: 'AUDIT.TARIFF.SUPPLIER',
+      stepId: 'tariff_investment',
+      pageIndex: 0,
+    },
+  ],
+  '"Fix now" points at the exact page the question is asked on',
+);
+
+assert.equal(
+  finishActionLabel(triaged, true).label,
+  'Preview proposal',
+  'the last button says what it does',
+);
+assert.equal(
+  finishActionLabel(triaged, false).label,
+  'Save and close',
+  'without a preview to open, the button does not promise one',
+);
+assert.equal(
+  finishActionLabel(
+    { available: [], outstanding: [], waiting: [], notApplicable: [] },
+    true,
+  ).label,
+  'Save and close',
+  'a proposal that can release nothing has nothing to preview',
 );
 
 console.log('Bouwa guided-wizard state checks passed.');

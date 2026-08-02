@@ -91,6 +91,41 @@ export function stepFieldViews(
   return views;
 }
 
+export interface QuestionLocation {
+  stepId: string;
+  stepTitle: string;
+  pageIndex: number;
+}
+
+/**
+ * Where every question lives, so a blocked figure can send someone to it.
+ *
+ * The layout is worked out from the same step definitions, the same readiness
+ * and the same page size the wizard itself uses, so a "Fix now" cannot land on
+ * a page that is not there. A question asked on two steps resolves to the first
+ * one, which is where it is answered.
+ */
+export function questionLocations(
+  steps: readonly WizardStep[],
+  formModel: AuditIntakeFormModel,
+  readiness: AuditReadinessAssessment,
+  fileParsed: boolean,
+): Map<string, QuestionLocation> {
+  const found = new Map<string, QuestionLocation>();
+  for (const step of steps) {
+    const views = stepFieldViews(step, formModel, readiness, fileParsed);
+    views.forEach((view, index) => {
+      if (found.has(view.field.code)) return;
+      found.set(view.field.code, {
+        stepId: step.id,
+        stepTitle: step.title,
+        pageIndex: Math.floor(index / WIZARD_FIELDS_PER_PAGE),
+      });
+    });
+  }
+  return found;
+}
+
 /** The step's questions split into cards that fit one screen. */
 export function stepPages(fields: WizardFieldView[]): WizardPage[] {
   if (fields.length === 0) return [{ index: 0, fields: [] }];

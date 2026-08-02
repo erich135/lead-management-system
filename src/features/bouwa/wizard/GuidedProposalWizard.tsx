@@ -55,6 +55,7 @@ import { ProposalTypeStep } from './steps/ProposalTypeStep';
 import { ReviewStep } from './steps/ReviewStep';
 import { UploadAuditStep } from './steps/UploadAuditStep';
 import { useWizardDraft } from './useWizardDraft';
+import { finishActionLabel, reviewTriage } from './reviewTriage';
 import {
   clampPageIndex,
   fieldGroups,
@@ -62,6 +63,7 @@ import {
   moveBack,
   moveForward,
   outstandingOnScreen,
+  questionLocations,
   stepFieldViews,
   stepPages,
   type WizardFieldView,
@@ -200,6 +202,8 @@ export interface GuidedProposalWizardProps {
   formModel: AuditIntakeFormModel;
   onExit: () => void;
   onOpenTechnicalReview: (draftId: string) => void;
+  /** Opens the proposal that has been built. Absent where there is no preview. */
+  onPreview?: (draftId: string) => void;
 }
 
 export function GuidedProposalWizard({
@@ -207,6 +211,7 @@ export function GuidedProposalWizard({
   formModel,
   onExit,
   onOpenTechnicalReview,
+  onPreview,
 }: GuidedProposalWizardProps) {
   const draft = useWizardDraft(initialView);
   const { view, intake, saveState, conflict, busy, mayEdit } = draft;
@@ -301,6 +306,20 @@ export function GuidedProposalWizard({
     };
   }, [pricingScreen, view.draft.draftId]);
 
+  // The last step's own summary decides what the last button may honestly say.
+  const triage = useMemo(
+    () =>
+      reviewTriage(
+        view.readiness,
+        formModel,
+        questionLocations(steps, formModel, view.readiness, view.draft.fileParsed),
+      ),
+    [view.readiness, formModel, steps, view.draft.fileParsed],
+  );
+  const lastScreen =
+    stepIndex === steps.length - 1 && safePage === screens.length - 1;
+  const finishAction = finishActionLabel(triage, onPreview !== undefined);
+
   const screenFields =
     screen === undefined || !('fields' in screen) ? [] : screen.fields;
   const outstanding = outstandingOnScreen(
@@ -343,6 +362,16 @@ export function GuidedProposalWizard({
     [draft, steps],
   );
 
+  /** Takes the user from a blocked figure to the question that would release it. */
+  const fixNow = useCallback(
+    (targetStepId: string, targetPageIndex: number) => {
+      const index = steps.findIndex(entry => entry.id === targetStepId);
+      if (index < 0) return;
+      void goTo(index, targetPageIndex);
+    },
+    [goTo, steps],
+  );
+
   async function onContinue() {
     if (typeIncomplete) {
       setHint('Choose what this proposal is based on before continuing.');
@@ -364,7 +393,12 @@ export function GuidedProposalWizard({
     });
     if (move === null) {
       const saved = await draft.flush();
-      if (saved) onExit();
+      if (!saved) return;
+      // What the button said it would do is what happens: a preview where there
+      // is one to show, and otherwise the proposal simply closes.
+      if (onPreview !== undefined && triage.available.length > 0)
+        onPreview(view.draft.draftId);
+      else onExit();
       return;
     }
     await goTo(move.stepIndex, move.pageIndex);
@@ -482,13 +516,9 @@ export function GuidedProposalWizard({
             onContinue={() => void onContinue()}
             backDisabled={stepIndex === 0 && safePage === 0}
             continueDisabled={false}
-            continueLabel={
-              stepIndex === steps.length - 1 && safePage === screens.length - 1
-                ? 'Save & Finish'
-                : 'Save & Continue'
-            }
+            continueLabel={lastScreen ? finishAction.label : 'Save & Continue'}
             busy={busy}
-            hint={blocked ? hint : ''}
+            hint={blocked ? hint : lastScreen ? finishAction.detail : ''}
           />
         }
       >
@@ -729,6 +759,9 @@ export function GuidedProposalWizard({
             readiness={view.readiness}
             evidenceLevel={view.evidenceLevel}
             formModel={formModel}
+            steps={steps}
+            fileParsed={view.draft.fileParsed}
+            onFixNow={fixNow}
             onOpenTechnicalReview={() => {
               // The review reads the stored draft, so anything outstanding is
               // stored first rather than being absent from what it reports.

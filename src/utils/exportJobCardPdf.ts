@@ -27,6 +27,26 @@ async function waitForImages(root: HTMLElement): Promise<void> {
  * Clones the report off-screen so html2canvas is not affected by modal scroll/overflow.
  */
 export async function exportElementToPdf(element: HTMLElement, filename: string): Promise<void> {
+  await renderElementToPdf(element, filename);
+}
+
+/**
+ * The same render, handing back the bytes as well as saving the file.
+ *
+ * Used where the PDF has to be kept as well as downloaded. The bytes returned
+ * are the bytes that were saved, taken from the same document object rather
+ * than from a second render, so the file on disk and the file on the server
+ * cannot be two different renderings of the same page.
+ */
+export async function exportElementToPdfBytes(
+  element: HTMLElement,
+  filename: string
+): Promise<ArrayBuffer> {
+  const pdf = await renderElementToPdf(element, filename);
+  return pdf.output('arraybuffer');
+}
+
+async function renderElementToPdf(element: HTMLElement, filename: string): Promise<jsPDF> {
   const sourceWidth = element.scrollWidth || element.offsetWidth;
   const sourceHeight = element.scrollHeight || element.offsetHeight;
 
@@ -106,6 +126,7 @@ export async function exportElementToPdf(element: HTMLElement, filename: string)
     }
 
     pdf.save(filename);
+    return pdf;
   } finally {
     document.body.removeChild(wrapper);
   }

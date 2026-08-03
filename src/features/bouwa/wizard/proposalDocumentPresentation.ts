@@ -53,12 +53,12 @@ export function documentStatusLine(
   stale: boolean,
 ): string {
   if (document.version === 0)
-    return 'Preview. This has not been issued to the customer.';
+    return 'Preview. No version of this proposal has been generated yet.';
   if (stale)
-    return `Issued as version ${document.version} on ${longDate(
+    return `Version ${document.version} was generated on ${longDate(
       document.issuedAt,
-    )}. The answers have changed since, so this preview differs from what was sent.`;
-  return `Version ${document.version}, issued on ${longDate(
+    )}. Answers have changed since, so what is shown here is newer than that version.`;
+  return `Version ${document.version}, generated on ${longDate(
     document.issuedAt,
   )} by ${document.issuedByName ?? 'ARS'}.`;
 }
@@ -120,12 +120,15 @@ export function investmentRows(
 }
 
 /**
- * Whether issuing a version would be honest.
+ * Whether generating another version would say anything new.
  *
- * Re-issuing an unchanged document is refused by the backend, so the button is
- * disabled rather than offered and then rejected.
+ * The button is always offered under the same words, because a rep looking for
+ * it should not have to find it under a different name depending on what the
+ * proposal happens to contain. It is disabled where nothing has changed: the
+ * backend refuses a second identical version, and a version number a customer
+ * quotes has to mean that something moved.
  */
-export function issueAction(
+export function newVersionAction(
   document: WizardProposalDocument,
   versions: readonly WizardProposalDocumentVersion[],
   stale: boolean,
@@ -133,22 +136,22 @@ export function issueAction(
   const latest = versions[versions.length - 1] ?? null;
   if (latest === null)
     return {
-      label: 'Issue version 1',
+      label: 'Generate new version',
       enabled: true,
-      detail: 'Records that this document went to the customer.',
+      detail: 'Produces version 1 of this proposal.',
     };
   if (!stale)
     return {
-      label: `Version ${latest.version} issued`,
+      label: 'Generate new version',
       enabled: false,
-      detail: `Nothing has changed since version ${latest.version}. Change an answer before issuing another version.`,
+      detail: `Version ${latest.version} already says exactly this. Change an answer to generate another version.`,
     };
   return {
-    label: `Issue version ${latest.version + 1}`,
+    label: 'Generate new version',
     enabled: true,
-    detail: `The answers have changed since version ${latest.version} was issued on ${longDate(
+    detail: `Answers have changed since version ${latest.version} was generated on ${longDate(
       latest.issuedAt,
-    )}.`,
+    )}. Generating version ${latest.version + 1} records what the proposal now says.`,
   };
 }
 

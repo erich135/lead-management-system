@@ -99,8 +99,12 @@ export function ReviewStep({
             Available now
           </h3>
           {triage.available.length === 0 ? (
+            // About the figures, and only the figures. The proposal itself can
+            // still be previewed and sent; a rep reading this once took it to
+            // mean there was nothing to open.
             <p className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-600">
-              Nothing can be released yet.
+              No calculated figure can be released yet. The proposal can still
+              be previewed and sent as a preliminary document.
             </p>
           ) : (
             <ul className="flex flex-wrap gap-1.5">

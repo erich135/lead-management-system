@@ -249,6 +249,42 @@ export function ProposalDocumentView({ document }: ProposalDocumentViewProps) {
         </section>
       )}
 
+      {document.assumptions.length > 0 && (
+        <section className="mt-5 break-inside-avoid">
+          <h2 className="mb-1.5 border-b border-gray-300 pb-1 text-[11px] font-bold uppercase tracking-wide text-ars-heading">
+            What these figures assume
+          </h2>
+          <ul className="space-y-1 text-[10px] text-gray-700">
+            {document.assumptions.map(assumption => (
+              <li key={assumption.label}>
+                <span className="font-medium text-black">
+                  {assumption.label}.
+                </span>{' '}
+                {assumption.statement}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {document.outstandingEvidence.length > 0 && (
+        <section className="mt-5 break-inside-avoid">
+          <h2 className="mb-1.5 border-b border-gray-300 pb-1 text-[11px] font-bold uppercase tracking-wide text-ars-heading">
+            Still to be confirmed
+          </h2>
+          <ul className="space-y-1 text-[10px] text-gray-700">
+            {document.outstandingEvidence.map(entry => (
+              <li key={entry.label}>
+                <span className="font-medium text-black">{entry.label}.</span>{' '}
+                {entry.statement}
+                {entry.expectedBy !== null &&
+                  ` Expected by ${longDate(entry.expectedBy)}.`}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {document.limitations.length > 0 && (
         <section className="mt-5 break-inside-avoid">
           <h2 className="mb-1.5 border-b border-gray-300 pb-1 text-[11px] font-bold uppercase tracking-wide text-ars-heading">

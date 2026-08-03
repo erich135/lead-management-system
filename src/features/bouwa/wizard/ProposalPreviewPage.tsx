@@ -5,9 +5,16 @@
  * The page shows the document itself at full size rather than a summary of it,
  * because the point is to check the thing that is going out.
  *
+ * Arriving here generates the proposal's first version if it has none, so the
+ * page always has a document on it. It does not generate a second version for
+ * a proposal that already has one: previewing something twice is not two
+ * versions of it, and the rep asks for the next version deliberately.
+ *
  * The document is read from the backend on every visit and is never assembled
  * here. Print and download both capture the same rendered element, so a printed
- * page and a downloaded PDF cannot disagree.
+ * page and a downloaded PDF cannot disagree. The downloaded file is also sent
+ * back and kept against its version, so the proposal list can hand it over
+ * later and a restart does not lose it.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -16,37 +23,50 @@ import {
   ArrowLeft,
   Download,
   Loader2,
+  Microscope,
   Printer,
   Stamp,
 } from 'lucide-react';
 
-import { exportElementToPdf } from '../../../utils/exportJobCardPdf';
+import { exportElementToPdfBytes } from '../../../utils/exportJobCardPdf';
 import { ProposalDocumentView } from './components/ProposalDocumentView';
 import {
   documentStatusLine,
-  issueAction,
+  newVersionAction,
   proposalFilename,
 } from './proposalDocumentPresentation';
-import { fetchProposalDocument, issueProposalVersion } from './wizardApi';
+import {
+  ensureProposalVersion,
+  fetchProposalDocument,
+  issueProposalVersion,
+  storeProposalPdf,
+} from './wizardApi';
 import type { WizardProposalDocumentView } from './wizardTypes';
 
 interface ProposalPreviewPageProps {
   draftId: string;
   onBack: () => void;
+  onOpenTechnicalReview: () => void;
 }
 
 export function ProposalPreviewPage({
   draftId,
   onBack,
+  onOpenTechnicalReview,
 }: ProposalPreviewPageProps) {
   const [view, setView] = useState<WizardProposalDocumentView | null>(null);
   const [problem, setProblem] = useState('');
-  const [busy, setBusy] = useState<'idle' | 'pdf' | 'issuing'>('idle');
+  const [busy, setBusy] = useState<'idle' | 'pdf' | 'generating'>('idle');
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let live = true;
-    fetchProposalDocument(draftId)
+    setView(null);
+    setProblem('');
+    // The revision is read from the document itself, so a preview opened from
+    // a link works exactly as one opened from the wizard: neither has to be
+    // told what the draft was at when the page was written.
+    fetchAndEnsure(draftId)
       .then(next => {
         if (live) setView(next);
       })
@@ -63,6 +83,13 @@ export function ProposalPreviewPage({
     };
   }, [draftId]);
 
+  /**
+   * Renders the PDF and keeps it against the version it renders.
+   *
+   * The file goes to the rep either way. Storing it is what lets the proposal
+   * list offer it later, so a failure to store is reported without taking the
+   * download away from someone who already has it.
+   */
   const download = useCallback(async () => {
     const element = printRef.current?.querySelector(
       '.bouwa-proposal-document',
@@ -71,7 +98,26 @@ export function ProposalPreviewPage({
     setBusy('pdf');
     setProblem('');
     try {
-      await exportElementToPdf(element, proposalFilename(view.document));
+      const filename = proposalFilename(view.document);
+      const bytes = await exportElementToPdfBytes(element, filename);
+      if (view.document.version > 0) {
+        try {
+          const stored = await storeProposalPdf(
+            draftId,
+            view.revision,
+            view.document.version,
+            filename,
+            bytes,
+          );
+          setView({ ...view, revision: stored.revision });
+        } catch (reason: unknown) {
+          setProblem(
+            reason instanceof Error
+              ? `The PDF was downloaded but not kept on the proposal: ${reason.message}`
+              : 'The PDF was downloaded but not kept on the proposal.',
+          );
+        }
+      }
     } catch (reason: unknown) {
       setProblem(
         reason instanceof Error
@@ -81,11 +127,11 @@ export function ProposalPreviewPage({
     } finally {
       setBusy('idle');
     }
-  }, [view]);
+  }, [draftId, view]);
 
-  const issue = useCallback(async () => {
+  const generate = useCallback(async () => {
     if (view === null) return;
-    setBusy('issuing');
+    setBusy('generating');
     setProblem('');
     try {
       setView(await issueProposalVersion(draftId, view.revision));
@@ -93,7 +139,7 @@ export function ProposalPreviewPage({
       setProblem(
         reason instanceof Error
           ? reason.message
-          : 'The version could not be issued.',
+          : 'A new version could not be generated.',
       );
     } finally {
       setBusy('idle');
@@ -115,7 +161,7 @@ export function ProposalPreviewPage({
       </p>
     );
 
-  const action = issueAction(view.document, view.versions, view.stale);
+  const action = newVersionAction(view.document, view.versions, view.stale);
 
   return (
     <div className="space-y-4">
@@ -155,12 +201,20 @@ export function ProposalPreviewPage({
             </button>
             <button
               type="button"
-              onClick={issue}
+              onClick={onOpenTechnicalReview}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-ars-heading hover:bg-slate-50"
+            >
+              <Microscope className="h-4 w-4" />
+              Advanced Technical Review
+            </button>
+            <button
+              type="button"
+              onClick={generate}
               disabled={!action.enabled || busy !== 'idle'}
               title={action.detail}
               className="inline-flex items-center gap-1.5 rounded-lg bg-ars-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ars-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {busy === 'issuing' ? (
+              {busy === 'generating' ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Stamp className="h-4 w-4" />
@@ -187,6 +241,30 @@ export function ProposalPreviewPage({
   );
 }
 
+/**
+ * Reads the document, then makes sure a version of it exists.
+ *
+ * Two calls rather than one because generating needs the revision, and the
+ * revision is the draft's rather than something the caller can be trusted to
+ * still hold: a preview opened from a bookmark has no idea what the draft was
+ * saved at.
+ *
+ * Somebody reading a colleague's proposal is not allowed to generate a version
+ * of it, and that refusal is not a failure to show them the proposal. They are
+ * shown the document that was read.
+ */
+async function fetchAndEnsure(
+  draftId: string,
+): Promise<WizardProposalDocumentView> {
+  const current = await fetchProposalDocument(draftId);
+  if (current.versions.length > 0) return current;
+  try {
+    return await ensureProposalVersion(draftId, current.revision);
+  } catch {
+    return current;
+  }
+}
+
 function BackLink({ onBack }: { onBack: () => void }) {
   return (
     <button
@@ -195,7 +273,7 @@ function BackLink({ onBack }: { onBack: () => void }) {
       className="inline-flex items-center gap-1.5 text-sm font-medium text-ars-primary print:hidden"
     >
       <ArrowLeft className="h-4 w-4" />
-      Back to the proposal
+      Return to draft
     </button>
   );
 }

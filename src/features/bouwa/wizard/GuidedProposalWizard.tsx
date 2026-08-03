@@ -392,10 +392,11 @@ export function GuidedProposalWizard({
     if (move === null) {
       const saved = await draft.flush();
       if (!saved) return;
-      // What the button said it would do is what happens: a preview where there
-      // is one to show, and otherwise the proposal simply closes.
-      if (onPreview !== undefined && triage.available.length > 0)
-        onPreview(view.draft.draftId);
+      // What the button said it would do is what happens. Every proposal has a
+      // document, including one that is entirely preliminary: what it may
+      // state is printed in the document itself, and is not a reason to send
+      // the rep back to the list instead of showing it to them.
+      if (onPreview !== undefined) onPreview(view.draft.draftId);
       else onExit();
       return;
     }

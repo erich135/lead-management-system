@@ -420,8 +420,32 @@ export interface WizardProposalDocument {
     priceStatement: string;
   };
   evidence: WizardProposalEvidenceEntry[];
+  /** What the stated figures take to be true without having proved it. */
+  assumptions: WizardProposalAssumption[];
+  /** What is still to be supplied, and by when where that is recorded. */
+  outstandingEvidence: WizardProposalOutstandingEvidence[];
   limitations: string[];
   contentFingerprint: string;
+}
+
+export interface WizardProposalAssumption {
+  label: string;
+  statement: string;
+}
+
+export interface WizardProposalOutstandingEvidence {
+  label: string;
+  statement: string;
+  expectedBy: string | null;
+}
+
+/** The rendered file kept for a version, where one has been kept. */
+export interface WizardProposalDocumentPdf {
+  storageId: string;
+  filename: string;
+  byteLength: number;
+  sha256: string;
+  storedAt: string;
 }
 
 /** A document that was issued. The content is rebuilt, never read back. */
@@ -433,6 +457,7 @@ export interface WizardProposalDocumentVersion {
   evidenceLevel: WizardEvidenceLevel;
   contentFingerprint: string;
   draftRevision: number;
+  pdf: WizardProposalDocumentPdf | null;
 }
 
 export interface WizardProposalDocumentView {
@@ -517,6 +542,10 @@ export interface WizardDraftSummary {
   status: 'draft' | 'archived';
   sourceFilename: string | null;
   attachedDocumentCount: number;
+  /** The newest generated proposal document, or zero where none has been. */
+  documentVersion: number;
+  /** True where a rendered PDF is held and can be handed over as it stands. */
+  hasDocumentPdf: boolean;
   updatedAt: string;
   lastSavedByName: string | null;
   revision: number;

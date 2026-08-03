@@ -15,6 +15,8 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   Archive,
   Copy,
+  Download,
+  Eye,
   FileText,
   Loader2,
   Plus,
@@ -25,8 +27,10 @@ import {
 import {
   archiveWizardDraft,
   createWizardDraft,
+  downloadWizardFile,
   duplicateWizardDraft,
   listWizardDrafts,
+  proposalPdfDownloadUrl,
 } from './wizardApi';
 import { EVIDENCE_LEVEL_TONE } from './evidenceLevelPresentation';
 import { draftReadinessLabel, formatSavedAt } from './wizardState';
@@ -38,9 +42,14 @@ import {
 
 export interface DraftProposalsPageProps {
   onOpen: (draftId: string) => void;
+  /** Opens the generated proposal without going back through the questions. */
+  onPreview: (draftId: string) => void;
 }
 
-export function DraftProposalsPage({ onOpen }: DraftProposalsPageProps) {
+export function DraftProposalsPage({
+  onOpen,
+  onPreview,
+}: DraftProposalsPageProps) {
   const [drafts, setDrafts] = useState<WizardDraftSummary[]>([]);
   const [status, setStatus] = useState<'draft' | 'archived'>('draft');
   const [onlyMine, setOnlyMine] = useState(false);
@@ -250,6 +259,39 @@ export function DraftProposalsPage({ onOpen }: DraftProposalsPageProps) {
                   >
                     {summary.status === 'archived' ? 'View summary' : 'Continue'}
                   </button>
+                  {/* A proposal that has produced a document can be shown and
+                      handed over from here. Offered only where one exists, so
+                      the button never leads to a page with nothing on it. */}
+                  {summary.documentVersion === 0 ? null : (
+                    <button
+                      type="button"
+                      onClick={() => onPreview(summary.draftId)}
+                      title={`Open version ${summary.documentVersion} of this proposal.`}
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      Preview
+                    </button>
+                  )}
+                  {!summary.hasDocumentPdf ? null : (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        void act(() =>
+                          downloadWizardFile(
+                            proposalPdfDownloadUrl(summary.draftId),
+                            `${summary.reference}.pdf`.replace(/\s+/g, '_'),
+                          ),
+                        )
+                      }
+                      title="The PDF that was generated for this proposal."
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Download latest PDF
+                    </button>
+                  )}
                   <button
                     type="button"
                     disabled={busy}

@@ -27,7 +27,7 @@
  *   - No customer-safe export exposed.
  */
 
-import { useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Cpu, ChevronRight, FileText, Database, FolderOpen } from 'lucide-react';
 
 import { BouwaSpecLibraryPage }    from '../components/BouwaSpecLibraryPage';
@@ -102,11 +102,31 @@ function Breadcrumb({ view }: { view: BouwaTopNav }) {
 // Main shell
 // ---------------------------------------------------------------------------
 
-export function BouwaModuleShell() {
-  const [view, setView] = useState<BouwaTopNav>('proposals');
+/** Only the tabs this shell actually shows have an address. */
+const TAB_PATHS: Readonly<Partial<Record<BouwaTopNav, string>>> = {
+  proposals: '/bouwa',
+  'spec-library': '/bouwa/spec-library',
+  templates: '/bouwa/templates',
+};
 
-  function navigate(v: BouwaTopNav) {
-    setView(v);
+/**
+ * Which tab the address names. Anything under /bouwa/proposals is a proposal,
+ * so a rep who refreshes on a preview comes back to the proposals tab rather
+ * than to whichever tab the shell happened to start on.
+ */
+function tabFromPath(pathname: string): BouwaTopNav {
+  if (pathname.startsWith('/bouwa/spec-library')) return 'spec-library';
+  if (pathname.startsWith('/bouwa/templates')) return 'templates';
+  return 'proposals';
+}
+
+export function BouwaModuleShell() {
+  const location = useLocation();
+  const routerNavigate = useNavigate();
+  const view = tabFromPath(location.pathname);
+
+  function navigate(next: BouwaTopNav) {
+    routerNavigate(TAB_PATHS[next] ?? '/bouwa');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 

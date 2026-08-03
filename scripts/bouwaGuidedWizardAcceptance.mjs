@@ -374,6 +374,20 @@ async function main() {
     await new Promise(resolve => setTimeout(resolve, 2000));
     await shot(page, 'proposal-preview');
 
+    // The reported defect: pressing Preview returned to the Bouwa main screen.
+    // Landing on the list, or on an address that is still the list, is the
+    // failure itself and is worth naming rather than inferring from a later
+    // check that happens to fail.
+    const previewUrl = page.url();
+    check(
+      /\/bouwa\/proposals\/[^/]+\/preview$/.test(previewUrl),
+      'previewing goes to the proposal, not back to the Bouwa main screen',
+    );
+    check(
+      (await page.$('[data-testid="wizard-draft-list"]')) === null,
+      'the proposal list is not what a rep is shown after asking for a preview',
+    );
+
     const proposal = await pageText(page);
     check(
       proposal.includes('Acceptance Air Services'),
@@ -384,8 +398,12 @@ async function main() {
       'the proposal is rendered as a document, not as a summary',
     );
     check(
-      proposal.includes('Download PDF') && proposal.includes('Print'),
-      'the rep can print the proposal or save it as a PDF',
+      proposal.includes('Download PDF') &&
+        proposal.includes('Print') &&
+        proposal.includes('Generate new version') &&
+        proposal.includes('Return to draft') &&
+        proposal.includes('Advanced Technical Review'),
+      'the preview offers everything a rep needs to do with the proposal',
     );
     check(
       /R\s?\d/.test(proposal) || proposal.includes('Not yet priced'),
@@ -404,8 +422,17 @@ async function main() {
       'the proposal is honest about what it cannot state',
     );
     check(
-      proposalLower.split('this document is preliminary').length === 2,
+      proposalLower.split('this is a preliminary proposal').length === 2,
       'it says so once rather than warning the reader twice',
+    );
+    check(
+      proposalLower.includes('not a quotation'),
+      'a preliminary proposal is not left looking like a quotation',
+    );
+    check(
+      proposalLower.includes('still to be confirmed') ||
+        proposalLower.includes('these figures assume'),
+      'a preliminary proposal states its assumptions or what it waits on',
     );
     check(
       !(
@@ -458,31 +485,114 @@ async function main() {
       check(bytes > 20000, 'the PDF has the document in it, not an empty page');
     }
 
-    process.stdout.write('Issuing a version\n');
-    const issued = await clickByText(page, 'button', 'Issue version 1');
-    check(issued, 'the first version can be issued');
-    await new Promise(resolve => setTimeout(resolve, 2500));
-    await shot(page, 'proposal-issued');
-    const afterIssue = await pageText(page);
+    process.stdout.write('Checking the version the preview generated\n');
+    // Opening the preview generates version 1, so the rep never lands on a
+    // page with no document on it. A second version is a deliberate act.
     check(
-      afterIssue.includes('Version 1 issued'),
-      'once issued, the button stops offering an identical second version',
+      proposal.includes('Version 1'),
+      'opening the preview produced a version rather than an empty page',
     );
-    check(
-      afterIssue.includes('Version 1') && !afterIssue.includes('Preview.'),
-      'the document reports the version the customer was sent',
-    );
-
-    const disabled = await page.evaluate(() => {
+    const generateDisabled = await page.evaluate(() => {
       const button = Array.from(document.querySelectorAll('button')).find(
-        element => (element.textContent ?? '').includes('Version 1 issued'),
+        element =>
+          (element.textContent ?? '').includes('Generate new version'),
       );
       return button === undefined ? null : button.disabled;
     });
     check(
-      disabled === true,
-      're-issuing an unchanged document is refused before it is attempted',
+      generateDisabled === true,
+      'a second version saying exactly the same thing is not offered',
     );
+
+    process.stdout.write('Refreshing the browser on the preview\n');
+    await page.reload({ waitUntil: 'networkidle2' });
+    await waitForText(page, 'Download PDF');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    await shot(page, 'proposal-preview-after-refresh');
+    check(
+      page.url() === previewUrl,
+      'a refresh stays on the preview instead of returning to the list',
+    );
+    const refreshed = await pageText(page);
+    check(
+      refreshed.includes(prepared.reference) &&
+        (await page.$('.bouwa-proposal-document')) !== null,
+      'the same proposal is still on the page after the refresh',
+    );
+    check(
+      refreshed.includes('Version 1'),
+      'the version generated before the refresh is still the version shown',
+    );
+
+    process.stdout.write('Opening the preview from its address alone\n');
+    await page.goto(`${origin}/dashboard`, { waitUntil: 'networkidle2' });
+    await page.goto(previewUrl, { waitUntil: 'networkidle2' });
+    await waitForText(page, 'Download PDF');
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    check(
+      (await pageText(page)).includes(prepared.reference),
+      'the preview address opens the proposal on its own, as a link would',
+    );
+
+    process.stdout.write('The proposal list offers the document it holds\n');
+    await page.goto(PAGE_URL, { waitUntil: 'networkidle2' });
+    await waitForText(page, prepared.reference);
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    await shot(page, 'draft-list-with-document');
+    const listWithDocument = await pageText(page);
+    check(
+      listWithDocument.includes('Preview'),
+      'a proposal that has produced a document can be opened from the list',
+    );
+    check(
+      listWithDocument.includes('Download latest PDF'),
+      'the PDF generated earlier is offered from the list without reopening it',
+    );
+
+    process.stdout.write('Downloading the stored PDF from the list\n');
+    fs.rmSync(downloads, { recursive: true, force: true });
+    fs.mkdirSync(downloads, { recursive: true });
+    await clickByText(page, 'button', 'Download latest PDF');
+    const fromList = await waitForDownload(downloads);
+    check(
+      fromList !== null,
+      'the stored PDF is handed over from the list, not regenerated',
+    );
+    if (fromList !== null) {
+      const bytes = fs.statSync(path.join(downloads, fromList)).size;
+      process.stdout.write(`  file  ${fromList} (${bytes} bytes)\n`);
+      check(
+        bytes > 20000,
+        'the stored PDF holds the document rather than an empty page',
+      );
+    }
+
+    process.stdout.write('Returning to the draft from the preview\n');
+    await page.goto(previewUrl, { waitUntil: 'networkidle2' });
+    await waitForText(page, 'Return to draft');
+    check(
+      await clickByText(page, 'button', 'Return to draft'),
+      'the rep can go back to the questions from the proposal',
+    );
+    await waitForText(page, 'Review');
+    check(
+      /\/bouwa\/proposals\/[^/]+$/.test(page.url()),
+      'returning to the draft opens the proposal, not the list',
+    );
+
+    process.stdout.write('Reaching the technical review from the preview\n');
+    await page.goto(previewUrl, { waitUntil: 'networkidle2' });
+    await waitForText(page, 'Advanced Technical Review');
+    check(
+      await clickByText(page, 'button', 'Advanced Technical Review'),
+      'the engineering detail is reachable from the proposal',
+    );
+    await new Promise(resolve => setTimeout(resolve, 2500));
+    check(
+      /technical-review$/.test(page.url()),
+      'the technical review is a place of its own, reachable by address',
+    );
+    await shot(page, 'technical-review-from-preview');
 
     process.stdout.write('The other proposal type reaches the same document\n');
     const airAudit = await prepareDraft(page, API_ORIGIN, 'air_audit');
@@ -518,6 +628,41 @@ async function main() {
     check(
       !auditProposal.includes('AUDIT.') && !auditProposal.includes('air_audit'),
       'the other proposal type is also free of internal wording',
+    );
+
+    process.stdout.write('Confirming the document is held on the server\n');
+    // Read straight from the API rather than from the page. What survives a
+    // restart is what the server holds, and a browser that happens to still
+    // have the document in memory would prove nothing about that.
+    const held = await page.evaluate(async api => {
+      const token =
+        localStorage.getItem('token') ??
+        localStorage.getItem('authToken') ??
+        localStorage.getItem('accessToken') ??
+        '';
+      const response = await fetch(`${api}/api/bouwa/wizard/drafts`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) return { error: `${response.status}` };
+      const body = await response.json();
+      return { drafts: body.drafts ?? [] };
+    }, API_ORIGIN);
+    if (held.error !== undefined)
+      throw new Error(`The proposal list could not be read: ${held.error}`);
+    const stored = (held.drafts ?? []).find(
+      entry => entry.reference === prepared.reference,
+    );
+    if (stored === undefined)
+      throw new Error(
+        `${prepared.reference} is not in the list the server returned.`,
+      );
+    check(
+      stored !== undefined && stored.documentVersion >= 1,
+      'the generated version is held on the server, not only in the browser',
+    );
+    check(
+      stored !== undefined && stored.hasDocumentPdf === true,
+      'the rendered PDF is held on the server and outlives the session',
     );
   } finally {
     await browser.close();

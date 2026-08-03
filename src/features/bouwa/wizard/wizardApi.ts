@@ -495,6 +495,24 @@ export async function fetchProposalDocument(
   )) as unknown as WizardProposalDocumentView;
 }
 
+/**
+ * The document to preview, generating the first version where there is none.
+ *
+ * Opening a preview must land on something, so a proposal that has never been
+ * previewed gets its first version here. A proposal that already has one is
+ * handed the one it has: looking at a proposal twice is not two versions of
+ * it.
+ */
+export async function ensureProposalVersion(
+  draftId: string,
+  revision: number,
+): Promise<WizardProposalDocumentView> {
+  return (await requestJson(
+    `/drafts/${encodeURIComponent(draftId)}/document-versions/ensure`,
+    { method: 'POST', body: JSON.stringify({ revision }) },
+  )) as unknown as WizardProposalDocumentView;
+}
+
 /** Records that this document was issued, at the revision it was issued from. */
 export async function issueProposalVersion(
   draftId: string,
@@ -504,6 +522,44 @@ export async function issueProposalVersion(
     `/drafts/${encodeURIComponent(draftId)}/document-versions`,
     { method: 'POST', body: JSON.stringify({ revision }) },
   )) as unknown as WizardProposalDocumentView;
+}
+
+/**
+ * Keeps the rendered PDF against the version it was rendered from.
+ *
+ * Sent from here because the browser is what rendered it. The file a customer
+ * receives and the file ARS can produce again are then the same bytes rather
+ * than two renderings that have to be kept in step.
+ */
+export async function storeProposalPdf(
+  draftId: string,
+  revision: number,
+  version: number,
+  filename: string,
+  bytes: ArrayBuffer,
+): Promise<{ revision: number }> {
+  const response = await fetch(
+    wizardUrl(
+      `/drafts/${encodeURIComponent(draftId)}/document-versions/${version}/pdf`,
+    ),
+    {
+      method: 'PUT',
+      headers: authHeaders({
+        'Content-Type': 'application/pdf',
+        'X-Bouwa-Filename': encodeURIComponent(filename),
+        'X-Bouwa-Revision': String(revision),
+      }),
+      body: bytes,
+    },
+  );
+  return (await requireOk(response)) as unknown as { revision: number };
+}
+
+/** The authenticated download URL for the newest stored proposal PDF. */
+export function proposalPdfDownloadUrl(draftId: string): string {
+  return wizardUrl(
+    `/drafts/${encodeURIComponent(draftId)}/document-versions/latest/pdf`,
+  );
 }
 
 /* ------------------------------------------------------------------ *

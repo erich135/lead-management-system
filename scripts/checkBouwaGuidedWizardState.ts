@@ -66,11 +66,15 @@ import {
   reviewTriage,
 } from '../src/features/bouwa/wizard/reviewTriage.ts';
 import {
+  placeFromPath,
+  proposalPath,
+} from '../src/features/bouwa/wizard/proposalRouting.ts';
+import {
   addressBlock,
   documentStatusLine,
   investmentAmount,
   investmentRows,
-  issueAction,
+  newVersionAction,
   longDate,
   proposalFilename,
 } from '../src/features/bouwa/wizard/proposalDocumentPresentation.ts';
@@ -1806,6 +1810,8 @@ function proposalDocument(
       priceStatement: 'Priced from an ARS quotation.',
     },
     evidence: [],
+    assumptions: [],
+    outstandingEvidence: [],
     limitations: [],
     contentFingerprint: 'a'.repeat(64),
     ...overrides,
@@ -1917,20 +1923,20 @@ assert.equal(
 
 assert.match(
   documentStatusLine(proposalDocument(), false),
-  /not been issued/,
-  'a preview says plainly that the customer has not seen it',
+  /no version .* has been generated/i,
+  'a document with no version says so plainly',
 );
 assert.match(
   documentStatusLine(
     proposalDocument({ version: 2, issuedAt: '2026-08-01T08:00:00.000Z' }),
     true,
   ),
-  /differs from what was sent/,
-  'a changed proposal warns that the issued document no longer matches',
+  /newer than that version/i,
+  'a changed proposal warns that what is shown is ahead of the last version',
 );
 
-const firstIssue = issueAction(proposalDocument(), [], false);
-assert.equal(firstIssue.label, 'Issue version 1');
+const firstIssue = newVersionAction(proposalDocument(), [], false);
+assert.equal(firstIssue.label, 'Generate new version');
 assert.equal(firstIssue.enabled, true);
 
 const issuedVersion = {
@@ -1941,9 +1947,10 @@ const issuedVersion = {
   evidenceLevel: 'preliminary',
   contentFingerprint: 'a'.repeat(64),
   draftRevision: 4,
+  pdf: null,
 } as WizardProposalDocumentVersion;
 
-const unchanged = issueAction(
+const unchanged = newVersionAction(
   proposalDocument({ version: 1 }),
   [issuedVersion],
   false,
@@ -1953,10 +1960,125 @@ assert.equal(
   false,
   'a second version that would say the same thing is not offered',
 );
+assert.match(
+  unchanged.detail,
+  /already says exactly this/i,
+  'the rep is told why the button is not available rather than left guessing',
+);
+const changedSince = newVersionAction(
+  proposalDocument({ version: 1 }),
+  [issuedVersion],
+  true,
+);
 assert.equal(
-  issueAction(proposalDocument({ version: 1 }), [issuedVersion], true).label,
-  'Issue version 2',
-  'a changed proposal offers the next version by number',
+  changedSince.label,
+  'Generate new version',
+  'the button reads the same wherever a rep finds it',
+);
+assert.equal(changedSince.enabled, true);
+assert.match(
+  changedSince.detail,
+  /version 2/,
+  'the rep is told which version generating would produce',
+);
+
+/* ------------------------------------------------------------------ *
+ * Where the preview lives
+ *
+ * The defect this covers: pressing Preview returned the rep to the Bouwa
+ * main screen. A preview has to be a place with an address, so a refresh
+ * lands back on it rather than on the list.
+ * ------------------------------------------------------------------ */
+
+assert.equal(
+  proposalPath({ kind: 'preview', draftId: 'draft-7' }),
+  '/bouwa/proposals/draft-7/preview',
+  'the preview has an address of its own',
+);
+assert.equal(
+  proposalPath({ kind: 'wizard', draftId: 'draft-7' }),
+  '/bouwa/proposals/draft-7',
+  'the proposal being worked on has an address of its own',
+);
+assert.deepEqual(
+  placeFromPath('/bouwa/proposals/draft-7/preview'),
+  { kind: 'preview', draftId: 'draft-7' },
+  'refreshing on a preview comes back to that preview',
+);
+assert.deepEqual(
+  placeFromPath('/bouwa/proposals/draft-7'),
+  { kind: 'wizard', draftId: 'draft-7' },
+  'refreshing inside a proposal comes back to that proposal',
+);
+assert.deepEqual(
+  placeFromPath('/bouwa/proposals/draft-7/technical-review'),
+  { kind: 'technical', draftId: 'draft-7' },
+  'the technical review is reachable by address too',
+);
+assert.deepEqual(
+  placeFromPath('/bouwa'),
+  { kind: 'list' },
+  'the module itself opens on the list',
+);
+assert.deepEqual(
+  placeFromPath('/bouwa/proposals/'),
+  { kind: 'list' },
+  'an address naming no proposal is the list, not an error',
+);
+for (const place of [
+  { kind: 'list' } as const,
+  { kind: 'wizard', draftId: 'd' } as const,
+  { kind: 'preview', draftId: 'd' } as const,
+  { kind: 'technical', draftId: 'd' } as const,
+  { kind: 'workspace', draftId: 'd' } as const,
+])
+  assert.deepEqual(
+    placeFromPath(proposalPath(place)),
+    place,
+    'every place round-trips through its own address',
+  );
+
+/* ------------------------------------------------------------------ *
+ * What a preliminary proposal still tells the customer
+ * ------------------------------------------------------------------ */
+
+const preliminary = proposalDocument({
+  preliminaryNotice:
+    'This is a preliminary proposal. Some of what it needs has not been confirmed.',
+  assumptions: [
+    {
+      label: 'Running hours',
+      statement:
+        'Annual savings are calculated on 6 240 operating hours a year.',
+    },
+  ],
+  outstandingEvidence: [
+    {
+      label: 'Annual operating hours',
+      statement: 'The hours the machine runs decide every annual figure.',
+      expectedBy: null,
+    },
+  ],
+});
+assert.match(
+  preliminary.preliminaryNotice ?? '',
+  /preliminary proposal/i,
+  'a preliminary proposal names itself in words a customer reads',
+);
+assert.equal(
+  preliminary.assumptions.length,
+  1,
+  'the assumptions the figures rest on travel with the document',
+);
+assert.equal(
+  preliminary.outstandingEvidence.length,
+  1,
+  'what is still to be confirmed travels with the document',
+);
+assert.equal(
+  proposalFilename(preliminary),
+  'BW-2026-0001_draft.pdf',
+  'a document with no version still downloads under a name that identifies it',
 );
 
 assert.equal(

@@ -164,6 +164,18 @@ export function removeAuthToken(): void {
   localStorage.removeItem('authToken');
 }
 
+export interface BouwaPilotAccessState {
+  featureKey: 'bouwa';
+  featureEnabled: boolean;
+  isSuperAdmin: boolean;
+  allowed: boolean;
+  reason: 'allowed' | 'feature_flag_absent' | 'feature_flag_disabled' | 'super_admin_required';
+}
+
+export async function getBouwaPilotAccessState(): Promise<BouwaPilotAccessState> {
+  return apiRequest<BouwaPilotAccessState>('/api/bouwa-pilot-access');
+}
+
 /**
  * Makes an authenticated API request.
  * Automatically includes the authorization token in headers.

@@ -45,6 +45,7 @@ import {
   ClipboardList,
   Smartphone,
   ScanLine,
+  Gauge,
 } from 'lucide-react';
 import { LeadsList } from './LeadsList';
 import { LeadForm } from './LeadForm';
@@ -68,6 +69,8 @@ import { TechAppDownload } from './TechAppDownload';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { Tooltip, HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
+import { useBouwaPilotAccess } from '../features/bouwa/BouwaPilotAccessContext';
+import { canShowBouwaNavigation } from '../features/bouwa/bouwaPilotPresentation';
 
 type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady' | 'pendingReadings' | 'techApp';
 
@@ -77,6 +80,12 @@ interface DashboardProps {
 
 export function Dashboard({ view: initialView }: DashboardProps = {}) {
   const { user, signOut, isSuperAdmin, hasPermission } = useAuth();
+  const bouwaPilotAccess = useBouwaPilotAccess();
+  const showBouwaNavigation = canShowBouwaNavigation(
+    bouwaPilotAccess.state,
+    bouwaPilotAccess.loading,
+    bouwaPilotAccess.unavailable,
+  );
   const isTechnician = user?.role?.name?.toLowerCase() === 'technician';
   const canViewTechApp = isSuperAdmin || isTechnician;
   const showJobsDropdown =
@@ -862,6 +871,15 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                         {pendingReadingsCount > 9 ? '9+' : pendingReadingsCount}
                       </span>
                     )}
+                  </Link>
+                )}
+                {showBouwaNavigation && (
+                  <Link
+                    to="/bouwa"
+                    className="group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 text-[#383838] hover:text-[#f7c12b]"
+                  >
+                    <Gauge className="w-4 h-4 transition-transform group-hover:scale-110" />
+                    <span>Bouwa</span>
                   </Link>
                 )}
                 {isSuperAdmin && (

@@ -18,8 +18,9 @@
  */
 
 import { Lock, ShieldAlert, Flag } from 'lucide-react';
-import { useAuth } from '../../../contexts/AuthContext';
-import { BOUWA_PERMISSIONS, BOUWA_FEATURE_FLAG } from '../bouwaFrontendConfig';
+import { BOUWA_FEATURE_FLAG } from '../bouwaFrontendConfig';
+import { useBouwaPilotAccess } from '../BouwaPilotAccessContext';
+import { bouwaPilotPresentation } from '../bouwaPilotPresentation';
 
 interface BouwaRouteGuardProps {
   children: React.ReactNode;
@@ -49,8 +50,8 @@ function BouwaAccessDenied() {
             Access to the Bouwa Proposal Module is restricted.
           </p>
           <p className="text-sm text-red-800 mt-2">
-            Your account does not have the required permission for this module.
-            Contact your system administrator to request access.
+            This pilot requires both an enabled server feature flag and a Super Admin account.
+            Contact your system administrator if you believe the pilot should be available.
           </p>
         </div>
 
@@ -63,10 +64,8 @@ function BouwaAccessDenied() {
           <div className="flex items-start gap-2 text-sm text-ars-body">
             <Lock className="w-4 h-4 mt-0.5 shrink-0 text-slate-500" />
             <span>
-              <span className="font-medium text-ars-heading">Required permission: </span>
-              <code className="rounded bg-slate-100 border border-slate-200 px-1 py-0.5 text-xs font-mono">
-                {BOUWA_PERMISSIONS.VIEW}
-              </code>
+              <span className="font-medium text-ars-heading">Required role: </span>
+              Super Admin
             </span>
           </div>
 
@@ -99,11 +98,18 @@ function BouwaAccessDenied() {
  * This guard checks: isSuperAdmin OR hasPermission("bouwa.view").
  */
 export function BouwaRouteGuard({ children }: BouwaRouteGuardProps) {
-  const { isSuperAdmin, hasPermission } = useAuth();
+  const { state, loading, unavailable } = useBouwaPilotAccess();
+  const presentation = bouwaPilotPresentation(state, loading, unavailable);
 
-  const canAccess = isSuperAdmin || hasPermission(BOUWA_PERMISSIONS.VIEW);
+  if (presentation === 'resolving') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center" role="status">
+        <p className="text-sm text-ars-body">Checking Bouwa pilot access…</p>
+      </div>
+    );
+  }
 
-  if (!canAccess) {
+  if (presentation === 'denied') {
     return <BouwaAccessDenied />;
   }
 

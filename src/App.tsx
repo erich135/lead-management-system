@@ -11,6 +11,7 @@ import { MachineScanPage } from './components/MachineScanPage';
 import { BouwaModuleShell } from './features/bouwa/pages/BouwaModuleShell';
 import { BouwaRouteGuard } from './features/bouwa/components/BouwaRouteGuard';
 import { BouwaLoggerLocalApp } from './features/bouwa/pages/BouwaLoggerLocalApp';
+import { BouwaPilotAccessProvider } from './features/bouwa/BouwaPilotAccessContext';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -188,9 +189,11 @@ function App() {
 
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <AppContent />
-      </BrowserRouter>
+      <BouwaPilotAccessProvider>
+        <BrowserRouter>
+          <AppContent />
+        </BrowserRouter>
+      </BouwaPilotAccessProvider>
     </AuthProvider>
   );
 }

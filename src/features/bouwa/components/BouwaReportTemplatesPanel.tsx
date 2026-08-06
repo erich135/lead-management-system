@@ -26,7 +26,7 @@ import type { BouwaReportTemplate, BouwaReportSection } from '../types';
 
 const ACCESS_BLOCKED_MSG =
   'Report template data is not available yet. This may be because Bouwa ' +
-  'permissions or feature flags are not enabled.';
+  'Bouwa access requires an active Super Admin account.';
 
 // ---------------------------------------------------------------------------
 // Helpers

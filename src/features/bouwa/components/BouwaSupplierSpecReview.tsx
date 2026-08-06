@@ -81,7 +81,7 @@ function ErrorState({ message }: { message: string }) {
       <div className="space-y-1">
         <p className="text-sm font-semibold text-amber-900">Spec data unavailable.</p>
         <p className="text-sm text-amber-800">
-          The Bouwa feature flag or permissions may not be enabled on this server.
+          Bouwa Super Admin access may not be available for this account.
         </p>
         {message && (
           <p className="text-xs text-amber-700 font-mono mt-2 bg-amber-100 rounded px-2 py-1">

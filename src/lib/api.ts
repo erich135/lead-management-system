@@ -165,11 +165,14 @@ export function removeAuthToken(): void {
 }
 
 export interface BouwaPilotAccessState {
-  featureKey: 'bouwa';
-  featureEnabled: boolean;
+  featureKey?: 'bouwa';
+  /** @deprecated Informational stub; not an access condition. */
+  featureEnabled?: boolean;
   isSuperAdmin: boolean;
+  authenticated?: boolean;
   allowed: boolean;
-  reason: 'allowed' | 'feature_flag_absent' | 'feature_flag_disabled' | 'super_admin_required';
+  reason: 'allowed' | 'super_admin_required' | 'feature_flag_absent' | 'feature_flag_disabled';
+  accessMode?: 'role_only';
 }
 
 export async function getBouwaPilotAccessState(): Promise<BouwaPilotAccessState> {

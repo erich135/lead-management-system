@@ -88,8 +88,8 @@ function ErrorState({ message }: { message: string }) {
           Tariff table data is not available yet.
         </p>
         <p className="text-sm text-amber-800">
-          This may be because Bouwa permissions or the Bouwa feature flag are not yet enabled on
-          this server. Once enabled, this list will populate automatically.
+          This may be because Bouwa Super Admin access is required on this server.
+          Once available, this list will populate automatically.
         </p>
         {message && (
           <p className="text-xs text-amber-700 font-mono mt-2 bg-amber-100 rounded px-2 py-1">

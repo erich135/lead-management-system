@@ -24,7 +24,7 @@ import type { BouwaAssumption } from '../types';
 
 const ACCESS_BLOCKED_MSG =
   'Assumption data is not available yet. This may be because Bouwa ' +
-  'permissions or feature flags are not enabled.';
+  'Bouwa access requires an active Super Admin account.';
 
 // ---------------------------------------------------------------------------
 // Helpers

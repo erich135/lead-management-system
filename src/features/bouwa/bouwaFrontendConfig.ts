@@ -21,9 +21,8 @@ import { FEATURE_FLAGS } from '../../constants/features';
 export const BOUWA_MODULE_KEY = 'bouwa' as const;
 
 /**
- * Backend feature flag key that gates access to this module.
- * Must be enabled (isEnabled: true) in the FeatureFlag collection before
- * the module is accessible.
+ * Historical module feature-flag key. Bouwa access is role-only (Super Admin)
+ * and does not require this flag to be enabled.
  */
 export const BOUWA_FEATURE_FLAG = FEATURE_FLAGS.BOUWA;
 

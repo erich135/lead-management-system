@@ -1,15 +1,11 @@
 /**
  * BouwaAccessNotice
  *
- * Explains what is required to access the Bouwa module and notes that
- * customer-facing outputs remain disabled.
- *
- * Purely presentational — no API calls.
- * Phase 4C-2: shell only.
+ * Explains Super Admin role access and notes that customer-facing outputs
+ * remain disabled. Purely presentational — no API calls.
  */
 
-import { Lock, ShieldAlert, Flag } from 'lucide-react';
-import { BOUWA_FEATURE_FLAG, BOUWA_VIEW_PERMISSION } from '../bouwaFrontendConfig';
+import { Lock, ShieldAlert } from 'lucide-react';
 
 export function BouwaAccessNotice() {
   return (
@@ -21,24 +17,10 @@ export function BouwaAccessNotice() {
 
       <ul className="space-y-3 text-sm text-amber-900">
         <li className="flex items-start gap-2">
-          <Flag className="w-4 h-4 mt-0.5 shrink-0 text-amber-700" />
-          <span>
-            <span className="font-medium">Feature flag required: </span>
-            <code className="rounded bg-amber-100 border border-amber-200 px-1 py-0.5 text-xs font-mono">
-              {BOUWA_FEATURE_FLAG}
-            </code>
-            {' '}— must be enabled by a super admin before this module is accessible.
-          </span>
-        </li>
-
-        <li className="flex items-start gap-2">
           <Lock className="w-4 h-4 mt-0.5 shrink-0 text-amber-700" />
           <span>
-            <span className="font-medium">Permission required: </span>
-            <code className="rounded bg-amber-100 border border-amber-200 px-1 py-0.5 text-xs font-mono">
-              {BOUWA_VIEW_PERMISSION}
-            </code>
-            {' '}— users must have this permission assigned through their role.
+            <span className="font-medium">Required role: </span>
+            Super Admin — Bouwa is available only to authorised Super Admin users.
           </span>
         </li>
 

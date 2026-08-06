@@ -204,7 +204,7 @@ export function BouwaMachineSpecLibrary({
               Machine specification data is not available.
             </p>
             <p className="text-sm text-amber-800">
-              Confirm the Bouwa feature flag is enabled and your account is Super Admin.
+              Confirm your account is an active Super Admin and try again.
             </p>
             <p className="text-xs text-amber-700 font-mono mt-2 bg-amber-100 rounded px-2 py-1">
               {error}

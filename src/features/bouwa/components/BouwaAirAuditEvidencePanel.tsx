@@ -27,7 +27,7 @@ import type { BouwaAuditSession, BouwaEvidenceFile } from '../types';
 
 const ACCESS_BLOCKED_MSG =
   'Air audit evidence data is not available yet. This may be because Bouwa ' +
-  'permissions or feature flags are not enabled on this server.';
+  'Bouwa access requires an active Super Admin account.';
 
 // ---------------------------------------------------------------------------
 // Helpers

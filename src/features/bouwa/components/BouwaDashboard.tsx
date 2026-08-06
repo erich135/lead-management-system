@@ -1,16 +1,17 @@
 /**
  * BouwaDashboard
  *
- * Phase 4D-15: Landing dashboard for the Air Audit Proposal Builder.
- * The user immediately sees "I am creating an air audit savings proposal."
- *
- * Static/demo data — no API calls, no DB writes.
+ * Landing dashboard for the Air Audit Proposal Builder.
+ * Machine Spec Library count is loaded from the consolidated library API.
+ * Other summary cards remain illustrative until those modules are wired.
  */
 
+import { useEffect, useState } from 'react';
 import {
   Activity, Wind, FileText, Plus, ArrowRight, ChevronRight, Cpu,
   BarChart3, CheckCircle2, Zap,
 } from 'lucide-react';
+import { browseSpecLibrary } from '../wizard/wizardApi';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -30,14 +31,13 @@ interface BouwaDashboardProps {
 }
 
 // ---------------------------------------------------------------------------
-// Demo data
+// Demo data (non-library cards remain illustrative)
 // ---------------------------------------------------------------------------
 
-const STATS = [
-  { label: 'Bouwa Specs Loaded',       value: '75',  color: 'text-blue-700',  bg: 'bg-blue-50 border-blue-200',  icon: <Cpu      className="w-5 h-5 text-blue-500" /> },
-  { label: 'Draft Proposals',          value: '3',   color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200',icon: <FileText className="w-5 h-5 text-amber-500" /> },
-  { label: 'Completed Comparisons',    value: '2',   color: 'text-green-700', bg: 'bg-green-50 border-green-200',icon: <BarChart3 className="w-5 h-5 text-green-500" /> },
-  { label: 'Reports Generated',        value: '2',   color: 'text-purple-700',bg: 'bg-purple-50 border-purple-200',icon: <Zap     className="w-5 h-5 text-purple-500" /> },
+const ILLUSTRATIVE_STATS = [
+  { label: 'Draft Proposals',          value: '—',  color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200',icon: <FileText className="w-5 h-5 text-amber-500" /> },
+  { label: 'Completed Comparisons',    value: '—',  color: 'text-green-700', bg: 'bg-green-50 border-green-200',icon: <BarChart3 className="w-5 h-5 text-green-500" /> },
+  { label: 'Reports Generated',        value: '—',  color: 'text-purple-700',bg: 'bg-purple-50 border-purple-200',icon: <Zap     className="w-5 h-5 text-purple-500" /> },
 ];
 
 const RECENT_PROPOSALS = [
@@ -87,6 +87,32 @@ function LocalhostBadge() {
 // ---------------------------------------------------------------------------
 
 export function BouwaDashboard({ onNavigate }: BouwaDashboardProps) {
+  const [activeSpecCount, setActiveSpecCount] = useState<string>('…');
+
+  useEffect(() => {
+    let cancelled = false;
+    browseSpecLibrary({ equipmentType: 'air_compressor', limit: 1, offset: 0 })
+      .then((page) => {
+        if (!cancelled) setActiveSpecCount(String(page.total));
+      })
+      .catch(() => {
+        if (!cancelled) setActiveSpecCount('—');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const stats = [
+    {
+      label: 'Active Machine Specs',
+      value: activeSpecCount,
+      color: 'text-blue-700',
+      bg: 'bg-blue-50 border-blue-200',
+      icon: <Cpu className="w-5 h-5 text-blue-500" />,
+    },
+    ...ILLUSTRATIVE_STATS,
+  ];
   return (
     <div className="space-y-8">
 
@@ -142,7 +168,7 @@ export function BouwaDashboard({ onNavigate }: BouwaDashboardProps) {
 
       {/* ── Stats row ────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {STATS.map((s) => (
+        {stats.map((s) => (
           <div key={s.label} className={`rounded-xl border ${s.bg} px-4 py-4 flex items-center gap-3`}>
             {s.icon}
             <div>
@@ -202,7 +228,7 @@ export function BouwaDashboard({ onNavigate }: BouwaDashboardProps) {
         <QuickLinkCard
           icon={<Cpu className="w-5 h-5 text-blue-600" />}
           title="Machine Spec Library"
-          desc="75 Bouwa specs + manufacturer reference specs"
+          desc="Consolidated active library (live count)"
           bg="bg-blue-50 border-blue-200"
           onClick={() => onNavigate('spec-library')}
         />

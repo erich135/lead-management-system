@@ -367,6 +367,7 @@ export interface SpecLibraryQuery {
   search?: string;
   manufacturer?: string;
   controlMethod?: string;
+  sourceType?: string;
   minimumPressureBarG?: number;
   maximumPressureBarG?: number;
   minimumFadM3PerMin?: number;
@@ -374,6 +375,21 @@ export interface SpecLibraryQuery {
   minimumPowerKw?: number;
   maximumPowerKw?: number;
   limit?: number;
+  offset?: number;
+}
+
+export interface SpecLibrarySourceBreakdownEntry {
+  sourceType: string;
+  count: number;
+  label: string;
+}
+
+export interface SpecLibraryBrowseResult {
+  records: WizardSpecRecord[];
+  total: number;
+  offset: number;
+  limit: number;
+  sourceBreakdown: SpecLibrarySourceBreakdownEntry[];
 }
 
 function queryString(params: Record<string, unknown>): string {
@@ -393,13 +409,30 @@ function queryString(params: Record<string, unknown>): string {
 export async function searchSpecLibrary(
   query: SpecLibraryQuery = {},
 ): Promise<WizardSpecRecord[]> {
+  const body = await browseSpecLibrary(query);
+  return body.records;
+}
+
+/**
+ * Browse/paginated library read used by the Machine Spec Library screen.
+ * Returns authoritative totals and provenance breakdown from the server.
+ */
+export async function browseSpecLibrary(
+  query: SpecLibraryQuery = {},
+): Promise<SpecLibraryBrowseResult> {
   const body = await requestJson(
     `/spec-library${queryString({
       ...query,
       equipmentType: query.equipmentType ?? 'air_compressor',
     })}`,
   );
-  return (body.records as WizardSpecRecord[]) ?? [];
+  return {
+    records: (body.records as WizardSpecRecord[]) ?? [],
+    total: typeof body.total === 'number' ? body.total : ((body.records as WizardSpecRecord[]) ?? []).length,
+    offset: typeof body.offset === 'number' ? body.offset : Number(query.offset ?? 0),
+    limit: typeof body.limit === 'number' ? body.limit : Number(query.limit ?? 25),
+    sourceBreakdown: (body.sourceBreakdown as SpecLibrarySourceBreakdownEntry[]) ?? [],
+  };
 }
 
 export async function listSpecLibraryManufacturers(

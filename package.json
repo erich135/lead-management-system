@@ -12,6 +12,7 @@
     "verify:sales-report-numbers": "node --experimental-strip-types scripts/verify-sales-report-numbers.ts",
     "test:bouwa-acceptance": "node scripts/bouwaBrowserAcceptance.mjs",
     "test:bouwa-contracts": "node scripts/checkBouwaLocalUiContracts.mjs",
+    "test:bouwa-spec-library-page": "node scripts/checkBouwaSpecLibraryPage.mjs",
     "test:bouwa-intake": "set \"TS_NODE_PROJECT=tsconfig.app.json\" && node --loader ts-node/esm/transpile-only scripts/checkBouwaAuditIntakeState.ts",
     "test:bouwa-provenance": "set \"TS_NODE_PROJECT=tsconfig.app.json\" && node --loader ts-node/esm/transpile-only scripts/checkBouwaProvenancePresentation.ts",
     "test:bouwa-state": "set \"TS_NODE_PROJECT=tsconfig.app.json\" && node --loader ts-node/esm/transpile-only scripts/checkBouwaProposalEditorState.ts",

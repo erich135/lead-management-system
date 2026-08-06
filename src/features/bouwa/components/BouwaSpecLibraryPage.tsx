@@ -34,7 +34,6 @@ export function BouwaSpecLibraryPage() {
     setSummaryError(null);
     try {
       const page = await browseSpecLibrary({
-        equipmentType: 'air_compressor',
         limit: 1,
         offset: 0,
       });

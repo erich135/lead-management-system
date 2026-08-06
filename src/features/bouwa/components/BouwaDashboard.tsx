@@ -91,7 +91,7 @@ export function BouwaDashboard({ onNavigate }: BouwaDashboardProps) {
 
   useEffect(() => {
     let cancelled = false;
-    browseSpecLibrary({ equipmentType: 'air_compressor', limit: 1, offset: 0 })
+    browseSpecLibrary({ limit: 1, offset: 0 })
       .then((page) => {
         if (!cancelled) setActiveSpecCount(String(page.total));
       })

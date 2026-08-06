@@ -31,6 +31,24 @@ if (page.includes("badge: '75'") || page.includes("75 Bouwa specs")) {
 if (!page.includes("browseSpecLibrary")) {
   failures.push("BouwaSpecLibraryPage does not call browseSpecLibrary.");
 }
+if (page.includes("equipmentType: 'air_compressor'") || page.includes('equipmentType: "air_compressor"')) {
+  failures.push("BouwaSpecLibraryPage must not hard-filter the active library to air_compressor.");
+}
+if (library.includes("equipmentType: 'air_compressor'") || library.includes('equipmentType: "air_compressor"')) {
+  failures.push("BouwaMachineSpecLibrary must not hard-filter the active library to air_compressor.");
+}
+if (!library.includes("All equipment") && !library.includes("equipmentType")) {
+  failures.push("BouwaMachineSpecLibrary should allow browsing all equipment or filtering explicitly.");
+}
+if (api.includes("equipmentType: query.equipmentType ?? 'air_compressor'") && api.includes("browseSpecLibrary")) {
+  // browse must not default; searchSpecLibrary may still default.
+  const browseBlock = api.slice(api.indexOf("export async function browseSpecLibrary"));
+  const browseEnd = browseBlock.indexOf("export async function listSpecLibraryManufacturers");
+  const browseFn = browseEnd >= 0 ? browseBlock.slice(0, browseEnd) : browseBlock;
+  if (browseFn.includes("?? 'air_compressor'") || browseFn.includes('?? "air_compressor"')) {
+    failures.push("browseSpecLibrary must not default equipmentType to air_compressor.");
+  }
+}
 if (library.includes("listBouwaMachineSpecs")) {
   failures.push("BouwaMachineSpecLibrary still calls legacy listBouwaMachineSpecs.");
 }

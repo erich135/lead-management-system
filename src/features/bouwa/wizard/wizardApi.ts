@@ -403,18 +403,22 @@ function queryString(params: Record<string, unknown>): string {
 }
 
 /**
- * Searches the library. The equipment type is always sent, so a compressor
- * proposal cannot fall back to a search that would return dryers.
+ * Wizard machine search. Always scopes to an equipment class (default
+ * air_compressor) so a compressor proposal cannot quietly offer dryers.
  */
 export async function searchSpecLibrary(
   query: SpecLibraryQuery = {},
 ): Promise<WizardSpecRecord[]> {
-  const body = await browseSpecLibrary(query);
+  const body = await browseSpecLibrary({
+    ...query,
+    equipmentType: query.equipmentType ?? 'air_compressor',
+  });
   return body.records;
 }
 
 /**
  * Browse/paginated library read used by the Machine Spec Library screen.
+ * Omitting equipmentType returns every active authoritative record.
  * Returns authoritative totals and provenance breakdown from the server.
  */
 export async function browseSpecLibrary(
@@ -423,7 +427,6 @@ export async function browseSpecLibrary(
   const body = await requestJson(
     `/spec-library${queryString({
       ...query,
-      equipmentType: query.equipmentType ?? 'air_compressor',
     })}`,
   );
   return {

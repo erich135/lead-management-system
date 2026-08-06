@@ -19,13 +19,23 @@ import {
 import {
   browseSpecLibrary,
 } from '../wizard/wizardApi';
-import type { WizardSpecRecord } from '../wizard/wizardTypes';
+import type { WizardSpecEquipmentType, WizardSpecRecord } from '../wizard/wizardTypes';
 
 const SOURCE_FILTERS: Array<{ id: string; label: string }> = [
   { id: '', label: 'All sources' },
   { id: 'cagi_directory', label: 'CAGI directory' },
   { id: 'cagi_verified_datasheet', label: 'CAGI / pack verified' },
   { id: 'oem_datasheet', label: 'OEM datasheet' },
+];
+
+const EQUIPMENT_FILTERS: Array<{ id: string; label: string }> = [
+  { id: '', label: 'All equipment' },
+  { id: 'air_compressor', label: 'Air compressor' },
+  { id: 'air_dryer', label: 'Air dryer' },
+  { id: 'air_receiver', label: 'Air receiver' },
+  { id: 'filtration', label: 'Filtration' },
+  { id: 'reference_drawing', label: 'Reference drawing' },
+  { id: 'other', label: 'Other' },
 ];
 
 function na(value: unknown, unit?: string): string {
@@ -49,6 +59,11 @@ function sourceLabel(record: WizardSpecRecord): string {
   return title || org || record.source?.sourceType || 'Not available';
 }
 
+function equipmentLabel(value: string | undefined): string {
+  const match = EQUIPMENT_FILTERS.find((option) => option.id === value);
+  return match?.label || value || 'Not available';
+}
+
 interface BouwaMachineSpecLibraryProps {
   pageSize?: number;
 }
@@ -62,6 +77,7 @@ export function BouwaMachineSpecLibrary({
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sourceType, setSourceType] = useState('');
+  const [equipmentType, setEquipmentType] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,16 +88,18 @@ export function BouwaMachineSpecLibrary({
 
   useEffect(() => {
     setOffset(0);
-  }, [debouncedSearch, sourceType]);
+  }, [debouncedSearch, sourceType, equipmentType]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const page = await browseSpecLibrary({
-        equipmentType: 'air_compressor',
         search: debouncedSearch || undefined,
         sourceType: sourceType || undefined,
+        equipmentType: equipmentType
+          ? (equipmentType as WizardSpecEquipmentType)
+          : undefined,
         limit: pageSize,
         offset,
       });
@@ -94,7 +112,7 @@ export function BouwaMachineSpecLibrary({
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, sourceType, offset, pageSize]);
+  }, [debouncedSearch, sourceType, equipmentType, offset, pageSize]);
 
   useEffect(() => {
     void load();
@@ -139,6 +157,17 @@ export function BouwaMachineSpecLibrary({
             className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-ars-primary/30"
           />
         </div>
+        <select
+          value={equipmentType}
+          onChange={(event) => setEquipmentType(event.target.value)}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+        >
+          {EQUIPMENT_FILTERS.map((option) => (
+            <option key={option.id || 'all-equipment'} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+        </select>
         <select
           value={sourceType}
           onChange={(event) => setSourceType(event.target.value)}
@@ -231,6 +260,7 @@ export function BouwaMachineSpecLibrary({
                 <tr className="bg-slate-50 border-b border-slate-200 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   <th className="px-4 py-3 whitespace-nowrap">Manufacturer</th>
                   <th className="px-4 py-3 whitespace-nowrap">Model</th>
+                  <th className="px-4 py-3 whitespace-nowrap">Equipment</th>
                   <th className="px-4 py-3 whitespace-nowrap">Control</th>
                   <th className="px-4 py-3 whitespace-nowrap text-right">Pressure</th>
                   <th className="px-4 py-3 whitespace-nowrap text-right">FAD</th>
@@ -250,6 +280,9 @@ export function BouwaMachineSpecLibrary({
                       {record.modelVariant && (
                         <div className="text-xs text-slate-500">{record.modelVariant}</div>
                       )}
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-700">
+                      {equipmentLabel(record.equipmentType)}
                     </td>
                     <td className="px-4 py-2.5 text-slate-700">{na(record.controlMethod)}</td>
                     <td className="px-4 py-2.5 text-right">

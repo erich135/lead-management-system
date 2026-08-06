@@ -5,11 +5,18 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:bouwa": "vite --host 127.0.0.1",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json",
-    "verify:sales-report-numbers": "node --experimental-strip-types scripts/verify-sales-report-numbers.ts"
+    "verify:sales-report-numbers": "node --experimental-strip-types scripts/verify-sales-report-numbers.ts",
+    "test:bouwa-acceptance": "node scripts/bouwaBrowserAcceptance.mjs",
+    "test:bouwa-contracts": "node scripts/checkBouwaLocalUiContracts.mjs",
+    "test:bouwa-intake": "set \"TS_NODE_PROJECT=tsconfig.app.json\" && node --loader ts-node/esm/transpile-only scripts/checkBouwaAuditIntakeState.ts",
+    "test:bouwa-provenance": "set \"TS_NODE_PROJECT=tsconfig.app.json\" && node --loader ts-node/esm/transpile-only scripts/checkBouwaProvenancePresentation.ts",
+    "test:bouwa-state": "set \"TS_NODE_PROJECT=tsconfig.app.json\" && node --loader ts-node/esm/transpile-only scripts/checkBouwaProposalEditorState.ts",
+    "test:bouwa-wizard": "set \"TS_NODE_PROJECT=tsconfig.app.json\" && node --loader ts-node/esm/transpile-only scripts/checkBouwaGuidedWizardState.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
     "@types/leaflet": "^1.9.21",

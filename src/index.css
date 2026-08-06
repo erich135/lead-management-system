@@ -135,3 +135,56 @@
     page-break-inside: avoid;
   }
 }
+
+/* Bouwa proposal — print
+ *
+ * Printing sends the proposal and nothing else: the surrounding application
+ * chrome, the wizard toolbar and the preview's grey mount are all hidden, so
+ * what leaves the printer is the same page the customer receives by email.
+ */
+@media print {
+  body:has(.bouwa-proposal-print-root) * {
+    visibility: hidden;
+  }
+
+  /* Both selectors carry the :has() prefix so that bringing the proposal back
+   * outranks the rule that hid everything, which is more specific than a bare
+   * class would be. */
+  body:has(.bouwa-proposal-print-root) .bouwa-proposal-print-root,
+  body:has(.bouwa-proposal-print-root) .bouwa-proposal-print-root * {
+    visibility: visible;
+  }
+
+  .bouwa-proposal-print-root {
+    position: absolute !important;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: auto !important;
+    z-index: 99999;
+    background: white !important;
+    overflow: visible !important;
+    display: block !important;
+    padding: 0 !important;
+  }
+
+  .bouwa-proposal-print-root > * {
+    display: block !important;
+    box-shadow: none !important;
+  }
+
+  .bouwa-proposal-document {
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+    page-break-inside: auto;
+  }
+
+  .bouwa-proposal-document section {
+    page-break-inside: avoid;
+  }
+
+  .bouwa-proposal-document tr {
+    page-break-inside: avoid;
+  }
+}

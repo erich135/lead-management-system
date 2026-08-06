@@ -222,6 +222,11 @@ export interface ValidationItem {
 }
 
 // ── Optimiser ───────────────────────────────────────────────────────────────
+//
+// Load-sharing optimisation is not implemented. The draft engine that used this
+// shape was retired: it applied a 14% VSD credit with no accepted derivation and
+// left the optimised scenario at zero cost. The shape stays as the record of
+// what an accepted optimiser would need to return.
 
 export interface OptimiserScenario {
   label: string;

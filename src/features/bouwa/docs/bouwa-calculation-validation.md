@@ -1,10 +1,56 @@
 # Bouwa Proposal Builder — Calculation Validation
-## Phase 4D-19
+## Phase 4D-19 / 4D-21B
 
 **App:** `BouwaNewProposalWizard.tsx` + `src/features/bouwa/calculations/`  
-**Reference:** `ARS Calculators/Ingrain L160.xlsx`  
-**Generated:** Phase 4D-17–20  
-**Status:** Draft — pending ARS/Bouwa confirmation of source conflicts
+**Reference:** `ARS Calculators/Ingrain L160.xlsx` (Scenario 1) + `Element Six BOUWA SVC RS132 KW Updated - March 2025.xlsx` (Scenario 2)  
+**Generated:** Phase 4D-17–20, updated Phase 4D-21B  
+**Status:** Scenario 1 (Ingrain) — draft pending confirmation. Scenario 2 (Element Six) — implemented with John-confirmed values (July 2026).
+
+---
+
+## Scenario 2 — Element Six (Phase 4D-21B)
+
+Reference module: `elementSixReferenceScenario.ts`  
+Validation function: `runE6Validation()` in `validationEngine.ts`  
+UI: Step 11 scenario selector — switch between Ingrain / Element Six
+
+### Key confirmed values (John, July 2026)
+
+| Field | Value | Source |
+|---|---|---|
+| Customer / site | Element Six | Workbook / offer document |
+| Existing machine | Ingersoll Rand / CompAir ML250 (250 kW, 94% motor eff.) | Workbook Results!B4, B10 |
+| Proposed model | BOUWA SVC-RS132A-II | Workbook Results!C1 |
+| "A" suffix meaning | Air Cooled | John confirmed July 2026 |
+| Base model | SVC-RS132-II | John confirmed July 2026 |
+| Sea-level FAD | 30.1 m³/min | Workbook Results!C2 — NOT site-effective |
+| Site altitude | 5,337 ft (~1,627 m) | Effect Output calc!D63 |
+| Altitude loss | 20% | John confirmed July 2026 |
+| Corrected site FAD | **24.0 m³/min** | John confirmed: 30.1 × 0.80 = 24.08 ≈ 24.0 |
+| ML250 annual cost | R1,277,799 | Results!F29 |
+| Bouwa annual cost | R963,499 | Results!G29 |
+| VSD credit (14%) | R134,890 | Results!G30 |
+| Annual saving | R449,190 | Results!G31 |
+| Machine price (1×) | R838,350 | ROI!B5 |
+| Net investment | R518,350 | ROI!B12 |
+| ROI % | 86.66% | ROI!B11 |
+| Payback | 13.85 months | ROI!C13 |
+| Buy-back total | R320,000 | Offer + workbook (total agrees; per-unit split differs) |
+| Buy-back unit 1 | ML250 R220,000 incl. VAT | Offer document (John confirmed) |
+| Buy-back unit 2 | R132i R100,000 incl. VAT | Offer document (John confirmed) |
+| Workbook buy-back split | R200,000 + R120,000 | ROI!B7+B8 — differs from offer split |
+
+### Altitude correction (critical)
+- 30.1 m³/min = sea-level FAD (manufacturer rated). **Do not use as site-effective output.**
+- At 5,337 ft and 20% loss: corrected site output = **24.0 m³/min**.
+- Altitude correction engine (`altitudeCorrection.ts`) formula: `sitePressureBar = 1.013 − (5337 × 0.001 / 30) = 0.8221 bar` (workbook uses a slightly different factor giving 0.8351 bar at same altitude). John confirmed 20% loss as the agreed site correction.
+
+### Buy-back discrepancy (visible in app)
+Both the offer document and workbook total R320,000. The per-unit split differs:
+- **Offer (confirmed):** ML250 R220,000 + R132i R100,000
+- **Workbook:** Machine 1 R200,000 + Machine 2 R120,000
+
+Both are stored in the scenario module. The discrepancy is shown in the validation table (buy-back unit rows). Net investment (R518,350) is the same under either split.
 
 ---
 

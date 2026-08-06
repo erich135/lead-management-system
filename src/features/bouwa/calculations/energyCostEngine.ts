@@ -22,6 +22,42 @@ import type { TouRates, AnnualDayCalendar } from './bouwaTypes';
 /** VSD saving credit % applied in the workbook (14% of gross proposed cost) */
 export const WORKBOOK_VSD_CREDIT_PCT = 0.14;
 
+export interface FirstPrinciplesAnnualCostResult {
+  annualEnergyKwh: number;
+  annualEnergyCostR: number;
+}
+
+/** Flat-rate annual energy and cost from effective electrical input and declared hours. */
+export function calcFirstPrinciplesAnnualCost(
+  effectiveInputKw: number,
+  annualOperatingHours: number,
+  energyRateRPerKwh: number,
+): FirstPrinciplesAnnualCostResult | null {
+  if (
+    !Number.isFinite(effectiveInputKw) || effectiveInputKw <= 0 ||
+    !Number.isFinite(annualOperatingHours) || annualOperatingHours <= 0 ||
+    !Number.isFinite(energyRateRPerKwh) || energyRateRPerKwh < 0
+  ) return null;
+  const annualEnergyKwh = calcAnnualKwh(effectiveInputKw, annualOperatingHours);
+  return { annualEnergyKwh, annualEnergyCostR: annualEnergyKwh * energyRateRPerKwh };
+}
+
+/** Comparable current-versus-proposed savings with no implicit VSD or workbook credit. */
+export function calcFirstPrinciplesSavings(
+  currentAnnualEnergyKwh: number,
+  proposedAnnualEnergyKwh: number,
+  currentAnnualCostR: number,
+  proposedAnnualCostR: number,
+): { annualEnergySavingKwh: number; annualCostSavingR: number; savingPct: number } | null {
+  if ([currentAnnualEnergyKwh, proposedAnnualEnergyKwh, currentAnnualCostR, proposedAnnualCostR].some(value => !Number.isFinite(value)) || currentAnnualCostR <= 0) return null;
+  const annualCostSavingR = currentAnnualCostR - proposedAnnualCostR;
+  return {
+    annualEnergySavingKwh: currentAnnualEnergyKwh - proposedAnnualEnergyKwh,
+    annualCostSavingR,
+    savingPct: annualCostSavingR / currentAnnualCostR * 100,
+  };
+}
+
 /**
  * Calculate annual gross energy cost using TOU rates and calendar.
  */

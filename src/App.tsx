@@ -10,6 +10,7 @@ import { MachineScanPage } from './components/MachineScanPage';
 // Bouwa module — hidden route, unmounted from nav, guarded by permission
 import { BouwaModuleShell } from './features/bouwa/pages/BouwaModuleShell';
 import { BouwaRouteGuard } from './features/bouwa/components/BouwaRouteGuard';
+import { BouwaLoggerLocalApp } from './features/bouwa/pages/BouwaLoggerLocalApp';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -150,8 +151,10 @@ function AppContent() {
             <Dashboard view="pendingReadings" />
           </ProtectedRoute>
         } />
-        {/* Hidden Bouwa route — authenticated + permission-gated, not in nav */}
-        <Route path="/bouwa" element={
+        {/* Hidden Bouwa route — authenticated + permission-gated, not in nav.
+            Wildcard because a proposal and its preview are addressable: a rep
+            who refreshes on a preview must land back on that preview. */}
+        <Route path="/bouwa/*" element={
           <ProtectedRoute>
             <BouwaRouteGuard>
               <BouwaModuleShell />
@@ -175,6 +178,14 @@ function AppContent() {
 }
 
 function App() {
+  if (import.meta.env.DEV && window.location.pathname === '/bouwa/logger-analysis-local') {
+    return (
+      <BrowserRouter>
+        <BouwaLoggerLocalApp />
+      </BrowserRouter>
+    );
+  }
+
   return (
     <AuthProvider>
       <BrowserRouter>

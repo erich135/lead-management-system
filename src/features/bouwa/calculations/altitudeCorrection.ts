@@ -24,6 +24,54 @@ export const ISO_1217_REF = {
   tempK: 293, // 273 + 20
 };
 
+const STANDARD_ATMOSPHERE = {
+  seaLevelPressurePa: 101325,
+  seaLevelTemperatureK: 288.15,
+  lapseRateKPerM: 0.0065,
+  exponent: 5.25588,
+  ratedReferenceTemperatureK: 293.15,
+} as const;
+
+/** First-principles standard-troposphere pressure for screening calculations. */
+export function calcStandardAtmospherePressurePa(altitudeM: number): number | null {
+  if (!Number.isFinite(altitudeM) || altitudeM < 0 || altitudeM > 11000) return null;
+  const base = 1 - STANDARD_ATMOSPHERE.lapseRateKPerM * altitudeM / STANDARD_ATMOSPHERE.seaLevelTemperatureK;
+  return STANDARD_ATMOSPHERE.seaLevelPressurePa * Math.pow(base, STANDARD_ATMOSPHERE.exponent);
+}
+
+/** Density-ratio screening correction using absolute pressure and Kelvin temperature. */
+export function applyFirstPrinciplesSiteCorrection(
+  ratedFadM3Min: number,
+  altitudeM: number,
+  ambientTempC: number,
+): { correctedFadM3Min: number; lossPct: number; note: string } | null {
+  if (!Number.isFinite(ratedFadM3Min) || ratedFadM3Min <= 0 || !Number.isFinite(ambientTempC) || ambientTempC <= -273.15) return null;
+  const sitePressurePa = calcStandardAtmospherePressurePa(altitudeM);
+  if (sitePressurePa === null) return null;
+  const pressureFactor = sitePressurePa / STANDARD_ATMOSPHERE.seaLevelPressurePa;
+  const temperatureFactor = STANDARD_ATMOSPHERE.ratedReferenceTemperatureK / (ambientTempC + 273.15);
+  const correctedFadM3Min = ratedFadM3Min * pressureFactor * temperatureFactor;
+  const lossPct = (1 - correctedFadM3Min / ratedFadM3Min) * 100;
+  return {
+    correctedFadM3Min,
+    lossPct,
+    note: 'Standard-atmosphere density-ratio screening estimate; manufacturer correction remains preferred.',
+  };
+}
+
+/** Apply an explicitly approved proposal loss percentage without consulting workbook formulas. */
+export function applyApprovedFadLoss(
+  ratedFadM3Min: number,
+  approvedLossPct: number,
+): { correctedFadM3Min: number; lossPct: number; note: string } | null {
+  if (!Number.isFinite(ratedFadM3Min) || ratedFadM3Min <= 0 || !Number.isFinite(approvedLossPct) || approvedLossPct < 0 || approvedLossPct >= 100) return null;
+  return {
+    correctedFadM3Min: ratedFadM3Min * (1 - approvedLossPct / 100),
+    lossPct: approvedLossPct,
+    note: 'Proposal-specific approved FAD loss applied as a declared input.',
+  };
+}
+
 /**
  * Calculate site atmospheric pressure from altitude.
  * Workbook approximation: -1 mbar per 30 ft of altitude.

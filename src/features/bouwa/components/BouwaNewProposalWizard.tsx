@@ -23,12 +23,18 @@
 import { useState } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-// Phase 4D-17/18 — calculation modules
+// Historical workbook material, shown as comparison evidence only. This screen
+// imports no calculation engine: the accepted backend produces the results.
 import { INGRAIN_LOAD_PROFILE as LOAD_PROFILE } from '../calculations/loadProfileEngine';
-import { INGRAIN_COST_REFERENCE, MODEL_NAMING_CONFLICT_NOTE } from '../calculations/ingrainReferenceScenario';
-import { runValidation, summariseValidation } from '../calculations/validationEngine';
-import { INGRAIN_ROI_REFERENCE } from '../calculations/roiEngine';
-import { ESKOM_RATES_SET_A, ESKOM_RATES_SET_B, INGRAIN_DAY_CALENDAR } from '../calculations/tariffEngine';
+import { MODEL_NAMING_CONFLICT_NOTE } from '../calculations/ingrainReferenceScenario';
+import { runValidation, summariseValidation, runE6Validation, E6_VALIDATION_META } from '../calculations/validationEngine';
+import { ESKOM_RATES_SET_A, INGRAIN_DAY_CALENDAR } from '../calculations/tariffEngine';
+import {
+  createReferenceProposalInputs, updateProposalInput,
+  ALTITUDE_UNIT_OPTIONS, CORRECTION_METHOD_OPTIONS, POWER_BASIS_OPTIONS,
+  type EditableCalculationValue, type ProposalCalculationInputs, type ProposalScenarioId,
+} from '../calculations/proposalCalculationState';
+import { BackendOwnedOutputs, HistoricalWorkbookEvidence } from './BouwaResultAuthority';
 import {
   ChevronRight, ChevronLeft, Check, Wind, FileText, Cpu, Zap, BarChart3,
   AlertTriangle, CheckCircle2, Download, Upload, Plus, Info, Printer,
@@ -65,6 +71,7 @@ interface ProposalSetup {
 
 interface SiteConditions {
   altitudeM: string;
+  altitudeUnit: 'm' | 'ft';
   ambientTempC: string;
   relativeHumidity: string;
   compressorRoomVentilation: string;
@@ -133,12 +140,13 @@ const DEFAULT_SETUP: ProposalSetup = {
 };
 
 const DEFAULT_SITE_CONDITIONS: SiteConditions = {
-  altitudeM: '~10 m (near sea level — Bellville / Cape Town)',
+  altitudeM: '10',
+  altitudeUnit: 'm',
   ambientTempC: '21',
   relativeHumidity: 'Not recorded — assume typical coastal',
   compressorRoomVentilation: 'Standard ventilated room — to be confirmed on site',
   coolingAirCondition: 'Ambient air-cooled — no supplementary cooling noted',
-  sitePressureRequirement: '7.5 bar(g)',
+  sitePressureRequirement: '7.5',
   conditionSource: 'audit-measured',
 };
 
@@ -150,10 +158,10 @@ const DEFAULT_TARIFF: TariffProfile = {
   tariffCategoryName: 'TBC — confirm with site',
   tariffType: 'flat',
   vatIncluded: 'unknown',
-  blendedAvgRkWh: 'Placeholder — from deck savings calculation',
-  peakRateRkWh: 'TBC — confirm with site billing',
-  standardRateRkWh: 'TBC — confirm with site billing',
-  offPeakRateRkWh: 'TBC — confirm with site billing',
+  blendedAvgRkWh: '2',
+  peakRateRkWh: '2.7678',
+  standardRateRkWh: '1.5562',
+  offPeakRateRkWh: '1.1115',
   demandChargeRkVA: 'Not available',
   networkAccessCharge: 'TBC',
   serviceAdminCharge: 'TBC',
@@ -175,10 +183,49 @@ const DEFAULT_TARIFF_OP_PROFILE: TariffOperatingProfile = {
   peakRunPct: '~80% (estimated)',
   standardRunPct: '~15% (estimated)',
   offPeakRunPct: '~5% (estimated)',
-  annualRunHours: '6,000',
-  annualPeakHours: '~4,800',
-  annualStandardHours: '~900',
-  annualOffPeakHours: '~300',
+  annualRunHours: '8760',
+  annualPeakHours: '1576.8',
+  annualStandardHours: '3854.4',
+  annualOffPeakHours: '3328.8',
+};
+
+const ELEMENT_SIX_SETUP: ProposalSetup = {
+  ...DEFAULT_SETUP,
+  customer: 'Element Six',
+  site: 'Element Six site — Gauteng',
+  cityTown: 'Gauteng',
+  province: 'Gauteng',
+  plantLocation: 'Element Six compressor installation',
+  proposalTitle: 'Element Six — Compressed Air Proposal',
+  notes: 'Historical Element Six reference scenario. Current outputs use editable proposal inputs and controlled app calculations.',
+};
+
+const ELEMENT_SIX_SITE_CONDITIONS: SiteConditions = {
+  ...DEFAULT_SITE_CONDITIONS,
+  altitudeM: '1627',
+  altitudeUnit: 'm',
+  ambientTempC: '25',
+  relativeHumidity: 'Not recorded',
+  compressorRoomVentilation: 'To be confirmed',
+  coolingAirCondition: 'Air cooled',
+  sitePressureRequirement: '7.5',
+  conditionSource: 'manufacturer-assumption',
+};
+
+const ELEMENT_SIX_TARIFF: TariffProfile = {
+  ...DEFAULT_TARIFF,
+  electricitySupplier: 'Eskom — historical workbook reference; confirm current supplier',
+  municipalityRegion: 'Gauteng',
+  blendedAvgRkWh: '1.5',
+  peakRateRkWh: '1.9646',
+  standardRateRkWh: '1.3524',
+  offPeakRateRkWh: '0.859',
+  sourceDocumentRef: 'Historical Element Six workbook comparison — current bill required',
+};
+
+const ELEMENT_SIX_TARIFF_OP_PROFILE: TariffOperatingProfile = {
+  ...DEFAULT_TARIFF_OP_PROFILE,
+  annualRunHours: '8736',
 };
 
 // Demo compressor rows — exact values from Ingrain Belville deck (30 May 2025 audit)
@@ -385,6 +432,40 @@ function SourceBadge({ source }: { source: string }) {
   );
 }
 
+function CalculationInputField({ input, onChange }: { input: EditableCalculationValue; onChange: (value: string) => void }) {
+  const sourceLabel = input.isEdited ? 'Edited / manual' : input.source.replace(/_/g, ' ');
+  const options = input.key === 'existingPowerBasis' || input.key === 'proposedPowerBasis'
+    ? POWER_BASIS_OPTIONS
+    : input.key === 'correctionMethod' ? CORRECTION_METHOD_OPTIONS
+      : input.key === 'altitudeUnit' ? ALTITUDE_UNIT_OPTIONS : null;
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 space-y-1">
+      <div className="flex items-start justify-between gap-2">
+        <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">{input.label}</label>
+        <span className={`text-[9px] font-semibold rounded px-1.5 py-0.5 ${input.isEdited ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>{sourceLabel}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        {options ? (
+          <select value={input.value} onChange={e => onChange(e.target.value)} className="min-w-0 flex-1 text-sm font-semibold border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-ars-primary/30 bg-white">
+            {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        ) : (
+          <input value={input.value} onChange={e => onChange(e.target.value)} className="min-w-0 flex-1 text-sm font-semibold border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-ars-primary/30" />
+        )}
+        {input.unit && <span className="text-[10px] text-slate-500 whitespace-nowrap">{input.unit}</span>}
+      </div>
+      {input.isEdited && <p className="text-[10px] text-amber-700">Reference: {input.referenceValue} {input.unit}</p>}
+      <p className="text-[10px] text-slate-400">{input.reviewStatus.replace(/_/g, ' ')}</p>
+    </div>
+  );
+}
+
+function CalculationInputGrid({ inputs, keys, onInputChange }: { inputs: ProposalCalculationInputs; keys: string[]; onInputChange: (key: string, value: string) => void }) {
+  return <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+    {keys.map(key => <CalculationInputField key={key} input={inputs[key]} onChange={value => onInputChange(key, value)} />)}
+  </div>;
+}
+
 function TariffConfidenceBadge({ confidence }: { confidence: TariffConfidence }) {
   const cfg: Record<TariffConfidence, { label: string; cls: string; dot: string }> = {
     'bill-confirmed':    { label: 'Customer Bill Confirmed', cls: 'bg-green-100 text-green-800 border-green-300',  dot: 'bg-green-500' },
@@ -560,7 +641,8 @@ function Step1_SiteAndConditions({
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {textField('Altitude Above Sea Level (m)', siteConditions.altitudeM, sc('altitudeM'), <Mountain className="w-3.5 h-3.5" />)}
+          {textField(`Altitude Above Sea Level (${siteConditions.altitudeUnit})`, siteConditions.altitudeM, sc('altitudeM'), <Mountain className="w-3.5 h-3.5" />)}
+          <LabelledSelect label="Altitude Unit" value={siteConditions.altitudeUnit} options={ALTITUDE_UNIT_OPTIONS.map(option => ({ ...option }))} onChange={sc('altitudeUnit')} icon={<Mountain className="w-3.5 h-3.5" />} />
           {textField('Ambient Temperature (°C)', siteConditions.ambientTempC, sc('ambientTempC'), <Thermometer className="w-3.5 h-3.5" />)}
           {textField('Relative Humidity', siteConditions.relativeHumidity, sc('relativeHumidity'), <Gauge className="w-3.5 h-3.5" />)}
           {textField('Site Pressure Requirement (bar(g))', siteConditions.sitePressureRequirement, sc('sitePressureRequirement'), <Gauge className="w-3.5 h-3.5" />)}
@@ -742,15 +824,20 @@ function Step1_SiteAndConditions({
   );
 }
 
-function Step2_ExistingCompressors() {
+function Step2_ExistingCompressors({ scenario, inputs, onInputChange }: { scenario: ProposalScenarioId; inputs: ProposalCalculationInputs; onInputChange: (key: string, value: string) => void }) {
   return (
     <div className="space-y-5">
       <StepHeader
         icon={<Cpu className="w-5 h-5 text-ars-primary" />}
         title="Existing Compressors"
-        sub="Captured from site audit — CompAir L250 and CompAir L160. Multiple compressors supported."
+        sub={`${scenario === 'ingrain' ? 'Ingrain Bellville' : 'Element Six'} reference inputs loaded. Multiple compressors supported.`}
       />
-      <div className="space-y-5">
+      <SectionCard className="border-blue-200 bg-blue-50/30">
+        <h3 className="text-sm font-semibold text-ars-heading mb-1">Editable existing-compressor calculation inputs</h3>
+        <p className="text-xs text-slate-600 mb-3">Edit inputs only. The controlled calculation register remains the formula authority.</p>
+        <CalculationInputGrid inputs={inputs} onInputChange={onInputChange} keys={['existingModel', 'existingFadM3Min', 'existingKw', 'existingPowerBasis', 'existingMotorEfficiency', 'existingPressureBar', 'loadedPct', 'unloadedPct', 'annualOperatingHours']} />
+      </SectionCard>
+      {scenario === 'ingrain' ? <div className="space-y-5">
         {DEMO_COMPRESSORS.map((c, i) => (
           <SectionCard key={c.id}>
             <div className="flex items-center justify-between mb-3">
@@ -802,7 +889,11 @@ function Step2_ExistingCompressors() {
             )}
           </SectionCard>
         ))}
-      </div>
+      </div> : (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-700">
+          Historical Element Six reference: existing ML250. Workbook/reference comparisons remain available in Step 11; current proposal outputs use the editable inputs above.
+        </div>
+      )}
       <button
         type="button"
         className="flex items-center gap-2 text-sm text-ars-primary font-medium border border-ars-primary/30 rounded-lg px-4 py-2 hover:bg-ars-primary/5 transition"
@@ -819,7 +910,7 @@ function Step3_DataSource({ mode, onChange }: { mode: DataSourceMode; onChange: 
       key: 'audit-excel',
       icon: <FileText className="w-6 h-6 text-green-600" />,
       label: 'Use Completed Air Audit Excel',
-      sub: 'Measured values from site audit. Excel template is the source of truth. Most accurate.',
+      sub: 'Measured values imported from a site audit. The file supplies inputs; controlled app formulas remain authoritative.',
       badge: 'Measured',
       badgeColor: 'bg-green-100 text-green-700 border-green-200',
     },
@@ -951,7 +1042,17 @@ function FileActionButton({ icon, label, color, bg }: { icon: React.ReactNode; l
   );
 }
 
-function Step4_SiteObservations() {
+function ElementSixReferenceNotice({ title }: { title: string }) {
+  return <div className="space-y-5">
+    <StepHeader icon={<Info className="w-5 h-5 text-ars-primary" />} title={title} sub="Element Six scenario selected." />
+    <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-900">
+      Element Six historical workbook detail remains available in Step 11. This section does not substitute Ingrain observations into the active Element Six proposal.
+    </div>
+  </div>;
+}
+
+function Step4_SiteObservations({ scenario }: { scenario: ProposalScenarioId }) {
+  if (scenario === 'element-six') return <ElementSixReferenceNotice title="Site Observations" />;
   return (
     <div className="space-y-5">
       <StepHeader
@@ -1012,14 +1113,41 @@ function Step4_SiteObservations() {
   );
 }
 
-function Step5_PerformanceMetrics() {
+function Step5_PerformanceMetrics({ scenario }: { scenario: ProposalScenarioId }) {
+  if (scenario === 'element-six') {
+    return <div className="space-y-5">
+      <StepHeader icon={<BarChart3 className="w-5 h-5 text-ars-primary" />} title="Performance Metrics" sub="Machine performance is released by the accepted backend from a measured audit." />
+      <BackendOwnedOutputs
+        outputs={[
+          'Existing effective electrical input',
+          'Proposed effective electrical input',
+          'Proposed site-corrected FAD',
+          'Existing specific power',
+          'Proposed specific power',
+        ]}
+        note="Site-corrected capacity additionally depends on CALC-049, which has no accepted implementation, so it stays blocked even once the audit intake is complete."
+      />
+    </div>;
+  }
   return (
     <div className="space-y-5">
       <StepHeader
         icon={<BarChart3 className="w-5 h-5 text-ars-primary" />}
         title="Performance Metrics"
-        sub="Based on Ingrain Belville audit data and Ingrain deck methodology."
+        sub="Historical figures from the Ingrain Bellville deck, kept for comparison."
       />
+
+      <BackendOwnedOutputs
+        outputs={[
+          'Effective electrical input',
+          'Specific power',
+          'Energy per cubic metre',
+          'Cost per cubic metre',
+        ]}
+      />
+
+      <HistoricalWorkbookEvidence source="the Ingrain Bellville audit deck and the Ingrain L160 workbook">
+      <div className="space-y-5">
 
       {/* Flow vs Power */}
       <SectionCard>
@@ -1172,11 +1300,14 @@ function Step5_PerformanceMetrics() {
           </div>
         </div>
       </SectionCard>
+      </div>
+      </HistoricalWorkbookEvidence>
     </div>
   );
 }
 
-function Step6_EfficiencyRootCause() {
+function Step6_EfficiencyRootCause({ scenario }: { scenario: ProposalScenarioId }) {
+  if (scenario === 'element-six') return <ElementSixReferenceNotice title="Efficiency Analysis & Root Cause" />;
   return (
     <div className="space-y-5">
       <StepHeader
@@ -1209,16 +1340,28 @@ function Step6_EfficiencyRootCause() {
   );
 }
 
-function Step7_SelectBouwaSolution() {
+function Step7_SelectBouwaSolution({ scenario, inputs, onInputChange }: { scenario: ProposalScenarioId; inputs: ProposalCalculationInputs; onInputChange: (key: string, value: string) => void }) {
   return (
     <div className="space-y-5">
       <StepHeader
         icon={<Wind className="w-5 h-5 text-ars-primary" />}
         title="Select Bouwa Solution"
-        sub="Choose the Bouwa model to propose. Default: SVC-RS160-II based on site demand profile."
+        sub={`Choose the Bouwa model to propose. Current reference: ${inputs.proposedModel.value}.`}
       />
 
-      <div className="rounded-xl border-2 border-ars-primary bg-ars-primary/5 p-5">
+      <SectionCard className="border-green-200 bg-green-50/30">
+        <h3 className="text-sm font-semibold text-ars-heading mb-1">Proposed-machine and site-condition inputs</h3>
+        <p className="text-xs text-slate-600 mb-3">These are captured inputs. The site-corrected capacity they feed is produced by the backend, not here.</p>
+        <CalculationInputGrid inputs={inputs} onInputChange={onInputChange} keys={['proposedModel', 'proposedBaseModel', 'coolingType', 'proposedSeaLevelFadM3Min', 'proposedKw', 'proposedPowerBasis', 'proposedMotorEfficiency', 'altitudeM', 'altitudeUnit', 'ambientTempC', 'correctionMethod', 'altitudeLossPct']} />
+        <div className="mt-3">
+          <BackendOwnedOutputs
+            outputs={['Proposed site-corrected FAD at altitude and temperature']}
+            note="Correcting a rated FAD to site conditions is CALC-049, which has no accepted implementation. Recording the altitude, the measured barometric pressure and the manufacturer derating table lets the audit carry the evidence, but the corrected capacity stays unavailable until the calculation itself is accepted."
+          />
+        </div>
+      </SectionCard>
+
+      {scenario === 'ingrain' ? <div className="rounded-xl border-2 border-ars-primary bg-ars-primary/5 p-5">
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -1260,7 +1403,11 @@ function Step7_SelectBouwaSolution() {
         <div className="mt-3 rounded-lg bg-green-50 border border-green-200 px-3 py-2">
           <p className="text-xs text-green-800">{BOUWA_SOLUTION.notes}</p>
         </div>
-      </div>
+      </div> : (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-900">
+          Element Six reference model SVC-RS132A-II is loaded above. Historical model, altitude, and workbook comparison notes remain visible in Step 11.
+        </div>
+      )}
 
       <button
         type="button"
@@ -1272,15 +1419,33 @@ function Step7_SelectBouwaSolution() {
   );
 }
 
-function Step8_SavingsOpportunity({ tariffProfile }: { tariffProfile: TariffProfile }) {
+function Step8_SavingsOpportunity({ scenario, tariffProfile, inputs, onInputChange }: { scenario: ProposalScenarioId; tariffProfile: TariffProfile; inputs: ProposalCalculationInputs; onInputChange: (key: string, value: string) => void }) {
   return (
     <div className="space-y-5">
       <StepHeader
         icon={<Zap className="w-5 h-5 text-ars-primary" />}
         title="Savings Opportunity"
-        sub="Estimated energy savings. Based on audit data and Bouwa VSD performance at operating point."
+        sub="Savings are released by the accepted backend once the tariff and audit evidence are complete."
       />
 
+      <SectionCard className="border-green-200 bg-green-50/30">
+        <h3 className="text-sm font-semibold text-ars-heading mb-1">Tariff and annualisation inputs</h3>
+        <p className="text-xs text-slate-600 mb-3">These are captured inputs. Annual operating hours are never assumed, and no figure below is calculated in the browser.</p>
+        <CalculationInputGrid inputs={inputs} onInputChange={onInputChange} keys={['tariffSource', 'tariffConfidence', 'blendedRate', 'peakRate', 'standardRate', 'offPeakRate', 'vatTreatment', 'demandCharge', 'annualDays', 'annualOperatingHours', 'hoursPerDay']} />
+      </SectionCard>
+
+      <BackendOwnedOutputs
+        outputs={[
+          'Existing and proposed machine energy models',
+          'Annual electricity consumption',
+          'Annual electricity cost',
+          'Monetary saving',
+          'Percentage saving',
+        ]}
+        note="A tariff-dependent output needs the customer electricity bill or supply agreement and authoritative dated rates. A saving involving a proposed variable-speed machine additionally needs the manufacturer part-load flow-versus-power curve."
+      />
+
+      {scenario === 'ingrain' && <HistoricalWorkbookEvidence source="the Ingrain Bellville deck and the Ingrain L160 workbook"><div className="space-y-5">
       {/* Tariff calculation basis summary */}
       <div className="rounded-xl border border-green-200 bg-green-50/40 p-4 space-y-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -1402,18 +1567,29 @@ function Step8_SavingsOpportunity({ tariffProfile }: { tariffProfile: TariffProf
           </div>
         </div>
       </SectionCard>
+      </div></HistoricalWorkbookEvidence>}
     </div>
   );
 }
 
-function Step9_ROIComparison() {
+function Step9_ROIComparison({ scenario, inputs, onInputChange }: { scenario: ProposalScenarioId; inputs: ProposalCalculationInputs; onInputChange: (key: string, value: string) => void }) {
   return (
     <div className="space-y-5">
       <StepHeader
         icon={<DollarSign className="w-5 h-5 text-ars-primary" />}
         title="ROI Comparison"
-        sub="Structured scenarios — pricing TBC. Savings from Ingrain deck."
+        sub={`${scenario === 'ingrain' ? 'Ingrain Bellville' : 'Element Six'} commercial inputs. Return and payback come from the backend.`}
       />
+      <SectionCard className="border-blue-200 bg-blue-50/30">
+        <h3 className="text-sm font-semibold text-ars-heading mb-1">Commercial inputs</h3>
+        <p className="text-xs text-slate-600 mb-3">Buy-back, installation, refurbishment, and other costs are proposal inputs; no values are persisted in this draft builder.</p>
+        <CalculationInputGrid inputs={inputs} onInputChange={onInputChange} keys={['unitPrice', 'quantity', 'buyBack', 'installation', 'refurbishment', 'otherCosts']} />
+      </SectionCard>
+      <BackendOwnedOutputs
+        outputs={['Net investment', 'Simple payback', 'Simple annual return']}
+        note="A return rests on a monetary saving, so it stays blocked for as long as the saving it divides into does."
+      />
+      {scenario === 'ingrain' && <HistoricalWorkbookEvidence source="the Ingrain Bellville deck and the Ingrain L160 ROI sheet"><div className="space-y-5">
       <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-start gap-3">
         <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
         <p className="text-xs text-amber-800">
@@ -1511,14 +1687,17 @@ function Step9_ROIComparison() {
         * Pricing TBC — obtain Bouwa quote before finalising ROI calculations.
         Savings from Ingrain Belville deck. Pricing excludes VAT.
       </p>
+      </div></HistoricalWorkbookEvidence>}
     </div>
   );
 }
 
-function Step10_Recommendations({ recs, onToggle }: {
+function Step10_Recommendations({ scenario, recs, onToggle }: {
+  scenario: ProposalScenarioId;
   recs: typeof RECOMMENDATIONS;
   onToggle: (id: string) => void;
 }) {
+  if (scenario === 'element-six') return <ElementSixReferenceNotice title="Recommendations & Next Steps" />;
   return (
     <div className="space-y-5">
       <StepHeader
@@ -1549,11 +1728,13 @@ function Step10_Recommendations({ recs, onToggle }: {
   );
 }
 
-function Step11_ReportPreview({ setup, siteConditions, tariffProfile, onGeneratePDF }: {
+function Step11_ReportPreview({ scenario, setup, siteConditions, tariffProfile, inputs, onScenarioChange }: {
+  scenario: ProposalScenarioId;
   setup: ProposalSetup;
   siteConditions: SiteConditions;
   tariffProfile: TariffProfile;
-  onGeneratePDF: () => void;
+  inputs: ProposalCalculationInputs;
+  onScenarioChange: (scenario: ProposalScenarioId) => void;
 }) {
   const REPORT_SECTIONS = [
     { num: 1,    title: 'Cover Page',                          desc: `${setup.proposalTitle} — prepared ${setup.reportDate}` },
@@ -1564,17 +1745,17 @@ function Step11_ReportPreview({ setup, siteConditions, tariffProfile, onGenerate
     { num: '5b', title: 'Tariff Accuracy & Calculation Basis', desc: `Confidence: ${tariffProfile.tariffConfidence} | Type: ${tariffProfile.tariffType} | VAT: ${tariffProfile.vatIncluded}` },
     { num: '5c', title: 'Tariff Calendar & TOU Basis',         desc: 'LDS/HDS day calendar, workday/weekend, peak/standard/off-peak rates used' },
     { num: '5d', title: 'Altitude / Site Correction',         desc: `Alt: ${siteConditions.altitudeM} | Ambient: ${siteConditions.ambientTempC}°C | Correction: ${siteConditions.conditionSource}` },
-    { num: 6,    title: 'Unit Specifications & Site Observations', desc: 'L250 / L160 specs, audit findings, ball valve, leak survey' },
-    { num: '6b', title: 'Load Profile / Air Flow Analysis',   desc: `Avg: ${LOAD_PROFILE.avgFlowM3Min} m³/min | Peak: ${LOAD_PROFILE.peakFlowM3Min} m³/min | Min: ${LOAD_PROFILE.minFlowM3Min} m³/min — 29 May 2025` },
+    { num: 6,    title: 'Unit Specifications & Site Observations', desc: `Existing: ${inputs.existingModel.value} | Proposed: ${inputs.proposedModel.value}` },
+    { num: '6b', title: 'Load Profile / Air Flow Analysis',   desc: scenario === 'ingrain' ? `Historical reference — Avg: ${LOAD_PROFILE.avgFlowM3Min} m³/min | Peak: ${LOAD_PROFILE.peakFlowM3Min} m³/min` : 'Element Six historical load-profile references remain in the validation record' },
     { num: 7,    title: 'Performance Metrics',                 desc: 'Flow vs power, load/unload utilisation, specific power comparison' },
-    { num: '7b', title: 'Cost per m³ Compressed Air',         desc: 'L160: 0.1315 kWh/m³ | Bouwa RS132: 0.0928 kWh/m³ | Improvement: 29.4%' },
+    { num: '7b', title: 'Cost per m³ Compressed Air',         desc: 'Current proposal values calculated from effective electrical input, delivered FAD, and tariff' },
     { num: 8,    title: 'Real-Time Data Overview',             desc: 'Operating kW, pressure profile, demand vs capacity chart' },
     { num: 9,    title: 'Efficiency Analysis',                 desc: 'kW/m³/min analysis, benchmarking against VSD alternative' },
     { num: 10,   title: 'Root Cause Analysis',                 desc: 'Oversizing, fixed-speed mismatch, leak losses, age factors' },
     { num: 11,   title: 'Recommendations',                     desc: 'Right-size, leak repair, buy-back, control, follow-up schedule' },
     { num: 12,   title: 'Estimated Savings Opportunity',       desc: `Annual kWh, R/year, CO₂ savings per scenario. Tariff basis: ${tariffProfile.tariffSource}` },
-    { num: '12b',title: 'Gross Proposed Cost & VSD Credit',   desc: 'Gross Bouwa cost, 14% VSD credit, net proposed cost — shown separately' },
-    { num: 13,   title: 'ROI Scenario',                        desc: 'Workbook reference: R984,810/unit × 2 = R1,969,620 | Net invest R2,297,860 | Payback 7.35 months | ROI 48.35%' },
+    { num: '12b',title: 'Current Proposed Energy Cost',        desc: 'First-principles annual energy and cost; no implicit workbook VSD credit' },
+    { num: 13,   title: 'ROI Scenario',                        desc: `Current proposal price ${inputs.unitPrice.value} × ${inputs.quantity.value}; calculated ROI shown separately from history` },
     { num: '13b',title: 'Optimiser / Load-Sharing Scenario',   desc: 'Current vs proposed vs optimised annual cost — partial draft' },
     { num: '13c',title: 'Calculation Trace / Review Status',   desc: 'Source per value, review status, conflict items requiring ARS confirmation' },
     { num: 14,   title: 'Conclusion',                          desc: 'Summary recommendation and proposed next actions' },
@@ -1583,6 +1764,13 @@ function Step11_ReportPreview({ setup, siteConditions, tariffProfile, onGenerate
 
   const validationItems = runValidation();
   const summary = summariseValidation(validationItems);
+  const e6ValidationItems = runE6Validation();
+  const e6Summary = summariseValidation(e6ValidationItems);
+
+  const valScenario = scenario === 'element-six' ? 'e6' : 'ingrain';
+  const activeItems = valScenario === 'e6' ? e6ValidationItems : validationItems;
+  const activeSummary = valScenario === 'e6' ? e6Summary : summary;
+  const editedInputs = Object.values(inputs).filter(value => value.isEdited);
 
   const statusConfig: Record<string, { label: string; cls: string }> = {
     'match':           { label: 'Match',           cls: 'bg-green-100 text-green-700 border-green-200' },
@@ -1603,17 +1791,37 @@ function Step11_ReportPreview({ setup, siteConditions, tariffProfile, onGenerate
       <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-start gap-3">
         <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
         <p className="text-xs text-amber-800">
-          <span className="font-semibold">Demo only — </span>
-          Generated PDF is watermarked DEMO ONLY — INTERNAL DRAFT. Not approved for customer issue.
+          <span className="font-semibold">Internal working proposal — </span>
+          PDF export remains disabled. The template still carries historical workbook savings, return and a VSD credit that the accepted backend has never released, so it may not be issued until it is rebuilt on backend outputs. Not approved for customer issue.
         </p>
       </div>
 
       {/* ── Calculation Validation / Review Status ───────────── */}
+      <HistoricalWorkbookEvidence source="the Ingrain L160 and Element Six workbooks, recalculated against their own recorded anchors">
       <SectionCard className="border-slate-300 bg-slate-50/50">
         <div className="flex items-center gap-3 mb-3 flex-wrap">
           <h3 className="text-sm font-semibold text-ars-heading flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-slate-600" /> Calculation Validation — App vs Workbook
           </h3>
+        </div>
+
+        {/* ── Scenario selector ─────────────────────────────── */}
+        <div className="flex gap-2 mb-3 flex-wrap items-center">
+          <span className="text-[11px] font-semibold text-slate-500 mr-1">Scenario:</span>
+          <button
+            type="button"
+            onClick={() => onScenarioChange('ingrain')}
+            className={`px-3 py-1 rounded-full text-[11px] font-semibold border transition ${valScenario === 'ingrain' ? 'bg-ars-primary text-white border-ars-primary' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'}`}
+          >
+            1 — Ingrain Bellville
+          </button>
+          <button
+            type="button"
+            onClick={() => onScenarioChange('element-six')}
+            className={`px-3 py-1 rounded-full text-[11px] font-semibold border transition ${valScenario === 'e6' ? 'bg-ars-primary text-white border-ars-primary' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'}`}
+          >
+            2 — Element Six
+          </button>
           <div className="flex gap-2 ml-auto flex-wrap">
             {([
               ['match', 'Match'],
@@ -1622,22 +1830,50 @@ function Step11_ReportPreview({ setup, siteConditions, tariffProfile, onGenerate
               ['requires-review', 'Review'],
             ] as [string, string][]).map(([k, l]) => (
               <span key={k} className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${statusConfig[k].cls}`}>
-                {l}: {summary[k === 'minor-rounding' ? 'minorRounding' : k === 'requires-review' ? 'requiresReview' : k as keyof typeof summary]}
+                {l}: {activeSummary[k === 'minor-rounding' ? 'minorRounding' : k === 'requires-review' ? 'requiresReview' : k as keyof typeof activeSummary]}
               </span>
             ))}
           </div>
         </div>
+
+        {/* ── Element Six context notes ──────────────────────── */}
+        {valScenario === 'e6' && (
+          <div className="mb-3 space-y-2">
+            <div className="rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 flex items-start gap-2">
+              <Mountain className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-900">
+                <span className="font-bold">Altitude correction: </span>
+                {E6_VALIDATION_META.altitudeNote}
+              </p>
+            </div>
+            <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 flex items-start gap-2">
+              <Banknote className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-900">
+                <span className="font-bold">Buy-back note: </span>
+                {E6_VALIDATION_META.buyBackNote}
+              </p>
+            </div>
+            <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-1.5">
+              <p className="text-[10px] text-slate-600">
+                <span className="font-semibold">Scenario 2 — {E6_VALIDATION_META.customer}:</span>{' '}
+                Existing: {E6_VALIDATION_META.existingMachine} · Proposed: {E6_VALIDATION_META.proposedModel} ·
+                Confirmed by: {E6_VALIDATION_META.confirmedBy} · Source: {E6_VALIDATION_META.workbookFile}
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-slate-100 border-b border-slate-200">
-                {['Metric', 'Workbook Ref', 'App Calculated', 'PPT Value', 'Difference', 'Status'].map(h => (
+                {['Metric', 'Workbook Ref', 'Reference App', 'PPT Value', 'Difference', 'Status'].map(h => (
                   <th key={h} className="px-2 py-2 text-left font-semibold text-slate-600 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {validationItems.map(item => {
+              {activeItems.map(item => {
                 const cfg = statusConfig[item.status] ?? statusConfig['not-calculated'];
                 return (
                   <tr key={item.metric} className="hover:bg-slate-50">
@@ -1657,9 +1893,9 @@ function Step11_ReportPreview({ setup, siteConditions, tariffProfile, onGenerate
             </tbody>
           </table>
         </div>
-        {validationItems.some(i => i.note) && (
+        {activeItems.some(i => i.note) && (
           <div className="mt-3 space-y-1">
-            {validationItems.filter(i => i.note).slice(0, 4).map(i => (
+            {activeItems.filter(i => i.note).slice(0, 5).map(i => (
               <p key={i.metric} className="text-[10px] text-slate-500 italic">
                 <span className="font-semibold">{i.metric}:</span> {i.note}
               </p>
@@ -1670,11 +1906,54 @@ function Step11_ReportPreview({ setup, siteConditions, tariffProfile, onGenerate
           <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />
           <p className="text-xs text-red-800">
             <span className="font-bold">Do not issue final customer report until: </span>
-            Confirm customer electricity bill, tariff category, Bouwa model (RS132 vs RS160-II), and machine price.
-            See bouwa-calculation-map.md §14 for full conflict list.
+            {valScenario === 'ingrain'
+              ? 'Confirm customer electricity bill, tariff category, Bouwa model (RS132 vs RS160-II), and machine price. See bouwa-calculation-map.md §14 for full conflict list.'
+              : 'Confirm VAT treatment on buy-back (offer incl. VAT vs workbook excl. VAT), tariff year/category for Element Six site, and altitude correction (24.0 m³/min site output confirmed by John).'}
           </p>
         </div>
       </SectionCard>
+      </HistoricalWorkbookEvidence>
+
+      <SectionCard className="border-blue-300 bg-blue-50/30">
+        <h3 className="text-sm font-semibold text-ars-heading mb-3">Current proposal inputs</h3>
+        <p className="text-xs text-slate-600 mb-3">
+          What has been entered against the scenario reference. The results these
+          inputs feed are released by the backend from a measured audit, so this
+          table records the inputs and their provenance rather than restating an
+          answer the backend has not given.
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead><tr className="bg-blue-100 border-b border-blue-200">
+              {['Input', 'Scenario Reference', 'Entered Value', 'Unit', 'Source', 'Review Status'].map(header => <th key={header} className="px-2 py-2 text-left font-semibold text-slate-600 whitespace-nowrap">{header}</th>)}
+            </tr></thead>
+            <tbody className="divide-y divide-blue-100">
+              {editedInputs.length === 0
+                ? <tr><td className="px-2 py-2 text-slate-500" colSpan={6}>No input has been changed from the scenario reference.</td></tr>
+                : editedInputs.map(value => <tr key={value.key}>
+                    <td className="px-2 py-2 font-medium text-ars-body">{value.label}</td>
+                    <td className="px-2 py-2">{value.referenceValue || '—'}</td>
+                    <td className="px-2 py-2 font-semibold">{value.value || '—'}</td>
+                    <td className="px-2 py-2">{value.unit || '—'}</td>
+                    <td className="px-2 py-2">{value.source.replace(/_/g, ' ')}</td>
+                    <td className="px-2 py-2 text-[10px] text-amber-700">{value.reviewStatus.replace(/_/g, ' ')}</td>
+                  </tr>)}
+            </tbody>
+          </table>
+        </div>
+      </SectionCard>
+
+      <BackendOwnedOutputs
+        outputs={[
+          'Existing and proposed machine energy models',
+          'Engineering comparison',
+          'Annual electricity cost',
+          'Monetary saving',
+          'Net investment',
+          'Simple payback',
+          'Simple annual return',
+        ]}
+      />
 
       <SectionCard>
         <h3 className="text-sm font-semibold text-ars-heading mb-3">Report Sections</h3>
@@ -1697,10 +1976,10 @@ function Step11_ReportPreview({ setup, siteConditions, tariffProfile, onGenerate
       <div className="flex gap-3">
         <button
           type="button"
-          onClick={onGeneratePDF}
-          className="flex items-center gap-2 px-5 py-3 bg-ars-primary text-white font-bold rounded-xl hover:bg-ars-primary/90 transition shadow text-sm"
+          disabled
+          className="flex items-center gap-2 px-5 py-3 bg-ars-primary text-white font-bold rounded-xl hover:bg-ars-primary/90 transition shadow text-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Printer className="w-4 h-4" /> Generate Demo PDF Report
+          <Printer className="w-4 h-4" /> PDF requires backend-released outputs
         </button>
         <button
           type="button"
@@ -1714,7 +1993,20 @@ function Step11_ReportPreview({ setup, siteConditions, tariffProfile, onGenerate
 }
 
 // ---------------------------------------------------------------------------
-// PDF generator
+// PDF generator — retired, and deliberately left without a call site.
+//
+// This builds a customer-facing document out of the original workbook: annual
+// savings, a payback, a return, and a 14% VSD credit that has no accepted
+// derivation. None of it came from the accepted backend, so issuing it would
+// put figures in front of a customer that the backend has specifically declined
+// to release. The export buttons are disabled and nothing calls this function;
+// the contract check in scripts/checkBouwaLocalUiContracts.mjs fails if a call
+// site reappears.
+//
+// It is kept rather than deleted because proposal export is a real feature with
+// no backend replacement yet. Rebuilding it means reading the released outputs
+// from the audit workflow and printing those, together with whatever the
+// backend still reports as blocked.
 // ---------------------------------------------------------------------------
 
 function generateProposalPDF(setup: ProposalSetup, siteConditions: SiteConditions, tariffProfile: TariffProfile, tariffOpProfile: TariffOperatingProfile) {
@@ -2142,6 +2434,8 @@ function StepperNav({ step, total, onGo }: { step: number; total: number; onGo: 
 
 export function BouwaNewProposalWizard() {
   const [step, setStep] = useState(1);
+  const [scenario, setScenario] = useState<ProposalScenarioId>('ingrain');
+  const [calculationInputs, setCalculationInputs] = useState<ProposalCalculationInputs>(() => createReferenceProposalInputs('ingrain'));
   const [setup, setSetup] = useState<ProposalSetup>(DEFAULT_SETUP);
   const [siteConditions, setSiteConditions] = useState<SiteConditions>(DEFAULT_SITE_CONDITIONS);
   const [tariffProfile, setTariffProfile] = useState<TariffProfile>(DEFAULT_TARIFF);
@@ -2154,19 +2448,71 @@ export function BouwaNewProposalWizard() {
     setRecs(prev => prev.map(r => r.id === id ? { ...r, checked: !r.checked } : r));
   }
 
+  function selectScenario(nextScenario: ProposalScenarioId) {
+    setScenario(nextScenario);
+    setCalculationInputs(createReferenceProposalInputs(nextScenario));
+    setSetup(nextScenario === 'element-six' ? ELEMENT_SIX_SETUP : DEFAULT_SETUP);
+    setSiteConditions(nextScenario === 'element-six' ? ELEMENT_SIX_SITE_CONDITIONS : DEFAULT_SITE_CONDITIONS);
+    setTariffProfile(nextScenario === 'element-six' ? ELEMENT_SIX_TARIFF : DEFAULT_TARIFF);
+    setTariffOpProfile(nextScenario === 'element-six' ? ELEMENT_SIX_TARIFF_OP_PROFILE : DEFAULT_TARIFF_OP_PROFILE);
+  }
+
+  function changeCalculationInput(key: string, value: string) {
+    setCalculationInputs(previous => updateProposalInput(previous, key, value));
+    if (key === 'altitudeM') setSiteConditions(previous => ({ ...previous, altitudeM: value }));
+    if (key === 'altitudeUnit' && (value === 'm' || value === 'ft')) setSiteConditions(previous => ({ ...previous, altitudeUnit: value }));
+    if (key === 'ambientTempC') setSiteConditions(previous => ({ ...previous, ambientTempC: value }));
+    if (key === 'existingPressureBar') setSiteConditions(previous => ({ ...previous, sitePressureRequirement: value }));
+    if (key === 'annualOperatingHours') setTariffOpProfile(previous => ({ ...previous, annualRunHours: value }));
+    if (key === 'blendedRate') setTariffProfile(previous => ({ ...previous, blendedAvgRkWh: value }));
+    if (key === 'peakRate') setTariffProfile(previous => ({ ...previous, peakRateRkWh: value }));
+    if (key === 'standardRate') setTariffProfile(previous => ({ ...previous, standardRateRkWh: value }));
+    if (key === 'offPeakRate') setTariffProfile(previous => ({ ...previous, offPeakRateRkWh: value }));
+    if (key === 'demandCharge') setTariffProfile(previous => ({ ...previous, demandChargeRkVA: value }));
+  }
+
+  function changeSiteConditions(next: SiteConditions) {
+    setSiteConditions(next);
+    setCalculationInputs(previous => {
+      let updated = updateProposalInput(previous, 'altitudeM', next.altitudeM);
+      updated = updateProposalInput(updated, 'altitudeUnit', next.altitudeUnit);
+      updated = updateProposalInput(updated, 'ambientTempC', next.ambientTempC);
+      return updateProposalInput(updated, 'existingPressureBar', next.sitePressureRequirement);
+    });
+  }
+
+  function changeTariffProfile(next: TariffProfile) {
+    setTariffProfile(next);
+    setCalculationInputs(previous => {
+      let updated = updateProposalInput(previous, 'tariffSource', next.tariffSource);
+      updated = updateProposalInput(updated, 'tariffConfidence', next.tariffConfidence);
+      updated = updateProposalInput(updated, 'blendedRate', next.blendedAvgRkWh);
+      updated = updateProposalInput(updated, 'peakRate', next.peakRateRkWh);
+      updated = updateProposalInput(updated, 'standardRate', next.standardRateRkWh);
+      updated = updateProposalInput(updated, 'offPeakRate', next.offPeakRateRkWh);
+      updated = updateProposalInput(updated, 'vatTreatment', next.vatIncluded);
+      return updateProposalInput(updated, 'demandCharge', next.demandChargeRkVA);
+    });
+  }
+
+  function changeTariffOperatingProfile(next: TariffOperatingProfile) {
+    setTariffOpProfile(next);
+    setCalculationInputs(previous => updateProposalInput(previous, 'annualOperatingHours', next.annualRunHours));
+  }
+
   function renderStep() {
     switch (step) {
-      case 1:  return <Step1_SiteAndConditions data={setup} onChange={setSetup} siteConditions={siteConditions} onChangeSiteConditions={setSiteConditions} tariffProfile={tariffProfile} onChangeTariff={setTariffProfile} tariffOpProfile={tariffOpProfile} onChangeTariffOpProfile={setTariffOpProfile} />;
-      case 2:  return <Step2_ExistingCompressors />;
+      case 1:  return <Step1_SiteAndConditions data={setup} onChange={setSetup} siteConditions={siteConditions} onChangeSiteConditions={changeSiteConditions} tariffProfile={tariffProfile} onChangeTariff={changeTariffProfile} tariffOpProfile={tariffOpProfile} onChangeTariffOpProfile={changeTariffOperatingProfile} />;
+      case 2:  return <Step2_ExistingCompressors scenario={scenario} inputs={calculationInputs} onInputChange={changeCalculationInput} />;
       case 3:  return <Step3_DataSource mode={dataMode} onChange={setDataMode} />;
-      case 4:  return <Step4_SiteObservations />;
-      case 5:  return <Step5_PerformanceMetrics />;
-      case 6:  return <Step6_EfficiencyRootCause />;
-      case 7:  return <Step7_SelectBouwaSolution />;
-      case 8:  return <Step8_SavingsOpportunity tariffProfile={tariffProfile} />;
-      case 9:  return <Step9_ROIComparison />;
-      case 10: return <Step10_Recommendations recs={recs} onToggle={toggleRec} />;
-      case 11: return <Step11_ReportPreview setup={setup} siteConditions={siteConditions} tariffProfile={tariffProfile} onGeneratePDF={() => generateProposalPDF(setup, siteConditions, tariffProfile, tariffOpProfile)} />;
+      case 4:  return <Step4_SiteObservations scenario={scenario} />;
+      case 5:  return <Step5_PerformanceMetrics scenario={scenario} />;
+      case 6:  return <Step6_EfficiencyRootCause scenario={scenario} />;
+      case 7:  return <Step7_SelectBouwaSolution scenario={scenario} inputs={calculationInputs} onInputChange={changeCalculationInput} />;
+      case 8:  return <Step8_SavingsOpportunity scenario={scenario} tariffProfile={tariffProfile} inputs={calculationInputs} onInputChange={changeCalculationInput} />;
+      case 9:  return <Step9_ROIComparison scenario={scenario} inputs={calculationInputs} onInputChange={changeCalculationInput} />;
+      case 10: return <Step10_Recommendations scenario={scenario} recs={recs} onToggle={toggleRec} />;
+      case 11: return <Step11_ReportPreview scenario={scenario} setup={setup} siteConditions={siteConditions} tariffProfile={tariffProfile} inputs={calculationInputs} onScenarioChange={selectScenario} />;
       default: return null;
     }
   }
@@ -2180,8 +2526,15 @@ export function BouwaNewProposalWizard() {
         </div>
         <div>
           <h1 className="text-xl font-bold text-ars-heading">New Air Audit Proposal</h1>
-          <p className="text-sm text-ars-body">11-step proposal builder — Ingrain Belville demo data loaded.</p>
+          <p className="text-sm text-ars-body">11-step internal proposal builder — {scenario === 'ingrain' ? 'Ingrain Bellville' : 'Element Six'} reference inputs loaded.</p>
         </div>
+      </div>
+
+      <div className="rounded-xl border border-blue-200 bg-blue-50/40 px-4 py-3 flex items-center gap-3 flex-wrap">
+        <span className="text-xs font-semibold text-blue-900">Start from reference scenario:</span>
+        <button type="button" onClick={() => selectScenario('ingrain')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${scenario === 'ingrain' ? 'bg-ars-primary text-white border-ars-primary' : 'bg-white text-slate-700 border-slate-300'}`}>Ingrain</button>
+        <button type="button" onClick={() => selectScenario('element-six')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${scenario === 'element-six' ? 'bg-ars-primary text-white border-ars-primary' : 'bg-white text-slate-700 border-slate-300'}`}>Element Six</button>
+        <button type="button" onClick={() => selectScenario(scenario)} className="ml-auto px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber-300 bg-amber-50 text-amber-800">Reset this scenario to reference values</button>
       </div>
 
       {/* Stepper */}
@@ -2215,10 +2568,10 @@ export function BouwaNewProposalWizard() {
         ) : (
           <button
             type="button"
-            onClick={() => generateProposalPDF(setup, siteConditions, tariffProfile, tariffOpProfile)}
-            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-700 transition shadow-sm"
+            disabled
+            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-700 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Download className="w-4 h-4" /> Generate PDF
+            <Download className="w-4 h-4" /> PDF requires backend-released outputs
           </button>
         )}
       </div>

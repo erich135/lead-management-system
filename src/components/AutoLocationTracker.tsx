@@ -3,9 +3,10 @@ import { io, Socket } from 'socket.io-client';
 import { useAuth } from '../contexts/AuthContext';
 import useLocationTracking from '../hooks/useLocationTracking';
 import { getAuthToken } from '../lib/api';
+import { resolveApiBaseUrl } from '../lib/resolveApiBaseUrl';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
-const API_BASE_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+const SOCKET_URL = resolveApiBaseUrl();
+const API_BASE_URL = resolveApiBaseUrl();
 
 /**
  * Invisible component that auto-starts GPS tracking for users
@@ -42,9 +43,11 @@ export function AutoLocationTracker() {
 
     (async () => {
       try {
-        const reg = await navigator.serviceWorker.register('/location-tracking-sw.js', {
-          scope: '/',
-        });
+        // Use the shared PWA service worker (same scope) so installability and
+        // location heartbeats share one registration.
+        const reg =
+          (await navigator.serviceWorker.getRegistration('/')) ||
+          (await navigator.serviceWorker.ready);
         if (cancelled) return;
         swRegistrationRef.current = reg;
 

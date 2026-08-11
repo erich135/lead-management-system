@@ -227,7 +227,7 @@ export function AppointmentScheduler({ leadId, leadCompanyName, repCodes, onClos
             <label htmlFor="reminderEnabled" className="text-sm text-gray-700">
               <span className="font-medium">Send reminder notification</span>
               <span className="block text-xs text-gray-600 mt-0.5">
-                The assigned rep will receive a reminder 24 hours before the appointment
+                The assigned rep will receive reminders 1 hour before, 5 minutes before, and 1 minute before the appointment
               </span>
             </label>
           </div>

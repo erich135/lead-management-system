@@ -1,33 +1,14 @@
-# PWA Icons Setup
+# PWA Icons
 
-To complete the Progressive Web App (PWA) setup, you need to add app icons to the `public` directory.
+App icons in `public/` used by the web app manifest and iOS home screen.
 
-## Required Icons
+| File | Size | Purpose |
+|------|------|---------|
+| `icon-192.png` | 192×192 | Home screen / install (any) |
+| `icon-512.png` | 512×512 | Home screen / install (any) |
+| `icon-192-maskable.png` | 192×192 | Android adaptive icon |
+| `icon-512-maskable.png` | 512×512 | Android adaptive icon |
+| `apple-touch-icon.png` | 180×180 | iOS home screen |
 
-1. **icon-192.png** - 192x192 pixels
-2. **icon-512.png** - 512x512 pixels
-
-## How to Create Icons
-
-1. Create a square image (at least 512x512 pixels) with your ARS logo
-2. Export it as PNG format
-3. Create two sizes:
-   - 192x192 pixels → `icon-192.png`
-   - 512x512 pixels → `icon-512.png`
-4. Place both files in the `public` directory
-
-## Icon Design Tips
-
-- Use a simple, recognizable logo or icon
-- Ensure good contrast for visibility
-- Use transparent background or solid color
-- Test on both light and dark backgrounds
-
-## Temporary Solution
-
-If you don't have icons yet, you can:
-1. Use a placeholder image generator
-2. Create simple colored squares with "ARS" text
-3. The app will still work, but won't be installable as a PWA until icons are added
-
-
+Android uses the manifest `background_color` + icon for the launch splash.
+Source artwork: `public/Logo.png`

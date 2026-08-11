@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
-import { ClipboardList, Calendar, MapPin, BarChart3 } from 'lucide-react';
+import { ClipboardList, Calendar, MapPin, BarChart3, FileText } from 'lucide-react';
 import { SalesLeadsList } from './SalesLeadsList';
 import SalesLeadDiary from './SalesLeadDiary';
 import SalesLeadReports from './SalesLeadReports';
 import SalesLeadMapsTab from './SalesLeadMapsTab';
+import SalesRequestsTab from './SalesRequestsTab';
 import { SalesLeadForm } from './SalesLeadForm';
 import { SalesLeadDetails } from './SalesLeadDetails';
 import { LeadStatsWidget } from './LeadStatsWidget';
 import type { SalesLead, Branch, RepCode } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
+import { SALES_REQUEST_PERMISSIONS } from '../constants/salesRequestPermissions';
 
-type SalesLeadTab = 'management' | 'diary' | 'maps' | 'reports';
+type SalesLeadTab = 'management' | 'diary' | 'maps' | 'reports' | 'requests';
 
 interface SalesLeadsContainerProps {
   branches: Branch[];
@@ -17,6 +20,12 @@ interface SalesLeadsContainerProps {
 }
 
 const SalesLeadsContainer: React.FC<SalesLeadsContainerProps> = ({ branches, repCodes }) => {
+  const { hasPermission, isSuperAdmin } = useAuth();
+  // Super admins use Pending Approvals in the main nav — not the Sales Leads Requests tab.
+  const canViewRequests =
+    !isSuperAdmin &&
+    (hasPermission(SALES_REQUEST_PERMISSIONS.READ) ||
+      hasPermission(SALES_REQUEST_PERMISSIONS.CREATE));
   const [activeTab, setActiveTab] = useState<SalesLeadTab>('management');
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [selectedLead, setSelectedLead] = useState<SalesLead | null>(null);
@@ -127,6 +136,23 @@ const SalesLeadsContainer: React.FC<SalesLeadsContainerProps> = ({ branches, rep
             <BarChart3 className="w-5 h-5" />
             Reports
           </button>
+
+          {canViewRequests && (
+            <button
+              onClick={() => setActiveTab('requests')}
+              className={`
+                flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors
+                ${
+                  activeTab === 'requests'
+                    ? 'border-ars-primary text-ars-primary'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }
+              `}
+            >
+              <FileText className="w-5 h-5" />
+              Requests
+            </button>
+          )}
         </nav>
       </div>
 
@@ -144,6 +170,9 @@ const SalesLeadsContainer: React.FC<SalesLeadsContainerProps> = ({ branches, rep
         {activeTab === 'diary' && <SalesLeadDiary />}
         {activeTab === 'maps' && <SalesLeadMapsTab branches={branches} repCodes={repCodes} />}
         {activeTab === 'reports' && <SalesLeadReports />}
+        {activeTab === 'requests' && canViewRequests && (
+          <SalesRequestsTab refreshKey={refreshKey} />
+        )}
       </div>
 
       {/* Lead Form Modal */}

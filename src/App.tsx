@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginPage } from './components/LoginPage';
 import { SetPasswordPage } from './components/SetPasswordPage';
@@ -7,6 +8,14 @@ import { Dashboard } from './components/Dashboard';
 import { ChatWidget } from './components/ChatWidget';
 // import { AutoLocationTracker } from './components/AutoLocationTracker'; // disabled
 import { MachineScanPage } from './components/MachineScanPage';
+import PwaInstallPrompt from './components/PwaInstallPrompt';
+// Push / appointment reminder UI — commented out (re-enable when needed)
+// import { PushNotificationBootstrap } from './components/PushNotificationBootstrap';
+// import AppointmentReminderToastHost from './components/AppointmentReminderToastHost';
+import { MobileRepAppGate } from './mobile-rep/MobileRepApp';
+import { useIsMobile } from './hooks/useIsMobile';
+import { isRepUser } from './mobile-rep/mobileRepUtils';
+import { PwaInstallProvider } from './pwa/PwaInstallContext';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -63,6 +72,31 @@ function SetPasswordRoute({ children }: { children: React.ReactNode }) {
 
 function AppContent() {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
+  const hideChatForMobileRep = isMobile && isRepUser(user);
+  const navigate = useNavigate();
+
+  /**
+   * Handles Service Worker "Open Appointment" clicks when a tab is already open.
+   */
+  useEffect(() => {
+    /**
+     * Routes to the URL embedded in a push notification click.
+     */
+    function onSwMessage(event: MessageEvent): void {
+      const data = event.data;
+      if (!data || data.type !== 'ARS_OPEN_URL' || typeof data.url !== 'string') return;
+      try {
+        const path = new URL(data.url, window.location.origin);
+        navigate(`${path.pathname}${path.search}${path.hash}`);
+      } catch {
+        navigate(data.url);
+      }
+    }
+
+    navigator.serviceWorker?.addEventListener('message', onSwMessage);
+    return () => navigator.serviceWorker?.removeEventListener('message', onSwMessage);
+  }, [navigate]);
 
   return (
     <>
@@ -84,67 +118,100 @@ function AppContent() {
         } />
         <Route path="/dashboard" element={
           <ProtectedRoute>
-            <Dashboard view="dashboard" />
+            <MobileRepAppGate>
+              <Dashboard view="dashboard" />
+            </MobileRepAppGate>
           </ProtectedRoute>
         } />
         <Route path="/jobs" element={
           <ProtectedRoute>
-            <Dashboard view="leads" />
+            <MobileRepAppGate>
+              <Dashboard view="leads" />
+            </MobileRepAppGate>
           </ProtectedRoute>
         } />
         <Route path="/sales-leads" element={
           <ProtectedRoute>
-            <Dashboard view="salesLeads" />
+            <MobileRepAppGate>
+              <Dashboard view="salesLeads" />
+            </MobileRepAppGate>
           </ProtectedRoute>
         } />
         <Route path="/reports" element={
           <ProtectedRoute>
-            <Dashboard view="reports" />
+            <MobileRepAppGate>
+              <Dashboard view="reports" />
+            </MobileRepAppGate>
           </ProtectedRoute>
         } />
         <Route path="/diary" element={
           <ProtectedRoute>
-            <Dashboard view="diary" />
+            <MobileRepAppGate>
+              <Dashboard view="diary" />
+            </MobileRepAppGate>
           </ProtectedRoute>
         } />
         <Route path="/machines" element={
           <ProtectedRoute>
-            <Dashboard view="machines" />
+            <MobileRepAppGate>
+              <Dashboard view="machines" />
+            </MobileRepAppGate>
           </ProtectedRoute>
         } />
         <Route path="/admin" element={
           <ProtectedRoute>
-            <Dashboard view="admin" />
+            <MobileRepAppGate>
+              <Dashboard view="admin" />
+            </MobileRepAppGate>
           </ProtectedRoute>
         } />
         <Route path="/activities" element={
           <ProtectedRoute>
-            <Dashboard view="activities" />
+            <MobileRepAppGate>
+              <Dashboard view="activities" />
+            </MobileRepAppGate>
           </ProtectedRoute>
         } />
         <Route path="/job-card-templates" element={
           <ProtectedRoute>
-            <Dashboard view="jobCardTemplates" />
+            <MobileRepAppGate>
+              <Dashboard view="jobCardTemplates" />
+            </MobileRepAppGate>
           </ProtectedRoute>
         } />
         <Route path="/job-card-submissions" element={
           <ProtectedRoute>
-            <Dashboard view="jobCardSubmissions" />
+            <MobileRepAppGate>
+              <Dashboard view="jobCardSubmissions" />
+            </MobileRepAppGate>
           </ProtectedRoute>
         } />
         <Route path="/parts-ready" element={
           <ProtectedRoute>
-            <Dashboard view="partsReady" />
+            <MobileRepAppGate>
+              <Dashboard view="partsReady" />
+            </MobileRepAppGate>
           </ProtectedRoute>
         } />
         <Route path="/tech-app" element={
           <ProtectedRoute>
-            <Dashboard view="techApp" />
+            <MobileRepAppGate>
+              <Dashboard view="techApp" />
+            </MobileRepAppGate>
           </ProtectedRoute>
         } />
         <Route path="/pending-machine-readings" element={
           <ProtectedRoute>
-            <Dashboard view="pendingReadings" />
+            <MobileRepAppGate>
+              <Dashboard view="pendingReadings" />
+            </MobileRepAppGate>
+          </ProtectedRoute>
+        } />
+        <Route path="/pending-sales-requests" element={
+          <ProtectedRoute>
+            <MobileRepAppGate>
+              <Dashboard view="pendingSalesRequests" />
+            </MobileRepAppGate>
           </ProtectedRoute>
         } />
         {/* Public QR scan landing — NO auth, NO PublicRoute redirect. */}
@@ -153,12 +220,17 @@ function AppContent() {
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
 
-      {/* Chat widget - only show when logged in */}
-      {user && <ChatWidget />}
+      {/* Chat widget — hidden on the dedicated mobile Representative shell */}
+      {user && !hideChatForMobileRep && <ChatWidget />}
 
       {/* Auto-start GPS tracking for enabled users */}
       {/* AutoLocationTracker disabled — re-enable when location tracking is needed */}
       {/* {user && <AutoLocationTracker />} */}
+
+      <PwaInstallPrompt />
+      {/* Push notifications + in-app appointment reminder toasts — disabled for now */}
+      {/* <PushNotificationBootstrap /> */}
+      {/* {user && <AppointmentReminderToastHost />} */}
     </>
   );
 }
@@ -166,9 +238,11 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <AppContent />
-      </BrowserRouter>
+      <PwaInstallProvider>
+        <BrowserRouter>
+          <AppContent />
+        </BrowserRouter>
+      </PwaInstallProvider>
     </AuthProvider>
   );
 }

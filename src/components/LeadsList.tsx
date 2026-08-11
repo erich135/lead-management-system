@@ -785,16 +785,16 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-0 bg-white md:min-h-screen">
       {loading ? (
         <div className="text-center py-20">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ars-primary mx-auto mb-4"></div>
           <p className="text-ars-body">Loading jobs...</p>
         </div>
       ) : (
-        <div className="flex gap-6 pt-5">
-          {/* Left Sidebar - Filters */}
-          <div className="w-64 flex-shrink-0 bg-white rounded-2xl border border-gray-200 p-4 max-h-[calc(100vh-140px)] overflow-y-auto sticky top-[115px]">
+        <div className="flex flex-col gap-4 pt-3 md:flex-row md:gap-6 md:pt-5">
+          {/* Left Sidebar - Filters (full-width stack on phones; desktop sidebar unchanged) */}
+          <div className="w-full max-h-[42vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-4 md:sticky md:top-[115px] md:w-64 md:max-h-[calc(100vh-140px)] md:flex-shrink-0">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold text-ars-heading flex items-center gap-2">
                 <Filter className="w-4 h-4 text-ars-primary" />
@@ -1171,7 +1171,7 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
           </div>
 
           {/* Right Side - Job Cards */}
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             {loading ? (
               <div className="text-center py-20">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ars-primary mx-auto mb-4"></div>
@@ -1587,10 +1587,10 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
         </div>
       )}
 
-      {/* Floating Action Button */}
+      {/* Floating Action Button — clear of mobile bottom nav; desktop position unchanged */}
       <button
         onClick={onCreateNew}
-        className="fixed bottom-8 right-8 w-14 h-14 bg-ars-primary text-white rounded-full shadow-2xl flex items-center justify-center z-40"
+        className="fixed bottom-24 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-ars-primary text-white shadow-2xl md:bottom-8 md:right-8"
       >
         <Plus className="w-6 h-6" />
       </button>

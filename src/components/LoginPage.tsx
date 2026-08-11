@@ -26,8 +26,11 @@ export function LoginPage() {
     setError('');
     setLoading(true);
 
+    const submittedEmail = email.trim();
+    setEmail(submittedEmail);
+
     try {
-      const result = await signIn(email, password);
+      const result = await signIn(submittedEmail, password);
       if (result.error) {
         // Check for specific error messages
         const errorMessage = result.error.message.toLowerCase();
@@ -48,6 +51,8 @@ export function LoginPage() {
         }
         
         setError(displayMessage);
+        // Keep the email the user typed; only clear the password after a failed attempt.
+        setPassword('');
       }
     } catch (err) {
       // Handle any unexpected errors
@@ -60,12 +65,14 @@ export function LoginPage() {
           errorMessage.includes('401')) {
         // Already set to the correct message
       } else if (errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('failed to fetch')) {
-        displayMessage = 'Unable to connect to the server. Please check your connection and try again.';
+        displayMessage =
+          'Unable to connect to the server. On your phone open this PC’s Wi‑Fi address (check the Vite Network URL, e.g. http://192.168.0.251:5173 or :5174), not localhost.';
       } else {
         displayMessage = err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.';
       }
       
       setError(displayMessage);
+      setPassword('');
     } finally {
       setLoading(false);
     }
@@ -84,13 +91,13 @@ export function LoginPage() {
 
       <div className="w-full max-w-md relative z-10">
         {/* Main login card */}
-        <div className="bg-white/95 backdrop-blur-lg rounded-3xl shadow-2xl p-8 md:p-10 border border-white/20">
+        <div className="bg-white/95 backdrop-blur-lg rounded-3xl shadow-2xl p-5 sm:p-8 md:p-10 border border-white/20">
           {/* Logo and header */}
           <div className="text-center mb-8">
             <div className="flex justify-center mb-6">
               <div className="relative">
                 <div className="rounded-2xl flex items-center justify-center p-3">
-                  <img src="/Logo.png" alt="ARS Logo" className="w-[250px] h-auto object-contain" />
+                  <img src="/Logo.png" alt="ARS Logo" className="h-auto w-full max-w-[250px] object-contain" />
                 </div>
               </div>
             </div>
@@ -127,7 +134,7 @@ export function LoginPage() {
           )}
 
           {/* Login form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6" autoComplete="on">
             {/* Email input */}
             <div className="space-y-2">
               <div className="relative">
@@ -136,11 +143,15 @@ export function LoginPage() {
                 </div>
                 <input
                   id="email"
+                  name="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  autoComplete="email"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   className="w-full pl-12 pr-4 py-3.5 border-2 border-gray-200 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-ars-primary transition-all duration-200 bg-white focus:bg-white text-ars-heading text-[15px]"
                   placeholder="Email Address"
                 />

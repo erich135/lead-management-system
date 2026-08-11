@@ -69,11 +69,15 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**
  * Converts backend user to frontend user format.
- * 
+ *
  * @param backendUser - User data from backend API
  * @returns {FrontendUser} Formatted user object
  */
 function transformUser(backendUser: BackendUser): FrontendUser {
+  if (!backendUser?.role || typeof backendUser.role !== 'object' || !backendUser.role.name) {
+    throw new Error('User role is missing from the login response. Contact your administrator.');
+  }
+
   const adminCode = typeof backendUser.adminCode === 'object' && backendUser.adminCode !== null
     ? {
         id: backendUser.adminCode._id,
@@ -140,6 +144,7 @@ function transformUser(backendUser: BackendUser): FrontendUser {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<FrontendUser | null>(null);
+  /** True only while restoring a session on first load — never during Sign In. */
   const [loading, setLoading] = useState(true);
 
   /**
@@ -170,21 +175,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /**
    * Signs in a user with email and password.
-   * 
+   * Does not toggle the global session `loading` flag — that flag unmounts the
+   * login form via PublicRoute and causes the browser to autofill the previous
+   * (often Super Admin) email after a failed attempt.
+   *
    * @param email - User email
    * @param password - User password
    * @returns {Promise<{ error: Error | null }>} Error object if login fails
    */
   async function signIn(email: string, password: string) {
     try {
-      setLoading(true);
-      const response = await login({ email, password });
+      const trimmedEmail = email.trim();
+      const response = await login({ email: trimmedEmail, password });
       setUser(transformUser(response.user));
       return { error: null };
     } catch (error) {
       return { error: error as Error };
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -198,6 +204,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Logout error:', error);
     } finally {
       setUser(null);
+      // Allow notification onboarding again on the next login in this tab.
+      try {
+        sessionStorage.removeItem('ars-push-prompt-dismissed-session');
+      } catch {
+        /* ignore */
+      }
     }
   }
 

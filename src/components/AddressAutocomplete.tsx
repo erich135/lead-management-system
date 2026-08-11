@@ -5,14 +5,20 @@ import { geocodeSearch, type GeoSearchResult } from '../lib/api';
 
 interface AddressAutocompleteProps {
   value: string;
+  /** Optional GeoJSON [lng, lat] used to seed the map pin picker. */
+  coordinates?: [number, number] | null;
   onChange: (address: string, coordinates?: [number, number]) => void;
   placeholder?: string;
   className?: string;
   required?: boolean;
 }
 
+/**
+ * Address search with optional map pin for diary and lead location capture.
+ */
 export function AddressAutocomplete({
   value,
+  coordinates = null,
   onChange,
   placeholder = 'Start typing an address...',
   className = '',
@@ -24,7 +30,7 @@ export function AddressAutocomplete({
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<string | null>(value || null);
   const [showMapPicker, setShowMapPicker] = useState(false);
-  const [currentCoords, setCurrentCoords] = useState<[number, number] | null>(null);
+  const [currentCoords, setCurrentCoords] = useState<[number, number] | null>(coordinates);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -35,6 +41,10 @@ export function AddressAutocomplete({
       setSelectedAddress(value);
     }
   }, [value]);
+
+  useEffect(() => {
+    setCurrentCoords(coordinates ?? null);
+  }, [coordinates]);
 
   // Close dropdown on outside click
   useEffect(() => {

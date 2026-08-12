@@ -1,5 +1,5 @@
 import React from 'react';
-import { Briefcase, CalendarDays, ClipboardList, Home, User } from 'lucide-react';
+import { Briefcase, Cog, Home, TrendingUp, Clock } from 'lucide-react';
 import type { MobileRepTab } from './mobileRepUtils';
 
 interface MobileRepBottomNavProps {
@@ -14,10 +14,10 @@ const TABS: Array<{
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
 }> = [
   { id: 'home', label: 'Home', icon: Home },
-  { id: 'planner', label: 'Planner', icon: CalendarDays },
+  { id: 'sales_leads', label: 'Sales Leads', icon: TrendingUp },
   { id: 'jobs', label: 'Jobs', icon: Briefcase },
-  { id: 'history', label: 'History', icon: ClipboardList },
-  { id: 'profile', label: 'Profile', icon: User },
+  { id: 'activities', label: 'Activities', icon: Clock },
+  { id: 'machines', label: 'Machines', icon: Cog },
 ];
 
 /**

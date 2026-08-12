@@ -14,6 +14,7 @@ import {
   getSalesRequest,
   reviewUpdateSalesRequest,
   type Job,
+  type PlannerFormPublished,
   type SalesRequest,
 } from '../lib/api';
 import {
@@ -23,7 +24,8 @@ import {
 import DiaryRfcForm from './diary/DiaryRfcForm';
 import DiaryLoanRentalForm from './diary/DiaryLoanRentalForm';
 import DiaryNewServiceLevelForm from './diary/DiaryNewServiceLevelForm';
-import type { RfcFormData } from './diary/rfcFormUtils';
+import { DynamicPlannerFormRenderer, type DynamicFormValues } from './diary/DynamicPlannerFormRenderer';
+import { normalizeRfcForm, type RfcFormData } from './diary/rfcFormUtils';
 import type { LoanRentalFormData } from './diary/loanRentalFormUtils';
 import type { NewServiceLevelFormData } from './diary/newServiceLevelFormUtils';
 import { normalizeFormForRequestType } from '../utils/salesRequestValidation';
@@ -79,6 +81,18 @@ function userName(
   if (typeof user === 'string') return user;
   const full = [user.firstName, user.lastName].filter(Boolean).join(' ');
   return full || user.email || '—';
+}
+
+/**
+ * Returns true when stored form data uses the published dynamic planner schema
+ * (formSchemaSnapshot + values) rather than legacy section-based RFC fields.
+ */
+function isDynamicPlannerFormData(data: Record<string, unknown>): boolean {
+  return (
+    Boolean(data.formSchemaSnapshot) &&
+    Boolean(data.values) &&
+    typeof data.values === 'object'
+  );
 }
 
 /**
@@ -333,10 +347,21 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
   function renderForm(): React.ReactNode {
     if (!detail) return null;
 
+    if (isDynamicPlannerFormData(formData)) {
+      return (
+        <DynamicPlannerFormRenderer
+          schema={formData.formSchemaSnapshot as PlannerFormPublished}
+          values={formData.values as DynamicFormValues}
+          onChange={(next) => setFormData({ ...formData, values: next })}
+          disabled={!fieldsEditable}
+        />
+      );
+    }
+
     if (detail.requestType === 'rfc') {
       return (
         <DiaryRfcForm
-          value={formData as unknown as RfcFormData}
+          value={normalizeRfcForm(formData as Partial<RfcFormData>)}
           onChange={(next) => setFormData(next as unknown as Record<string, unknown>)}
           disabled={!fieldsEditable}
         />

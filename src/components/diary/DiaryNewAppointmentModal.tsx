@@ -61,6 +61,22 @@ function escapeRegex(value: string): string {
 }
 
 /**
+ * Resolves the appointment location from the form and any linked customer/lead.
+ */
+function resolveAppointmentLocation(
+  location: string,
+  customer: Customer | null,
+  lead: SalesLead | null,
+): string {
+  return (
+    location.trim() ||
+    customer?.address?.trim() ||
+    lead?.contactAddress?.trim() ||
+    ''
+  );
+}
+
+/**
  * Resolves the logged-in user's primary rep code identifier.
  */
 function getLoggedInRepId(user: ReturnType<typeof useAuth>['user']): string | undefined {
@@ -227,7 +243,7 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
         const [customerResponse, leadResponse] = await Promise.all([
           getCustomers({
             search: `^${escapeRegex(query)}`,
-            limit: 15,
+            limit: 500,
           }),
           getSalesLeads({
             search: query,
@@ -237,9 +253,11 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
           }),
         ]);
 
+        const normalizedQuery = query.toLowerCase();
+
         const customerMatches = (customerResponse.customers || [])
           .filter((customer) =>
-            customer.name.toLowerCase().startsWith(query.toLowerCase()),
+            customer.name.toLowerCase().startsWith(normalizedQuery),
           )
           .map(
             (customer): ClientSuggestion => ({
@@ -251,7 +269,7 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
 
         const leadMatches = (leadResponse.leads || [])
           .filter((lead) =>
-            lead.companyName.toLowerCase().includes(query.toLowerCase()),
+            lead.companyName.toLowerCase().includes(normalizedQuery),
           )
           .map(
             (lead): ClientSuggestion => ({
@@ -261,8 +279,8 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
             }),
           );
 
-        // Prefer sales leads first (richer CRM data), then reference customers.
-        setClientSuggestions([...leadMatches, ...customerMatches].slice(0, 20));
+        // List every prefix-matching Reference Data customer, then append leads.
+        setClientSuggestions([...customerMatches, ...leadMatches.slice(0, 15)]);
       } catch (requestError) {
         console.error('Failed to load client suggestions:', requestError);
         setClientSuggestions([]);
@@ -325,7 +343,7 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
   }
 
   /**
-   * Links a Reference Data customer and auto-fills location / contact fields.
+   * Links a Reference Data customer and auto-fills the Location field from saved address.
    */
   function handleSelectCustomer(customer: Customer): void {
     setSelectedCustomer(customer);
@@ -333,9 +351,13 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
     setCustomerSearch(customer.name);
     setClientSuggestions([]);
 
-    applyClientDetailsToForm({
-      location: customer.address,
-    });
+    const savedAddress = customer.address?.trim();
+    if (savedAddress) {
+      setFormData((current) => ({
+        ...current,
+        location: savedAddress,
+      }));
+    }
   }
 
   /**
@@ -510,16 +532,15 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
     }
 
     const appointmentType = normalizeDiaryAppointmentType(formData.appointmentType);
-    const trimmedLocation = formData.location.trim();
+    const trimmedLocation = resolveAppointmentLocation(
+      formData.location,
+      selectedCustomer,
+      selectedLead,
+    );
 
     if (requiresSiteVisitPin(appointmentType)) {
       if (!trimmedLocation) {
         setError('Enter a location for this Site Visit.');
-        return;
-      }
-
-      if (!buildGeoLocationPayload(locationCoordinates)) {
-        setError('Pin the Site Visit location on the map before saving.');
         return;
       }
     }
@@ -789,6 +810,7 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
                 )}
               </label>
               <AddressAutocomplete
+                key={selectedCustomer?._id ?? 'appointment-location'}
                 value={formData.location}
                 coordinates={locationCoordinates}
                 onChange={(address, coordinates) => {

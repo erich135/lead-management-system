@@ -83,4 +83,12 @@ export function addDays(date: Date, days: number): Date {
   return d;
 }
 
-export type MobileRepTab = 'home' | 'planner' | 'jobs' | 'history' | 'profile';
+export type MobileRepTab =
+  | 'home'
+  | 'sales_leads'
+  | 'planner'
+  | 'jobs'
+  | 'history'
+  | 'profile'
+  | 'activities'
+  | 'machines';

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { ClipboardList, Cog, Menu, ScanLine, Clock, LogOut, User } from 'lucide-react';
 import {
   getRepCodes,
   getUnreadNotificationCount,
@@ -17,6 +18,7 @@ import MobileRepBottomNav from './MobileRepBottomNav';
 import MobileRepHome from './MobileRepHome';
 import MobileRepAppointment from './MobileRepAppointment';
 import MobileRepJobs from './MobileRepJobs';
+import MobileRepSalesLeads from './MobileRepSalesLeads';
 import MobileRepHistory from './MobileRepHistory';
 import MobileRepProfile from './MobileRepProfile';
 import MobileRepNotifications from './MobileRepNotifications';
@@ -31,8 +33,9 @@ import {
  * Still the same website — responsive layout only; no native runtime.
  */
 const MobileRepApp: React.FC = () => {
-  const { user } = useAuth();
+  const { user, signOut, hasPermission } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<MobileRepTab>('home');
   const [selectedAppointment, setSelectedAppointment] = useState<PlannerAppointment | null>(null);
   const [visitAppointment, setVisitAppointment] = useState<PlannerAppointment | null>(null);
@@ -41,6 +44,10 @@ const MobileRepApp: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [plannerKey, setPlannerKey] = useState(0);
   const [repCodes, setRepCodes] = useState<RepCode[]>([]);
+  /**
+   * Mobile-only slide-up menu for non-tab sections (Activities, Machines, QR, approvals).
+   */
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   /**
    * Syncs a queued offline appointment update when connectivity returns.
@@ -103,7 +110,7 @@ const MobileRepApp: React.FC = () => {
         const match = (rows || []).find((row) => row._id === appointmentId);
         if (!match) return;
         setSelectedAppointment(match as PlannerAppointment);
-        setTab('planner');
+        setTab('sales_leads');
         const next = new URLSearchParams(searchParams);
         next.delete('appointmentId');
         setSearchParams(next, { replace: true });
@@ -254,11 +261,110 @@ const MobileRepApp: React.FC = () => {
               {user?.fullName || 'Representative'}
             </p>
           </div>
+          <button
+            type="button"
+            onClick={() => setShowMoreMenu((v) => !v)}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/15 text-white ring-1 ring-white/20"
+            aria-label="More"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('profile')}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/15 text-white ring-1 ring-white/20"
+            aria-label="Profile"
+          >
+            <User className="h-5 w-5" />
+          </button>
           <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/90 ring-1 ring-white/20">
             Field
           </span>
         </div>
       </header>
+
+      {showMoreMenu && (
+        <>
+          <div
+            className="fixed inset-0 z-[70] bg-black/40"
+            role="presentation"
+            onClick={() => setShowMoreMenu(false)}
+          />
+          <div className="fixed bottom-16 left-0 right-0 z-[71] mx-auto max-w-lg rounded-t-3xl bg-white shadow-2xl md:hidden">
+            <div className="p-5">
+              <div className="mx-auto mb-4 h-1 w-12 rounded-full bg-gray-300" aria-hidden />
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    setTab('history');
+                  }}
+                  className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left font-semibold text-slate-800 hover:bg-slate-50"
+                >
+                  <ClipboardList className="h-5 w-5 text-[#0969a9]" />
+                  History
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    setTab('profile');
+                  }}
+                  className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left font-semibold text-slate-800 hover:bg-slate-50"
+                >
+                  <User className="h-5 w-5 text-[#0969a9]" />
+                  Profile
+                </button>
+
+                {(hasPermission('machines.verifyReadings') || user?.isSuperAdmin) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      navigate('/pending-machine-readings');
+                    }}
+                    className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left font-semibold text-slate-800 hover:bg-slate-50"
+                  >
+                    <ScanLine className="h-5 w-5 text-[#0969a9]" />
+                    QR Readings
+                  </button>
+                )}
+
+                {(hasPermission('sales_requests.review') || user?.isSuperAdmin) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      navigate('/pending-sales-requests');
+                    }}
+                    className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left font-semibold text-slate-800 hover:bg-slate-50"
+                  >
+                    <ClipboardList className="h-5 w-5 text-[#0969a9]" />
+                    Rep Approvals
+                  </button>
+                )}
+
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void signOut().finally(() => {
+                        setShowMoreMenu(false);
+                      })
+                    }
+                    className="flex w-full items-center gap-3 rounded-2xl border border-rose-200 px-4 py-3 text-left font-semibold text-rose-700 hover:bg-rose-50"
+                  >
+                    <LogOut className="h-5 w-5" />
+                    Logout
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       <main className="min-h-0 flex-1 overflow-y-auto pb-24">
         {tab === 'home' && (
@@ -270,7 +376,15 @@ const MobileRepApp: React.FC = () => {
             onOpenAppointment={handleOpenAppointment}
             onStartVisit={handleStartVisit}
             onNewAppointment={openNewAppointment}
-            onOpenPlanner={() => setTab('planner')}
+            onOpenPlanner={() => setTab('sales_leads')}
+          />
+        )}
+
+        {tab === 'sales_leads' && (
+          <MobileRepSalesLeads
+            plannerKey={plannerKey}
+            onOpenAppointment={handleOpenAppointment}
+            onOpenHistory={() => setTab('history')}
           />
         )}
 
@@ -289,7 +403,7 @@ const MobileRepApp: React.FC = () => {
         {tab === 'jobs' && <MobileRepJobs />}
 
         {tab === 'history' && (
-          <MobileRepHistory onExit={() => setTab('planner')} />
+          <MobileRepHistory onExit={() => setTab('sales_leads')} />
         )}
 
         {tab === 'profile' && <MobileRepProfile />}
@@ -299,6 +413,14 @@ const MobileRepApp: React.FC = () => {
         activeTab={tab}
         onChange={(next) => {
           setSelectedAppointment(null);
+          if (next === 'activities') {
+            navigate('/activities');
+            return;
+          }
+          if (next === 'machines') {
+            navigate('/machines');
+            return;
+          }
           setTab(next);
         }}
         notificationCount={unreadCount}
@@ -319,7 +441,7 @@ const MobileRepApp: React.FC = () => {
         onCreated={async () => {
           closeNewAppointment(false);
           setPlannerKey((value) => value + 1);
-          if (tab !== 'planner') setTab('planner');
+          if (tab !== 'sales_leads') setTab('sales_leads');
         }}
       />
 
@@ -349,8 +471,25 @@ const MobileRepApp: React.FC = () => {
 export function MobileRepAppGate({ children }: { children: React.ReactNode }): React.ReactElement {
   const { user } = useAuth();
   const isMobile = useIsMobile();
+  const location = useLocation();
 
-  if (isMobile && isRepUser(user)) {
+  /**
+   * Routes that should display the existing Dashboard pages even for mobile reps,
+   * so features like Activities / Machines / QR Readings / Rep Approvals remain accessible.
+   */
+  const shouldBypassMobileRepAppShell = [
+    '/activities',
+    '/machines',
+    '/pending-machine-readings',
+    '/pending-sales-requests',
+    '/tech-app',
+    '/admin',
+    '/job-card-templates',
+    '/job-card-submissions',
+    '/parts-ready',
+  ].includes(location.pathname);
+
+  if (isMobile && isRepUser(user) && !shouldBypassMobileRepAppShell) {
     return <MobileRepApp />;
   }
 

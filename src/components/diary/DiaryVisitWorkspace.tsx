@@ -10,8 +10,8 @@ import {
   StickyNote,
   X,
 } from 'lucide-react';
-import { createSalesRequest, listSalesRequests, submitSalesRequest, updateAppointment, updateSalesRequest } from '../../lib/api';
-import type { SalesRequest, SalesRequestType } from '../../lib/api';
+import { createSalesRequest, listSalesRequests, submitSalesRequest, updateAppointment, updateSalesRequest, getPublishedPlannerForm } from '../../lib/api';
+import type { SalesRequest, SalesRequestType, PlannerFormPublished } from '../../lib/api';
 import type { PlannerAppointment } from './DiaryDayAppointmentCard';
 import { DiaryCompletedDot } from './DiaryCompletedDot';
 import {
@@ -33,16 +33,25 @@ import {
   type VisitCompletionAction,
   type VisitPhoto,
   type VisitSession,
+  type VisitDynamicFormState,
 } from './visitUtils';
 import {
+  appointmentTypeToPlannerFormType,
+  appointmentTypeToSalesRequestType,
   getAppointmentLeadId,
   isLoanRentalAppointmentType,
   isNewServiceLevelAppointmentType,
   isRfcSheetAppointmentType,
+  normalizeDiaryAppointmentType,
 } from './diaryUtils';
 import DiaryRfcForm from './DiaryRfcForm';
 import DiaryLoanRentalForm from './DiaryLoanRentalForm';
 import DiaryNewServiceLevelForm from './DiaryNewServiceLevelForm';
+import {
+  DynamicPlannerFormRenderer,
+  createEmptyDynamicFormValues,
+  getMissingRequiredDynamicFields,
+} from './DynamicPlannerFormRenderer';
 import { useAuth } from '../../contexts/AuthContext';
 import { useGeolocation } from '../../hooks/useGeolocation';
 import { reverseGeocode } from '../../utils/geocoding';
@@ -293,6 +302,20 @@ function resolveSheetPayloadFromSession(session: VisitSession, appointment: Plan
   requestType: SalesRequestType;
   formData: Record<string, unknown>;
 } | null {
+  if (session.dynamicForm) {
+    const requestType = appointmentTypeToSalesRequestType(appointment.appointmentType);
+    if (!requestType) return null;
+    return {
+      requestType,
+      formData: {
+        formTemplateType: session.dynamicForm.formTemplateType,
+        formTemplateVersion: session.dynamicForm.formTemplateVersion,
+        formSchemaSnapshot: session.dynamicForm.formSchemaSnapshot,
+        values: session.dynamicForm.values,
+      },
+    };
+  }
+
   if (isRfcSheetAppointmentType(appointment.appointmentType) && session.rfcForm) {
     return {
       requestType: 'rfc',
@@ -301,7 +324,7 @@ function resolveSheetPayloadFromSession(session: VisitSession, appointment: Plan
   }
   if (isLoanRentalAppointmentType(appointment.appointmentType) && session.loanRentalForm) {
     return {
-      requestType: 'loan_rental',
+      requestType: appointmentTypeToSalesRequestType(appointment.appointmentType) || 'loan_rental',
       formData: session.loanRentalForm as unknown as Record<string, unknown>,
     };
   }
@@ -315,6 +338,22 @@ function resolveSheetPayloadFromSession(session: VisitSession, appointment: Plan
     };
   }
   return null;
+}
+
+/**
+ * Builds a visit dynamic form state from a published Super Admin template.
+ */
+function buildDynamicFormState(
+  published: PlannerFormPublished & { type?: string },
+  existingValues?: VisitDynamicFormState['values'],
+): VisitDynamicFormState {
+  const type = (published.type || 'rfc') as VisitDynamicFormState['formTemplateType'];
+  return {
+    formTemplateType: type,
+    formTemplateVersion: published.version,
+    formSchemaSnapshot: published,
+    values: existingValues || createEmptyDynamicFormValues(published.fields || []),
+  };
 }
 
 /**
@@ -344,6 +383,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
   const [savedDurationLabel, setSavedDurationLabel] = useState('');
   const [visitFrozenAt, setVisitFrozenAt] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<VisitWorkspaceTab>('notes');
+  const [showDynamicValidation, setShowDynamicValidation] = useState(false);
   const [visitGpsVerification, setVisitGpsVerification] =
     useState<VisitGpsVerification | null>(null);
   const visitGpsRef = useRef<VisitGpsVerification | null>(null);
@@ -412,35 +452,29 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
           localSession.newServiceLevelForm ?? serverSession.newServiceLevelForm,
         newServiceLevelCompletedAt:
           localSession.newServiceLevelCompletedAt ?? serverSession.newServiceLevelCompletedAt,
+        dynamicForm: localSession.dynamicForm ?? serverSession.dynamicForm,
       };
     }
 
     const isRfcVisit = isRfcSheetAppointmentType(appointment.appointmentType);
     const isLoanRentalVisit = isLoanRentalAppointmentType(appointment.appointmentType);
     const isNewServiceLevelVisit = isNewServiceLevelAppointmentType(appointment.appointmentType);
+    const plannerFormType = appointmentTypeToPlannerFormType(appointment.appointmentType);
     setSession({
       ...restoredSession,
-      rfcForm: isRfcVisit
-        ? resolveRfcFormForAppointment(appointment, restoredSession.rfcForm)
-        : undefined,
-      loanRentalForm: isLoanRentalVisit
-        ? resolveLoanRentalFormForAppointment(appointment, restoredSession.loanRentalForm)
-        : undefined,
-      newServiceLevelForm: isNewServiceLevelVisit
-        ? resolveNewServiceLevelFormForAppointment(
-            appointment,
-            restoredSession.newServiceLevelForm,
-          )
-        : undefined,
+      rfcForm: undefined,
+      loanRentalForm: undefined,
+      newServiceLevelForm: undefined,
+      dynamicForm: restoredSession.dynamicForm,
     });
     setActiveTab(
-      isRfcVisit && !isCompletedVisit
-        ? 'rfc'
-        : isLoanRentalVisit && !isCompletedVisit
-          ? 'loan_rental'
-          : isNewServiceLevelVisit && !isCompletedVisit
-            ? 'new_service_level'
-            : 'notes',
+      (isRfcVisit || isLoanRentalVisit || isNewServiceLevelVisit) && !isCompletedVisit
+        ? isRfcVisit
+          ? 'rfc'
+          : isLoanRentalVisit
+            ? 'loan_rental'
+            : 'new_service_level'
+        : 'notes',
     );
 
     setError(null);
@@ -454,12 +488,53 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
     setLastSavedAt(null);
 
     /**
-     * Relinks an editable draft/declined sales request for this appointment so
-     * the rep can continue working after create or after a rejection.
+     * Always load the latest published Super Admin form for in-progress visits,
+     * so Save/Publish changes appear when the rep presses Start.
      */
     let cancelled = false;
     void (async () => {
       try {
+        if (plannerFormType && !isCompletedVisit) {
+          const published = await getPublishedPlannerForm(plannerFormType);
+          if (!cancelled) {
+            setSession((current) => {
+              if (!current) return current;
+              // Do not overwrite a sheet the rep already finished in this visit.
+              if (current.dynamicForm?.completedAt) return current;
+
+              const previousValues = current.dynamicForm?.values || {};
+              const previousFields = current.dynamicForm?.formSchemaSnapshot?.fields || [];
+              const nextValues = createEmptyDynamicFormValues(published.fields || []);
+
+              for (const field of published.fields || []) {
+                if (previousValues[field.id] != null && previousValues[field.id] !== '') {
+                  nextValues[field.id] = previousValues[field.id];
+                  continue;
+                }
+                const byKey = previousFields.find((row) => row.key === field.key);
+                if (byKey && previousValues[byKey.id] != null && previousValues[byKey.id] !== '') {
+                  nextValues[field.id] = previousValues[byKey.id];
+                }
+              }
+
+              const next: VisitSession = {
+                ...current,
+                dynamicForm: {
+                  formTemplateType: plannerFormType,
+                  formTemplateVersion: published.version,
+                  formSchemaSnapshot: { ...published, type: plannerFormType },
+                  values: nextValues,
+                },
+                rfcForm: undefined,
+                loanRentalForm: undefined,
+                newServiceLevelForm: undefined,
+              };
+              saveVisitSession(next);
+              return next;
+            });
+          }
+        }
+
         const { requests } = await listSalesRequests({
           appointment: appointment._id,
           limit: 20,
@@ -474,37 +549,66 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
 
         setSession((current) => {
           if (!current) return current;
+          const formData = editable.formData || {};
+          const hasDynamic =
+            Boolean(formData.formSchemaSnapshot) &&
+            Boolean(formData.values) &&
+            typeof formData.values === 'object';
+
+          // Prefer latest published schema; keep draft answers when keys match.
           const next: VisitSession = {
             ...current,
             salesRequestId: editable._id,
             notes: current.notes || editable.visitNotes || '',
-            rfcForm:
-              editable.requestType === 'rfc' && editable.formData
-                ? resolveRfcFormForAppointment(
-                    appointment,
-                    editable.formData as unknown as RfcFormData,
-                  )
-                : current.rfcForm,
-            loanRentalForm:
-              editable.requestType === 'loan_rental' && editable.formData
-                ? resolveLoanRentalFormForAppointment(
-                    appointment,
-                    editable.formData as unknown as LoanRentalFormData,
-                  )
-                : current.loanRentalForm,
-            newServiceLevelForm:
-              editable.requestType === 'rfc_new_service_level' && editable.formData
-                ? resolveNewServiceLevelFormForAppointment(
-                    appointment,
-                    editable.formData as unknown as NewServiceLevelFormData,
-                  )
-                : current.newServiceLevelForm,
+            dynamicForm:
+              current.dynamicForm ||
+              (hasDynamic
+                ? {
+                    formTemplateType:
+                      (formData.formTemplateType as VisitDynamicFormState['formTemplateType']) ||
+                      plannerFormType ||
+                      'rfc',
+                    formTemplateVersion: Number(formData.formTemplateVersion) || 1,
+                    formSchemaSnapshot: formData.formSchemaSnapshot as PlannerFormPublished,
+                    values: formData.values as VisitDynamicFormState['values'],
+                    completedAt: undefined,
+                  }
+                : current.dynamicForm),
           };
           saveVisitSession(next);
           return next;
         });
       } catch {
-        // Non-fatal — local session / appointment feedback remain the source of truth.
+        if (plannerFormType) {
+          setSession((current) => {
+            if (!current || current.dynamicForm) return current;
+            if (isRfcVisit) {
+              return {
+                ...current,
+                rfcForm: resolveRfcFormForAppointment(appointment, current.rfcForm),
+              };
+            }
+            if (isLoanRentalVisit) {
+              return {
+                ...current,
+                loanRentalForm: resolveLoanRentalFormForAppointment(
+                  appointment,
+                  current.loanRentalForm,
+                ),
+              };
+            }
+            if (isNewServiceLevelVisit) {
+              return {
+                ...current,
+                newServiceLevelForm: resolveNewServiceLevelFormForAppointment(
+                  appointment,
+                  current.newServiceLevelForm,
+                ),
+              };
+            }
+            return current;
+          });
+        }
       }
     })();
 
@@ -769,6 +873,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
     session?.loanRentalCompletedAt,
     session?.newServiceLevelForm,
     session?.newServiceLevelCompletedAt,
+    session?.dynamicForm,
     appointment,
     showCompletionDialog,
     persistVisitProgress,
@@ -796,13 +901,17 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
   const leadId = getAppointmentLeadId(appointment);
   const isEditingCompletedVisit =
     appointment.status === 'completed' || Boolean(appointment.attended);
+  const plannerFormType = appointmentTypeToPlannerFormType(appointment.appointmentType);
+  const hasDynamicForm = Boolean(session.dynamicForm);
   const isRfcVisit =
-    isRfcSheetAppointmentType(appointment.appointmentType) && Boolean(session.rfcForm);
+    isRfcSheetAppointmentType(appointment.appointmentType) &&
+    (hasDynamicForm || Boolean(session.rfcForm));
   const isLoanRentalVisit =
-    isLoanRentalAppointmentType(appointment.appointmentType) && Boolean(session.loanRentalForm);
+    isLoanRentalAppointmentType(appointment.appointmentType) &&
+    (hasDynamicForm || Boolean(session.loanRentalForm));
   const isNewServiceLevelVisit =
     isNewServiceLevelAppointmentType(appointment.appointmentType) &&
-    Boolean(session.newServiceLevelForm);
+    (hasDynamicForm || Boolean(session.newServiceLevelForm));
   const hasSheetForm = isRfcVisit || isLoanRentalVisit || isNewServiceLevelVisit;
   const rfcProgress = session.rfcForm ? getRfcFormProgress(session.rfcForm) : null;
   const loanRentalProgress = session.loanRentalForm
@@ -811,13 +920,15 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
   const newServiceLevelProgress = session.newServiceLevelForm
     ? getNewServiceLevelFormProgress(session.newServiceLevelForm)
     : null;
-  const sheetCompleted = isRfcVisit
-    ? Boolean(session.rfcCompletedAt)
-    : isLoanRentalVisit
-      ? Boolean(session.loanRentalCompletedAt)
-      : isNewServiceLevelVisit
-        ? Boolean(session.newServiceLevelCompletedAt)
-        : true;
+  const sheetCompleted = session.dynamicForm
+    ? Boolean(session.dynamicForm.completedAt)
+    : isRfcVisit
+      ? Boolean(session.rfcCompletedAt)
+      : isLoanRentalVisit
+        ? Boolean(session.loanRentalCompletedAt)
+        : isNewServiceLevelVisit
+          ? Boolean(session.newServiceLevelCompletedAt)
+          : true;
 
   /**
    * Updates one field on the active visit session.
@@ -827,11 +938,60 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
   }
 
   /**
+   * Completes the Super Admin dynamic form, then moves the rep to notes.
+   */
+  async function handleFinishDynamicForm(): Promise<void> {
+    if (!session.dynamicForm) {
+      return;
+    }
+
+    const missing = getMissingRequiredDynamicFields(
+      session.dynamicForm.formSchemaSnapshot.fields || [],
+      session.dynamicForm.values,
+    );
+    if (missing.length > 0) {
+      setShowDynamicValidation(true);
+      setError(`Please complete required fields: ${missing.join(', ')}`);
+      return;
+    }
+
+    const completedSession: VisitSession = {
+      ...session,
+      dynamicForm: {
+        ...session.dynamicForm,
+        completedAt: new Date().toISOString(),
+      },
+    };
+
+    setIsSaving(true);
+    setError(null);
+    setShowDynamicValidation(false);
+    setSession(completedSession);
+    sessionRef.current = completedSession;
+    saveVisitSession(completedSession);
+
+    try {
+      await persistVisitProgress(false, completedSession);
+      await upsertDraftSalesRequest(completedSession);
+      setLastSavedAt(new Date());
+      setActiveTab('notes');
+    } catch (saveError: any) {
+      setError(saveError.message || 'Failed to save the form');
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  /**
    * Completes and immediately saves the RFC sheet, then moves the rep to the
    * discussion notes without ending the active customer visit.
    * Incomplete fields stay empty as captured — Finish is never blocked.
    */
   async function handleFinishRfc(): Promise<void> {
+    if (session.dynamicForm) {
+      await handleFinishDynamicForm();
+      return;
+    }
     if (!session.rfcForm) {
       return;
     }
@@ -867,6 +1027,10 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
    * Incomplete fields stay empty as captured — Finish is never blocked.
    */
   async function handleFinishLoanRental(): Promise<void> {
+    if (session.dynamicForm) {
+      await handleFinishDynamicForm();
+      return;
+    }
     if (!session.loanRentalForm) {
       return;
     }
@@ -901,6 +1065,10 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
    * Incomplete fields stay empty as captured — Finish is never blocked.
    */
   async function handleFinishNewServiceLevel(): Promise<void> {
+    if (session.dynamicForm) {
+      await handleFinishDynamicForm();
+      return;
+    }
     if (!session.newServiceLevelForm) {
       return;
     }
@@ -1361,18 +1529,36 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
           </div>
         )}
 
-        {isRfcVisit && activeTab === 'rfc' && session.rfcForm && (
+        {isRfcVisit && activeTab === 'rfc' && (session.dynamicForm || session.rfcForm) && (
           <>
-            <DiaryRfcForm
-              value={session.rfcForm}
-              onChange={(nextForm) =>
-                updateSession({
-                  rfcForm: nextForm,
-                  rfcCompletedAt: undefined,
-                })
-              }
-              disabled={showCompletionDialog}
-            />
+            {session.dynamicForm ? (
+              <DynamicPlannerFormRenderer
+                schema={session.dynamicForm.formSchemaSnapshot}
+                values={session.dynamicForm.values}
+                showValidation={showDynamicValidation}
+                disabled={showCompletionDialog}
+                onChange={(nextValues) =>
+                  updateSession({
+                    dynamicForm: {
+                      ...session.dynamicForm!,
+                      values: nextValues,
+                      completedAt: undefined,
+                    },
+                  })
+                }
+              />
+            ) : session.rfcForm ? (
+              <DiaryRfcForm
+                value={session.rfcForm}
+                onChange={(nextForm) =>
+                  updateSession({
+                    rfcForm: nextForm,
+                    rfcCompletedAt: undefined,
+                  })
+                }
+                disabled={showCompletionDialog}
+              />
+            ) : null}
             {!showCompletionDialog && (
               <div className="sticky bottom-0 z-10 mt-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.10)]">
                 <button
@@ -1396,18 +1582,38 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
           </>
         )}
 
-        {isLoanRentalVisit && activeTab === 'loan_rental' && session.loanRentalForm && (
+        {isLoanRentalVisit &&
+          activeTab === 'loan_rental' &&
+          (session.dynamicForm || session.loanRentalForm) && (
           <>
-            <DiaryLoanRentalForm
-              value={session.loanRentalForm}
-              onChange={(nextForm) =>
-                updateSession({
-                  loanRentalForm: nextForm,
-                  loanRentalCompletedAt: undefined,
-                })
-              }
-              disabled={showCompletionDialog}
-            />
+            {session.dynamicForm ? (
+              <DynamicPlannerFormRenderer
+                schema={session.dynamicForm.formSchemaSnapshot}
+                values={session.dynamicForm.values}
+                showValidation={showDynamicValidation}
+                disabled={showCompletionDialog}
+                onChange={(nextValues) =>
+                  updateSession({
+                    dynamicForm: {
+                      ...session.dynamicForm!,
+                      values: nextValues,
+                      completedAt: undefined,
+                    },
+                  })
+                }
+              />
+            ) : session.loanRentalForm ? (
+              <DiaryLoanRentalForm
+                value={session.loanRentalForm}
+                onChange={(nextForm) =>
+                  updateSession({
+                    loanRentalForm: nextForm,
+                    loanRentalCompletedAt: undefined,
+                  })
+                }
+                disabled={showCompletionDialog}
+              />
+            ) : null}
             {!showCompletionDialog && (
               <div className="sticky bottom-0 z-10 mt-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.10)]">
                 <button
@@ -1421,7 +1627,11 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
                   ) : (
                     <Save className="h-4 w-4" />
                   )}
-                  Finish Loan &amp; Rental & Continue to Notes
+                  Finish{' '}
+                  {normalizeDiaryAppointmentType(appointment.appointmentType) === 'rental'
+                    ? 'Rental'
+                    : 'Loan'}{' '}
+                  & Continue to Notes
                 </button>
                 <p className="mt-2 text-center text-[11px] text-slate-500">
                   Saves as a draft. Keep editing until you choose Submit for Approval.
@@ -1433,18 +1643,36 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
 
         {isNewServiceLevelVisit &&
           activeTab === 'new_service_level' &&
-          session.newServiceLevelForm && (
+          (session.dynamicForm || session.newServiceLevelForm) && (
             <>
-              <DiaryNewServiceLevelForm
-                value={session.newServiceLevelForm}
-                onChange={(nextForm) =>
-                  updateSession({
-                    newServiceLevelForm: nextForm,
-                    newServiceLevelCompletedAt: undefined,
-                  })
-                }
-                disabled={showCompletionDialog}
-              />
+              {session.dynamicForm ? (
+                <DynamicPlannerFormRenderer
+                  schema={session.dynamicForm.formSchemaSnapshot}
+                  values={session.dynamicForm.values}
+                  showValidation={showDynamicValidation}
+                  disabled={showCompletionDialog}
+                  onChange={(nextValues) =>
+                    updateSession({
+                      dynamicForm: {
+                        ...session.dynamicForm!,
+                        values: nextValues,
+                        completedAt: undefined,
+                      },
+                    })
+                  }
+                />
+              ) : session.newServiceLevelForm ? (
+                <DiaryNewServiceLevelForm
+                  value={session.newServiceLevelForm}
+                  onChange={(nextForm) =>
+                    updateSession({
+                      newServiceLevelForm: nextForm,
+                      newServiceLevelCompletedAt: undefined,
+                    })
+                  }
+                  disabled={showCompletionDialog}
+                />
+              ) : null}
               {!showCompletionDialog && (
                 <div className="sticky bottom-0 z-10 mt-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.10)]">
                   <button

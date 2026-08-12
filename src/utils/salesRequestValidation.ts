@@ -31,6 +31,31 @@ export function validateSalesRequestForm(
   requestType: SalesRequestType,
   formData: Record<string, unknown>,
 ): SalesRequestValidationResult {
+  const schema = formData.formSchemaSnapshot as
+    | { fields?: Array<{ id?: string; label?: string; required?: boolean; enabled?: boolean }> }
+    | undefined;
+  const values = formData.values as Record<string, unknown> | undefined;
+  if (schema && Array.isArray(schema.fields) && values && typeof values === 'object') {
+    const enabled = schema.fields.filter((field) => field && field.enabled !== false);
+    const missingFields = enabled
+      .filter((field) => field.required)
+      .filter((field) => {
+        const raw = values[String(field.id)];
+        if (raw == null) return true;
+        if (typeof raw === 'string') return raw.trim().length === 0;
+        if (Array.isArray(raw)) return raw.length === 0;
+        return false;
+      })
+      .map((field) => field.label || String(field.id));
+    const filled = enabled.length - missingFields.length;
+    return {
+      valid: missingFields.length === 0,
+      missingFields,
+      filled: Math.max(0, filled),
+      total: enabled.length,
+    };
+  }
+
   switch (requestType) {
     case 'rfc': {
       const form = normalizeRfcForm(formData as Partial<RfcFormData>);
@@ -43,6 +68,8 @@ export function validateSalesRequestForm(
         total: progress.total,
       };
     }
+    case 'loan':
+    case 'rental':
     case 'loan_rental': {
       const form = normalizeLoanRentalForm(formData as Partial<LoanRentalFormData>);
       const progress = getLoanRentalFormProgress(form);
@@ -51,7 +78,7 @@ export function validateSalesRequestForm(
         missingFields:
           progress.filled === progress.total
             ? []
-            : [`Complete all important Loan & Rental fields (${progress.filled}/${progress.total} done)`],
+            : ['Complete required loan/rental fields'],
         filled: progress.filled,
         total: progress.total,
       };
@@ -64,7 +91,7 @@ export function validateSalesRequestForm(
         missingFields:
           progress.filled === progress.total
             ? []
-            : [`Complete all important New Service Level fields (${progress.filled}/${progress.total} done)`],
+            : ['Complete required service level fields'],
         filled: progress.filled,
         total: progress.total,
       };
@@ -83,6 +110,8 @@ export function createEmptyFormForRequestType(
   switch (requestType) {
     case 'rfc':
       return normalizeRfcForm(null) as unknown as Record<string, unknown>;
+    case 'loan':
+    case 'rental':
     case 'loan_rental':
       return normalizeLoanRentalForm(null) as unknown as Record<string, unknown>;
     case 'rfc_new_service_level':
@@ -99,9 +128,15 @@ export function normalizeFormForRequestType(
   requestType: SalesRequestType,
   formData: Record<string, unknown>,
 ): Record<string, unknown> {
+  if (formData.formSchemaSnapshot && formData.values) {
+    return formData;
+  }
+
   switch (requestType) {
     case 'rfc':
       return normalizeRfcForm(formData as Partial<RfcFormData>) as unknown as Record<string, unknown>;
+    case 'loan':
+    case 'rental':
     case 'loan_rental':
       return normalizeLoanRentalForm(formData as Partial<LoanRentalFormData>) as unknown as Record<string, unknown>;
     case 'rfc_new_service_level':

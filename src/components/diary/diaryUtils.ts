@@ -5,6 +5,8 @@
 export type DiaryAppointmentType =
   | 'site_visit'
   | 'rfc'
+  | 'loan'
+  | 'rental'
   | 'loan_rental'
   | 'rfc_new_service_level';
 
@@ -155,6 +157,14 @@ export function normalizeDiaryAppointmentType(value?: string): DiaryAppointmentT
     return 'rfc';
   }
 
+  if (value === 'loan') {
+    return 'loan';
+  }
+
+  if (value === 'rental') {
+    return 'rental';
+  }
+
   if (value === 'loan_rental') {
     return 'loan_rental';
   }
@@ -182,10 +192,27 @@ export function isRfcSheetAppointmentType(value?: string): boolean {
 }
 
 /**
+ * Returns whether an appointment type should open the Loan request sheet.
+ */
+export function isLoanAppointmentType(value?: string): boolean {
+  const normalized = normalizeDiaryAppointmentType(value);
+  return normalized === 'loan' || normalized === 'loan_rental';
+}
+
+/**
+ * Returns whether an appointment type should open the Rental request sheet.
+ */
+export function isRentalAppointmentType(value?: string): boolean {
+  return normalizeDiaryAppointmentType(value) === 'rental';
+}
+
+/**
  * Returns whether an appointment type should open the Loan & Rental request sheet.
+ * @deprecated Prefer isLoanAppointmentType / isRentalAppointmentType.
  */
 export function isLoanRentalAppointmentType(value?: string): boolean {
-  return normalizeDiaryAppointmentType(value) === 'loan_rental';
+  const normalized = normalizeDiaryAppointmentType(value);
+  return normalized === 'loan_rental' || normalized === 'loan' || normalized === 'rental';
 }
 
 /**
@@ -193,6 +220,36 @@ export function isLoanRentalAppointmentType(value?: string): boolean {
  */
 export function isNewServiceLevelAppointmentType(value?: string): boolean {
   return normalizeDiaryAppointmentType(value) === 'rfc_new_service_level';
+}
+
+/**
+ * Maps a diary appointment type to the Super Admin planner form template type.
+ */
+export function appointmentTypeToPlannerFormType(
+  value?: string,
+): 'rfc' | 'loan_rental' | 'new_service_level' | null {
+  const normalized = normalizeDiaryAppointmentType(value);
+  if (normalized === 'rfc') return 'rfc';
+  if (normalized === 'loan' || normalized === 'rental' || normalized === 'loan_rental') {
+    return 'loan_rental';
+  }
+  if (normalized === 'rfc_new_service_level') return 'new_service_level';
+  return null;
+}
+
+/**
+ * Maps planner form / appointment type to sales request type.
+ */
+export function appointmentTypeToSalesRequestType(
+  value?: string,
+): 'rfc' | 'loan' | 'rental' | 'loan_rental' | 'rfc_new_service_level' | null {
+  const normalized = normalizeDiaryAppointmentType(value);
+  if (normalized === 'rfc') return 'rfc';
+  if (normalized === 'loan') return 'loan';
+  if (normalized === 'rental') return 'rental';
+  if (normalized === 'loan_rental') return 'loan_rental';
+  if (normalized === 'rfc_new_service_level') return 'rfc_new_service_level';
+  return null;
 }
 
 /**

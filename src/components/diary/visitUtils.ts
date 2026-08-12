@@ -9,6 +9,8 @@ import {
   type NewServiceLevelFormData,
 } from './newServiceLevelFormUtils';
 import { normalizeRfcForm, type RfcFormData } from './rfcFormUtils';
+import type { PlannerFormPublished, PlannerFormType } from '../../lib/api';
+import type { DynamicFormValues } from './DynamicPlannerFormRenderer';
 
 export type VisitCompletionAction = 'finish_close' | 'book_next_visit';
 
@@ -104,6 +106,19 @@ export interface StoredVisitRecord {
   newServiceLevelForm?: NewServiceLevelFormData;
   /** Timestamp confirming the New Service Level step was finished before notes. */
   newServiceLevelCompletedAt?: string;
+  /** Dynamic Super Admin form payload (preferred over legacy sheet fields). */
+  dynamicForm?: VisitDynamicFormState;
+}
+
+/**
+ * Dynamic planner form values captured during a visit (schema snapshot + answers).
+ */
+export interface VisitDynamicFormState {
+  formTemplateType: PlannerFormType;
+  formTemplateVersion: number;
+  formSchemaSnapshot: PlannerFormPublished;
+  values: DynamicFormValues;
+  completedAt?: string;
 }
 
 export interface VisitSession {
@@ -125,6 +140,8 @@ export interface VisitSession {
   newServiceLevelForm?: NewServiceLevelFormData;
   /** Timestamp confirming the New Service Level form was explicitly saved. */
   newServiceLevelCompletedAt?: string;
+  /** Preferred dynamic form from Super Admin Form Editor. */
+  dynamicForm?: VisitDynamicFormState;
   /**
    * Linked draft/declined sales request ID created while the visit is still editable.
    * Submission for approval happens separately and locks the appointment.
@@ -166,6 +183,13 @@ function normalizeVisitSession(raw: Partial<VisitSession> & { appointmentId: str
       ? normalizeNewServiceLevelForm(raw.newServiceLevelForm)
       : undefined,
     newServiceLevelCompletedAt: raw.newServiceLevelCompletedAt,
+    dynamicForm:
+      raw.dynamicForm &&
+      typeof raw.dynamicForm === 'object' &&
+      raw.dynamicForm.formSchemaSnapshot &&
+      raw.dynamicForm.values
+        ? (raw.dynamicForm as VisitDynamicFormState)
+        : undefined,
     salesRequestId: typeof raw.salesRequestId === 'string' ? raw.salesRequestId : undefined,
   };
 }
@@ -230,6 +254,7 @@ export function sessionFromStoredRecord(
     loanRentalCompletedAt: record.loanRentalCompletedAt,
     newServiceLevelForm: record.newServiceLevelForm,
     newServiceLevelCompletedAt: record.newServiceLevelCompletedAt,
+    dynamicForm: record.dynamicForm,
   });
 }
 
@@ -388,6 +413,7 @@ export function buildVisitRecord(
     loanRentalCompletedAt: session.loanRentalCompletedAt,
     newServiceLevelForm: session.newServiceLevelForm,
     newServiceLevelCompletedAt: session.newServiceLevelCompletedAt,
+    dynamicForm: session.dynamicForm,
   };
 }
 
@@ -438,6 +464,13 @@ export function parseStoredVisitRecord(feedback?: string | null): StoredVisitRec
         ? normalizeNewServiceLevelForm(raw.newServiceLevelForm)
         : undefined,
       newServiceLevelCompletedAt: raw.newServiceLevelCompletedAt,
+      dynamicForm:
+        raw.dynamicForm &&
+        typeof raw.dynamicForm === 'object' &&
+        raw.dynamicForm.formSchemaSnapshot &&
+        raw.dynamicForm.values
+          ? raw.dynamicForm
+          : undefined,
     };
   } catch {
     return null;

@@ -3753,7 +3753,233 @@ export async function createDiaryAppointment(data: {
 }
 
 /** Sales request form types aligned with diary visit sheets. */
-export type SalesRequestType = 'rfc' | 'loan_rental' | 'rfc_new_service_level';
+export type SalesRequestType =
+  | 'rfc'
+  | 'loan'
+  | 'rental'
+  | 'loan_rental'
+  | 'rfc_new_service_level';
+
+/** Planner form template types controlled by Super Admin (system + custom_*). */
+export type PlannerFormType = string;
+
+/** Dynamic field types for planner forms. */
+export type PlannerFormFieldType =
+  | 'text'
+  | 'textarea'
+  | 'number'
+  | 'phone'
+  | 'email'
+  | 'date'
+  | 'time'
+  | 'dropdown'
+  | 'checkbox'
+  | 'radio'
+  | 'address'
+  | 'file';
+
+/** Visual builder element types (Shopify-style form editor). */
+export type PlannerFormElementType =
+  | 'heading'
+  | 'text_block'
+  | 'divider'
+  | 'section'
+  | 'spacer'
+  | PlannerFormFieldType
+  | 'logo'
+  | 'image'
+  | 'button';
+
+export interface PlannerFormFieldOption {
+  value: string;
+  label: string;
+}
+
+/** Appearance / layout / validation settings for a builder element. */
+export interface PlannerFormElementSettings {
+  fontSize?: number;
+  fontWeight?: string;
+  textAlign?: 'left' | 'center' | 'right';
+  textColor?: string;
+  backgroundColor?: string;
+  padding?: string;
+  margin?: string;
+  borderRadius?: string;
+  borderColor?: string;
+  visibility?: boolean;
+  logoUrl?: string;
+  imageUrl?: string;
+  logoWidth?: number;
+  logoHeight?: number;
+  columns?: number;
+  buttonStyle?: 'primary' | 'secondary' | 'outline';
+  buttonAction?: 'save' | 'submit' | 'next' | 'none';
+  spacerHeight?: number;
+  validationMin?: number;
+  validationMax?: number;
+  validationPattern?: string;
+}
+
+/** Single visual builder element in the form tree. */
+export interface PlannerFormElement {
+  id: string;
+  type: PlannerFormElementType;
+  order: number;
+  enabled: boolean;
+  label?: string;
+  key?: string;
+  content?: string;
+  required?: boolean;
+  placeholder?: string;
+  helpText?: string;
+  description?: string;
+  defaultValue?: string;
+  options?: PlannerFormFieldOption[];
+  width?: 'full' | 'half' | 'third';
+  settings?: PlannerFormElementSettings;
+  children?: PlannerFormElement[];
+}
+
+export interface PlannerFormField {
+  id: string;
+  key: string;
+  type: PlannerFormFieldType;
+  label: string;
+  description?: string;
+  placeholder?: string;
+  helpText?: string;
+  required: boolean;
+  enabled: boolean;
+  options?: PlannerFormFieldOption[];
+  order: number;
+  width?: 'full' | 'half';
+}
+
+export interface PlannerFormContent {
+  name: string;
+  title: string;
+  description?: string;
+  logoUrl?: string;
+  elements?: PlannerFormElement[];
+  fields: PlannerFormField[];
+}
+
+export interface PlannerFormPublished extends PlannerFormContent {
+  type?: PlannerFormType;
+  version: number;
+  publishedAt: string;
+}
+
+export interface PlannerFormAdminTemplate {
+  type: PlannerFormType;
+  draft: PlannerFormContent;
+  published: PlannerFormPublished | null;
+  hasUnpublishedChanges?: boolean;
+  draftSavedAt?: string | null;
+  isActive?: boolean;
+  displayOrder?: number;
+  isSystem?: boolean;
+  updatedAt?: string | null;
+  updatedBy?: string | null;
+}
+
+/**
+ * Lists published planner forms (metadata) for diary users.
+ */
+export async function listPublishedPlannerForms(): Promise<{
+  forms: Array<{
+    type: PlannerFormType;
+    name: string;
+    title: string;
+    description?: string;
+    logoUrl?: string;
+    version: number;
+    publishedAt?: string | null;
+    fieldCount: number;
+    elementCount?: number;
+    isSystem?: boolean;
+    displayOrder?: number;
+  }>;
+}> {
+  return apiRequest('/api/planner-form-templates/published');
+}
+
+/**
+ * Loads the published planner form schema for a type (rep fill).
+ */
+export async function getPublishedPlannerForm(
+  type: PlannerFormType,
+): Promise<PlannerFormPublished & { type: PlannerFormType }> {
+  return apiRequest(`/api/planner-form-templates/published/${type}`);
+}
+
+/**
+ * Lists draft + published templates for Super Admin Form Editor.
+ */
+export async function listAdminPlannerForms(): Promise<{ forms: PlannerFormAdminTemplate[] }> {
+  return apiRequest('/api/planner-form-templates/admin');
+}
+
+/**
+ * Creates a new custom form template (Super Admin).
+ */
+export async function createAdminPlannerForm(payload: {
+  name: string;
+  description?: string;
+  logoUrl?: string;
+}): Promise<PlannerFormAdminTemplate> {
+  return apiRequest('/api/planner-form-templates/admin', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * Loads one Super Admin draft template.
+ */
+export async function getAdminPlannerForm(
+  type: PlannerFormType,
+): Promise<PlannerFormAdminTemplate> {
+  return apiRequest(`/api/planner-form-templates/admin/${type}`);
+}
+
+/**
+ * Saves Super Admin draft changes (does not publish).
+ */
+export async function saveAdminPlannerFormDraft(
+  type: PlannerFormType,
+  draft: PlannerFormContent,
+): Promise<PlannerFormAdminTemplate> {
+  return apiRequest(`/api/planner-form-templates/admin/${type}`, {
+    method: 'PUT',
+    body: JSON.stringify({ draft }),
+  });
+}
+
+/**
+ * Publishes the Super Admin draft so reps receive the updated form.
+ */
+export async function publishAdminPlannerForm(
+  type: PlannerFormType,
+  draft?: PlannerFormContent,
+): Promise<PlannerFormAdminTemplate> {
+  return apiRequest(`/api/planner-form-templates/admin/${type}/publish`, {
+    method: 'POST',
+    body: JSON.stringify(draft ? { draft } : {}),
+  });
+}
+
+/**
+ * Discards unpublished draft and restores from published version.
+ */
+export async function discardAdminPlannerFormDraft(
+  type: PlannerFormType,
+): Promise<PlannerFormAdminTemplate> {
+  return apiRequest(`/api/planner-form-templates/admin/${type}/discard`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
 
 /** Sales request lifecycle status. */
 export type SalesRequestStatus = 'draft' | 'pending' | 'approved' | 'declined';

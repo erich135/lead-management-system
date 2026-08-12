@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  BookOpen,
   CheckCircle2,
   ClipboardList,
   Clock,
@@ -10,8 +11,10 @@ import {
   History,
   Loader2,
   Paperclip,
+  Pencil,
   RefreshCw,
   Search,
+  Settings2,
   XCircle,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -28,6 +31,7 @@ import {
 } from '../constants/salesRequestPermissions';
 import SalesRequestReviewModal from './SalesRequestReviewModal';
 import SalesRequestAttachmentsSheet from './SalesRequestAttachmentsSheet';
+import PlannerFormEditorModal from './diary/PlannerFormEditorModal';
 import { EmptyState } from './ui';
 import {
   resolveAttachmentDownloadAction,
@@ -36,7 +40,7 @@ import {
   collectRequestDownloadUrls,
 } from '../utils/repApprovalsDownload';
 
-type AdminQueueTab = 'pending' | 'history';
+type AdminQueueTab = 'pending' | 'history' | 'rep_diaries';
 type StatusFilter = 'all' | SalesRequestStatus;
 
 /** Display labels for the Rep Approvals page (UI only). */
@@ -180,6 +184,7 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
   const [attachmentNotice, setAttachmentNotice] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [showFormEditor, setShowFormEditor] = useState(false);
 
   /**
    * Loads headline statistics without altering the main queue fetch behaviour.
@@ -214,6 +219,10 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
    */
   const loadQueue = useCallback(async () => {
     if (!canViewQueue) return;
+    if (tab === 'rep_diaries') {
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -386,6 +395,12 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
       hint: 'Approved & rejected',
       icon: History,
     },
+    {
+      id: 'rep_diaries' as AdminQueueTab,
+      label: 'Rep Diaries',
+      hint: 'Forms & diary tools',
+      icon: BookOpen,
+    },
   ];
 
   if (!canViewQueue) {
@@ -436,7 +451,9 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
             <p className="mt-1 max-w-2xl text-sm leading-snug text-slate-600">
               {tab === 'pending'
                 ? 'Review rep submissions, download attachments, and approve or reject.'
-                : 'Browse approved and rejected submissions for audit and reference.'}
+                : tab === 'history'
+                  ? 'Browse approved and rejected submissions for audit and reference.'
+                  : 'Manage rep diary forms used on appointments (Super Admin).'}
             </p>
           </div>
           <button
@@ -445,7 +462,7 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
               void loadQueue();
               void loadStats();
             }}
-            disabled={loading}
+            disabled={loading || tab === 'rep_diaries'}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -498,6 +515,54 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
         {/* Main content */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:rounded-2xl lg:border lg:border-slate-200 lg:bg-white lg:shadow-sm">
           <div className="flex-1 overflow-auto p-4 sm:p-6">
+            {tab === 'rep_diaries' ? (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5">
+                  <div className="flex items-start gap-3">
+                    <span className="rounded-xl bg-white p-2 text-[#0969a9] shadow-sm">
+                      <BookOpen className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-lg font-extrabold text-slate-900">Rep Diaries</h2>
+                      <p className="mt-1 text-sm text-slate-600">
+                        Edit the forms reps use when they start RFC, Loan Rental, or New Service
+                        Level appointments.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {isSuperAdmin ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowFormEditor(true)}
+                    className="flex w-full items-start gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-[#0969a9] hover:shadow-md"
+                  >
+                    <span className="rounded-xl bg-[#0969a9]/10 p-3 text-[#0969a9]">
+                      <Settings2 className="h-6 w-6" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-base font-extrabold text-slate-900">
+                        Form Editor
+                      </span>
+                      <span className="mt-1 block text-sm text-slate-600">
+                        Open RFC, Loan Rental, and New Service Level. Save draft or publish for
+                        reps.
+                      </span>
+                      <span className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[#0969a9]/10 px-2.5 py-1 text-xs font-bold text-[#0969a9]">
+                        <Pencil className="h-3.5 w-3.5" />
+                        Open Form Editor
+                      </span>
+                    </span>
+                  </button>
+                ) : (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    Only Super Admin can open the Form Editor.
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
             {/* Summary cards */}
             <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
@@ -723,6 +788,8 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
                 })}
               </div>
             )}
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -741,6 +808,13 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
         open={Boolean(attachmentsRequest)}
         onClose={() => setAttachmentsRequest(null)}
       />
+
+      {isSuperAdmin ? (
+        <PlannerFormEditorModal
+          isOpen={showFormEditor}
+          onClose={() => setShowFormEditor(false)}
+        />
+      ) : null}
     </div>
   );
 }

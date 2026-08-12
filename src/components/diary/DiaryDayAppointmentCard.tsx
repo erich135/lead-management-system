@@ -40,6 +40,8 @@ function typeTone(appointmentType?: string): StatusBadgeTone {
   switch (normalizeDiaryAppointmentType(appointmentType)) {
     case 'rfc':
       return 'rfc';
+    case 'loan':
+    case 'rental':
     case 'loan_rental':
       return 'loan';
     case 'rfc_new_service_level':
@@ -56,6 +58,8 @@ function typeRailClass(appointmentType?: string): string {
   switch (normalizeDiaryAppointmentType(appointmentType)) {
     case 'rfc':
       return 'crm-type-rfc';
+    case 'loan':
+    case 'rental':
     case 'loan_rental':
       return 'crm-type-loan';
     case 'rfc_new_service_level':

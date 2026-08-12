@@ -581,8 +581,8 @@ const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
 
   const quickCreate = [
     { type: 'site_visit', label: 'Site', title: 'Site Visit', icon: <MapPin className="h-3.5 w-3.5" /> },
-    { type: 'loan_rental', label: 'Loan', title: 'Loan Rental', icon: <Truck className="h-3.5 w-3.5" /> },
     { type: 'rfc', label: 'RFC', title: 'RFC', icon: <FileText className="h-3.5 w-3.5" /> },
+    { type: 'loan_rental', label: 'Loan Rental', title: 'Loan Rental', icon: <Truck className="h-3.5 w-3.5" /> },
     {
       type: 'rfc_new_service_level',
       label: 'Service',

@@ -3,6 +3,8 @@
  * Handles authentication, request/response formatting, and error handling.
  */
 
+import { resolveApiBaseUrl } from './resolveApiBaseUrl';
+
 // Re-export types from types/index.ts for convenience
 export type {
   SalesLead,
@@ -15,7 +17,12 @@ export type {
   CanvassingPlanStatus,
 } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+/**
+ * Hostname-aware API origin so LAN IP pages call the same host (not localhost).
+ */
+function apiBase(): string {
+  return resolveApiBaseUrl();
+}
 
 /**
  * API response wrapper type.
@@ -141,7 +148,7 @@ async function apiRequest<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const token = getAuthToken();
-  const url = `${API_BASE_URL}${endpoint}`;
+  const url = `${apiBase()}${endpoint}`;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -155,6 +162,8 @@ async function apiRequest<T>(
   const response = await fetch(url, {
     ...options,
     headers,
+    // Include cookies so development session cookies work on localhost and LAN.
+    credentials: 'include',
   });
 
   // Try to parse JSON response
@@ -1418,7 +1427,7 @@ export async function downloadMachinePlannerReport(customerId: string, customerN
   const token = getAuthToken();
   if (!token) throw new Error('No authentication token found');
 
-  const response = await fetch(`${API_BASE_URL}/api/reports/machine-planner/${customerId}`, {
+  const response = await fetch(`${apiBase()}/api/reports/machine-planner/${customerId}`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -1895,7 +1904,7 @@ export async function uploadTechnicianAppRelease(
     throw new Error('No authentication token found');
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/technician-app/release`, {
+  const response = await fetch(`${apiBase()}/api/technician-app/release`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -1933,7 +1942,7 @@ export async function downloadTechnicianAppApk(versionLabel?: string): Promise<v
     throw new Error('No authentication token found');
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/technician-app/release/download`, {
+  const response = await fetch(`${apiBase()}/api/technician-app/release/download`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -1977,7 +1986,7 @@ export async function importJobs(file: File, clearExisting: boolean, branchId?: 
     throw new Error('No authentication token found');
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/import/jobs`, {
+  const response = await fetch(`${apiBase()}/api/import/jobs`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -2006,7 +2015,7 @@ export async function updateJobs(file: File): Promise<{ message: string; data: {
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await fetch(`${API_BASE_URL}/api/import/jobs/update`, {
+  const response = await fetch(`${apiBase()}/api/import/jobs/update`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -2035,7 +2044,7 @@ export async function importCustomers(file: File, clearExisting: boolean): Promi
     throw new Error('No authentication token found');
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/import/customers`, {
+  const response = await fetch(`${apiBase()}/api/import/customers`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -2064,7 +2073,7 @@ export async function importRentalMachines(file: File, clearExisting: boolean): 
     throw new Error('No authentication token found');
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/import/rental-machines`, {
+  const response = await fetch(`${apiBase()}/api/import/rental-machines`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -2087,7 +2096,7 @@ export async function importCustomerMachines(machines: ImportableMachineRow[]): 
   const token = getAuthToken();
   if (!token) throw new Error('No authentication token found');
 
-  const response = await fetch(`${API_BASE_URL}/api/import/customer-machines`, {
+  const response = await fetch(`${apiBase()}/api/import/customer-machines`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -2120,7 +2129,7 @@ export async function validateMachinesCSV(file: File): Promise<{
   formData.append('file', file);
   const token = getAuthToken();
   if (!token) throw new Error('No authentication token found');
-  const response = await fetch(`${API_BASE_URL}/api/import/machines/validate`, {
+  const response = await fetch(`${apiBase()}/api/import/machines/validate`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}` },
     body: formData,
@@ -2143,7 +2152,7 @@ export async function confirmMachinesImport(
 }> {
   const token = getAuthToken();
   if (!token) throw new Error('No authentication token found');
-  const response = await fetch(`${API_BASE_URL}/api/import/machines/confirm`, {
+  const response = await fetch(`${apiBase()}/api/import/machines/confirm`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -2174,7 +2183,7 @@ export async function previewDedupMachines(): Promise<{
 }> {
   const token = getAuthToken();
   if (!token) throw new Error('No authentication token found');
-  const response = await fetch(`${API_BASE_URL}/api/machines/dedup/preview`, {
+  const response = await fetch(`${apiBase()}/api/machines/dedup/preview`, {
     headers: { 'Authorization': `Bearer ${token}` },
   });
   if (!response.ok) {
@@ -2190,7 +2199,7 @@ export async function confirmDedupMachines(): Promise<{
 }> {
   const token = getAuthToken();
   if (!token) throw new Error('No authentication token found');
-  const response = await fetch(`${API_BASE_URL}/api/machines/dedup/confirm`, {
+  const response = await fetch(`${apiBase()}/api/machines/dedup/confirm`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}` },
   });
@@ -2214,7 +2223,7 @@ export async function importSalesLeads(file: File, clearExisting: boolean): Prom
     throw new Error('No authentication token found');
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/import/sales-leads`, {
+  const response = await fetch(`${apiBase()}/api/import/sales-leads`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -2239,7 +2248,7 @@ export async function downloadExampleCSV(type: 'jobs' | 'customers' | 'rental-ma
     throw new Error('No authentication token found');
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/import/example/${type}`, {
+  const response = await fetch(`${apiBase()}/api/import/example/${type}`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -2486,7 +2495,7 @@ export async function uploadChatAttachment(file: File): Promise<ChatAttachment> 
   formData.append('file', file);
   
   const token = getAuthToken();
-  const response = await fetch(`${API_BASE_URL}/api/chat/attachments`, {
+  const response = await fetch(`${apiBase()}/api/chat/attachments`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -2508,7 +2517,7 @@ export async function uploadChatAttachment(file: File): Promise<ChatAttachment> 
  */
 export function getChatAttachmentUrl(attachmentId: string): string {
   const token = getAuthToken();
-  return `${API_BASE_URL}/api/chat/attachments/${attachmentId}?token=${token}`;
+  return `${apiBase()}/api/chat/attachments/${attachmentId}?token=${token}`;
 }
 
 /**
@@ -2660,7 +2669,7 @@ export async function uploadRSRDocument(
   formData.append('visibility', visibility);
 
   const token = getAuthToken();
-  const response = await fetch(`${API_BASE_URL}/api/jobs/${jobId}/rsr-documents`, {
+  const response = await fetch(`${apiBase()}/api/jobs/${jobId}/rsr-documents`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -2690,7 +2699,7 @@ export async function getRSRDocuments(jobId: string): Promise<JobRSRDocument[]> 
  */
 export function getRSRDocumentUrl(documentId: string): string {
   const token = getAuthToken();
-  return `${API_BASE_URL}/api/rsr-documents/${documentId}?token=${token}`;
+  return `${apiBase()}/api/rsr-documents/${documentId}?token=${token}`;
 }
 
 /**
@@ -2731,7 +2740,7 @@ export async function uploadMachineRSR(
   if (extraFields?.nextServiceDate) formData.append('nextServiceDate', extraFields.nextServiceDate);
 
   const token = getAuthToken();
-  const response = await fetch(`${API_BASE_URL}/api/machines/${machineId}/rsr`, {
+  const response = await fetch(`${apiBase()}/api/machines/${machineId}/rsr`, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,
@@ -2793,7 +2802,7 @@ export async function uploadRSR(params: {
   if (params.comments) formData.append('comments', params.comments);
 
   const token = getAuthToken();
-  const response = await fetch(`${API_BASE_URL}/api/machines/rsr`, {
+  const response = await fetch(`${apiBase()}/api/machines/rsr`, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,
@@ -2840,7 +2849,7 @@ export async function getMachineRSRs(machineId: string): Promise<MachineRSR[]> {
  * Get machine RSR document download URL.
  */
 export function getMachineRSRUrl(machineId: string, rsrId: string): string {
-  return `${API_BASE_URL}/api/machines/${machineId}/rsr/${rsrId}`;
+  return `${apiBase()}/api/machines/${machineId}/rsr/${rsrId}`;
 }
 
 /**
@@ -2884,7 +2893,7 @@ export async function uploadJobNoteAttachment(file: File): Promise<JobNoteAttach
   formData.append('file', file);
 
   const token = getAuthToken();
-  const response = await fetch(`${API_BASE_URL}/api/notes/attachments`, {
+  const response = await fetch(`${apiBase()}/api/notes/attachments`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -2906,7 +2915,7 @@ export async function uploadJobNoteAttachment(file: File): Promise<JobNoteAttach
  */
 export function getJobNoteAttachmentUrl(attachmentId: string): string {
   const token = getAuthToken();
-  return `${API_BASE_URL}/api/notes/attachments/${attachmentId}?token=${token}`;
+  return `${apiBase()}/api/notes/attachments/${attachmentId}?token=${token}`;
 }
 
 /**
@@ -3038,7 +3047,7 @@ export async function markTicketAsReadBySupport(ticketId: string): Promise<void>
 // Sales Lead Management
 // ============================================================================
 
-import type { SalesLead, SalesLeadWithDetails, Appointment, CanvassingPlan } from '../types';
+import type { SalesLead, SalesLeadWithDetails, Appointment, CanvassingPlan, VisitGpsVerification } from '../types';
 
 /**
  * Get all sales leads with optional filtering.
@@ -3399,16 +3408,51 @@ export async function getWeeklyAppointments(params?: {
   endDate?: string;
   branch?: string;
   assignedRep?: string;
+  search?: string;
+  status?: string;
+  appointmentType?: string;
 }): Promise<any[]> {
   const query = new URLSearchParams();
   if (params?.startDate) query.append('startDate', params.startDate);
   if (params?.endDate) query.append('endDate', params.endDate);
   if (params?.branch) query.append('branch', params.branch);
   if (params?.assignedRep) query.append('assignedRep', params.assignedRep);
+  if (params?.search) query.append('search', params.search);
+  if (params?.status) query.append('status', params.status);
+  if (params?.appointmentType) query.append('appointmentType', params.appointmentType);
 
   const qs = query.toString();
   const response = await apiRequest<any[]>(`/api/sales-leads/appointments/weekly${qs ? `?${qs}` : ''}`);
   return response;
+}
+
+/**
+ * Loads completed / cancelled visit history for the Sales Diary History tab.
+ */
+export async function getVisitHistory(params?: {
+  search?: string;
+  customer?: string;
+  assignedRep?: string;
+  branch?: string;
+  appointmentType?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+}): Promise<any[]> {
+  const query = new URLSearchParams();
+  if (params?.search) query.append('search', params.search);
+  if (params?.customer) query.append('customer', params.customer);
+  if (params?.assignedRep) query.append('assignedRep', params.assignedRep);
+  if (params?.branch) query.append('branch', params.branch);
+  if (params?.appointmentType) query.append('appointmentType', params.appointmentType);
+  if (params?.status) query.append('status', params.status);
+  if (params?.startDate) query.append('startDate', params.startDate);
+  if (params?.endDate) query.append('endDate', params.endDate);
+  if (params?.limit != null) query.append('limit', String(params.limit));
+
+  const qs = query.toString();
+  return apiRequest<any[]>(`/api/sales-leads/appointments/history${qs ? `?${qs}` : ''}`);
 }
 
 /**
@@ -3569,7 +3613,622 @@ export async function getSalesLeadAnalytics(filters?: {
   }
   const queryString = params.toString();
   const url = `/api/sales-leads/analytics${queryString ? '?' + queryString : ''}`;
-  return apiRequest<any>(url);
+  const raw = await apiRequest<any>(url);
+
+  /**
+   * Normalizes analytics payloads so older/newer backend shapes both work in the UI.
+   */
+  const valueMetricsRaw = raw?.leadPerformance?.valueMetrics || {};
+  const convertedMetricsRaw = raw?.leadPerformance?.convertedValueMetrics || {};
+  const repRows = Array.isArray(raw?.repPerformance)
+    ? raw.repPerformance
+    : Array.isArray(raw?.repPerformance?.reps)
+      ? raw.repPerformance.reps
+      : [];
+
+  const leadAgingRaw = raw?.leadAging;
+  const leadAgingRanges = Array.isArray(leadAgingRaw?.ranges)
+    ? leadAgingRaw.ranges
+    : [
+        { range: '0-7 days', count: Number(leadAgingRaw?.['0-7days']) || 0 },
+        { range: '8-30 days', count: Number(leadAgingRaw?.['8-30days']) || 0 },
+        { range: '31-60 days', count: Number(leadAgingRaw?.['31-60days']) || 0 },
+        { range: '60+ days', count: Number(leadAgingRaw?.['60plus']) || 0 },
+      ];
+
+  return {
+    leadPerformance: {
+      totalLeads: Number(raw?.leadPerformance?.totalLeads) || 0,
+      statusBreakdown: raw?.leadPerformance?.statusBreakdown || {},
+      conversionRate: Number(raw?.leadPerformance?.conversionRate) || 0,
+      avgDaysToConversion: Number(raw?.leadPerformance?.avgDaysToConversion) || 0,
+      valueMetrics: {
+        totalPipelineValue:
+          Number(valueMetricsRaw.totalPipelineValue ?? valueMetricsRaw.totalEstimatedValue) || 0,
+        totalConvertedValue:
+          Number(
+            valueMetricsRaw.totalConvertedValue ??
+              convertedMetricsRaw.totalConvertedValue,
+          ) || 0,
+        avgLeadValue:
+          Number(valueMetricsRaw.avgLeadValue ?? valueMetricsRaw.avgEstimatedValue) || 0,
+        avgConvertedValue:
+          Number(
+            valueMetricsRaw.avgConvertedValue ?? convertedMetricsRaw.avgConvertedValue,
+          ) || 0,
+      },
+    },
+    sourceAnalysis: {
+      leadsBySource: (raw?.sourceAnalysis?.leadsBySource || []).map((item: any) => ({
+        source: item.source || item._id || 'Unknown',
+        count: Number(item.count) || 0,
+        totalValue: Number(item.totalValue) || 0,
+      })),
+      sourceConversionRates: (raw?.sourceAnalysis?.sourceConversionRates || []).map(
+        (item: any) => ({
+          source: item.source || item._id || 'Unknown',
+          conversionRate: Number(item.conversionRate) || 0,
+          totalLeads: Number(item.totalLeads ?? item.total) || 0,
+          convertedLeads: Number(item.convertedLeads ?? item.converted) || 0,
+        }),
+      ),
+    },
+    repPerformance: {
+      reps: repRows.map((item: any) => {
+        const repDoc = item._id && typeof item._id === 'object' ? item._id : null;
+        const totalLeads = Number(item.totalLeads) || 0;
+        const totalValue = Number(item.totalValue) || 0;
+        return {
+          repId: String(item.repId || repDoc?._id || item._id || ''),
+          repName:
+            item.repName ||
+            repDoc?.description ||
+            repDoc?.code ||
+            repDoc?.name ||
+            'Unknown rep',
+          totalLeads,
+          convertedLeads: Number(item.convertedLeads) || 0,
+          conversionRate: Number(item.conversionRate) || 0,
+          totalValue,
+          avgLeadValue:
+            Number(item.avgLeadValue) ||
+            (totalLeads > 0 ? totalValue / totalLeads : 0),
+        };
+      }),
+    },
+    appointmentAnalytics: {
+      totalAppointments: Number(raw?.appointmentAnalytics?.totalAppointments) || 0,
+      attendedAppointments: Number(raw?.appointmentAnalytics?.attendedAppointments) || 0,
+      noShowAppointments: Number(raw?.appointmentAnalytics?.noShowAppointments) || 0,
+      appointmentShowRate: Number(raw?.appointmentAnalytics?.appointmentShowRate) || 0,
+    },
+    branchPerformance: (raw?.branchPerformance || []).map((item: any) => {
+      const branchDoc = item._id && typeof item._id === 'object' ? item._id : null;
+      return {
+        branch:
+          item.branch ||
+          branchDoc?.name ||
+          branchDoc?.code ||
+          String(item._id || 'Unknown branch'),
+        totalLeads: Number(item.totalLeads) || 0,
+        convertedLeads: Number(item.convertedLeads) || 0,
+        totalValue: Number(item.totalValue) || 0,
+        avgValue: Number(item.avgValue) || 0,
+      };
+    }),
+    leadAging: {
+      ranges: leadAgingRanges,
+    },
+    lostReasons: (raw?.lostReasons || []).map((item: any) => ({
+      reason: item.reason || item._id || 'Unknown',
+      count: Number(item.count) || 0,
+    })),
+  };
+}
+
+/**
+ * Creates a diary appointment from customer name or an existing sales lead.
+ * Used by the Sales Diary planner New Appointment flow.
+ */
+export async function createDiaryAppointment(data: {
+  customerName?: string;
+  salesLeadId?: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  appointmentType?: string;
+  status?: string;
+  location?: string;
+  purpose?: string;
+  notes?: string;
+  internalNotes?: string;
+  nextAction?: string;
+  assignedRep?: string;
+  geoLocation?: { type: 'Point'; coordinates: [number, number] };
+}): Promise<Appointment> {
+  const response = await apiRequest<Appointment>('/api/sales-leads/appointments/diary', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  return response;
+}
+
+/** Sales request form types aligned with diary visit sheets. */
+export type SalesRequestType =
+  | 'rfc'
+  | 'loan'
+  | 'rental'
+  | 'loan_rental'
+  | 'rfc_new_service_level';
+
+/** Planner form template types controlled by Super Admin (system + custom_*). */
+export type PlannerFormType = string;
+
+/** Dynamic field types for planner forms. */
+export type PlannerFormFieldType =
+  | 'text'
+  | 'textarea'
+  | 'number'
+  | 'phone'
+  | 'email'
+  | 'date'
+  | 'time'
+  | 'dropdown'
+  | 'checkbox'
+  | 'radio'
+  | 'address'
+  | 'file';
+
+/** Visual builder element types (Shopify-style form editor). */
+export type PlannerFormElementType =
+  | 'heading'
+  | 'text_block'
+  | 'divider'
+  | 'section'
+  | 'spacer'
+  | PlannerFormFieldType
+  | 'logo'
+  | 'image'
+  | 'button';
+
+export interface PlannerFormFieldOption {
+  value: string;
+  label: string;
+}
+
+/** Appearance / layout / validation settings for a builder element. */
+export interface PlannerFormElementSettings {
+  fontSize?: number;
+  fontWeight?: string;
+  textAlign?: 'left' | 'center' | 'right';
+  textColor?: string;
+  backgroundColor?: string;
+  padding?: string;
+  margin?: string;
+  borderRadius?: string;
+  borderColor?: string;
+  visibility?: boolean;
+  logoUrl?: string;
+  imageUrl?: string;
+  logoWidth?: number;
+  logoHeight?: number;
+  columns?: number;
+  buttonStyle?: 'primary' | 'secondary' | 'outline';
+  buttonAction?: 'save' | 'submit' | 'next' | 'none';
+  spacerHeight?: number;
+  validationMin?: number;
+  validationMax?: number;
+  validationPattern?: string;
+}
+
+/** Single visual builder element in the form tree. */
+export interface PlannerFormElement {
+  id: string;
+  type: PlannerFormElementType;
+  order: number;
+  enabled: boolean;
+  label?: string;
+  key?: string;
+  content?: string;
+  required?: boolean;
+  placeholder?: string;
+  helpText?: string;
+  description?: string;
+  defaultValue?: string;
+  options?: PlannerFormFieldOption[];
+  width?: 'full' | 'half' | 'third';
+  settings?: PlannerFormElementSettings;
+  children?: PlannerFormElement[];
+}
+
+export interface PlannerFormField {
+  id: string;
+  key: string;
+  type: PlannerFormFieldType;
+  label: string;
+  description?: string;
+  placeholder?: string;
+  helpText?: string;
+  required: boolean;
+  enabled: boolean;
+  options?: PlannerFormFieldOption[];
+  order: number;
+  width?: 'full' | 'half';
+}
+
+export interface PlannerFormContent {
+  name: string;
+  title: string;
+  description?: string;
+  logoUrl?: string;
+  elements?: PlannerFormElement[];
+  fields: PlannerFormField[];
+}
+
+export interface PlannerFormPublished extends PlannerFormContent {
+  type?: PlannerFormType;
+  version: number;
+  publishedAt: string;
+}
+
+export interface PlannerFormAdminTemplate {
+  type: PlannerFormType;
+  draft: PlannerFormContent;
+  published: PlannerFormPublished | null;
+  hasUnpublishedChanges?: boolean;
+  draftSavedAt?: string | null;
+  isActive?: boolean;
+  displayOrder?: number;
+  isSystem?: boolean;
+  updatedAt?: string | null;
+  updatedBy?: string | null;
+}
+
+/**
+ * Lists published planner forms (metadata) for diary users.
+ */
+export async function listPublishedPlannerForms(): Promise<{
+  forms: Array<{
+    type: PlannerFormType;
+    name: string;
+    title: string;
+    description?: string;
+    logoUrl?: string;
+    version: number;
+    publishedAt?: string | null;
+    fieldCount: number;
+    elementCount?: number;
+    isSystem?: boolean;
+    displayOrder?: number;
+  }>;
+}> {
+  return apiRequest('/api/planner-form-templates/published');
+}
+
+/**
+ * Loads the published planner form schema for a type (rep fill).
+ */
+export async function getPublishedPlannerForm(
+  type: PlannerFormType,
+): Promise<PlannerFormPublished & { type: PlannerFormType }> {
+  return apiRequest(`/api/planner-form-templates/published/${type}`);
+}
+
+/**
+ * Lists draft + published templates for Super Admin Form Editor.
+ */
+export async function listAdminPlannerForms(): Promise<{ forms: PlannerFormAdminTemplate[] }> {
+  return apiRequest('/api/planner-form-templates/admin');
+}
+
+/**
+ * Creates a new custom form template (Super Admin).
+ */
+export async function createAdminPlannerForm(payload: {
+  name: string;
+  description?: string;
+  logoUrl?: string;
+}): Promise<PlannerFormAdminTemplate> {
+  return apiRequest('/api/planner-form-templates/admin', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * Loads one Super Admin draft template.
+ */
+export async function getAdminPlannerForm(
+  type: PlannerFormType,
+): Promise<PlannerFormAdminTemplate> {
+  return apiRequest(`/api/planner-form-templates/admin/${type}`);
+}
+
+/**
+ * Saves Super Admin draft changes (does not publish).
+ */
+export async function saveAdminPlannerFormDraft(
+  type: PlannerFormType,
+  draft: PlannerFormContent,
+): Promise<PlannerFormAdminTemplate> {
+  return apiRequest(`/api/planner-form-templates/admin/${type}`, {
+    method: 'PUT',
+    body: JSON.stringify({ draft }),
+  });
+}
+
+/**
+ * Publishes the Super Admin draft so reps receive the updated form.
+ */
+export async function publishAdminPlannerForm(
+  type: PlannerFormType,
+  draft?: PlannerFormContent,
+): Promise<PlannerFormAdminTemplate> {
+  return apiRequest(`/api/planner-form-templates/admin/${type}/publish`, {
+    method: 'POST',
+    body: JSON.stringify(draft ? { draft } : {}),
+  });
+}
+
+/**
+ * Discards unpublished draft and restores from published version.
+ */
+export async function discardAdminPlannerFormDraft(
+  type: PlannerFormType,
+): Promise<PlannerFormAdminTemplate> {
+  return apiRequest(`/api/planner-form-templates/admin/${type}/discard`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+/** Sales request lifecycle status. */
+export type SalesRequestStatus = 'draft' | 'pending' | 'approved' | 'declined';
+
+/**
+ * Stored sales request attachment metadata returned by the API.
+ */
+export interface SalesRequestAttachmentMeta {
+  _id: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  source?: 'visit_photo' | 'upload' | 'signature';
+  caption?: string;
+  clientRef?: string;
+  createdAt?: string;
+}
+
+/**
+ * Sales request document returned by `/api/sales-requests`.
+ */
+export interface SalesRequest {
+  _id: string;
+  requestNumber: string;
+  requestType: SalesRequestType;
+  status: SalesRequestStatus;
+  formData: Record<string, unknown>;
+  salesLead?: string | {
+    _id: string;
+    leadNumber?: string;
+    companyName?: string;
+    contactPerson?: string;
+    contactPhone?: string;
+    contactEmail?: string;
+    contactAddress?: string;
+    city?: string;
+  };
+  appointment?: string;
+  appointmentDetails?: {
+    _id?: string;
+    appointmentDate?: string;
+    appointmentTime?: string;
+    appointmentType?: string;
+    status?: string;
+    location?: string;
+    notes?: string;
+    purpose?: string;
+    outcome?: string;
+    attended?: boolean;
+    attendedAt?: string;
+    visitGpsVerification?: VisitGpsVerification;
+    attendanceLocation?: { type?: string; coordinates?: [number, number] };
+    attendanceAccuracy?: number;
+    attendanceMethod?: string;
+    geoLocation?: { type?: string; coordinates?: [number, number] };
+  } | null;
+  visitNotes?: string;
+  visitPhotos?: Array<{ id?: string; dataUrl?: string; caption?: string; attachmentId?: string }>;
+  attachments?: SalesRequestAttachmentMeta[];
+  attachmentCount?: number;
+  repCode?: string | { _id: string; code?: string; name?: string; email?: string };
+  branch?: string | { _id: string; name?: string; code?: string };
+  customerCompanyName?: string;
+  customerContactPerson?: string;
+  submittedBy?: string | { _id: string; firstName?: string; lastName?: string; email?: string };
+  submittedAt?: string;
+  approvedBy?: string | { _id: string; firstName?: string; lastName?: string; email?: string };
+  approvedAt?: string;
+  approvedJob?: string | { _id: string; jobNumber?: string; status?: string; startDate?: string };
+  declinedBy?: string | { _id: string; firstName?: string; lastName?: string; email?: string };
+  declinedAt?: string;
+  declineReason?: string;
+  reviewedBy?: string | { _id: string; firstName?: string; lastName?: string; email?: string };
+  reviewedAt?: string;
+  createdBy: string | { _id: string; firstName?: string; lastName?: string; email?: string };
+  updatedBy?: string | { _id: string; firstName?: string; lastName?: string; email?: string };
+  dbStatus: 'active' | 'deleted';
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Lists sales requests with optional status / type / appointment filters.
+ */
+export async function listSalesRequests(params?: {
+  status?: SalesRequestStatus;
+  requestType?: SalesRequestType;
+  appointment?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}): Promise<{
+  requests: SalesRequest[];
+  pagination: { total: number; page: number; limit: number; pages: number };
+}> {
+  const searchParams = new URLSearchParams();
+  if (params?.status) searchParams.set('status', params.status);
+  if (params?.requestType) searchParams.set('requestType', params.requestType);
+  if (params?.appointment) searchParams.set('appointment', params.appointment);
+  if (params?.page) searchParams.set('page', String(params.page));
+  if (params?.limit) searchParams.set('limit', String(params.limit));
+  if (params?.sortBy) searchParams.set('sortBy', params.sortBy);
+  if (params?.sortOrder) searchParams.set('sortOrder', params.sortOrder);
+  const query = searchParams.toString();
+  return apiRequest(`/api/sales-requests${query ? `?${query}` : ''}`);
+}
+
+/**
+ * Fetches a single sales request by ID.
+ */
+export async function getSalesRequest(id: string): Promise<SalesRequest> {
+  return apiRequest<SalesRequest>(`/api/sales-requests/${id}`);
+}
+
+/**
+ * Creates a draft sales request from a diary visit sheet.
+ */
+export async function createSalesRequest(data: {
+  requestType: SalesRequestType;
+  formData?: Record<string, unknown>;
+  salesLead?: string;
+  appointment?: string;
+  repCode?: string;
+  branch?: string;
+  visitNotes?: string;
+  visitPhotos?: Array<{ id?: string; dataUrl?: string; caption?: string }>;
+}): Promise<SalesRequest> {
+  return apiRequest<SalesRequest>('/api/sales-requests', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Updates a draft or declined sales request form payload.
+ */
+export async function updateSalesRequest(
+  id: string,
+  data: {
+    formData?: Record<string, unknown>;
+    salesLead?: string;
+    appointment?: string;
+    repCode?: string;
+    branch?: string;
+    visitNotes?: string;
+    visitPhotos?: Array<{ id?: string; dataUrl?: string; caption?: string }>;
+  },
+): Promise<SalesRequest> {
+  return apiRequest<SalesRequest>(`/api/sales-requests/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Submits a draft or declined sales request for admin approval.
+ * Optional visitGpsVerification is persisted on the linked appointment when provided.
+ */
+export async function submitSalesRequest(
+  id: string,
+  data?: { visitGpsVerification?: VisitGpsVerification },
+): Promise<SalesRequest> {
+  return apiRequest<SalesRequest>(`/api/sales-requests/${id}/submit`, {
+    method: 'POST',
+    body: JSON.stringify(data ?? {}),
+  });
+}
+
+/**
+ * Soft-deletes a draft sales request owned by the current user.
+ */
+export async function deleteSalesRequest(id: string): Promise<void> {
+  await apiRequest(`/api/sales-requests/${id}`, { method: 'DELETE' });
+}
+
+/**
+ * Approves a pending sales request and creates a Job via the existing Job model.
+ */
+export async function approveSalesRequest(
+  id: string,
+  data?: { formData?: Record<string, unknown> },
+): Promise<{ request: SalesRequest; job: Job }> {
+  return apiRequest(`/api/sales-requests/${id}/approve`, {
+    method: 'POST',
+    body: JSON.stringify(data ?? {}),
+  });
+}
+
+/**
+ * Declines a pending sales request and returns it to the representative.
+ */
+export async function declineSalesRequest(
+  id: string,
+  data?: { formData?: Record<string, unknown>; declineReason?: string },
+): Promise<SalesRequest> {
+  return apiRequest<SalesRequest>(`/api/sales-requests/${id}/decline`, {
+    method: 'POST',
+    body: JSON.stringify(data ?? {}),
+  });
+}
+
+/**
+ * Saves reviewer edits on a pending sales request without approving or rejecting.
+ */
+export async function reviewUpdateSalesRequest(
+  id: string,
+  data: { formData?: Record<string, unknown>; visitNotes?: string },
+): Promise<SalesRequest> {
+  return apiRequest<SalesRequest>(`/api/sales-requests/${id}/review`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Deletes a stored sales request attachment.
+ */
+export async function deleteSalesRequestAttachment(attachmentId: string): Promise<void> {
+  await apiRequest(`/api/sales-requests/attachments/${attachmentId}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Uploads a PDF, photo, or document to a draft sales request.
+ */
+export async function uploadSalesRequestAttachment(
+  requestId: string,
+  file: File,
+): Promise<SalesRequestAttachmentMeta> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const token = getAuthToken();
+  const response = await fetch(`${apiBase()}/api/sales-requests/${requestId}/attachments`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Upload failed' } }));
+    throw new Error(error.error?.message || 'Failed to upload attachment');
+  }
+
+  const payload = await response.json();
+  return payload.data.attachment as SalesRequestAttachmentMeta;
 }
 
 /**
@@ -3581,6 +4240,9 @@ export async function createAppointment(leadId: string, data: {
   location: string;
   purpose?: string;
   notes?: string;
+  appointmentType?: string;
+  status?: string;
+  assignedRep?: string;
   geoLocation?: { type: 'Point'; coordinates: [number, number] };
 }): Promise<Appointment> {
   const response = await apiRequest<Appointment>(`/api/sales-leads/${leadId}/appointments`, {
@@ -4061,7 +4723,7 @@ export async function sendScheduledReportNow(id: string): Promise<{ message: str
 
 export async function previewScheduledReport(data: ScheduledReportPayload): Promise<string> {
   const token = getAuthToken();
-  const response = await fetch(`${API_BASE_URL}/api/scheduled-reports/preview`, {
+  const response = await fetch(`${apiBase()}/api/scheduled-reports/preview`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -4175,8 +4837,21 @@ export default {
   assignSalesLead,
   convertSalesLeadToJob,
   getAppointments,
+  getWeeklyAppointments,
+  getVisitHistory,
+  createDiaryAppointment,
   createAppointment,
   updateAppointment,
+  listSalesRequests,
+  getSalesRequest,
+  createSalesRequest,
+  updateSalesRequest,
+  submitSalesRequest,
+  deleteSalesRequest,
+  approveSalesRequest,
+  declineSalesRequest,
+  reviewUpdateSalesRequest,
+  deleteSalesRequestAttachment,
   getCanvassingPlans,
   getCanvassingPlan,
   createCanvassingPlan,
@@ -4518,7 +5193,7 @@ export async function getMachineReadingHistory(
 export async function getPublicMachineForScan(
   token: string,
 ): Promise<{ machine: PublicMachineForScan }> {
-  const url = `${API_BASE_URL}/api/public/machine-readings/${encodeURIComponent(token)}`;
+  const url = `${apiBase()}/api/public/machine-readings/${encodeURIComponent(token)}`;
   const response = await fetch(url, {
     headers: { Accept: 'application/json' },
   });
@@ -4553,7 +5228,7 @@ export async function submitPublicMachineReading(
   if (payload.submitterPhone) form.append('submitterPhone', payload.submitterPhone);
   if (payload.submitterEmail) form.append('submitterEmail', payload.submitterEmail);
 
-  const url = `${API_BASE_URL}/api/public/machine-readings/${encodeURIComponent(token)}`;
+  const url = `${apiBase()}/api/public/machine-readings/${encodeURIComponent(token)}`;
   const response = await fetch(url, {
     method: 'POST',
     body: form,
@@ -4579,7 +5254,7 @@ export interface PublicReadingHistoryEntry {
 export async function getPublicMachineReadingHistory(
   token: string,
 ): Promise<{ submissions: PublicReadingHistoryEntry[] }> {
-  const url = `${API_BASE_URL}/api/public/machine-readings/${encodeURIComponent(token)}/history`;
+  const url = `${apiBase()}/api/public/machine-readings/${encodeURIComponent(token)}/history`;
   const response = await fetch(url, {
     headers: { Accept: 'application/json' },
   });
@@ -4608,7 +5283,7 @@ export async function listMachineReadingSubmissions(
  */
 export function getMachineReadingPhotoUrl(submissionId: string): string {
   const token = getAuthToken();
-  const base = `${API_BASE_URL}/api/machine-reading-submissions/${submissionId}/photo`;
+  const base = `${apiBase()}/api/machine-reading-submissions/${submissionId}/photo`;
   return token ? `${base}?token=${encodeURIComponent(token)}` : base;
 }
 

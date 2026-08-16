@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginPage } from './components/LoginPage';
 import { SetPasswordPage } from './components/SetPasswordPage';
@@ -7,6 +8,11 @@ import { Dashboard } from './components/Dashboard';
 import { ChatWidget } from './components/ChatWidget';
 // import { AutoLocationTracker } from './components/AutoLocationTracker'; // disabled
 import { MachineScanPage } from './components/MachineScanPage';
+import PwaInstallPrompt from './components/PwaInstallPrompt';
+// Push / appointment reminder UI — commented out (re-enable when needed)
+// import { PushNotificationBootstrap } from './components/PushNotificationBootstrap';
+// import AppointmentReminderToastHost from './components/AppointmentReminderToastHost';
+import { PwaInstallProvider } from './pwa/PwaInstallContext';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -63,6 +69,29 @@ function SetPasswordRoute({ children }: { children: React.ReactNode }) {
 
 function AppContent() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+
+  /**
+   * Handles Service Worker "Open Appointment" clicks when a tab is already open.
+   */
+  useEffect(() => {
+    /**
+     * Routes to the URL embedded in a push notification click.
+     */
+    function onSwMessage(event: MessageEvent): void {
+      const data = event.data;
+      if (!data || data.type !== 'ARS_OPEN_URL' || typeof data.url !== 'string') return;
+      try {
+        const path = new URL(data.url, window.location.origin);
+        navigate(`${path.pathname}${path.search}${path.hash}`);
+      } catch {
+        navigate(data.url);
+      }
+    }
+
+    navigator.serviceWorker?.addEventListener('message', onSwMessage);
+    return () => navigator.serviceWorker?.removeEventListener('message', onSwMessage);
+  }, [navigate]);
 
   return (
     <>
@@ -147,18 +176,27 @@ function AppContent() {
             <Dashboard view="pendingReadings" />
           </ProtectedRoute>
         } />
+        <Route path="/pending-sales-requests" element={
+          <ProtectedRoute>
+            <Dashboard view="pendingSalesRequests" />
+          </ProtectedRoute>
+        } />
         {/* Public QR scan landing — NO auth, NO PublicRoute redirect. */}
         <Route path="/scan/machine/:token" element={<MachineScanPage />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
 
-      {/* Chat widget - only show when logged in */}
       {user && <ChatWidget />}
 
       {/* Auto-start GPS tracking for enabled users */}
       {/* AutoLocationTracker disabled — re-enable when location tracking is needed */}
       {/* {user && <AutoLocationTracker />} */}
+
+      <PwaInstallPrompt />
+      {/* Push notifications + in-app appointment reminder toasts — disabled for now */}
+      {/* <PushNotificationBootstrap /> */}
+      {/* {user && <AppointmentReminderToastHost />} */}
     </>
   );
 }
@@ -166,9 +204,11 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <AppContent />
-      </BrowserRouter>
+      <PwaInstallProvider>
+        <BrowserRouter>
+          <AppContent />
+        </BrowserRouter>
+      </PwaInstallProvider>
     </AuthProvider>
   );
 }

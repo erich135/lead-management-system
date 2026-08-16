@@ -1,45 +1,32 @@
 import { useState, useEffect } from 'react';
 
+/** Matches Tailwind `md` / mobile redesign breakpoint (screens below 768px). */
+const MOBILE_MAX_WIDTH = 767;
+
 /**
- * Custom hook to detect if the user is on a mobile device.
- * Checks both screen width and user agent for accurate detection.
- * 
- * @returns {boolean} True if on mobile device
+ * Detects narrow viewports for the mobile Representative shell.
+ * Uses width ≤ 767px only so it matches CSS `@media (max-width: 767px)`.
+ *
+ * @returns True when the mobile experience should be used
  */
 export function useIsMobile(): boolean {
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth <= MOBILE_MAX_WIDTH;
+  });
 
   useEffect(() => {
     /**
-     * Checks if device is mobile based on screen width and user agent.
+     * Syncs mobile layout with the 768px redesign breakpoint.
      */
     function checkMobile() {
-      const width = window.innerWidth;
-      const userAgent = navigator.userAgent || navigator.vendor;
-      
-      // Check screen width (mobile breakpoint)
-      const isSmallScreen = width < 768;
-      
-      // Check user agent for mobile devices
-      const isMobileUserAgent = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(
-        userAgent.toLowerCase()
-      );
-      
-      setIsMobile(isSmallScreen || isMobileUserAgent);
+      setIsMobile(window.innerWidth <= MOBILE_MAX_WIDTH);
     }
 
-    // Check on mount
     checkMobile();
-
-    // Check on resize
     window.addEventListener('resize', checkMobile);
-    
-    return () => {
-      window.removeEventListener('resize', checkMobile);
-    };
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   return isMobile;
 }
-
-

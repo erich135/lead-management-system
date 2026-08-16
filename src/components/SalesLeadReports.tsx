@@ -152,12 +152,13 @@ const SalesLeadReports: React.FC = () => {
 
   // Format currency
   const formatCurrency = (value: number) => {
-    if (value >= 1000000) {
-      return `R ${(value / 1000000).toFixed(1)}M`;
-    } else if (value >= 1000) {
-      return `R ${(value / 1000).toFixed(0)}K`;
+    const amount = Number(value) || 0;
+    if (amount >= 1000000) {
+      return `R ${(amount / 1000000).toFixed(1)}M`;
+    } else if (amount >= 1000) {
+      return `R ${(amount / 1000).toFixed(0)}K`;
     }
-    return `R ${value.toFixed(0)}`;
+    return `R ${amount.toFixed(0)}`;
   };
 
   if (loading) {
@@ -399,7 +400,7 @@ const ExecutiveOverview: React.FC<{ data: AnalyticsData; formatCurrency: (value:
     <div className="bg-white p-6 rounded-lg border border-gray-200">
       <h4 className="text-md font-semibold text-gray-900 mb-4">Lead Aging Analysis</h4>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {data.leadAging.ranges.map((range) => (
+        {(data.leadAging?.ranges || []).map((range) => (
           <div key={range.range} className="text-center p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-600">{range.range}</p>
             <p className="text-2xl font-bold text-gray-900 mt-1">{range.count}</p>
@@ -568,8 +569,21 @@ const SourceAnalysisReport: React.FC<{ data: AnalyticsData; formatCurrency: (val
 );
 
 const RepPerformanceReport: React.FC<{ data: AnalyticsData; formatCurrency: (value: number) => string }> = ({ data, formatCurrency }) => {
-  // Sort reps by converted value (descending)
-  const sortedReps = [...data.repPerformance.reps].sort((a, b) => b.totalValue - a.totalValue);
+  const reps = data.repPerformance?.reps || [];
+  // Sort reps by total value (descending)
+  const sortedReps = [...reps].sort((a, b) => b.totalValue - a.totalValue);
+
+  if (sortedReps.length === 0) {
+    return (
+      <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
+        <Users className="mx-auto h-8 w-8 text-gray-400" />
+        <h3 className="mt-3 text-lg font-semibold text-gray-900">No rep performance data</h3>
+        <p className="mt-1 text-sm text-gray-500">
+          There are no assigned leads in this date range yet.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -663,9 +677,9 @@ const RepPerformanceReport: React.FC<{ data: AnalyticsData; formatCurrency: (val
         <div className="bg-white p-6 rounded-lg border border-gray-200">
           <p className="text-sm font-medium text-gray-600">Total Reps</p>
           <div className="mt-2">
-            <p className="text-lg font-bold text-gray-900">{data.repPerformance.reps.length}</p>
+            <p className="text-lg font-bold text-gray-900">{sortedReps.length}</p>
             <p className="text-sm text-gray-600">
-              {data.repPerformance.reps.filter(r => r.convertedLeads > 0).length} with conversions
+              {sortedReps.filter(r => r.convertedLeads > 0).length} with conversions
             </p>
           </div>
         </div>

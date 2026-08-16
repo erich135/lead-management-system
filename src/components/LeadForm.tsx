@@ -634,19 +634,19 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
         </div>
       )}
 
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="sticky top-0 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white px-6 py-4 flex justify-between items-center rounded-t-2xl">
-            <h2 className="text-xl font-bold">Create New Job</h2>
+      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 backdrop-blur-sm md:items-center md:p-4">
+        <div className="max-h-[92dvh] w-full max-w-4xl overflow-y-auto rounded-t-2xl bg-white shadow-2xl md:max-h-[90vh] md:rounded-2xl">
+          <div className="sticky top-0 flex items-center justify-between rounded-t-2xl bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] px-4 py-3 text-white md:px-6 md:py-4">
+            <h2 className="text-lg font-bold md:text-xl">Create New Job</h2>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-lg transition-all"
+              className="rounded-lg p-2 transition-all hover:bg-white/20"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-5">{/* Removed inline error display */}
+          <form onSubmit={handleSubmit} className="space-y-5 p-4 md:p-6">{/* Removed inline error display */}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {true && (
@@ -1231,7 +1231,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
                   {showNewMachineForm && (
                     <div className="p-4 bg-gray-50 rounded-[8px] border border-gray-200 space-y-3">
                       <h4 className="font-semibold text-ars-heading text-sm">Add New Machine</h4>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
                           <label className="block text-xs font-semibold text-ars-body mb-1">Machine Type *</label>
                           <select

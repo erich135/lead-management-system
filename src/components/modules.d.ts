@@ -15,7 +15,10 @@ declare module './CanvassingPlansList' {
 }
 
 declare module './WeeklyPlanner' {
-  const WeeklyPlanner: React.FC;
+  interface WeeklyPlannerProps {
+    onOpenHistory?: () => void;
+  }
+  const WeeklyPlanner: React.FC<WeeklyPlannerProps>;
   export default WeeklyPlanner;
 }
 

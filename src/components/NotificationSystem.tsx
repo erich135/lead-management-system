@@ -287,7 +287,9 @@ export function NotificationSystem({ onLeadClick }: NotificationSystemProps) {
                     key={notification._id}
                     className={`p-3 rounded-lg border cursor-pointer transition-colors ${getNotificationPriorityClass(notification.priority)}`}
                     onClick={() => {
-                      if (notification.leadId && onLeadClick) {
+                      if (notification.actionUrl) {
+                        window.location.assign(notification.actionUrl);
+                      } else if (notification.leadId && onLeadClick) {
                         onLeadClick(notification.leadId);
                       }
                       handleMarkRead(notification._id);

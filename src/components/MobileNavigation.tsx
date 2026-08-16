@@ -1,9 +1,10 @@
-import { LayoutDashboard, FileText, BarChart3, Calendar, Users, Menu, X, Bell, LogOut, Clock, Cog, Briefcase, Smartphone, ScanLine } from 'lucide-react';
+import { LayoutDashboard, FileText, BarChart3, Calendar, Users, Menu, X, Bell, LogOut, Clock, Cog, Briefcase, Smartphone, ScanLine, ClipboardList } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import PwaInstallButton from './PwaInstallButton';
 
-type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady' | 'techApp' | 'pendingReadings';
+type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady' | 'techApp' | 'pendingReadings' | 'pendingSalesRequests';
 
 interface MobileNavigationProps {
   currentView: View;
@@ -11,6 +12,7 @@ interface MobileNavigationProps {
   notificationsCount: number;
   onNotificationsClick: () => void;
   pendingReadingsCount?: number;
+  pendingSalesRequestsCount?: number;
 }
 
 /**
@@ -23,6 +25,7 @@ export function MobileNavigation({
   notificationsCount,
   onNotificationsClick,
   pendingReadingsCount = 0,
+  pendingSalesRequestsCount = 0,
 }: MobileNavigationProps) {
   const { user, signOut, hasPermission } = useAuth();
   const location = useLocation();
@@ -43,6 +46,7 @@ export function MobileNavigation({
     if (path === '/parts-ready') return 'partsReady';
     if (path === '/tech-app') return 'techApp';
     if (path === '/pending-machine-readings') return 'pendingReadings';
+    if (path === '/pending-sales-requests') return 'pendingSalesRequests';
     return 'dashboard';
   };
 
@@ -53,6 +57,8 @@ export function MobileNavigation({
   const canViewSalesLeads = user?.isSuperAdmin || hasPermission('sales_leads.read');
   const canViewTechApp = user?.isSuperAdmin || user?.role?.name?.toLowerCase() === 'technician';
   const canVerifyReadings = user?.isSuperAdmin || hasPermission('machines.verifyReadings');
+  const canReviewSalesRequests =
+    user?.isSuperAdmin || hasPermission('sales_requests.review');
 
   const navItems = [
     { id: 'dashboard' as View, label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
@@ -210,6 +216,33 @@ export function MobileNavigation({
                   </Link>
                 )}
 
+                {canReviewSalesRequests && (
+                  <Link
+                    to="/pending-sales-requests"
+                    onClick={() => setShowMenu(false)}
+                    className={`w-full flex items-center gap-4 p-4 rounded-[8px] transition-all ${
+                      activeView === 'pendingSalesRequests'
+                        ? 'bg-ars-secondary/20 text-ars-heading'
+                        : 'bg-gray-50 text-ars-heading hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="relative">
+                      <ClipboardList className="w-5 h-5" />
+                      {pendingSalesRequestsCount > 0 && (
+                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                          {pendingSalesRequestsCount > 9 ? '9+' : pendingSalesRequestsCount}
+                        </span>
+                      )}
+                    </div>
+                    <span className="font-medium">Rep Approvals</span>
+                    {pendingSalesRequestsCount > 0 && (
+                      <span className="ml-auto text-xs text-red-500 font-semibold">
+                        {pendingSalesRequestsCount} pending
+                      </span>
+                    )}
+                  </Link>
+                )}
+
                 {/* System Admin (if super admin) */}
                 {user?.isSuperAdmin ? (
                   <Link
@@ -244,6 +277,14 @@ export function MobileNavigation({
                   </div>
                   <span className="font-medium">Notifications</span>
                 </button>
+
+                <div
+                  onClick={() => setShowMenu(false)}
+                  onKeyDown={() => undefined}
+                  role="presentation"
+                >
+                  <PwaInstallButton variant="menu" />
+                </div>
 
                 {/* Logout */}
                 <button

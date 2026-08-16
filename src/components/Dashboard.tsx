@@ -11,6 +11,7 @@ import {
   getTechnicians,
   getAdminCodes,
   listMachineReadingSubmissions,
+  listSalesRequests,
   type JobStats,
   type OverdueJob,
   type Status,
@@ -63,12 +64,16 @@ import { JobCardTemplates } from './JobCardTemplates';
 import { JobCardSubmissions } from './JobCardSubmissions';
 import { PartsReadyJobCards } from './PartsReadyJobCards';
 import { PendingMachineReadings } from './PendingMachineReadings';
+import PendingSalesRequests from './PendingSalesRequests';
 import { TechAppDownload } from './TechAppDownload';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { Tooltip, HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
+import { ProfileSettingsModal } from './ProfileSettingsModal';
+import { RepDashboardHome } from './RepDashboardHome';
+import { isRepUser } from '../mobile-rep/mobileRepUtils';
 
-type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady' | 'pendingReadings' | 'techApp';
+type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady' | 'pendingReadings' | 'pendingSalesRequests' | 'techApp';
 
 interface DashboardProps {
   view?: View;
@@ -100,6 +105,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
     if (path === '/job-card-submissions') return 'jobCardSubmissions';
     if (path === '/parts-ready') return 'partsReady';
     if (path === '/pending-machine-readings') return 'pendingReadings';
+    if (path === '/pending-sales-requests') return 'pendingSalesRequests';
     if (path === '/tech-app') return 'techApp';
     return 'dashboard';
   };
@@ -122,6 +128,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
       jobCardSubmissions: '/job-card-submissions',
       partsReady: '/parts-ready',
       pendingReadings: '/pending-machine-readings',
+      pendingSalesRequests: '/pending-sales-requests',
       techApp: '/tech-app',
     };
     navigate(routes[newView]);
@@ -132,6 +139,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
   const [error, setError] = useState<string | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showNotificationPanel, setShowNotificationPanel] = useState(false);
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -142,6 +150,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [_adminCodes, setAdminCodes] = useState<AdminCode[]>([]);
   const [pendingReadingsCount, setPendingReadingsCount] = useState(0);
+  const [pendingSalesRequestsCount, setPendingSalesRequestsCount] = useState(0);
   const [selectedPriority, setSelectedPriority] = useState<'all' | 'critical' | 'warning' | 'info'>('all');
   const [leadsListRefreshKey, setLeadsListRefreshKey] = useState(0);
   const [isJobsMenuExpanded, setIsJobsMenuExpanded] = useState(false);
@@ -211,6 +220,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
         loadTechnicians(),
         loadAdminCodes(),
         loadPendingReadingsCount(),
+        loadPendingSalesRequestsCount(),
       ]);
     } catch (err: any) {
       console.error('Error loading initial data:', err);
@@ -234,6 +244,22 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
     try {
       const { submissions } = await listMachineReadingSubmissions('pending');
       setPendingReadingsCount(submissions.length);
+    } catch {
+      // Non-critical — silently ignore
+    }
+  }
+
+  /**
+   * Loads the count of sales requests awaiting admin approval.
+   */
+  async function loadPendingSalesRequestsCount() {
+    try {
+      if (!isSuperAdmin && !hasPermission('sales_requests.review')) return;
+      const { pagination } = await listSalesRequests({
+        status: 'pending',
+        limit: 1,
+      });
+      setPendingSalesRequestsCount(pagination?.total || 0);
     } catch {
       // Non-critical — silently ignore
     }
@@ -863,6 +889,24 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                     )}
                   </Link>
                 )}
+                {(isSuperAdmin || hasPermission('sales_requests.review')) && (
+                  <Link
+                    to="/pending-sales-requests"
+                    className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
+                      view === 'pendingSalesRequests'
+                        ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
+                        : 'text-[#383838] hover:text-[#f7c12b]'
+                    }`}
+                  >
+                    <ClipboardList className={`w-4 h-4 transition-transform ${view === 'pendingSalesRequests' ? 'scale-110' : ''}`} />
+                    <span>Rep Approvals</span>
+                    {pendingSalesRequestsCount > 0 && (
+                      <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full">
+                        {pendingSalesRequestsCount > 9 ? '9+' : pendingSalesRequestsCount}
+                      </span>
+                    )}
+                  </Link>
+                )}
                 {isSuperAdmin && (
                   <Link
                     to="/admin"
@@ -890,12 +934,16 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
               <NotificationBell onOpenPanel={() => setShowNotificationPanel(true)} />
 
               {/* User Profile */}
-
               <div className="flex items-center gap-3 pl-4 border-l border-white/20">
-                <div className="text-right">
+                <button
+                  type="button"
+                  onClick={() => setShowProfileSettings(true)}
+                  className="text-right rounded-[8px] px-2 py-1 hover:bg-gray-100 transition-colors"
+                  title="Profile settings"
+                >
                   <p className="text-sm font-semibold text-[#383838]">{user?.fullName || 'User'}</p>
-                  <p className="text-xs text-[#383838]/70 capitalize">{user?.role?.name || 'user'}</p>
-                </div>
+                  <p className="text-xs text-[#383838]/70 capitalize">{user?.role?.name || 'user'} · Settings</p>
+                </button>
                 <button
                   onClick={signOut}
                   className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-[8px] transition-all duration-300 hover:scale-105 group"
@@ -908,6 +956,11 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           </div>
         </div>
       </nav>
+
+      <ProfileSettingsModal
+        open={showProfileSettings}
+        onClose={() => setShowProfileSettings(false)}
+      />
 
       {/* Desktop Notification Drawer Overlay */}
       {showNotifications && !isMobile && (
@@ -1148,7 +1201,11 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           </div>
         )}
 
-        {view === 'dashboard' && loading && (
+        {view === 'dashboard' && isRepUser(user) && (
+          <RepDashboardHome />
+        )}
+
+        {view === 'dashboard' && !isRepUser(user) && loading && (
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ars-primary mx-auto mb-4"></div>
@@ -1157,7 +1214,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           </div>
         )}
 
-        {view === 'dashboard' && stats && !loading && (
+        {view === 'dashboard' && !isRepUser(user) && stats && !loading && (
           <div className="space-y-6">
             {/* Header with Gradient Background */}
             <div className="relative overflow-hidden rounded-[16px] bg-[#0969a9] p-8 text-white">
@@ -2072,6 +2129,25 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
         {view === 'pendingReadings' && (
           <PendingMachineReadings />
         )}
+
+        {view === 'pendingSalesRequests' && (isSuperAdmin || hasPermission('sales_requests.review')) && (
+          <PendingSalesRequests
+            onJobCreated={(job) => {
+              void loadPendingSalesRequestsCount();
+              void loadStats();
+              if (job?._id) {
+                navigate('/jobs');
+              }
+            }}
+          />
+        )}
+
+        {view === 'pendingSalesRequests' && !isSuperAdmin && !hasPermission('sales_requests.review') && (
+          <div className="p-8 bg-white rounded-[8px] shadow-lg max-w-lg mx-auto mt-8">
+            <h2 className="text-xl font-semibold text-[#383838] mb-2">Access restricted</h2>
+            <p className="text-slate-600 mb-6">You do not have permission to review sales requests.</p>
+          </div>
+        )}
       </main>
 
       {showLeadForm && (
@@ -2107,6 +2183,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           notificationsCount={stats ? stats.overdueReminders + stats.approachingReminders : 0}
           onNotificationsClick={() => setShowNotifications(!showNotifications)}
           pendingReadingsCount={pendingReadingsCount}
+          pendingSalesRequestsCount={pendingSalesRequestsCount}
         />
       )}
 

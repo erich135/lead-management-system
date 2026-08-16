@@ -8,8 +8,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { getAuthToken } from '../lib/api';
+import { resolveApiBaseUrl } from '../lib/resolveApiBaseUrl';
 
-const SOCKET_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5005';
+const SOCKET_URL = resolveApiBaseUrl();
 
 export interface RepLocationUpdate {
   userId: string;

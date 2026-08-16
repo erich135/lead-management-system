@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { getAuthToken } from './api';
 import { ChatMessage } from './api';
+import { resolveApiBaseUrl } from './resolveApiBaseUrl';
 
-const SOCKET_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5005';
+const SOCKET_URL = resolveApiBaseUrl();
 
 interface UseChatSocketReturn {
   socket: Socket | null;

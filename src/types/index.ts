@@ -8,7 +8,35 @@ export interface GeoPoint {
   coordinates: [number, number]; // [longitude, latitude]
 }
 
-export type AttendanceMethod = 'auto_geofence' | 'manual_checkin' | 'manual_override';
+export type AttendanceMethod =
+  | 'auto_geofence'
+  | 'manual_checkin'
+  | 'manual_override'
+  | 'gps_verification';
+
+/**
+ * Live GPS proof captured before a visit can be completed / submitted.
+ * Geofencing distance fields are prepared for future admin flagging.
+ * When declinedByUser is true, coordinates may be absent.
+ */
+export interface VisitGpsVerification {
+  verified: boolean;
+  latitude?: number;
+  longitude?: number;
+  accuracyMeters?: number;
+  capturedAt: string;
+  capturedBy?: string;
+  appointmentId?: string;
+  address?: string;
+  expectedLatitude?: number;
+  expectedLongitude?: number;
+  distanceFromExpectedMeters?: number;
+  outsideExpectedLocation?: boolean;
+  geofenceRadiusMeters?: number;
+  declinedByUser?: boolean;
+  permissionStatus?: string;
+  declineReason?: string;
+}
 
 export interface Branch {
   id: string;
@@ -199,18 +227,24 @@ export interface SalesLead {
 export interface Appointment {
   _id: string;
   salesLead: string;
+  assignedRep?: string | { _id: string; code?: string; name?: string };
   appointmentDate: string;
   appointmentTime: string;
+  appointmentType?: string;
+  status?: string;
   location: string;
   geoLocation?: GeoPoint;
   geofenceRadius?: number;
   purpose?: string;
   notes?: string;
+  internalNotes?: string;
+  nextAction?: string;
   attended: boolean;
   attendedAt?: string;
   attendanceMethod?: AttendanceMethod;
   attendanceLocation?: GeoPoint;
   attendanceAccuracy?: number;
+  visitGpsVerification?: VisitGpsVerification;
   noShowReason?: string;
   noShowAutoDetected?: boolean;
   outcome?: string;

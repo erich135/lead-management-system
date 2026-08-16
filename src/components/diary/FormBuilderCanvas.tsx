@@ -198,7 +198,12 @@ function FormElementView({
     );
   }
 
+  // Builder chrome only — reps finish via Visit workspace, not schema buttons.
   if (element.type === 'button') {
+    if (!adminMode) {
+      return null;
+    }
+
     const btnStyle = settings.buttonStyle || 'primary';
     const btnClass =
       btnStyle === 'outline'
@@ -233,6 +238,18 @@ function FormElementView({
           ? 'grid grid-cols-1 gap-3'
           : 'grid grid-cols-1 gap-3 md:grid-cols-2';
 
+    const sortedChildren = [...(element.children || [])].sort(
+      (a, b) => a.order - b.order,
+    );
+    // Hide empty Actions sections once schema buttons are filtered out for reps.
+    const fillChildren = adminMode
+      ? sortedChildren
+      : sortedChildren.filter((child) => child.type !== 'button');
+
+    if (!adminMode && fillChildren.length === 0) {
+      return null;
+    }
+
     return (
       <section
         className={`rounded-xl border border-slate-100 p-3 ${outlineClass} ${
@@ -251,9 +268,7 @@ function FormElementView({
           </div>
         ) : null}
         <div className={gridClass}>
-          {[...(element.children || [])]
-            .sort((a, b) => a.order - b.order)
-            .map((child) => (
+          {fillChildren.map((child) => (
               <FormElementView
                 key={child.id}
                 element={child}

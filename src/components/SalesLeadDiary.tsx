@@ -4,15 +4,18 @@ import WeeklyPlanner from './WeeklyPlanner';
 import CanvassingPlansList from './CanvassingPlansList';
 import DiaryHistoryView from './diary/DiaryHistoryView';
 import { useAuth } from '../contexts/AuthContext';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 type DiaryView = 'planner' | 'history' | 'canvassing';
 
 /**
  * Sales Diary shell: Planner, History and Canvassing with compact spacing.
  * Super admins review history from Pending Approvals — History is hidden here.
+ * On mobile, day-swipe is enabled for the nicer field planner experience.
  */
 const SalesLeadDiary: React.FC = () => {
   const { isSuperAdmin } = useAuth();
+  const isMobile = useIsMobile();
   const [view, setView] = useState<DiaryView>('planner');
 
   const tabs: Array<{ id: DiaryView; label: string; icon: React.ReactNode }> = [
@@ -54,6 +57,7 @@ const SalesLeadDiary: React.FC = () => {
       <div className="flex-1 overflow-auto p-3 sm:p-4">
         {view === 'planner' && (
           <WeeklyPlanner
+            enableDaySwipe={isMobile}
             hideHistoryButton={isSuperAdmin}
             onOpenHistory={isSuperAdmin ? undefined : () => setView('history')}
           />

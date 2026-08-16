@@ -460,6 +460,109 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
                 </p>
               )}
 
+              {visitGps && (
+                <section className="rounded-xl border border-emerald-300 bg-emerald-50 p-4">
+                  <h3 className="mb-1 text-sm font-bold uppercase tracking-wide text-emerald-900">
+                    Visit Location (GPS)
+                  </h3>
+                  <p className="mb-3 text-xs text-emerald-800">
+                    Where the rep was when they submitted — not the customer address on file.
+                  </p>
+                  <dl className="grid gap-2 text-sm sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <dt className="text-xs font-semibold uppercase text-emerald-800/80">Status</dt>
+                      <dd className="font-semibold text-emerald-800">GPS Verified</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-semibold uppercase text-emerald-800/80">Latitude</dt>
+                      <dd>{Number(visitGps.latitude).toFixed(6)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-semibold uppercase text-emerald-800/80">
+                        Longitude
+                      </dt>
+                      <dd>{Number(visitGps.longitude).toFixed(6)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-semibold uppercase text-emerald-800/80">Accuracy</dt>
+                      <dd>{Math.round(Number(visitGps.accuracyMeters))} metres</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-semibold uppercase text-emerald-800/80">
+                        Timestamp
+                      </dt>
+                      <dd>{formatDate(visitGps.capturedAt)}</dd>
+                    </div>
+                    <div className="sm:col-span-2 rounded-lg border border-emerald-200 bg-white px-3 py-2">
+                      <dt className="text-xs font-semibold uppercase text-emerald-800/80">
+                        GPS detected address
+                      </dt>
+                      <dd className="mt-0.5 text-emerald-950">
+                        {visitGps.address ||
+                          `${Number(visitGps.latitude).toFixed(6)}, ${Number(visitGps.longitude).toFixed(6)}`}
+                      </dd>
+                    </div>
+                    {visitGps.outsideExpectedLocation && (
+                      <div className="sm:col-span-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">
+                        Outside expected location
+                        {typeof visitGps.distanceFromExpectedMeters === 'number'
+                          ? ` (${visitGps.distanceFromExpectedMeters} m from scheduled pin)`
+                          : ''}
+                      </div>
+                    )}
+                  </dl>
+                  <a
+                    href={`https://www.google.com/maps?q=${visitGps.latitude},${visitGps.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-100/50"
+                  >
+                    View GPS on Google Maps
+                  </a>
+                </section>
+              )}
+
+              {appointment?.visitGpsVerification &&
+                (appointment.visitGpsVerification.declinedByUser ||
+                  appointment.visitGpsVerification.verified === false) && (
+                <section className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+                  <h3 className="mb-1 text-sm font-bold uppercase tracking-wide text-amber-900">
+                    Visit Location (GPS)
+                  </h3>
+                  <p className="mb-2 text-sm font-semibold text-amber-950">
+                    Location not captured — representative declined or permission was unavailable.
+                  </p>
+                  <dl className="grid gap-2 text-sm sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <dt className="text-xs font-semibold uppercase text-amber-800/80">Status</dt>
+                      <dd className="font-semibold text-amber-900">GPS Declined / Unavailable</dd>
+                    </div>
+                    {appointment.visitGpsVerification.permissionStatus && (
+                      <div>
+                        <dt className="text-xs font-semibold uppercase text-amber-800/80">
+                          Permission
+                        </dt>
+                        <dd>{appointment.visitGpsVerification.permissionStatus}</dd>
+                      </div>
+                    )}
+                    {appointment.visitGpsVerification.capturedAt && (
+                      <div>
+                        <dt className="text-xs font-semibold uppercase text-amber-800/80">
+                          Recorded at
+                        </dt>
+                        <dd>{formatDate(appointment.visitGpsVerification.capturedAt)}</dd>
+                      </div>
+                    )}
+                    {appointment.visitGpsVerification.declineReason && (
+                      <div className="sm:col-span-2">
+                        <dt className="text-xs font-semibold uppercase text-amber-800/80">Reason</dt>
+                        <dd>{appointment.visitGpsVerification.declineReason}</dd>
+                      </div>
+                    )}
+                  </dl>
+                </section>
+              )}
+
               {customer && (
                 <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-800">
@@ -585,68 +688,6 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
                       </div>
                     )}
                   </dl>
-                </section>
-              )}
-
-              {visitGps && (
-                <section className="rounded-xl border border-emerald-300 bg-emerald-50 p-4">
-                  <h3 className="mb-1 text-sm font-bold uppercase tracking-wide text-emerald-900">
-                    Visit Location (GPS)
-                  </h3>
-                  <p className="mb-3 text-xs text-emerald-800">
-                    Where the rep was when they submitted — not the customer address on file.
-                  </p>
-                  <dl className="grid gap-2 text-sm sm:grid-cols-2">
-                    <div className="sm:col-span-2">
-                      <dt className="text-xs font-semibold uppercase text-emerald-800/80">Status</dt>
-                      <dd className="font-semibold text-emerald-800">GPS Verified</dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs font-semibold uppercase text-emerald-800/80">Latitude</dt>
-                      <dd>{visitGps.latitude.toFixed(6)}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs font-semibold uppercase text-emerald-800/80">
-                        Longitude
-                      </dt>
-                      <dd>{visitGps.longitude.toFixed(6)}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs font-semibold uppercase text-emerald-800/80">Accuracy</dt>
-                      <dd>{Math.round(visitGps.accuracyMeters)} metres</dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs font-semibold uppercase text-emerald-800/80">
-                        Timestamp
-                      </dt>
-                      <dd>{formatDate(visitGps.capturedAt)}</dd>
-                    </div>
-                    <div className="sm:col-span-2 rounded-lg border border-emerald-200 bg-white px-3 py-2">
-                      <dt className="text-xs font-semibold uppercase text-emerald-800/80">
-                        GPS detected address
-                      </dt>
-                      <dd className="mt-0.5 text-emerald-950">
-                        {visitGps.address ||
-                          `${visitGps.latitude.toFixed(6)}, ${visitGps.longitude.toFixed(6)}`}
-                      </dd>
-                    </div>
-                    {visitGps.outsideExpectedLocation && (
-                      <div className="sm:col-span-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">
-                        Outside expected location
-                        {typeof visitGps.distanceFromExpectedMeters === 'number'
-                          ? ` (${visitGps.distanceFromExpectedMeters} m from scheduled pin)`
-                          : ''}
-                      </div>
-                    )}
-                  </dl>
-                  <a
-                    href={`https://www.google.com/maps?q=${visitGps.latitude},${visitGps.longitude}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-3 inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-100/50"
-                  >
-                    View GPS on Google Maps
-                  </a>
                 </section>
               )}
 

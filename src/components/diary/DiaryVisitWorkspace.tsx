@@ -57,6 +57,7 @@ import { useGeolocation } from '../../hooks/useGeolocation';
 import { reverseGeocode } from '../../utils/geocoding';
 import type { VisitGpsVerification } from '../../types';
 import { enqueueOfflineVisitSync } from '../../mobile-rep/useOfflineVisitSync';
+import VisitLocationPermissionModal from './VisitLocationPermissionModal';
 import {
   createEmptyRfcForm,
   getRfcFormProgress,
@@ -198,19 +199,24 @@ function buildVisitContext(
   outcome?: string,
   visitGpsVerification?: VisitGpsVerification | null,
 ) {
+  const hasVerifiedCoords =
+    Boolean(visitGpsVerification?.verified) &&
+    Number.isFinite(Number(visitGpsVerification?.latitude)) &&
+    Number.isFinite(Number(visitGpsVerification?.longitude));
+
   return {
     location: appointment.location,
     geoLocation: appointment.geoLocation,
-    attendanceLocation: visitGpsVerification
+    attendanceLocation: hasVerifiedCoords
       ? {
           type: 'Point' as const,
-          coordinates: [visitGpsVerification.longitude, visitGpsVerification.latitude] as [
-            number,
-            number,
-          ],
+          coordinates: [
+            Number(visitGpsVerification!.longitude),
+            Number(visitGpsVerification!.latitude),
+          ] as [number, number],
         }
       : appointment.attendanceLocation,
-    attendanceMethod: visitGpsVerification
+    attendanceMethod: hasVerifiedCoords
       ? 'gps_verification'
       : appointment.attendanceMethod,
     attendanceAccuracy:
@@ -367,11 +373,12 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
   onCompletionAction,
 }) => {
   const { user } = useAuth();
-  const { getCurrentPosition, isSupported: isGeolocationSupported } = useGeolocation({
-    enableHighAccuracy: true,
-    maximumAge: 0,
-    timeout: 20000,
-  });
+  const { getCurrentPosition, isSupported: isGeolocationSupported, permissionState } =
+    useGeolocation({
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 20000,
+    });
   const [session, setSession] = useState<VisitSession | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [isSaving, setIsSaving] = useState(false);
@@ -387,6 +394,11 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
   const [visitGpsVerification, setVisitGpsVerification] =
     useState<VisitGpsVerification | null>(null);
   const visitGpsRef = useRef<VisitGpsVerification | null>(null);
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
+  const [locationPromptLoading, setLocationPromptLoading] = useState(false);
+  /** When true, the rep chose to continue without enabling location for this visit. */
+  const [locationDeclined, setLocationDeclined] = useState(false);
+  const locationPromptShownRef = useRef<string | null>(null);
 
   const photoInputRef = useRef<HTMLInputElement>(null);
   const notesRef = useRef<HTMLTextAreaElement>(null);
@@ -486,6 +498,11 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
     );
     setSavedDurationLabel('');
     setLastSavedAt(null);
+    setVisitGpsVerification(null);
+    visitGpsRef.current = null;
+    setLocationDeclined(false);
+    setShowLocationPrompt(false);
+    setLocationPromptLoading(false);
 
     /**
      * Always load the latest published Super Admin form for in-progress visits,
@@ -617,6 +634,86 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
     };
   }, [appointment]);
 
+  /**
+   * When the visit form opens, prompt for location if it is not already granted.
+   */
+  useEffect(() => {
+    if (!appointment?._id) return;
+
+    const isCompletedVisit =
+      appointment.status === 'completed' ||
+      (Boolean(appointment.attended) &&
+        appointment.status !== 'pending_approval' &&
+        appointment.status !== 'rejected' &&
+        appointment.status !== 'in_progress');
+
+    if (isCompletedVisit) return;
+    if (locationPromptShownRef.current === appointment._id) return;
+    locationPromptShownRef.current = appointment._id;
+
+    let cancelled = false;
+
+    void (async () => {
+      if (!isGeolocationSupported) {
+        if (!cancelled) {
+          setLocationDeclined(true);
+          setShowLocationPrompt(true);
+        }
+        return;
+      }
+
+      try {
+        if (typeof navigator !== 'undefined' && 'permissions' in navigator) {
+          const result = await navigator.permissions.query({
+            name: 'geolocation' as PermissionName,
+          });
+          if (cancelled) return;
+          if (result.state === 'granted') {
+            setLocationDeclined(false);
+            setShowLocationPrompt(false);
+            return;
+          }
+        }
+      } catch {
+        // Fall through to prompt when Permissions API is unavailable.
+      }
+
+      if (!cancelled) {
+        setShowLocationPrompt(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [appointment, isGeolocationSupported]);
+
+  /**
+   * Requests browser location permission from the open-form prompt.
+   */
+  async function handleEnableVisitLocation(): Promise<void> {
+    setLocationPromptLoading(true);
+    try {
+      const position = await getCurrentPosition();
+      if (position) {
+        setLocationDeclined(false);
+        setShowLocationPrompt(false);
+        return;
+      }
+      setLocationDeclined(true);
+    } finally {
+      setLocationPromptLoading(false);
+    }
+  }
+
+  /**
+   * Lets the rep continue filling the form without location; decline is recorded on submit.
+   */
+  function handleContinueWithoutVisitLocation(): void {
+    setLocationDeclined(true);
+    setShowLocationPrompt(false);
+  }
+
   useEffect(() => {
     if (!appointment || !session) {
       return;
@@ -709,12 +806,21 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
         ...(gpsProof
           ? {
               visitGpsVerification: gpsProof,
-              attendanceLocation: {
-                type: 'Point' as const,
-                coordinates: [gpsProof.longitude, gpsProof.latitude] as [number, number],
-              },
-              attendanceAccuracy: gpsProof.accuracyMeters,
-              attendanceMethod: 'gps_verification' as const,
+              ...(gpsProof.verified &&
+              Number.isFinite(Number(gpsProof.latitude)) &&
+              Number.isFinite(Number(gpsProof.longitude))
+                ? {
+                    attendanceLocation: {
+                      type: 'Point' as const,
+                      coordinates: [
+                        Number(gpsProof.longitude),
+                        Number(gpsProof.latitude),
+                      ] as [number, number],
+                    },
+                    attendanceAccuracy: gpsProof.accuracyMeters,
+                    attendanceMethod: 'gps_verification' as const,
+                  }
+                : {}),
             }
           : {}),
         internalNotes: [
@@ -1184,21 +1290,48 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
   }
 
   /**
-   * Captures live GPS automatically when the rep finishes / submits the visit.
-   * No separate verify-location step — Finish triggers capture itself.
+   * Captures live GPS when available, otherwise records an explicit decline for admin review.
+   * Submission is never blocked when location is unavailable.
    */
   async function captureVisitLocationAutomatically(): Promise<VisitGpsVerification> {
     if (!user?.id) {
       throw new Error('You must be signed in to finish this visit.');
     }
+
+    /**
+     * Builds the admin-visible decline payload when GPS cannot be captured.
+     */
+    function buildDeclinedProof(reason: string, status: string): VisitGpsVerification {
+      return {
+        verified: false,
+        declinedByUser: true,
+        permissionStatus: status,
+        declineReason: reason,
+        capturedAt: new Date().toISOString(),
+        capturedBy: user!.id,
+        appointmentId: appointment?._id,
+      };
+    }
+
     if (!isGeolocationSupported) {
-      throw new Error('GPS is not supported on this device or browser.');
+      return buildDeclinedProof(
+        'GPS is not supported on this device or browser.',
+        'unsupported',
+      );
+    }
+
+    if (locationDeclined) {
+      return buildDeclinedProof(
+        'Representative continued without enabling location.',
+        permissionState === 'denied' ? 'denied' : 'declined',
+      );
     }
 
     const position = await getCurrentPosition();
     if (!position) {
-      throw new Error(
-        'Unable to capture GPS location. Please enable location permissions and try Finish again.',
+      return buildDeclinedProof(
+        'Location was not enabled or could not be captured at submission.',
+        permissionState === 'denied' ? 'denied' : 'unavailable',
       );
     }
 
@@ -1212,6 +1345,8 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
 
     return {
       verified: true,
+      declinedByUser: false,
+      permissionStatus: 'granted',
       latitude: position.latitude,
       longitude: position.longitude,
       accuracyMeters: Math.round(position.accuracy),
@@ -1223,7 +1358,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
   }
 
   /**
-   * Starts finish/submit: auto-captures GPS, then completes the visit.
+   * Starts finish/submit: captures GPS when possible, otherwise records decline and continues.
    */
   async function handleRequestFinishVisit(): Promise<void> {
     if (!leadId) {
@@ -1253,7 +1388,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
   }
 
   /**
-   * Persists GPS proof first, then saves visit data and submits for approval when required.
+   * Persists GPS proof (or decline) first, then saves visit data and submits for approval when required.
    */
   async function handleFinishVisit(gpsProof: VisitGpsVerification): Promise<void> {
     if (!leadId) {
@@ -1267,15 +1402,26 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
     setError(null);
 
     try {
-      // Persist GPS on the appointment before any complete / pending_approval transition.
+      const hasVerifiedCoords =
+        gpsProof.verified &&
+        Number.isFinite(Number(gpsProof.latitude)) &&
+        Number.isFinite(Number(gpsProof.longitude));
+
       await updateAppointment(leadId, appointment._id, {
         visitGpsVerification: gpsProof,
-        attendanceLocation: {
-          type: 'Point',
-          coordinates: [gpsProof.longitude, gpsProof.latitude],
-        },
-        attendanceAccuracy: gpsProof.accuracyMeters,
-        attendanceMethod: 'gps_verification',
+        ...(hasVerifiedCoords
+          ? {
+              attendanceLocation: {
+                type: 'Point' as const,
+                coordinates: [Number(gpsProof.longitude), Number(gpsProof.latitude)] as [
+                  number,
+                  number,
+                ],
+              },
+              attendanceAccuracy: gpsProof.accuracyMeters,
+              attendanceMethod: 'gps_verification' as const,
+            }
+          : {}),
       });
 
       if (hasSheetForm) {
@@ -1283,7 +1429,6 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
           throw new Error('Complete the required form before submitting for approval.');
         }
 
-        // Save the latest draft first, then submit — locking happens only here.
         const activeSession = sessionRef.current ?? session;
         const draft = await upsertDraftSalesRequest(activeSession);
         await submitSalesRequest(draft._id, { visitGpsVerification: gpsProof });
@@ -1830,7 +1975,9 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
               {isEditingCompletedVisit
                 ? 'Save Changes & Return to History'
                 : isSaving
-                  ? 'Capturing location…'
+                  ? locationDeclined
+                    ? 'Submitting…'
+                    : 'Capturing location…'
                   : hasSheetForm
                     ? 'Submit for Approval'
                     : 'Finish Visit'}
@@ -1842,11 +1989,22 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
             {isEditingCompletedVisit
               ? 'Changes remain available in History'
               : hasSheetForm
-                ? 'Captures your location automatically, then locks until admin review'
-                : 'Captures your location automatically · review anytime in History'}
+                ? locationDeclined
+                  ? 'Location not enabled — admin will see that GPS was declined'
+                  : 'Attaches your location on submit, then locks until admin review'
+                : locationDeclined
+                  ? 'Location not enabled — admin will see that GPS was declined'
+                  : 'Attaches your location on submit · review anytime in History'}
           </div>
         </div>
       )}
+
+      <VisitLocationPermissionModal
+        visible={showLocationPrompt}
+        loading={locationPromptLoading}
+        onEnable={() => void handleEnableVisitLocation()}
+        onContinueWithout={handleContinueWithoutVisitLocation}
+      />
 
       {showCompletionDialog && (
         <VisitCompletionDialog

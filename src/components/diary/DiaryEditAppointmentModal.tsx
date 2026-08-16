@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Loader2, Save, X } from 'lucide-react';
 import { updateAppointment } from '../../lib/api';
 import { AddressAutocomplete } from '../AddressAutocomplete';
@@ -125,10 +126,10 @@ const DiaryEditAppointmentModal: React.FC<DiaryEditAppointmentModalProps> = ({
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-[75] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[85] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
       <div
-        className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-gray-200 bg-white shadow-xl sm:max-h-[90vh] sm:rounded-2xl mobile-fit-modal"
+        className="flex max-h-[min(92dvh,100%)] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-gray-200 bg-white shadow-xl sm:max-h-[90vh] sm:rounded-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="edit-appointment-title"
@@ -253,7 +254,8 @@ const DiaryEditAppointmentModal: React.FC<DiaryEditAppointmentModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

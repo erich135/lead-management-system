@@ -70,6 +70,8 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import { Tooltip, HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
 import { ProfileSettingsModal } from './ProfileSettingsModal';
+import { RepDashboardHome } from './RepDashboardHome';
+import { isRepUser } from '../mobile-rep/mobileRepUtils';
 
 type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady' | 'pendingReadings' | 'pendingSalesRequests' | 'techApp';
 
@@ -1199,7 +1201,11 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           </div>
         )}
 
-        {view === 'dashboard' && loading && (
+        {view === 'dashboard' && isRepUser(user) && (
+          <RepDashboardHome />
+        )}
+
+        {view === 'dashboard' && !isRepUser(user) && loading && (
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ars-primary mx-auto mb-4"></div>
@@ -1208,7 +1214,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           </div>
         )}
 
-        {view === 'dashboard' && stats && !loading && (
+        {view === 'dashboard' && !isRepUser(user) && stats && !loading && (
           <div className="space-y-6">
             {/* Header with Gradient Background */}
             <div className="relative overflow-hidden rounded-[16px] bg-[#0969a9] p-8 text-white">

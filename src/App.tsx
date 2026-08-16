@@ -12,9 +12,6 @@ import PwaInstallPrompt from './components/PwaInstallPrompt';
 // Push / appointment reminder UI — commented out (re-enable when needed)
 // import { PushNotificationBootstrap } from './components/PushNotificationBootstrap';
 // import AppointmentReminderToastHost from './components/AppointmentReminderToastHost';
-import { MobileRepAppGate } from './mobile-rep/MobileRepApp';
-import { useIsMobile } from './hooks/useIsMobile';
-import { isRepUser } from './mobile-rep/mobileRepUtils';
 import { PwaInstallProvider } from './pwa/PwaInstallContext';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -72,8 +69,6 @@ function SetPasswordRoute({ children }: { children: React.ReactNode }) {
 
 function AppContent() {
   const { user } = useAuth();
-  const isMobile = useIsMobile();
-  const hideChatForMobileRep = isMobile && isRepUser(user);
   const navigate = useNavigate();
 
   /**
@@ -118,100 +113,72 @@ function AppContent() {
         } />
         <Route path="/dashboard" element={
           <ProtectedRoute>
-            <MobileRepAppGate>
-              <Dashboard view="dashboard" />
-            </MobileRepAppGate>
+            <Dashboard view="dashboard" />
           </ProtectedRoute>
         } />
         <Route path="/jobs" element={
           <ProtectedRoute>
-            <MobileRepAppGate>
-              <Dashboard view="leads" />
-            </MobileRepAppGate>
+            <Dashboard view="leads" />
           </ProtectedRoute>
         } />
         <Route path="/sales-leads" element={
           <ProtectedRoute>
-            <MobileRepAppGate>
-              <Dashboard view="salesLeads" />
-            </MobileRepAppGate>
+            <Dashboard view="salesLeads" />
           </ProtectedRoute>
         } />
         <Route path="/reports" element={
           <ProtectedRoute>
-            <MobileRepAppGate>
-              <Dashboard view="reports" />
-            </MobileRepAppGate>
+            <Dashboard view="reports" />
           </ProtectedRoute>
         } />
         <Route path="/diary" element={
           <ProtectedRoute>
-            <MobileRepAppGate>
-              <Dashboard view="diary" />
-            </MobileRepAppGate>
+            <Dashboard view="diary" />
           </ProtectedRoute>
         } />
         <Route path="/machines" element={
           <ProtectedRoute>
-            <MobileRepAppGate>
-              <Dashboard view="machines" />
-            </MobileRepAppGate>
+            <Dashboard view="machines" />
           </ProtectedRoute>
         } />
         <Route path="/admin" element={
           <ProtectedRoute>
-            <MobileRepAppGate>
-              <Dashboard view="admin" />
-            </MobileRepAppGate>
+            <Dashboard view="admin" />
           </ProtectedRoute>
         } />
         <Route path="/activities" element={
           <ProtectedRoute>
-            <MobileRepAppGate>
-              <Dashboard view="activities" />
-            </MobileRepAppGate>
+            <Dashboard view="activities" />
           </ProtectedRoute>
         } />
         <Route path="/job-card-templates" element={
           <ProtectedRoute>
-            <MobileRepAppGate>
-              <Dashboard view="jobCardTemplates" />
-            </MobileRepAppGate>
+            <Dashboard view="jobCardTemplates" />
           </ProtectedRoute>
         } />
         <Route path="/job-card-submissions" element={
           <ProtectedRoute>
-            <MobileRepAppGate>
-              <Dashboard view="jobCardSubmissions" />
-            </MobileRepAppGate>
+            <Dashboard view="jobCardSubmissions" />
           </ProtectedRoute>
         } />
         <Route path="/parts-ready" element={
           <ProtectedRoute>
-            <MobileRepAppGate>
-              <Dashboard view="partsReady" />
-            </MobileRepAppGate>
+            <Dashboard view="partsReady" />
           </ProtectedRoute>
         } />
         <Route path="/tech-app" element={
           <ProtectedRoute>
-            <MobileRepAppGate>
-              <Dashboard view="techApp" />
-            </MobileRepAppGate>
+            <Dashboard view="techApp" />
           </ProtectedRoute>
         } />
         <Route path="/pending-machine-readings" element={
           <ProtectedRoute>
-            <MobileRepAppGate>
-              <Dashboard view="pendingReadings" />
-            </MobileRepAppGate>
+            <Dashboard view="pendingReadings" />
           </ProtectedRoute>
         } />
         <Route path="/pending-sales-requests" element={
           <ProtectedRoute>
-            <MobileRepAppGate>
-              <Dashboard view="pendingSalesRequests" />
-            </MobileRepAppGate>
+            <Dashboard view="pendingSalesRequests" />
           </ProtectedRoute>
         } />
         {/* Public QR scan landing — NO auth, NO PublicRoute redirect. */}
@@ -220,8 +187,7 @@ function AppContent() {
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
 
-      {/* Chat widget — hidden on the dedicated mobile Representative shell */}
-      {user && !hideChatForMobileRep && <ChatWidget />}
+      {user && <ChatWidget />}
 
       {/* Auto-start GPS tracking for enabled users */}
       {/* AutoLocationTracker disabled — re-enable when location tracking is needed */}

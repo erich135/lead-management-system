@@ -95,7 +95,7 @@
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }
 
@@ -110,8 +110,9 @@
     linear-gradient(180deg, #f0f7fc 0%, #eef2f6 45%, #f8fafc 100%);
 }
 
+/* Do not leave a persistent transform — it clips position:fixed diary modals. */
 .mobile-rep-rise {
-  animation: mobile-rep-rise 0.35s ease-out both;
+  animation: mobile-rep-rise 0.35s ease-out;
 }
 
 .mobile-rep-card {

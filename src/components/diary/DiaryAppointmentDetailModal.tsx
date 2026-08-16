@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   CalendarClock,
   CheckCircle2,
@@ -243,9 +244,9 @@ const DiaryAppointmentDetailModal: React.FC<DiaryAppointmentDetailModalProps> = 
     onClose();
   }
 
-  return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
-      <div className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-gray-200 bg-white shadow-xl sm:rounded-2xl mobile-fit-modal">
+  return createPortal(
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
+      <div className="max-h-[min(92dvh,100%)] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-2xl border border-gray-200 bg-white shadow-xl sm:rounded-2xl">
         <div className="sticky top-0 flex items-start justify-between border-b border-gray-200 bg-white px-5 py-4">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
@@ -551,7 +552,8 @@ const DiaryAppointmentDetailModal: React.FC<DiaryAppointmentDetailModalProps> = 
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

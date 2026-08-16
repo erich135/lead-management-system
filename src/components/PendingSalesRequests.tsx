@@ -742,17 +742,21 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
                         </div>
 
                         <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              void handleDownload(event, item);
-                            }}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-[#0969a9] px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#085a91] active:scale-[0.98]"
-                            title="Download attachment"
-                          >
-                            <Download className="h-4 w-4" />
-                            Download
-                          </button>
+                          {(item.attachmentCount ??
+                            item.attachments?.length ??
+                            collectRequestDownloadUrls(item).length) > 0 && (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                void handleDownload(event, item);
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-[#0969a9] px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#085a91] active:scale-[0.98]"
+                              title="Download attachments"
+                            >
+                              <Download className="h-4 w-4" />
+                              Download attachments
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => openReview(item._id)}

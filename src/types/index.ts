@@ -17,12 +17,13 @@ export type AttendanceMethod =
 /**
  * Live GPS proof captured before a visit can be completed / submitted.
  * Geofencing distance fields are prepared for future admin flagging.
+ * When declinedByUser is true, coordinates may be absent.
  */
 export interface VisitGpsVerification {
   verified: boolean;
-  latitude: number;
-  longitude: number;
-  accuracyMeters: number;
+  latitude?: number;
+  longitude?: number;
+  accuracyMeters?: number;
   capturedAt: string;
   capturedBy?: string;
   appointmentId?: string;
@@ -32,6 +33,9 @@ export interface VisitGpsVerification {
   distanceFromExpectedMeters?: number;
   outsideExpectedLocation?: boolean;
   geofenceRadiusMeters?: number;
+  declinedByUser?: boolean;
+  permissionStatus?: string;
+  declineReason?: string;
 }
 
 export interface Branch {

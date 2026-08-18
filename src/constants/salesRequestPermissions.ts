@@ -17,6 +17,8 @@ export type SalesRequestPermissionName =
  */
 export const SALES_REQUEST_TYPE_LABELS: Record<string, string> = {
   rfc: 'Request For Costing (RFC)',
+  loan: 'Loan Request',
+  rental: 'Rental Request',
   loan_rental: 'Loan & Rental Request',
   rfc_new_service_level: 'New Service Level Agreement',
 };

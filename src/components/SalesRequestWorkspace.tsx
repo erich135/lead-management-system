@@ -64,6 +64,22 @@ const WIZARD_STEPS: Record<SalesRequestType, FormWizardStep[]> = {
     { id: 'site', label: 'Site' },
     { id: 'signoff', label: 'Sign-off' },
   ],
+  loan: [
+    { id: 'customer', label: 'Customer' },
+    { id: 'details', label: 'Details' },
+    { id: 'units', label: 'Units' },
+    { id: 'aux', label: 'Auxiliary' },
+    { id: 'site', label: 'Site' },
+    { id: 'signoff', label: 'Sign-off' },
+  ],
+  rental: [
+    { id: 'customer', label: 'Customer' },
+    { id: 'details', label: 'Details' },
+    { id: 'units', label: 'Units' },
+    { id: 'aux', label: 'Auxiliary' },
+    { id: 'site', label: 'Site' },
+    { id: 'signoff', label: 'Sign-off' },
+  ],
   rfc_new_service_level: [
     { id: 'details', label: 'Details' },
     { id: 'customer', label: 'Customer' },

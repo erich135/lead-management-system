@@ -1549,21 +1549,6 @@ export async function relinkMachineToCustomer(
 }
 
 /**
- * Re-links a machine (active or archived) from a cash customer to a proper
- * customer record. Preserves the old cash customer name as currentLocation.
- */
-export async function relinkMachineToCustomer(
-  machineId: string,
-  customerId: string,
-  preserveAsLocation = true,
-): Promise<{ machine: Machine }> {
-  return apiRequest(`/api/machines/${machineId}/relink`, {
-    method: 'PUT',
-    body: JSON.stringify({ customerId, preserveAsLocation }),
-  });
-}
-
-/**
  * Deletes a machine.
  */
 export async function deleteMachine(id: string): Promise<void> {
@@ -2854,7 +2839,7 @@ async function postRSRUpload<T>(
 ): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    response = await fetch(`${apiBase()}${endpoint}`, {
       method: 'POST',
       headers: rsrUploadHeaders(attempt),
       body: formData,

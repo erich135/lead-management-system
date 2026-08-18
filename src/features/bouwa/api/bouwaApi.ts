@@ -24,6 +24,7 @@
  */
 
 import { getAuthToken } from '../../../lib/api';
+import { resolveApiBaseUrl } from '../../../lib/resolveApiBaseUrl';
 import type {
   BouwaMachineSpec,
   BouwaTariffTable,
@@ -56,7 +57,6 @@ import type {
 // Internal request helper
 // ---------------------------------------------------------------------------
 
-const BOUWA_API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 const BOUWA_BASE_PATH = '/api/bouwa';
 
 interface BouwaApiResponse<T> {
@@ -74,7 +74,7 @@ async function bouwaRequest<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const token = getAuthToken();
-  const url = `${BOUWA_API_BASE}${BOUWA_BASE_PATH}${path}`;
+  const url = `${resolveApiBaseUrl()}${BOUWA_BASE_PATH}${path}`;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -85,7 +85,7 @@ async function bouwaRequest<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(url, { ...options, headers });
+  const response = await fetch(url, { ...options, headers, credentials: 'include' });
 
   let data: BouwaApiResponse<T>;
   try {

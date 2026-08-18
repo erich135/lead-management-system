@@ -11,6 +11,7 @@
  */
 
 import { getAuthToken } from '../../../lib/api';
+import { resolveApiBaseUrl } from '../../../lib/resolveApiBaseUrl';
 import type {
   WizardConflict,
   WizardDraftSummary,
@@ -40,12 +41,10 @@ import type {
 } from './wizardTypes';
 import type { AuditIntakeDocument, AuditIntakeFormModel } from '../auditIntakeTypes';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-
 export const WIZARD_BASE_PATH = '/api/bouwa/wizard';
 
 export function wizardUrl(path: string): string {
-  return `${API_BASE}${WIZARD_BASE_PATH}${path}`;
+  return `${resolveApiBaseUrl()}${WIZARD_BASE_PATH}${path}`;
 }
 
 export class WizardRequestError extends Error {
@@ -101,6 +100,7 @@ async function requestJson(
 ): Promise<Record<string, unknown>> {
   const response = await fetch(wizardUrl(path), {
     ...options,
+    credentials: 'include',
     headers: authHeaders({
       ...(options.body === undefined
         ? {}
@@ -306,6 +306,7 @@ export async function uploadWizardSource(
         'X-Bouwa-Filename': encodeURIComponent(file.name),
         'X-Bouwa-Revision': String(revision),
       }),
+      credentials: 'include',
       body: await file.arrayBuffer(),
     },
   );
@@ -334,6 +335,7 @@ export async function uploadWizardDocument(
           ? { 'X-Bouwa-Evidence-Type': options.evidenceType }
           : {}),
       }),
+      credentials: 'include',
       body: await file.arrayBuffer(),
     },
   );
@@ -585,6 +587,7 @@ export async function storeProposalPdf(
         'X-Bouwa-Filename': encodeURIComponent(filename),
         'X-Bouwa-Revision': String(revision),
       }),
+      credentials: 'include',
       body: bytes,
     },
   );
@@ -716,7 +719,7 @@ export function wizardSourceDownloadUrl(draftId: string): string {
  * a local object URL. The token never travels in a query string.
  */
 export async function downloadWizardFile(url: string, filename: string): Promise<void> {
-  const response = await fetch(url, { headers: authHeaders() });
+  const response = await fetch(url, { headers: authHeaders(), credentials: 'include' });
   if (!response.ok) {
     const body = await readBody(response);
     throw new WizardRequestError(

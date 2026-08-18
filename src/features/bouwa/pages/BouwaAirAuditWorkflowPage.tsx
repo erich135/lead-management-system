@@ -16,6 +16,7 @@ import { useEffect, useState } from 'react';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 
 import { getAuthToken } from '../../../lib/api';
+import { resolveApiBaseUrl } from '../../../lib/resolveApiBaseUrl';
 import {
   arsWorkflowBasePath,
   arsWorkflowConnection,
@@ -23,9 +24,6 @@ import {
   type BouwaWorkflowSessionResponse,
 } from '../workflowConnection';
 import { BouwaLoggerLocalApp } from './BouwaLoggerLocalApp';
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 function Notice({ children }: { children: React.ReactNode }) {
   return (
@@ -52,9 +50,10 @@ export function BouwaAirAuditWorkflowPage() {
       setError('Your ARS session has ended. Sign in again to open an audit.');
       return;
     }
-    const basePath = arsWorkflowBasePath(API_BASE_URL);
+    const basePath = arsWorkflowBasePath(resolveApiBaseUrl());
     fetch(`${basePath}/session`, {
       headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
     })
       .then(async response => {
         const payload = (await response.json()) as

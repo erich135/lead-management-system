@@ -1,5 +1,5 @@
 import React from 'react';
-import { Briefcase, Cog, Home, TrendingUp, Clock } from 'lucide-react';
+import { Briefcase, Cog, Home, TrendingUp, Clock, type LucideIcon } from 'lucide-react';
 import type { MobileRepTab } from './mobileRepUtils';
 
 interface MobileRepBottomNavProps {
@@ -11,7 +11,7 @@ interface MobileRepBottomNavProps {
 const TABS: Array<{
   id: MobileRepTab;
   label: string;
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  icon: LucideIcon;
 }> = [
   { id: 'home', label: 'Home', icon: Home },
   { id: 'sales_leads', label: 'Sales Leads', icon: TrendingUp },

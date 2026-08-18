@@ -1,0 +1,131 @@
+/**
+ * Bouwa feature module — public barrel export.
+ *
+ * Import from this file when consuming Bouwa module components externally.
+ *
+ * IMPORTANT: This barrel is NOT imported into:
+ *   - src/components/Dashboard.tsx
+ *   - src/components/MobileNavigation.tsx
+ *
+ * Phase 4C-2: shell exports.
+ * Phase 4C-3: route guard exported.
+ * Phase 4C-4: API helpers and entity types exported.
+ * Phase 4C-8: BouwaProposalDraftsPanel, BouwaFormulaApprovalsPanel,
+ *              BouwaAssumptionsPanel, BouwaReportTemplatesPanel exported;
+ *              new/corrected types exported.
+ */
+
+// Shell page
+export { BouwaModuleShell } from './pages/BouwaModuleShell';
+
+// Sub-components
+export { BouwaPhaseCard } from './components/BouwaPhaseCard';
+export { BouwaAccessNotice } from './components/BouwaAccessNotice';
+export { BouwaRouteGuard } from './components/BouwaRouteGuard';
+export { BouwaMachineSpecLibrary } from './components/BouwaMachineSpecLibrary';
+export { BouwaTariffTablesPanel } from './components/BouwaTariffTablesPanel';
+export { BouwaAirAuditEvidencePanel } from './components/BouwaAirAuditEvidencePanel';
+export { BouwaProposalDraftsPanel } from './components/BouwaProposalDraftsPanel';
+export { BouwaFormulaApprovalsPanel } from './components/BouwaFormulaApprovalsPanel';
+export { BouwaAssumptionsPanel } from './components/BouwaAssumptionsPanel';
+export { BouwaReportTemplatesPanel } from './components/BouwaReportTemplatesPanel';
+
+// Shell types
+export type { BouwaPhaseStatus, BouwaShellCard, BouwaAccessRequirement } from './types';
+
+// API entity types
+export type {
+  BouwaId,
+  ISODateString,
+  BouwaMachineSpecCategory,
+  BouwaMachineSpecSpeedControl,
+  BouwaMachineSpec,
+  CreateBouwaMachineSpecPayload,
+  UpdateBouwaMachineSpecPayload,
+  BouwaTariffProviderType,
+  BouwaTariffCategory,
+  BouwaTariffTimeBand,
+  BouwaTariffRate,
+  BouwaTariffTable,
+  CreateBouwaTariffTablePayload,
+  UpdateBouwaTariffTablePayload,
+  BouwaAuditSessionStatus,
+  BouwaAuditMode,
+  BouwaAuditSession,
+  CreateBouwaAuditSessionPayload,
+  UpdateBouwaAuditSessionPayload,
+  BouwaProposalStatus,
+  BouwaReadinessSummary,
+  BouwaProposalDraft,
+  CreateBouwaProposalDraftPayload,
+  UpdateBouwaProposalDraftPayload,
+  BouwaFormulaCurrentStatus,
+  BouwaFormulaApprovalStatus,
+  BouwaFormulaApproval,
+  CreateBouwaFormulaApprovalPayload,
+  UpdateBouwaFormulaApprovalPayload,
+  BouwaAssumptionScope,
+  BouwaAssumptionConfidence,
+  BouwaAssumption,
+  CreateBouwaAssumptionPayload,
+  UpdateBouwaAssumptionPayload,
+  BouwaEvidenceFile,
+  BouwaEvidenceEntityType,
+  BouwaEvidenceApprovalStatus,
+  BouwaStorageProvider,
+  CreateBouwaEvidenceFileMetadataPayload,
+  UpdateBouwaEvidenceFileMetadataPayload,
+  BouwaReportTemplateStatus,
+  BouwaReportTemplateType,
+  BouwaReportSection,
+  BouwaReportTemplate,
+  CreateBouwaReportTemplatePayload,
+  UpdateBouwaReportTemplatePayload,
+} from './types';
+
+// API helpers (scaffolded; not yet called from BouwaModuleShell)
+export {
+  listBouwaMachineSpecs,
+  getBouwaMachineSpec,
+  createBouwaMachineSpec,
+  updateBouwaMachineSpec,
+  listBouwaTariffTables,
+  getBouwaTariffTable,
+  createBouwaTariffTable,
+  updateBouwaTariffTable,
+  listBouwaAuditSessions,
+  getBouwaAuditSession,
+  createBouwaAuditSession,
+  updateBouwaAuditSession,
+  listBouwaProposalDrafts,
+  getBouwaProposalDraft,
+  createBouwaProposalDraft,
+  updateBouwaProposalDraft,
+  archiveBouwaProposalDraft,
+  listBouwaFormulaApprovals,
+  getBouwaFormulaApproval,
+  createBouwaFormulaApproval,
+  updateBouwaFormulaApproval,
+  listBouwaAssumptions,
+  getBouwaAssumption,
+  createBouwaAssumption,
+  updateBouwaAssumption,
+  listBouwaEvidenceFiles,
+  getBouwaEvidenceFile,
+  createBouwaEvidenceFileMetadata,
+  updateBouwaEvidenceFileMetadata,
+  listBouwaReportTemplates,
+  getBouwaReportTemplate,
+  createBouwaReportTemplate,
+  updateBouwaReportTemplate,
+} from './api/bouwaApi';
+
+// Config re-export for convenience
+export {
+  BOUWA_MODULE_KEY,
+  BOUWA_FEATURE_FLAG,
+  BOUWA_VIEW_PERMISSION,
+  BOUWA_ALL_PERMISSIONS,
+  BOUWA_PERMISSIONS,
+  BOUWA_MODULE_META,
+} from './bouwaFrontendConfig';

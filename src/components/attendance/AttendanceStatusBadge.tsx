@@ -13,12 +13,14 @@ const METHOD_LABELS: Record<AttendanceMethod, string> = {
   auto_geofence: 'Auto-verified',
   manual_checkin: 'Manual check-in',
   manual_override: 'Manager override',
+  gps_verification: 'GPS verification',
 };
 
 const METHOD_COLORS: Record<AttendanceMethod, string> = {
   auto_geofence: 'bg-green-100 text-green-800 border-green-200',
   manual_checkin: 'bg-yellow-100 text-yellow-800 border-yellow-200',
   manual_override: 'bg-blue-100 text-blue-800 border-blue-200',
+  gps_verification: 'bg-emerald-100 text-emerald-800 border-emerald-200',
 };
 
 /**

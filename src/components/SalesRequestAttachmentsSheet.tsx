@@ -4,6 +4,7 @@ import type { SalesRequest } from '../lib/api';
 import {
   collectRequestDownloadUrls,
   downloadAttachmentsAsZip,
+  downloadStoredAttachment,
   triggerFileDownload,
   type RequestAttachmentFile,
 } from '../utils/repApprovalsDownload';

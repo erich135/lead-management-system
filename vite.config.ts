@@ -42,6 +42,10 @@ export default defineConfig({
     // Same-origin proxy so LAN devices never call localhost:5000 from the browser.
     // Cookies (SameSite=Lax) and JWT both work on localhost and 192.168.0.251.
     proxy: {
+      '/api/bouwa-local': {
+        target: 'http://127.0.0.1:4310',
+        changeOrigin: false,
+      },
       '/api': {
         target: 'http://127.0.0.1:5000',
         changeOrigin: true,

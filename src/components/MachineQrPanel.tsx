@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Printer, Loader2, AlertCircle, Lock } from 'lucide-react';
 import { getMachineQrToken } from '../lib/api';
@@ -29,23 +29,33 @@ export function MachineQrPanel({
   const [scanUrl, setScanUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const load = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { scanUrl: url } = await getMachineQrToken(machineId);
-      setScanUrl(url);
-    } catch (e: any) {
-      setError(e?.message || 'Failed to load QR code');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const requestGenerationRef = useRef(0);
 
   useEffect(() => {
-    if (machineId) load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const requestGeneration = ++requestGenerationRef.current;
+    let cancelled = false;
+    setScanUrl(null);
+    setLoading(Boolean(machineId));
+    setError(null);
+    if (!machineId) return () => { cancelled = true; };
+
+    void getMachineQrToken(machineId)
+      .then(({ scanUrl: url }) => {
+        if (!cancelled && requestGeneration === requestGenerationRef.current) setScanUrl(url);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled && requestGeneration === requestGenerationRef.current) {
+          setError(e instanceof Error ? e.message : 'Failed to load QR code');
+        }
+      })
+      .finally(() => {
+        if (!cancelled && requestGeneration === requestGenerationRef.current) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      requestGenerationRef.current += 1;
+    };
   }, [machineId]);
 
   /**

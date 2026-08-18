@@ -142,10 +142,10 @@ export function JobCardFormBuilder({ template, onSave, onCancel }: JobCardFormBu
    */
   const handleAddFieldRow = () => {
     const tableId = generateId();
-    const defaultPairs = [
-      { label: 'Client', valueType: 'jobField' as const, jobFieldKey: 'customer', staticValue: '' },
-      { label: 'Contact Person', valueType: 'jobField' as const, jobFieldKey: 'notes', staticValue: '' },
-      { label: 'Job no', valueType: 'jobField' as const, jobFieldKey: 'jobNumber', staticValue: '' },
+    const defaultPairs: Array<{ label: string; valueType: 'jobField' | 'staticText'; jobFieldKey: string; staticValue: string }> = [
+      { label: 'Client', valueType: 'jobField', jobFieldKey: 'customer', staticValue: '' },
+      { label: 'Contact Person', valueType: 'jobField', jobFieldKey: 'notes', staticValue: '' },
+      { label: 'Job no', valueType: 'jobField', jobFieldKey: 'jobNumber', staticValue: '' },
     ];
     const cells: GridCell[] = [];
     defaultPairs.forEach((pair, i) => {

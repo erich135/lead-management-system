@@ -1,8 +1,11 @@
-import { LayoutDashboard, FileText, BarChart3, Calendar, Users, Menu, X, Bell, LogOut, Clock, Cog, Briefcase, Smartphone, ScanLine, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, FileText, BarChart3, Calendar, Users, Menu, X, Bell, LogOut, Clock, Cog, Briefcase, Smartphone, ScanLine, ClipboardList, Gauge } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import PwaInstallButton from './PwaInstallButton';
+import { canAccessMachineReadingWorkflow } from '../lib/readingAccess';
+import { useBouwaPilotAccess } from '../features/bouwa/BouwaPilotAccessContext';
+import { canShowBouwaNavigation } from '../features/bouwa/bouwaPilotPresentation';
 
 type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady' | 'techApp' | 'pendingReadings' | 'pendingSalesRequests';
 
@@ -28,6 +31,12 @@ export function MobileNavigation({
   pendingSalesRequestsCount = 0,
 }: MobileNavigationProps) {
   const { user, signOut, hasPermission } = useAuth();
+  const bouwaPilotAccess = useBouwaPilotAccess();
+  const showBouwaNavigation = canShowBouwaNavigation(
+    bouwaPilotAccess.state,
+    bouwaPilotAccess.loading,
+    bouwaPilotAccess.unavailable,
+  );
   const location = useLocation();
   const [showMenu, setShowMenu] = useState(false);
 
@@ -56,7 +65,10 @@ export function MobileNavigation({
   const canViewReports = user?.isSuperAdmin || hasPermission('reports.read');
   const canViewSalesLeads = user?.isSuperAdmin || hasPermission('sales_leads.read');
   const canViewTechApp = user?.isSuperAdmin || user?.role?.name?.toLowerCase() === 'technician';
-  const canVerifyReadings = user?.isSuperAdmin || hasPermission('machines.verifyReadings');
+  const canVerifyReadings =
+    canAccessMachineReadingWorkflow(user) ||
+    user?.isSuperAdmin ||
+    hasPermission('machines.verifyReadings');
   const canReviewSalesRequests =
     user?.isSuperAdmin || hasPermission('sales_requests.review');
 
@@ -187,6 +199,17 @@ export function MobileNavigation({
                   >
                     <Smartphone className="w-5 h-5" />
                     <span className="font-medium">Tech App</span>
+                  </Link>
+                )}
+
+                {showBouwaNavigation && (
+                  <Link
+                    to="/bouwa"
+                    onClick={() => setShowMenu(false)}
+                    className="w-full flex items-center gap-4 p-4 rounded-[8px] transition-all bg-gray-50 text-ars-heading hover:bg-gray-100"
+                  >
+                    <Gauge className="w-5 h-5" />
+                    <span className="font-medium">Bouwa</span>
                   </Link>
                 )}
 

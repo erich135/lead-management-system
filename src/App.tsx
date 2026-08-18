@@ -13,6 +13,11 @@ import PwaInstallPrompt from './components/PwaInstallPrompt';
 // import { PushNotificationBootstrap } from './components/PushNotificationBootstrap';
 // import AppointmentReminderToastHost from './components/AppointmentReminderToastHost';
 import { PwaInstallProvider } from './pwa/PwaInstallContext';
+// Bouwa module — Super-Admin gated route
+import { BouwaModuleShell } from './features/bouwa/pages/BouwaModuleShell';
+import { BouwaRouteGuard } from './features/bouwa/components/BouwaRouteGuard';
+import { BouwaLoggerLocalApp } from './features/bouwa/pages/BouwaLoggerLocalApp';
+import { BouwaPilotAccessProvider } from './features/bouwa/BouwaPilotAccessContext';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -181,6 +186,16 @@ function AppContent() {
             <Dashboard view="pendingSalesRequests" />
           </ProtectedRoute>
         } />
+        {/* Hidden Bouwa route — authenticated + permission-gated.
+            Wildcard because a proposal and its preview are addressable: a rep
+            who refreshes on a preview must land back on that preview. */}
+        <Route path="/bouwa/*" element={
+          <ProtectedRoute>
+            <BouwaRouteGuard>
+              <BouwaModuleShell />
+            </BouwaRouteGuard>
+          </ProtectedRoute>
+        } />
         {/* Public QR scan landing — NO auth, NO PublicRoute redirect. */}
         <Route path="/scan/machine/:token" element={<MachineScanPage />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -202,13 +217,23 @@ function AppContent() {
 }
 
 function App() {
+  if (import.meta.env.DEV && window.location.pathname === '/bouwa/logger-analysis-local') {
+    return (
+      <BrowserRouter>
+        <BouwaLoggerLocalApp />
+      </BrowserRouter>
+    );
+  }
+
   return (
     <AuthProvider>
-      <PwaInstallProvider>
-        <BrowserRouter>
-          <AppContent />
-        </BrowserRouter>
-      </PwaInstallProvider>
+      <BouwaPilotAccessProvider>
+        <PwaInstallProvider>
+          <BrowserRouter>
+            <AppContent />
+          </BrowserRouter>
+        </PwaInstallProvider>
+      </BouwaPilotAccessProvider>
     </AuthProvider>
   );
 }

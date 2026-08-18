@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+// NOTE: This component was originally Supabase-era.
+// Supabase import removed — pending ARS backend migration.
 import { Lead, LeadStatus, Profile, Branch } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { StatusWorkflow } from './StatusWorkflow';
@@ -67,19 +68,8 @@ export function LeadsList({
 
   useEffect(() => {
     loadLeads();
-    
-    // Set up real-time subscription
-    const subscription = supabase
-      .channel('leads')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'leads' }, 
-        () => loadLeads()
-      )
-      .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    // NOTE: Supabase realtime subscription removed — pending ARS backend migration.
+    // TODO: Replace with ARS backend WebSocket/polling when attachment module is migrated.
   }, []);
 
   useEffect(() => {
@@ -87,24 +77,10 @@ export function LeadsList({
   }, [leads, filters, sortField, sortDirection]);
 
   async function loadLeads() {
-    try {
-      const { data } = await supabase
-        .from('leads')
-        .select(`
-          *,
-          branch:branches(*),
-          current_status:lead_statuses(*),
-          assigned_user:profiles!leads_assigned_to_fkey(*),
-          created_by_user:profiles!leads_created_by_fkey(*)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (data) setLeads(data);
-    } catch (error) {
-      console.error('Error loading leads:', error);
-    } finally {
-      setLoading(false);
-    }
+    // TODO: Replace Supabase leads fetch with ARS backend job/leads API.
+    // Supabase data fetch removed — pending ARS backend migration.
+    console.warn('[EnhancedLeadsList] loadLeads disabled — pending ARS backend migration.');
+    setLoading(false);
   }
 
   function applyFilters() {
@@ -216,52 +192,14 @@ export function LeadsList({
     });
   }
 
-  async function handleStatusChange(leadId: string, newStatusId: string, referenceNumber?: string) {
-    try {
-      const updateData: any = {
-        current_status_id: newStatusId,
-        updated_at: new Date().toISOString()
-      };
-
-      // Add reference numbers if provided
-      if (referenceNumber) {
-        const status = statuses.find(s => s.id === newStatusId);
-        if (status?.name === 'Quoted') updateData.quote_number = referenceNumber;
-        if (status?.name === 'Order Received') updateData.order_number = referenceNumber;
-        if (status?.name === 'Invoiced') updateData.invoice_number = referenceNumber;
-      }
-
-      const { error } = await supabase
-        .from('leads')
-        .update(updateData)
-        .eq('id', leadId);
-
-      if (error) throw error;
-
-      // The database trigger will handle creating the status history entry
-      await loadLeads();
-    } catch (error: any) {
-      throw new Error(error.message || 'Failed to update status');
-    }
+  async function handleStatusChange(_leadId: string, _newStatusId: string, _referenceNumber?: string) {
+    // TODO: Replace Supabase status update with ARS backend job status update API.
+    throw new Error('[EnhancedLeadsList] Status update disabled — pending ARS backend migration.');
   }
 
-  async function handleDeleteLead(leadId: string) {
-    if (!confirm('Are you sure you want to delete this lead? This action cannot be undone.')) {
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('leads')
-        .delete()
-        .eq('id', leadId);
-
-      if (error) throw error;
-      
-      await loadLeads();
-    } catch (error: any) {
-      alert(error.message || 'Failed to delete lead');
-    }
+  async function handleDeleteLead(_leadId: string) {
+    // TODO: Replace Supabase delete with ARS backend delete API.
+    console.warn('[EnhancedLeadsList] Lead delete disabled — pending ARS backend migration.');
   }
 
   function getStatusIndicator(lead: Lead) {

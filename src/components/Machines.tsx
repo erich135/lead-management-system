@@ -4,13 +4,10 @@ import {
   createMachine,
   updateMachine,
   relinkMachineToCustomer,
-  deleteMachine,
   getMachineRSRs,
   uploadRSR,
   getMachineRSRUrl,
   getRSRDocumentUrl,
-  deleteMachineRSR,
-  deleteRSRDocument,
   getAuthToken,
   getCustomers,
   getCustomersWithMachines,
@@ -22,6 +19,7 @@ import {
   sendMachineWhatsAppTest,
   getJobs,
   getJob,
+  resolveCanonicalMachineSelections,
   type Machine,
   type MachineRSR,
   type Customer,
@@ -30,8 +28,10 @@ import {
   type Job,
 } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { canAccessMachineReadingWorkflow } from '../lib/readingAccess';
 import { MachineQrPanel } from './MachineQrPanel';
-import { MachineReadingHistory } from './MachineReadingHistory';
+import { MachineActivityHistory } from './MachineActivityHistory';
+import { MachineRSRMetadataEditModal } from './MachineRSRMetadataEditModal';
 import { PendingMachineReadings } from './PendingMachineReadings';
 import { UnifiedMachineImport } from './UnifiedMachineImport';
 import {
@@ -41,7 +41,6 @@ import {
   FileText,
   Upload,
   Download,
-  Trash2,
   X,
   Calendar,
   AlertCircle,
@@ -62,13 +61,34 @@ import {
   Link,
 } from 'lucide-react';
 import { SmartDateInput } from './SmartDateInput';
+import {
+  createMachineActionContext,
+  hasConfirmedCanonicalResolution,
+  isCurrentMachineActionRequest,
+  isRetiredMachine,
+  type MachineActionContext,
+} from '../lib/machineActionState';
+import {
+  clearCommittedRSRUploadAttempt,
+  createResolvingMachineResolution,
+  createOrReuseRSRUploadAttempt,
+  entryForMachineReference,
+  machineResolutionMessage,
+  preserveIntendedMachineIds,
+  preserveMachineReferences,
+  retainRSRUploadOperation,
+  resolutionBlocksMachineIds,
+  type MachineResolutionSnapshot,
+  type RSRUploadAttempt,
+} from '../lib/machineAssociationSafety';
 
 export function Machines() {
-  const { isSuperAdmin, hasPermission } = useAuth();
+  const { user, isSuperAdmin, hasPermission } = useAuth();
 
   // Top-level tab inside the Machines page
   const [activeTab, setActiveTab] = useState<'list' | 'verify'>('list');
-  const canVerifyReadings = isSuperAdmin || hasPermission('machines.verifyReadings');
+  const canVerifyReadings = canAccessMachineReadingWorkflow(user);
+  const canManageMachines = isSuperAdmin || hasPermission('machines.manage');
 
   // Machine list state
   const [machines, setMachines] = useState<Machine[]>([]);
@@ -85,11 +105,10 @@ export function Machines() {
   // Selected / expanded machine
   const [expandedMachineId, setExpandedMachineId] = useState<string | null>(null);
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
+  const machineRequestGenerationRef = useRef(0);
 
   // Edit state
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
-  const [machineToDelete, setMachineToDelete] = useState<Machine | null>(null);
-  const [deletingMachine, setDeletingMachine] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Machine>>({});
   const [saving, setSaving] = useState(false);
   const [whatsAppTesting, setWhatsAppTesting] = useState(false);
@@ -98,10 +117,14 @@ export function Machines() {
   // RSR state
   const [machineRSRs, setMachineRSRs] = useState<MachineRSR[]>([]);
   const [loadingRSRs, setLoadingRSRs] = useState(false);
+  const [machineRSRContext, setMachineRSRContext] = useState<MachineActionContext | null>(null);
 
   // Preview state
-  const [previewRSR, setPreviewRSR] = useState<MachineRSR | null>(null);
+  const [previewRSR, setPreviewRSR] = useState<{ rsr: MachineRSR; context: MachineActionContext } | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+
+  // RSR metadata correction state
+  const [editingRSR, setEditingRSR] = useState<{ rsr: MachineRSR; context: MachineActionContext } | null>(null);
 
   // Report generation state
   const [showReportModal, setShowReportModal] = useState(false);
@@ -143,7 +166,9 @@ export function Machines() {
   const [jobRsrResults, setJobRsrResults] = useState<Job[]>([]);
   const [jobRsrSearching, setJobRsrSearching] = useState(false);
   const [jobRsrSelectedJob, setJobRsrSelectedJob] = useState<Job | null>(null);
+  const [jobRsrPinnedMachine, setJobRsrPinnedMachine] = useState<MachineActionContext | null>(null);
   const [jobRsrMachineIds, setJobRsrMachineIds] = useState<string[]>([]);
+  const [jobRsrMachineResolution, setJobRsrMachineResolution] = useState<MachineResolutionSnapshot<Machine> | null>(null);
   const [jobRsrQuoteDate, setJobRsrQuoteDate] = useState('');
   const [jobRsrJobNumber, setJobRsrJobNumber] = useState('');
   const [jobRsrValue, setJobRsrValue] = useState('');
@@ -160,22 +185,27 @@ export function Machines() {
   const [jobRsrHoursWorked, setJobRsrHoursWorked] = useState('');
   const [jobRsrComments, setJobRsrComments] = useState('');
   const [jobRsrUploading, setJobRsrUploading] = useState(false);
+  const [jobRsrUploadAttempt, setJobRsrUploadAttempt] = useState<RSRUploadAttempt | null>(null);
+  const jobRsrUploadInFlightRef = useRef(false);
   const [jobRsrError, setJobRsrError] = useState<string | null>(null);
+  const [jobRsrSuccess, setJobRsrSuccess] = useState<{ message: string; machineIds: string[] } | null>(null);
   const jobRsrFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Re-Link state (cash customer → proper customer)
+  // Re-link state (cash customer to proper customer)
   const [relinkMachine, setRelinkMachine] = useState<Machine | null>(null);
   const [relinkCustomerId, setRelinkCustomerId] = useState('');
   const [relinkSaving, setRelinkSaving] = useState(false);
   const [relinkError, setRelinkError] = useState<string | null>(null);
 
   const handleRelink = async () => {
-    if (!relinkMachine || !relinkCustomerId) return;
+    if (!relinkMachine || !relinkCustomerId || isRetiredMachine(relinkMachine)) return;
     setRelinkSaving(true);
     setRelinkError(null);
     try {
       const response = await relinkMachineToCustomer(relinkMachine._id, relinkCustomerId);
-      setMachines(prev => prev.map(m => m._id === relinkMachine._id ? { ...m, ...response.machine } : m));
+      setMachines(prev => prev.map(machine => (
+        machine._id === relinkMachine._id ? { ...machine, ...response.machine } : machine
+      )));
       setRelinkMachine(null);
       setRelinkCustomerId('');
     } catch (err: any) {
@@ -251,40 +281,56 @@ export function Machines() {
     loadMachineTypes();
   }, []);
 
-  // Load RSRs when a machine is expanded
+  // Load retained RSRs only for the immutable row context that requested them.
   useEffect(() => {
-    if (!expandedMachineId) {
+    if (!machineRSRContext) {
       setMachineRSRs([]);
+      setLoadingRSRs(false);
       return;
     }
-    const loadRSRs = async () => {
-      setLoadingRSRs(true);
-      try {
-        const rsrs = await getMachineRSRs(expandedMachineId);
-        setMachineRSRs(rsrs);
-      } catch (error) {
-        console.error('Error loading RSRs:', error);
-      } finally {
-        setLoadingRSRs(false);
-      }
+    let cancelled = false;
+    const context = machineRSRContext;
+    setMachineRSRs([]);
+    setLoadingRSRs(true);
+    void getMachineRSRs(context.requestedMachineId)
+      .then((rsrs) => {
+        if (!cancelled && isCurrentMachineActionRequest(context, machineRequestGenerationRef.current)) {
+          setMachineRSRs(rsrs);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled && isCurrentMachineActionRequest(context, machineRequestGenerationRef.current)) {
+          console.error('Error loading RSRs:', error);
+        }
+      })
+      .finally(() => {
+        if (!cancelled && isCurrentMachineActionRequest(context, machineRequestGenerationRef.current)) {
+          setLoadingRSRs(false);
+        }
+      });
+    return () => {
+      cancelled = true;
     };
-    loadRSRs();
-  }, [expandedMachineId]);
+  }, [machineRSRContext]);
 
   // Handlers
   const handleRowClick = (machine: Machine) => {
+    const generation = ++machineRequestGenerationRef.current;
     if (expandedMachineId === machine._id) {
       setExpandedMachineId(null);
       setSelectedMachine(null);
       setEditingMachine(null);
+      setMachineRSRContext(null);
     } else {
       setExpandedMachineId(machine._id);
       setSelectedMachine(machine);
       setEditingMachine(null);
+      setMachineRSRContext(createMachineActionContext(machine, generation));
     }
   };
 
   const handleEdit = (machine: Machine) => {
+    if (isRetiredMachine(machine)) return;
     setEditingMachine(machine);
     setWhatsAppTestResult(null);
     setEditForm({
@@ -311,8 +357,19 @@ export function Machines() {
     } as any);
   };
 
+  const handleFindCanonicalMachine = (machine: Machine) => {
+    if (!hasConfirmedCanonicalResolution(machine)) return;
+    machineRequestGenerationRef.current += 1;
+    setExpandedMachineId(null);
+    setSelectedMachine(null);
+    setEditingMachine(null);
+    setMachineRSRContext(null);
+    setOwnershipFilter('');
+    setSearchQuery(machine.serialNumber);
+  };
+
   const handleSave = async () => {
-    if (!editingMachine) return;
+    if (!editingMachine || isRetiredMachine(editingMachine)) return;
     setSaving(true);
     try {
       const payload: any = { ...editForm };
@@ -486,12 +543,11 @@ export function Machines() {
     }
   };
 
-  const handleDownloadRSR = (rsr: MachineRSR) => {
-    if (!expandedMachineId) return;
+  const handleDownloadRSR = (rsr: MachineRSR, context: MachineActionContext) => {
     const token = getAuthToken();
     const href = rsr.source === 'job'
       ? getRSRDocumentUrl(rsr._id) // already contains ?token=
-      : `${getMachineRSRUrl(expandedMachineId, rsr._id)}?token=${token}`;
+      : `${getMachineRSRUrl(context.requestedMachineId, rsr._id)}?token=${token}`;
     const link = document.createElement('a');
     link.href = href;
     link.download = rsr.fileName;
@@ -501,41 +557,45 @@ export function Machines() {
     document.body.removeChild(link);
   };
 
-  const handleViewRSR = (rsr: MachineRSR) => {
-    setPreviewRSR(rsr);
+  const handleViewRSR = (rsr: MachineRSR, context: MachineActionContext) => {
+    setPreviewRSR({ rsr, context });
     setShowPreview(true);
   };
 
-  const getPreviewUrl = (rsr: MachineRSR) => {
-    if (!expandedMachineId) return '';
+  // Only machine-native RSRs carry correctable report metadata, and a retired
+  // machine row is never a write target.
+  const canEditRSRMetadata = (rsr: MachineRSR, isReadOnlyMachine: boolean) =>
+    canManageMachines && !isReadOnlyMachine && rsr.source !== 'job';
+
+  const handleEditRSR = (rsr: MachineRSR, context: MachineActionContext) => {
+    setEditingRSR({ rsr, context });
+  };
+
+  const handleRSRMetadataSaved = (updated: MachineRSR) => {
+    setMachineRSRs((current) =>
+      current.map((candidate) =>
+        candidate._id === updated._id ? { ...candidate, ...updated } : candidate,
+      ),
+    );
+    setPreviewRSR((current) =>
+      current && current.rsr._id === updated._id
+        ? { ...current, rsr: { ...current.rsr, ...updated } }
+        : current,
+    );
+    setEditingRSR(null);
+  };
+
+  const getPreviewUrl = ({ rsr, context }: { rsr: MachineRSR; context: MachineActionContext }) => {
     const token = getAuthToken();
     if (rsr.source === 'job') {
       // getRSRDocumentUrl already includes ?token=...; append inline flag
       return `${getRSRDocumentUrl(rsr._id)}&inline=1`;
     }
-    const url = getMachineRSRUrl(expandedMachineId, rsr._id);
+    const url = getMachineRSRUrl(context.requestedMachineId, rsr._id);
     return `${url}?token=${token}&inline=1`;
   };
 
   const isImageFile = (mimeType: string) => mimeType.startsWith('image/');
-
-  const handleDeleteRSR = async (rsr: MachineRSR) => {
-    if (!expandedMachineId) return;
-    const confirmMsg = rsr.source === 'job'
-      ? `Are you sure you want to delete "${rsr.title}"? This RSR was uploaded via a job and will be removed from that job as well.`
-      : `Are you sure you want to delete "${rsr.title}"?`;
-    if (!confirm(confirmMsg)) return;
-    try {
-      if (rsr.source === 'job') {
-        await deleteRSRDocument(rsr._id);
-      } else {
-        await deleteMachineRSR(expandedMachineId, rsr._id);
-      }
-      setMachineRSRs(prev => prev.filter(r => r._id !== rsr._id));
-    } catch (error: any) {
-      alert(error.message || 'Failed to delete RSR');
-    }
-  };
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -562,21 +622,6 @@ export function Machines() {
     if (machine.cashCustomer) return 'cash';
     if (machine.isRental) return 'rental';
     return 'unknown';
-  };
-
-  const handleDeleteMachine = async () => {
-    if (!machineToDelete) return;
-    setDeletingMachine(true);
-    try {
-      await deleteMachine(machineToDelete._id);
-      setMachineToDelete(null);
-      setExpandedMachineId(null);
-      await loadMachines(pagination.page);
-    } catch (err: any) {
-      console.error('Failed to delete machine:', err);
-    } finally {
-      setDeletingMachine(false);
-    }
   };
 
   const handleOpenReportModal = async () => {
@@ -616,7 +661,11 @@ export function Machines() {
     setJobRsrSearch('');
     setJobRsrResults([]);
     setJobRsrSelectedJob(null);
+    setJobRsrPinnedMachine(null);
     setJobRsrMachineIds([]);
+    setJobRsrMachineResolution(null);
+    setJobRsrUploadAttempt(null);
+    jobRsrUploadInFlightRef.current = false;
     setJobRsrQuoteDate('');
     setJobRsrJobNumber('');
     setJobRsrValue('');
@@ -634,6 +683,13 @@ export function Machines() {
     setJobRsrComments('');
     setJobRsrError(null);
     if (jobRsrFileInputRef.current) jobRsrFileInputRef.current.value = '';
+  };
+
+  const openJobRSRModal = (machine?: Machine, context?: MachineActionContext) => {
+    if (machine && (!context || context.isReadOnly || isRetiredMachine(machine))) return;
+    setJobRsrSuccess(null);
+    setJobRsrPinnedMachine(context || null);
+    setShowJobRSRModal(true);
   };
 
   // Debounced job search
@@ -664,11 +720,27 @@ export function Machines() {
     try {
       // Fetch full job to get populated machine details.
       const { job: fullJob } = await getJob(job._id);
-      setJobRsrSelectedJob(fullJob);
       const ids = (fullJob.machines || [])
-        .map((m: any) => (typeof m === 'string' ? m : m?._id))
+        .map((m) => (typeof m === 'string' ? m : m?._id))
         .filter(Boolean) as string[];
-      setJobRsrMachineIds(ids);
+      setJobRsrMachineResolution(createResolvingMachineResolution(ids));
+      const machineResolution = await resolveCanonicalMachineSelections(ids);
+      setJobRsrMachineResolution(machineResolution);
+      const intendedMachineIds = jobRsrPinnedMachine
+        ? [jobRsrPinnedMachine.canonicalMachineId]
+        : preserveIntendedMachineIds(ids, machineResolution);
+      const resolutionError = machineResolutionMessage(machineResolution, intendedMachineIds);
+      if (resolutionBlocksMachineIds(intendedMachineIds, machineResolution)) {
+        setJobRsrError(resolutionError || 'One or more job machines could not be resolved safely.');
+      }
+      if (jobRsrPinnedMachine && !machineResolution.machineIds.includes(jobRsrPinnedMachine.canonicalMachineId)) {
+        setJobRsrError(
+          `Job ${fullJob.jobNumber} is not linked to the expanded machine. Select a job that contains this machine.`,
+        );
+        return;
+      }
+      setJobRsrSelectedJob({ ...fullJob, machines: preserveMachineReferences(fullJob.machines || [], machineResolution) });
+      setJobRsrMachineIds(intendedMachineIds);
       // Pre-fill the technician from the job's bookings (still editable).
       const techNames = Array.from(
         new Set(
@@ -709,7 +781,26 @@ export function Machines() {
     );
   };
 
+  const retryJobRsrMachineResolution = async () => {
+    if (!jobRsrSelectedJob) return;
+    const intendedMachineIds = [...jobRsrMachineIds];
+    setJobRsrError(null);
+    try {
+      setJobRsrMachineResolution(createResolvingMachineResolution(intendedMachineIds));
+      const resolution = await resolveCanonicalMachineSelections(intendedMachineIds);
+      setJobRsrMachineResolution(resolution);
+      const retainedMachineIds = preserveIntendedMachineIds(intendedMachineIds, resolution);
+      setJobRsrMachineIds(retainedMachineIds);
+      if (resolutionBlocksMachineIds(retainedMachineIds, resolution)) {
+        setJobRsrError(machineResolutionMessage(resolution, retainedMachineIds) || 'One or more intended machines could not be resolved safely.');
+      }
+    } catch (err: unknown) {
+      setJobRsrError(`${err instanceof Error ? err.message : 'Machine resolution failed'} The complete intended target set was retained for retry.`);
+    }
+  };
+
   const handleUploadJobRSR = async () => {
+    const uploadContext = jobRsrPinnedMachine;
     if (!jobRsrSelectedJob) {
       setJobRsrError('Select a job first');
       return;
@@ -726,13 +817,66 @@ export function Machines() {
       setJobRsrError('Select at least one machine to receive the RSR');
       return;
     }
+    let machineResolution: MachineResolutionSnapshot<Machine>;
+    try {
+      setJobRsrMachineResolution(createResolvingMachineResolution(jobRsrMachineIds));
+      machineResolution = await resolveCanonicalMachineSelections(jobRsrMachineIds);
+    } catch (err: unknown) {
+      setJobRsrError(`${err instanceof Error ? err.message : 'Machine resolution failed'} The complete intended target set was retained for retry.`);
+      return;
+    }
+    setJobRsrMachineResolution(machineResolution);
+    const resolutionError = machineResolutionMessage(machineResolution, jobRsrMachineIds);
+    if (resolutionBlocksMachineIds(jobRsrMachineIds, machineResolution) || machineResolution.machineIds.length === 0) {
+      setJobRsrMachineIds(preserveIntendedMachineIds(jobRsrMachineIds, machineResolution));
+      setJobRsrError(resolutionError || 'At least one resolved machine target is required before uploading an RSR.');
+      return;
+    }
+    const expectedMachineIds = machineResolution.machineIds;
+    if (expectedMachineIds.join(',') !== jobRsrMachineIds.join(',')) {
+      setJobRsrMachineIds(expectedMachineIds);
+    }
+    if (
+      jobRsrPinnedMachine &&
+      (expectedMachineIds.length !== 1 || expectedMachineIds[0] !== jobRsrPinnedMachine.canonicalMachineId)
+    ) {
+      setJobRsrError('The expanded machine is no longer the selected RSR target. Reopen the upload form and try again.');
+      return;
+    }
+    if (jobRsrUploadInFlightRef.current) return;
+    const attempt = createOrReuseRSRUploadAttempt(jobRsrUploadAttempt, {
+      routeType: 'unified_machine',
+      file: jobRsrFile,
+      jobId: jobRsrSelectedJob._id,
+      targetMachineIds: expectedMachineIds,
+      metadata: {
+        title: jobRsrRsrNumber.trim() ? `RSR ${jobRsrRsrNumber.trim()} · Job ${jobRsrSelectedJob.jobNumber}` : `Job ${jobRsrSelectedJob.jobNumber}`,
+        workDate: jobRsrWorkDate,
+        jobNumber: jobRsrJobNumber.trim() || undefined,
+        quoteDate: jobRsrQuoteDate || undefined,
+        value: jobRsrValue || undefined,
+        description: jobRsrDescription.trim() || undefined,
+        rsrNumber: jobRsrRsrNumber.trim() || undefined,
+        poNumber: jobRsrPoNumber.trim() || undefined,
+        invNumber: jobRsrInvNumber.trim() || undefined,
+        currentHours: jobRsrCurrentHours || undefined,
+        nextServiceHours: jobRsrNextServiceHours || undefined,
+        nextServiceDate: jobRsrNextServiceDate || undefined,
+        tech: jobRsrTech.trim() || undefined,
+        hoursWorked: jobRsrHoursWorked || undefined,
+        comments: jobRsrComments.trim() || undefined,
+      },
+    });
+    jobRsrUploadInFlightRef.current = true;
+    setJobRsrUploadAttempt(attempt);
     setJobRsrUploading(true);
     setJobRsrError(null);
+    setJobRsrSuccess(null);
     try {
-      await uploadRSR({
+      const result = await uploadRSR({
         file: jobRsrFile,
         jobId: jobRsrSelectedJob._id,
-        machineIds: jobRsrMachineIds,
+        machineIds: expectedMachineIds,
         title: jobRsrRsrNumber.trim()
           ? `RSR ${jobRsrRsrNumber.trim()} · Job ${jobRsrSelectedJob.jobNumber}`
           : `Job ${jobRsrSelectedJob.jobNumber}`,
@@ -750,17 +894,52 @@ export function Machines() {
         tech: jobRsrTech.trim() || undefined,
         hoursWorked: jobRsrHoursWorked ? Number(jobRsrHoursWorked) : undefined,
         comments: jobRsrComments.trim() || undefined,
+        attempt,
       });
-      await loadMachines(pagination.page);
-      // Refresh the expanded machine's RSR list if it received a copy.
-      if (expandedMachineId && jobRsrMachineIds.includes(expandedMachineId)) {
-        const rsrs = await getMachineRSRs(expandedMachineId);
-        setMachineRSRs(rsrs);
+      const retainedAttempt = retainRSRUploadOperation(attempt, result.operationId);
+      setJobRsrUploadAttempt(retainedAttempt);
+      if (result.state !== 'COMMITTED') {
+        setJobRsrError('RSR upload is pending recovery. Retry will use the same upload attempt.');
+        return;
       }
+
+      await loadMachines(pagination.page);
+      // Refresh only the immutable expanded-row context that initiated this upload.
+      if (
+        uploadContext
+        && isCurrentMachineActionRequest(uploadContext, machineRequestGenerationRef.current)
+        && result.targetMachineIds.includes(uploadContext.canonicalMachineId)
+      ) {
+        const rsrs = await getMachineRSRs(uploadContext.requestedMachineId);
+        if (isCurrentMachineActionRequest(uploadContext, machineRequestGenerationRef.current)) {
+          setMachineRSRs(rsrs);
+        }
+      }
+
+      const attachedMachineIds = new Set(result.targetMachineIds);
+      const missingMachineIds = expectedMachineIds.filter((machineId) => !attachedMachineIds.has(machineId));
+      if (
+        result.attachedCount !== expectedMachineIds.length ||
+        result.documents.length !== expectedMachineIds.length ||
+        result.rsrDocumentIds.length !== expectedMachineIds.length ||
+        missingMachineIds.length > 0
+      ) {
+        setJobRsrError(
+          `RSR upload was incomplete: attached to ${result.attachedCount} of ${expectedMachineIds.length} selected machines. The upload form has been kept open.`,
+        );
+        return;
+      }
+
+      setJobRsrSuccess({
+        message: `RSR uploaded successfully to ${result.attachedCount} ${result.attachedCount === 1 ? 'machine' : 'machines'}.`,
+        machineIds: result.targetMachineIds,
+      });
+      setJobRsrUploadAttempt(clearCommittedRSRUploadAttempt(retainedAttempt, result.state));
       resetJobRSRModal();
     } catch (err: any) {
-      setJobRsrError(err.message || 'Failed to upload RSR');
+      setJobRsrError(`${err.message || 'Failed to upload RSR'} The complete target set and upload attempt were retained for retry.`);
     } finally {
+      jobRsrUploadInFlightRef.current = false;
       setJobRsrUploading(false);
     }
   };
@@ -826,7 +1005,7 @@ export function Machines() {
               </button>
             )}
             <button
-              onClick={() => setShowJobRSRModal(true)}
+              onClick={() => openJobRSRModal()}
               className="flex items-center justify-center gap-2 w-40 h-14 px-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 shadow-sm transition-all text-sm font-medium text-center leading-tight"
             >
               <Upload className="w-4 h-4 shrink-0" />
@@ -849,6 +1028,13 @@ export function Machines() {
           </div>
         </div>
       </div>
+
+      {jobRsrSuccess && (
+        <div className="mb-6 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+          <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+          {jobRsrSuccess.message}
+        </div>
+      )}
 
       {/* Tabs */}
       {canVerifyReadings && (
@@ -1020,6 +1206,11 @@ export function Machines() {
               const isExpanded = expandedMachineId === machine._id;
               const isEditing = editingMachine?._id === machine._id;
               const custType = getCustomerType(machine);
+              const isReadOnlyMachine = isRetiredMachine(machine);
+              const hasCanonicalResolution = hasConfirmedCanonicalResolution(machine);
+              const rsrContext = machineRSRContext?.requestedMachineId === machine._id
+                ? machineRSRContext
+                : null;
 
               return (
                 <div key={machine._id} className={`border-b border-slate-100 last:border-0 ${isExpanded ? 'bg-amber-50/40' : ''}`}>
@@ -1036,7 +1227,7 @@ export function Machines() {
                       <div className="min-w-0">
                         <div className="font-semibold text-slate-800 truncate flex items-center gap-1.5">
                           {machine.make} {machine.model}
-                          {(machine as any).dbStatus === 'archived' && (
+                          {isReadOnlyMachine && (
                             <span className="text-[10px] font-medium text-amber-700 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded-full flex-shrink-0">
                               Archived
                             </span>
@@ -1127,7 +1318,7 @@ export function Machines() {
                           <div className="flex items-center gap-2">
                             {!isEditing ? (
                               <>
-                              {(machine as any).dbStatus !== 'archived' && (
+                               {!isReadOnlyMachine && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleEdit(machine); }}
                                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -1136,9 +1327,14 @@ export function Machines() {
                                 Edit
                               </button>
                               )}
-                              {(machine as any).cashCustomer && (
+                               {!isReadOnlyMachine && machine.cashCustomer && (
                                 <button
-                                  onClick={(e) => { e.stopPropagation(); setRelinkMachine(machine); setRelinkCustomerId(''); setRelinkError(null); }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRelinkMachine(machine);
+                                    setRelinkCustomerId('');
+                                    setRelinkError(null);
+                                  }}
                                   className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
                                   title="Re-link this machine from a cash customer to a proper customer record"
                                 >
@@ -1170,6 +1366,21 @@ export function Machines() {
 
                         {/* Detail Body */}
                         <div className="p-5">
+                          {hasCanonicalResolution && (
+                            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                              <div>
+                                <p className="font-medium">This retired machine has been consolidated into the canonical machine.</p>
+                                <p className="mt-0.5 text-xs text-amber-800">Retained documents and history remain available here for audit.</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleFindCanonicalMachine(machine)}
+                                className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
+                              >
+                                Find canonical machine
+                              </button>
+                            </div>
+                          )}
                           {isEditing ? (
                             /* Edit Form */
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1581,8 +1792,8 @@ export function Machines() {
                             </div>
                           )}
 
-                          {/* QR Code Panel (read-only view) */}
-                          {machine._id && (
+                          {/* QR creation remains available only for active canonical machines. */}
+                          {!isReadOnlyMachine && machine._id && (
                             <div className="mt-4">
                               <MachineQrPanel
                                 machineId={machine._id}
@@ -1594,11 +1805,9 @@ export function Machines() {
                             </div>
                           )}
 
-                          {/* Reading History */}
-                          {machine._id && (
-                            <div className="mt-4">
-                              <MachineReadingHistory machineId={machine._id} />
-                            </div>
+                          {/* Canonical-group history is read-only; retired records resolve to the confirmed target. */}
+                          {machine._id && (!isReadOnlyMachine || hasCanonicalResolution) && (
+                            <MachineActivityHistory machineId={hasCanonicalResolution ? machine.canonicalMachineId! : machine._id} />
                           )}
                         </div>
 
@@ -1612,7 +1821,27 @@ export function Machines() {
                                 <span className="text-xs font-normal text-slate-400">({machineRSRs.length})</span>
                               )}
                             </h4>
+                            {!isReadOnlyMachine && rsrContext && (
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openJobRSRModal(machine, rsrContext);
+                                }}
+                                className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700"
+                              >
+                                <Upload className="h-3.5 w-3.5" />
+                                Upload RSR
+                              </button>
+                            )}
                           </div>
+
+                          {jobRsrSuccess?.machineIds.includes(machine._id) && (
+                            <div className="mb-3 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+                              <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+                              {jobRsrSuccess.message}
+                            </div>
+                          )}
 
                           {loadingRSRs ? (
                             <div className="flex items-center justify-center py-6">
@@ -1654,15 +1883,20 @@ export function Machines() {
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-1">
-                                    <button onClick={(e) => { e.stopPropagation(); handleViewRSR(rsr); }} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg" title="View">
+                                    <button onClick={(e) => { e.stopPropagation(); if (rsrContext) handleViewRSR(rsr, rsrContext); }} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg" title="View">
                                       <Eye className="w-4 h-4" />
                                     </button>
-                                    <button onClick={(e) => { e.stopPropagation(); handleDownloadRSR(rsr); }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" title="Download">
+                                    <button onClick={(e) => { e.stopPropagation(); if (rsrContext) handleDownloadRSR(rsr, rsrContext); }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" title="Download">
                                       <Download className="w-4 h-4" />
                                     </button>
-                                    {isSuperAdmin && (
-                                      <button onClick={(e) => { e.stopPropagation(); handleDeleteRSR(rsr); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg" title="Delete">
-                                        <Trash2 className="w-4 h-4" />
+                                    {canEditRSRMetadata(rsr, isReadOnlyMachine) && (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); if (rsrContext) handleEditRSR(rsr, rsrContext); }}
+                                        className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg"
+                                        title="Edit RSR details"
+                                        aria-label="Edit RSR details"
+                                      >
+                                        <Edit3 className="w-4 h-4" />
                                       </button>
                                     )}
                                   </div>
@@ -1717,11 +1951,11 @@ export function Machines() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-slate-200">
               <div>
-                <h3 className="text-lg font-semibold text-slate-800">{previewRSR.title || previewRSR.fileName}</h3>
-                <p className="text-sm text-slate-500">{previewRSR.fileName}</p>
+                <h3 className="text-lg font-semibold text-slate-800">{previewRSR.rsr.title || previewRSR.rsr.fileName}</h3>
+                <p className="text-sm text-slate-500">{previewRSR.rsr.fileName}</p>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => handleDownloadRSR(previewRSR)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Download">
+                <button onClick={() => handleDownloadRSR(previewRSR.rsr, previewRSR.context)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Download">
                   <Download className="w-5 h-5" />
                 </button>
                 <button onClick={() => { setShowPreview(false); setPreviewRSR(null); }} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
@@ -1730,10 +1964,10 @@ export function Machines() {
               </div>
             </div>
             <div className="flex-1 overflow-auto p-4 bg-slate-100">
-              {isImageFile(previewRSR.mimeType) ? (
-                <img src={getPreviewUrl(previewRSR)} alt={previewRSR.title || previewRSR.fileName} className="max-w-full h-auto mx-auto rounded-lg shadow-lg" />
+              {isImageFile(previewRSR.rsr.mimeType) ? (
+                <img src={getPreviewUrl(previewRSR)} alt={previewRSR.rsr.title || previewRSR.rsr.fileName} className="max-w-full h-auto mx-auto rounded-lg shadow-lg" />
               ) : (
-                <iframe src={getPreviewUrl(previewRSR)} className="w-full h-full min-h-[70vh] rounded-lg bg-white" title={previewRSR.title || previewRSR.fileName} />
+                <iframe src={getPreviewUrl(previewRSR)} className="w-full h-full min-h-[70vh] rounded-lg bg-white" title={previewRSR.rsr.title || previewRSR.rsr.fileName} />
               )}
             </div>
           </div>
@@ -1756,7 +1990,7 @@ export function Machines() {
 
             <div className="p-5 space-y-4">
               {jobRsrError && (
-                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                <div role="alert" className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
                   {jobRsrError}
                 </div>
@@ -1826,7 +2060,7 @@ export function Machines() {
                   {/* Machines on the job */}
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Machines to update ({jobRsrMachineIds.length} selected)
+                      {jobRsrPinnedMachine ? 'Machine to update' : 'Machines to update'} ({jobRsrMachineIds.length} selected)
                     </label>
                     {(!jobRsrSelectedJob.machines || jobRsrSelectedJob.machines.length === 0) ? (
                       <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
@@ -1834,27 +2068,59 @@ export function Machines() {
                       </p>
                     ) : (
                       <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 max-h-48 overflow-y-auto">
-                        {(jobRsrSelectedJob.machines as any[]).map((m) => {
+                        {(jobRsrSelectedJob.machines as any[])
+                          .filter((m) => {
+                            const id = typeof m === 'string' ? m : m?._id;
+                             return !jobRsrPinnedMachine || id === jobRsrPinnedMachine.canonicalMachineId;
+                          })
+                          .map((m) => {
                           const id = typeof m === 'string' ? m : m?._id;
+                          const resolutionEntry = entryForMachineReference(jobRsrMachineResolution, m);
+                          const isUnresolved = resolutionEntry
+                            && resolutionEntry.status !== 'RESOLVED'
+                            && resolutionEntry.status !== 'RESOLVED_CANONICAL';
                           const label = typeof m === 'string'
                             ? m
                             : `${m.make || ''} ${m.model || ''} · ${m.serialNumber || 'no serial'}`.trim();
                           return (
-                            <label key={id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-slate-50">
+                            <label key={id} className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-slate-50 ${isUnresolved ? 'bg-amber-50' : ''}`}>
                               <input
                                 type="checkbox"
                                 checked={jobRsrMachineIds.includes(id)}
-                                onChange={() => toggleJobRsrMachine(id)}
+                                disabled={Boolean(jobRsrPinnedMachine)}
+                                onChange={() => {
+                                  if (!jobRsrPinnedMachine) toggleJobRsrMachine(id);
+                                }}
                                 className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
                               />
                               <span className="text-sm text-slate-700">{label}</span>
+                              {isUnresolved && (
+                                <span className="text-xs text-amber-800">
+                                  {resolutionEntry.status === 'UNRESOLVED_INVALID'
+                                    ? 'Invalid association — remove explicitly.'
+                                    : resolutionEntry.status === 'RESOLVING'
+                                      ? 'Resolving machine association…'
+                                      : 'Resolution failed — retry.'}
+                                </span>
+                              )}
                             </label>
                           );
                         })}
                       </div>
                     )}
+                    {jobRsrMachineResolution
+                      && resolutionBlocksMachineIds(jobRsrMachineIds, jobRsrMachineResolution) && (
+                      <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                        <span>{machineResolutionMessage(jobRsrMachineResolution, jobRsrMachineIds)}</span>
+                        <button type="button" onClick={retryJobRsrMachineResolution} className="shrink-0 font-medium underline">
+                          Retry resolution
+                        </button>
+                      </div>
+                    )}
                     <p className="text-xs text-slate-400 mt-1">
-                      Every selected machine receives a copy of this RSR.
+                      {jobRsrPinnedMachine
+                        ? 'This upload is pinned to the expanded machine.'
+                        : 'Every selected machine receives a copy of this RSR.'}
                     </p>
                   </div>
 
@@ -1990,7 +2256,7 @@ export function Machines() {
               </button>
               <button
                 onClick={handleUploadJobRSR}
-                disabled={jobRsrUploading || !jobRsrSelectedJob || !jobRsrFile || !jobRsrWorkDate || jobRsrMachineIds.length === 0}
+                disabled={jobRsrUploading || !jobRsrSelectedJob || !jobRsrFile || !jobRsrWorkDate || jobRsrMachineIds.length === 0 || Boolean(jobRsrMachineResolution && resolutionBlocksMachineIds(jobRsrMachineIds, jobRsrMachineResolution))}
                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
               >
                 {jobRsrUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
@@ -1999,6 +2265,16 @@ export function Machines() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Edit RSR metadata modal */}
+      {editingRSR && (
+        <MachineRSRMetadataEditModal
+          machineId={editingRSR.context.requestedMachineId}
+          rsr={editingRSR.rsr}
+          onCancel={() => setEditingRSR(null)}
+          onSaved={handleRSRMetadataSaved}
+        />
       )}
 
       {/* Generate Report Modal */}
@@ -2094,7 +2370,10 @@ export function Machines() {
 
       {/* Re-Link Machine Modal */}
       {relinkMachine && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4" onClick={() => !relinkSaving && setRelinkMachine(null)}>
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4"
+          onClick={() => !relinkSaving && setRelinkMachine(null)}
+        >
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
               <div className="flex items-center gap-3">
@@ -2103,28 +2382,29 @@ export function Machines() {
                 </div>
                 <h2 className="text-lg font-bold text-slate-800">Re-Link Machine to Customer</h2>
               </div>
-              <button onClick={() => setRelinkMachine(null)} disabled={relinkSaving} className="p-1.5 hover:bg-slate-100 rounded-lg">
+              <button
+                onClick={() => setRelinkMachine(null)}
+                disabled={relinkSaving}
+                className="p-1.5 hover:bg-slate-100 rounded-lg"
+              >
                 <X className="w-4 h-4 text-slate-500" />
               </button>
             </div>
             <div className="p-5 space-y-4">
-              {/* Machine summary */}
               <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
                 <p className="text-xs font-semibold text-slate-500 uppercase mb-0.5">Machine</p>
                 <p className="font-semibold text-slate-800">{relinkMachine.make} {relinkMachine.model}</p>
                 <p className="text-xs text-slate-500 font-mono">S/N: {relinkMachine.serialNumber}</p>
               </div>
-              {/* Current cash customer */}
               <div>
                 <p className="text-xs font-semibold text-slate-500 uppercase mb-1">Currently assigned to cash customer</p>
                 <p className="text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-                  {(relinkMachine as any).cashCustomer}
+                  {relinkMachine.cashCustomer}
                 </p>
                 <p className="text-xs text-slate-400 mt-1">
-                  This value will be saved as the machine&apos;s Current Location{(relinkMachine as any).currentLocation ? ' (location already set — not overwritten)' : ''}.
+                  The old cash customer is preserved as Current Location when that field is empty.
                 </p>
               </div>
-              {/* Target customer */}
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
                   Link to customer <span className="text-red-500">*</span>
@@ -2134,10 +2414,10 @@ export function Machines() {
                   onChange={e => setRelinkCustomerId(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent"
                 >
-                  <option value="">Select a customer…</option>
-                  {customers.map(c => (
-                    <option key={c._id} value={c._id}>
-                      {c.name}
+                  <option value="">Select a customer...</option>
+                  {customers.map(customer => (
+                    <option key={customer._id} value={customer._id}>
+                      {customer.name}
                     </option>
                   ))}
                 </select>
@@ -2147,7 +2427,11 @@ export function Machines() {
               )}
             </div>
             <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-200">
-              <button onClick={() => setRelinkMachine(null)} disabled={relinkSaving} className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800">
+              <button
+                onClick={() => setRelinkMachine(null)}
+                disabled={relinkSaving}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800"
+              >
                 Cancel
               </button>
               <button
@@ -2156,7 +2440,7 @@ export function Machines() {
                 className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
               >
                 {relinkSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link className="w-4 h-4" />}
-                {relinkSaving ? 'Saving…' : 'Re-Link Machine'}
+                {relinkSaving ? 'Saving...' : 'Re-Link Machine'}
               </button>
             </div>
           </div>

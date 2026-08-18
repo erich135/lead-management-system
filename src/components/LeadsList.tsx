@@ -246,14 +246,15 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
     if (user?.role?.name === 'rep' && !user?.isSuperAdmin && repCodeFilter === 'all') {
       // repCode can be either an ID string or populated object
       if (typeof user.repCode === 'string' && user.repCode) {
-        const userRepCode = repCodes.find(rc => rc._id === user.repCode || rc.code === user.repCode);
-        setRepCodeFilter(userRepCode?._id || user.repCode);
+        const repCodeStr = user.repCode; // narrowed to string for use in callbacks
+        const userRepCode = repCodes.find(rc => rc._id === repCodeStr || rc.code === repCodeStr);
+        setRepCodeFilter(userRepCode?._id || repCodeStr);
         return;
       }
 
       if (user.repCode && typeof user.repCode === 'object') {
-        if (user.repCode._id) {
-          setRepCodeFilter(user.repCode._id);
+        if (user.repCode.id) {
+          setRepCodeFilter(user.repCode.id);
           return;
         }
 
@@ -276,8 +277,8 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
         return;
       }
 
-      if (user.technician && typeof user.technician === 'object' && user.technician._id) {
-        setTechnicianFilter(user.technician._id);
+      if (user.technician && typeof user.technician === 'object' && user.technician.id) {
+        setTechnicianFilter(user.technician.id);
       }
     }
   }, [user, technicianFilter]);

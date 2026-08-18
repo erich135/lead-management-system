@@ -1,9 +1,10 @@
 import { useState, FormEvent, useEffect, useRef } from 'react';
-import { createJob, getJobs, getStatuses, getBranches, getCustomers, createCustomer, getTechnicians, getServiceDescriptions, getJobSources, getRepCodes, getAdminCodes, getMachinesByCustomer, getRentalMachines, createMachine, getMachineTypes, type Status, type Branch, type Customer, type Technician, type ServiceDescription, type JobSource, type RepCode, type AdminCode, type Machine, type MachineType, type Job } from '../lib/api';
+import { createJob, getJobs, getStatuses, getBranches, getCustomers, createCustomer, getTechnicians, getServiceDescriptions, getJobSources, getRepCodes, getAdminCodes, getMachinesByCustomer, getRentalMachines, createMachine, getMachineTypes, resolveCanonicalMachineSelections, type Status, type Branch, type Customer, type Technician, type ServiceDescription, type JobSource, type RepCode, type AdminCode, type Machine, type MachineType, type Job } from '../lib/api';
 import { X, Plus, Wrench } from 'lucide-react';
 import { HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
 import { SmartDateInput } from './SmartDateInput';
+import { isCanonicalMachineSelectable } from '../lib/canonicalMachines';
 
 interface LeadFormProps {
   statuses: Status[];
@@ -31,6 +32,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
   const [rentalMachines, setRentalMachines] = useState<Machine[]>([]);
   const [isRentalBranch, setIsRentalBranch] = useState(false);
   const [showNewMachineForm, setShowNewMachineForm] = useState(false);
+  const showInlineMachineCreate = false;
   const [newMachine, setNewMachine] = useState({
     make: '',
     model: '',
@@ -469,6 +471,16 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
         }
       }
 
+      const machineResolution = await resolveCanonicalMachineSelections(formData.machines || []);
+      if (machineResolution.unresolvedMachineIds.length > 0) {
+        setError('One or more selected machines could not be resolved safely. Refresh the machine selection and try again.');
+        setLoading(false);
+        return;
+      }
+      if (machineResolution.machineIds.join(',') !== (formData.machines || []).join(',')) {
+        setFormData((current) => ({ ...current, machines: machineResolution.machineIds }));
+      }
+
       // const today = getTodayDate(); // Removed unused variable
       const payload: any = {
         branch: formData.branch,
@@ -477,7 +489,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
         adm: formData.adm || undefined,
         assistingAdm: formData.assistingAdm || undefined,
         repCode: formData.repCode || undefined,
-        machines: Array.isArray(formData.machines) && formData.machines.length > 0 ? formData.machines : undefined,
+        machines: machineResolution.machineIds.length > 0 ? machineResolution.machineIds : undefined,
         registerDate: formData.registerDate || undefined,
         rsrNumber: formData.rsrNumber || undefined,
         feedback: formData.feedback || undefined,
@@ -1147,6 +1159,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
                     <div className="flex flex-col sm:flex-row gap-2 relative z-10">
                       <select
                         value=""
+                        aria-label="Add rental machine"
                         onChange={(e) => {
                           if (e.target.value) {
                             const currentMachines = Array.isArray(formData.machines) ? formData.machines : [];
@@ -1162,7 +1175,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
                         {rentalMachines && rentalMachines.length > 0 ? (
                           rentalMachines
                             .filter(m => {
-                              if (!m.isActive) return false;
+                              if (!isCanonicalMachineSelectable(m)) return false;
                               const currentMachines = Array.isArray(formData.machines) ? formData.machines : [];
                               return !currentMachines.includes(m._id);
                             })
@@ -1188,6 +1201,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
                     <div className="flex flex-col sm:flex-row gap-2 relative z-10">
                       <select
                         value=""
+                        aria-label="Add customer machine"
                         onChange={(e) => {
                           if (e.target.value) {
                             const currentMachines = Array.isArray(formData.machines) ? formData.machines : [];
@@ -1203,7 +1217,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
                         {machines && machines.length > 0 ? (
                           machines
                             .filter(m => {
-                              if (!m.isActive) return false;
+                              if (!isCanonicalMachineSelectable(m)) return false;
                               const currentMachines = Array.isArray(formData.machines) ? formData.machines : [];
                               return !currentMachines.includes(m._id);
                             })
@@ -1216,19 +1230,25 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
                           <option value="" disabled>No machines found for this customer</option>
                         )}
                       </select>
-                      <button
-                        type="button"
-                        onClick={() => setShowNewMachineForm(!showNewMachineForm)}
-                        className="px-4 py-2.5 bg-ars-primary text-white rounded-[8px] hover:bg-ars-primary/90 transition-colors whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-1 sm:w-auto w-full"
-                      >
-                        <Plus className="w-4 h-4" />
-                        {showNewMachineForm ? 'Cancel' : 'New Machine'}
-                      </button>
+                      {showInlineMachineCreate ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowNewMachineForm(!showNewMachineForm)}
+                          className="px-4 py-2.5 bg-ars-primary text-white rounded-[8px] hover:bg-ars-primary/90 transition-colors whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-1 sm:w-auto w-full"
+                        >
+                          <Plus className="w-4 h-4" />
+                          {showNewMachineForm ? 'Cancel' : 'New Machine'}
+                        </button>
+                      ) : (
+                        <p className="text-sm text-ars-body" role="note">
+                          New machines must be created from the Machines tab first. After creating the machine, return here and link it to the job.
+                        </p>
+                      )}
                     </div>
                   )}
                   
                   {/* New Machine Form */}
-                  {showNewMachineForm && (
+                  {showNewMachineForm && showInlineMachineCreate && (
                     <div className="p-4 bg-gray-50 rounded-[8px] border border-gray-200 space-y-3">
                       <h4 className="font-semibold text-ars-heading text-sm">Add New Machine</h4>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

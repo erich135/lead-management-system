@@ -1,5 +1,6 @@
 import { useState, FormEvent } from 'react';
-import { supabase } from '../lib/supabase';
+// NOTE: This component was originally Supabase-era.
+// Supabase import removed — pending ARS backend user/branch management migration.
 import { Profile, Branch } from '../types';
 import { Plus, X, UserCheck, UserX, Edit2, AlertCircle } from 'lucide-react';
 
@@ -32,70 +33,25 @@ export function UserManagement({ users, branches, onUpdate }: UserManagementProp
     e.preventDefault();
     setError('');
     setLoading(true);
-
-    try {
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: userForm.email,
-        password: userForm.password,
-        email_confirm: true,
-      });
-
-      if (authError) throw authError;
-
-      if (authData.user) {
-        const { error: profileError } = await supabase.from('profiles').insert({
-          id: authData.user.id,
-          email: userForm.email,
-          full_name: userForm.full_name,
-          role: userForm.role,
-          branch_id: userForm.branch_id || null,
-        });
-
-        if (profileError) throw profileError;
-      }
-
-      setShowForm(false);
-      setUserForm({ email: '', password: '', full_name: '', role: 'user', branch_id: '' });
-      onUpdate();
-    } catch (err: any) {
-      setError(err.message || 'Failed to create user');
-    } finally {
-      setLoading(false);
-    }
+    // TODO: Replace Supabase auth.admin.createUser + profiles insert with ARS backend user creation API.
+    console.warn('[UserManagement] User creation disabled — pending ARS backend migration.');
+    setError('User creation not yet available in ARS backend integration.');
+    setLoading(false);
   }
 
   async function handleBranchSubmit(e: FormEvent) {
     e.preventDefault();
     setError('');
     setLoading(true);
-
-    try {
-      const { error } = await supabase.from('branches').insert(branchForm);
-
-      if (error) throw error;
-
-      setShowBranchForm(false);
-      setBranchForm({ name: '', location: '' });
-      onUpdate();
-    } catch (err: any) {
-      setError(err.message || 'Failed to create branch');
-    } finally {
-      setLoading(false);
-    }
+    // TODO: Replace Supabase branches insert with ARS backend branch creation API.
+    console.warn('[UserManagement] Branch creation disabled — pending ARS backend migration.');
+    setError('Branch creation not yet available in ARS backend integration.');
+    setLoading(false);
   }
 
-  async function toggleUserStatus(userId: string, currentStatus: boolean) {
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ is_active: !currentStatus })
-        .eq('id', userId);
-
-      if (error) throw error;
-      onUpdate();
-    } catch (err: any) {
-      alert('Failed to update user status: ' + err.message);
-    }
+  async function toggleUserStatus(_userId: string, _currentStatus: boolean) {
+    // TODO: Replace Supabase profile update with ARS backend user status toggle API.
+    console.warn('[UserManagement] User status toggle disabled — pending ARS backend migration.');
   }
 
   return (

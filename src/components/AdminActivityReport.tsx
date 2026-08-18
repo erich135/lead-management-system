@@ -49,6 +49,9 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+/** Local alias so downstream helpers can use AdminRow. */
+type AdminRow = AdminActivityRow;
+
 interface Props {
   branches: { _id: string; name: string }[];
 }

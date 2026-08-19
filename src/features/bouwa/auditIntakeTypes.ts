@@ -88,7 +88,7 @@ export interface AuditFieldStatus {
   resolvedForStage: AuditReadinessStage | null;
   confirmedForStage: AuditReadinessStage | null;
   dependentOutputs: AuditOutputId[];
-  requiredEvidence: string[];
+  requiredEvidence: AuditEvidenceType[];
   message: string;
 }
 
@@ -116,7 +116,7 @@ export interface AuditExternalEvidenceBlocker {
   code: string;
   label: string;
   whyItMatters: string;
-  requiredEvidence: string[];
+  requiredEvidence: AuditEvidenceType[];
   dependentOutputs: AuditOutputId[];
   responsiblePerson: string | null;
   expectedConfirmationDate: string | null;
@@ -136,7 +136,7 @@ export interface AuditUnavailableDependency {
   label: string;
   reason: string;
   blockedOutputs: AuditOutputId[];
-  requiredEvidence: string[];
+  requiredEvidence: AuditEvidenceType[];
   intakeFieldCodes: string[];
   clearableByIntake: false;
 }
@@ -190,9 +190,32 @@ export type AuditEvidenceConfirmationStatus =
   | 'unavailable'
   | 'not_applicable';
 
+export type AuditEvidenceType =
+  | 'logger_export'
+  | 'logger_configuration_record'
+  | 'flow_sensor_configuration'
+  | 'flow_sensor_calibration_certificate'
+  | 'pressure_sensor_calibration_certificate'
+  | 'existing_machine_datasheet'
+  | 'existing_machine_nameplate_photograph'
+  | 'proposed_machine_datasheet'
+  | 'proposed_machine_part_load_curve'
+  | 'manufacturer_derating_table'
+  | 'site_altitude_record'
+  | 'operating_hours_confirmation'
+  | 'production_schedule'
+  | 'electricity_bill'
+  | 'supply_agreement'
+  | 'tariff_schedule'
+  | 'commercial_contract'
+  | 'maintenance_records'
+  | 'numeric_guarantee_conditions'
+  | 'exact_machine_performance'
+  | 'other_supporting_document';
+
 export interface AuditEvidenceReference {
   id: string;
-  evidenceType: string;
+  evidenceType: AuditEvidenceType;
   filename: string | null;
   documentReference: string | null;
   sourceOrganisation: string | null;
@@ -205,10 +228,465 @@ export interface AuditEvidenceReference {
   expectedConfirmationDate: string | null;
 }
 
+export type AuditMachineSpecProvenance =
+  | 'exact_manufacturer_document'
+  | 'exact_library_match'
+  | 'customer_supplied'
+  | 'source_document'
+  | 'nearest_model_reference_only'
+  | 'unconfirmed';
+
+export type AuditOperatingProfileFlowBasis =
+  | 'flow_fraction'
+  | 'measured_flow_m3_per_min';
+
+export type AuditCommercialResponsibility =
+  | 'customer'
+  | 'provider'
+  | 'shared'
+  | 'confirmation_required';
+
+export type CommercialComponentKind =
+  | 'fixed_service'
+  | 'variable_volume'
+  | 'customer_electricity'
+  | 'customer_maintenance';
+
+export type CommercialPayer = 'customer' | 'provider' | 'shared';
+export type CommercialScenarioKind = 'source' | 'independent';
+export type ChargeCombinationStatus =
+  | 'confirmed_additive'
+  | 'confirmed_alternative'
+  | 'unconfirmed_stacking';
+export type CommercialEscalationBasis = 'annual_compound_from_base_year';
+export type CommercialRoundingPolicy = 'unrounded_calculation_display_2dp';
+export type SourceVerificationStatus =
+  | 'verified'
+  | 'unverified_internal_only'
+  | 'confirmation_required';
+
+export interface ProvenanceActor {
+  actorId: string;
+  actorName: string;
+}
+
+/** The source value is immutable; an override is carried separately as currentValue. */
+export interface RecordValueProvenance<TValue = unknown> {
+  sourceValue: TValue | null;
+  currentValue: TValue | null;
+  sourceReference: string | null;
+  sourceFilename: string | null;
+  sourceSha256: string | null;
+  sourcePage: number | null;
+  sourceText: string | null;
+  evidenceIds: string[];
+  verificationStatus: SourceVerificationStatus;
+  overrideReason: string | null;
+  actor: ProvenanceActor | null;
+  recordedAt: string | null;
+}
+
+export interface SourceStatedValueRecord {
+  valueId: string;
+  label: string;
+  value: number | string;
+  unit: string;
+  provenance: RecordValueProvenance<number | string>;
+}
+
+export interface AuditEquipmentGroup {
+  groupId: string;
+  role: 'existing' | 'proposed';
+  quantity: number;
+  manufacturer: string;
+  model: string;
+  ratedFlowM3PerMin: number | null;
+  ratedPressureBarG: number | null;
+  machineProvenance: AuditMachineSpecProvenance;
+  specificationProvenance: AuditMachineSpecProvenance;
+  machineEvidenceIds: string[];
+  specificationEvidenceIds: string[];
+  exactLibraryMatch: boolean;
+  provenance: RecordValueProvenance;
+}
+
+export interface AuditOperatingProfileSegment {
+  segmentId: string;
+  label: string;
+  hoursPerDay: number;
+  flowBasis: AuditOperatingProfileFlowBasis;
+  flowFraction: number | null;
+  measuredFlowM3PerMin: number | null;
+  loadFraction: number | null;
+  sourceReference: string;
+  confirmed: boolean;
+  provenance: RecordValueProvenance;
+}
+
+export interface AuditRecurringCommercialCostComponent {
+  componentId: string;
+  label: string;
+  kind: CommercialComponentKind;
+  payer: CommercialPayer;
+  responsibility: AuditCommercialResponsibility;
+  amountRand: number | null;
+  sourceReference: string;
+  confirmed: boolean;
+  provenance: RecordValueProvenance;
+}
+
+export interface AuditCommercialScenario {
+  scenarioId: string;
+  label: string;
+  scenarioKind: CommercialScenarioKind;
+  equipmentGroupId: string;
+  componentIds: string[];
+  combinationStatus: ChargeCombinationStatus;
+  contractTermMonths: number | null;
+  annualEscalationFraction: number | null;
+  baseYear: number;
+  escalationBasis: CommercialEscalationBasis;
+  roundingPolicy: CommercialRoundingPolicy;
+  sourceStatedMonthlyTotalRand: number | null;
+  sourceStatedFiveYearTotalRand: number | null;
+  requiredComponentKinds: CommercialComponentKind[];
+  daysPerMonth: number;
+  sourceReference: string;
+  provenance: RecordValueProvenance;
+}
+
+export type ClaimAssessmentStatus =
+  | 'supported'
+  | 'reproducible'
+  | 'not_independently_reproducible'
+  | 'unsupported_by_supplied_evidence'
+  | 'calculation_discrepancy'
+  | 'unit_discrepancy'
+  | 'confirmation_required';
+export type ClaimReviewStatus = 'pending_review' | 'reviewed' | 'approved';
+
+export interface ClaimSourceExcerpt {
+  sourceFilename: string;
+  sourceSha256: string;
+  page: number | null;
+  text: string;
+}
+
+export interface ClaimIndependentResult {
+  value: number | null;
+  unit: string | null;
+  calculationId: string | null;
+  explanation: string;
+}
+
+export interface ClaimAssessmentInput {
+  claimId: string;
+  claim: string;
+  source: ClaimSourceExcerpt;
+  evidenceIds: string[];
+  independentResult: ClaimIndependentResult | null;
+  sourceValue: number | null;
+  sourceUnit: string | null;
+  materiality: string;
+  status: ClaimAssessmentStatus;
+  reviewerStatus: ClaimReviewStatus;
+  reviewerName: string | null;
+  reviewerNotes: string | null;
+}
+
+export interface AuditMethod {
+  proposalType: IntakeAnswer<'air_audit' | 'manual'>;
+  manualBasis: IntakeAnswer<
+    | 'site_survey'
+    | 'customer_supplied_information'
+    | 'manufacturer_information'
+    | 'preliminary_estimate'
+  >;
+}
+
+export interface AuditIdentity {
+  customerId: IntakeAnswer<string>;
+  customerName: IntakeAnswer<string>;
+  siteId: IntakeAnswer<string>;
+  siteName: IntakeAnswer<string>;
+  physicalAddress: IntakeAnswer<string>;
+  municipality: IntakeAnswer<string>;
+  gpsReference: IntakeAnswer<string>;
+  gpsSource: IntakeAnswer<
+    | 'ars_customer_address'
+    | 'ars_machine_location'
+    | 'map_lookup'
+    | 'user_supplied'
+    | 'verified_survey'
+  >;
+  auditStartDate: IntakeAnswer<string>;
+  auditEndDate: IntakeAnswer<string>;
+  sourceLoggerFilename: IntakeAnswer<string>;
+  sourceLoggerSha256: IntakeAnswer<string>;
+  auditPeriodCondition: IntakeAnswer<
+    | 'representative_normal_operation'
+    | 'representative_with_stated_exceptions'
+    | 'short_record_estimate'
+    | 'abnormal_operation'
+  >;
+  operatingConditionNotes: IntakeAnswer<string>;
+  technicalConfirmerName: IntakeAnswer<string>;
+}
+
+export interface AuditLoggerDetails {
+  manufacturer: IntakeAnswer<string>;
+  model: IntakeAnswer<string>;
+  serialNumber: IntakeAnswer<string>;
+  hardwareVersion: IntakeAnswer<string>;
+  softwareVersion: IntakeAnswer<string>;
+  exportFormatIdentity: IntakeAnswer<string>;
+  configurationVersion: IntakeAnswer<string>;
+}
+
+type AuditInstallationPosition =
+  | 'compressor_discharge'
+  | 'after_dryer'
+  | 'main_header'
+  | 'branch_line'
+  | 'receiver_outlet'
+  | 'other';
+type AuditFlowReferenceBasis =
+  | 'actual_volumetric'
+  | 'standard_volumetric'
+  | 'free_air_delivery'
+  | 'delivered_downstream'
+  | 'mass_flow'
+  | 'other_manufacturer_defined';
+
+export interface AuditFlowSensor {
+  manufacturer: IntakeAnswer<string>;
+  model: IntakeAnswer<string>;
+  serialNumber: IntakeAnswer<string>;
+  pipeDiameterMm: IntakeAnswer<number>;
+  installationPosition: IntakeAnswer<AuditInstallationPosition>;
+  installationPositionDescription: IntakeAnswer<string>;
+  measuringUnit: IntakeAnswer<'m3_per_min' | 'm3_per_h' | 'l_per_min' | 'cfm'>;
+  measuringRangeMinimumM3PerMin: IntakeAnswer<number>;
+  measuringRangeMaximumM3PerMin: IntakeAnswer<number>;
+  lowestUsableFlowM3PerMin: IntakeAnswer<number>;
+  configuredLowFlowCutOffM3PerMin: IntakeAnswer<number>;
+  flowReferenceBasis: IntakeAnswer<AuditFlowReferenceBasis>;
+  referenceAbsolutePressurePa: IntakeAnswer<number>;
+  referenceTemperatureK: IntakeAnswer<number>;
+  referenceHumidityBasis: IntakeAnswer<
+    'dry_zero_percent_rh' | 'stated_relative_humidity' | 'saturated'
+  >;
+  referenceRelativeHumidityPercent: IntakeAnswer<number>;
+  referenceStandardDefinition: IntakeAnswer<string>;
+  calibrationDate: IntakeAnswer<string>;
+  calibrationCertificateReference: IntakeAnswer<string>;
+  configurationEvidenceReference: IntakeAnswer<string>;
+}
+
+export interface AuditPressureSensor {
+  usage: IntakeAnswer<'used' | 'not_used'>;
+  manufacturer: IntakeAnswer<string>;
+  model: IntakeAnswer<string>;
+  serialNumber: IntakeAnswer<string>;
+  installationPosition: IntakeAnswer<AuditInstallationPosition>;
+  installationPositionDescription: IntakeAnswer<string>;
+  measuringRangeMinimumBar: IntakeAnswer<number>;
+  measuringRangeMaximumBar: IntakeAnswer<number>;
+  pressureBasis: IntakeAnswer<'gauge' | 'absolute' | 'differential'>;
+  differentialHighPoint: IntakeAnswer<string>;
+  differentialLowPoint: IntakeAnswer<string>;
+  calibrationDate: IntakeAnswer<string>;
+  calibrationCertificateReference: IntakeAnswer<string>;
+}
+
+export interface AuditTemperatureSensor {
+  usage: IntakeAnswer<'used' | 'not_used'>;
+  manufacturer: IntakeAnswer<string>;
+  model: IntakeAnswer<string>;
+  measuredQuantity: IntakeAnswer<
+    'ambient_air' | 'compressed_air_discharge' | 'cooling_water' | 'other'
+  >;
+  location: IntakeAnswer<string>;
+  unit: IntakeAnswer<'celsius' | 'kelvin' | 'fahrenheit'>;
+  correctionUse: IntakeAnswer<'used_in_corrections' | 'not_used_in_corrections'>;
+}
+
+type AuditMachineType =
+  | 'rotary_screw_oil_injected'
+  | 'rotary_screw_oil_free'
+  | 'reciprocating'
+  | 'centrifugal'
+  | 'scroll'
+  | 'other';
+type AuditControlMethod =
+  | 'fixed_speed_load_unload'
+  | 'fixed_speed_modulation'
+  | 'variable_speed_drive'
+  | 'sequenced_multiple_machines'
+  | 'other';
+type AuditPowerBasis =
+  | 'measured_package_electrical_input'
+  | 'measured_motor_electrical_input'
+  | 'shaft_output'
+  | 'motor_nameplate_rating'
+  | 'manufacturer_package_input';
+
+export interface AuditExistingMachine {
+  selectionMode: IntakeAnswer<'existing_catalog_machine' | 'new_equipment'>;
+  arsMachineId: IntakeAnswer<string>;
+  manufacturer: IntakeAnswer<string>;
+  model: IntakeAnswer<string>;
+  serialNumber: IntakeAnswer<string>;
+  machineType: IntakeAnswer<AuditMachineType>;
+  controlMethod: IntakeAnswer<AuditControlMethod>;
+  ratedDischargePressureBarG: IntakeAnswer<number>;
+  ratedFadM3PerMin: IntakeAnswer<number>;
+  ratedFlowReferenceBasis: IntakeAnswer<AuditFlowReferenceBasis>;
+  packageInputPowerKw: IntakeAnswer<number>;
+  motorNameplatePowerKw: IntakeAnswer<number>;
+  powerBasis: IntakeAnswer<AuditPowerBasis>;
+  motorEfficiency: IntakeAnswer<number>;
+  loadedFraction: IntakeAnswer<number>;
+  unloadedInputPowerKw: IntakeAnswer<number>;
+  manufacturerEvidenceReference: IntakeAnswer<string>;
+}
+
+export interface AuditPartLoadPoint {
+  flowM3PerMin: number;
+  packageInputPowerKw: number;
+}
+
+export interface AuditProposedMachine {
+  selectionMode: IntakeAnswer<'existing_catalog_machine' | 'new_equipment'>;
+  arsMachineId: IntakeAnswer<string>;
+  manufacturer: IntakeAnswer<string>;
+  model: IntakeAnswer<string>;
+  machineType: IntakeAnswer<AuditMachineType>;
+  controlMethod: IntakeAnswer<AuditControlMethod>;
+  ratedDischargePressureBarG: IntakeAnswer<number>;
+  ratedFadM3PerMin: IntakeAnswer<number>;
+  ratedFlowReferenceBasis: IntakeAnswer<AuditFlowReferenceBasis>;
+  packageInputPowerKw: IntakeAnswer<number>;
+  specificPowerKwPerM3PerMin: IntakeAnswer<number>;
+  powerBasis: IntakeAnswer<AuditPowerBasis>;
+  motorEfficiency: IntakeAnswer<number>;
+  vsdMinimumFlowM3PerMin: IntakeAnswer<number>;
+  vsdMaximumFlowM3PerMin: IntakeAnswer<number>;
+  partLoadCurvePoints: AuditPartLoadPoint[];
+  partLoadCurveEvidenceReference: IntakeAnswer<string>;
+  manufacturerSource: IntakeAnswer<string>;
+}
+
+export interface AuditOperatingConditions {
+  annualOperatingHours: IntakeAnswer<number>;
+  annualOperatingHoursStatus: IntakeAnswer<
+    | 'confirmed_by_customer'
+    | 'signed_operating_hours_declaration'
+    | 'confirmed_from_production_schedule'
+    | 'machine_hour_meter_reading'
+    | 'service_or_maintenance_records'
+    | 'runtime_report_scada_bms_plc'
+    | 'electricity_or_production_records'
+    | 'site_survey_notes'
+    | 'approved_assumption'
+    | 'other_specified'
+    | 'evidence_not_yet_available'
+  >;
+  annualOperatingHoursEvidenceReference: IntakeAnswer<string>;
+  annualOperatingHoursOtherBasis: IntakeAnswer<string>;
+  annualOperatingHoursConfirmedBy: IntakeAnswer<string>;
+  annualOperatingHoursConfirmedOn: IntakeAnswer<string>;
+  annualOperatingHoursEvidenceNotes: IntakeAnswer<string>;
+  annualOperatingHoursApprover: IntakeAnswer<string>;
+  operatingDaysPerWeek: IntakeAnswer<number>;
+  shiftsPerDay: IntakeAnswer<number>;
+  representativePeriodStatus: IntakeAnswer<
+    'representative_confirmed' | 'approved_assumption' | 'not_representative'
+  >;
+  representativePeriodBasis: IntakeAnswer<
+    | 'measured_record_four_weeks_or_more'
+    | 'documented_production_schedule'
+    | 'customer_statement'
+  >;
+  representativePeriodEvidenceReference: IntakeAnswer<string>;
+  representativePeriodApprover: IntakeAnswer<string>;
+}
+
+export interface AuditSiteConditions {
+  altitudeM: IntakeAnswer<number>;
+  altitudeSource: IntakeAnswer<
+    | 'surveyed_site_record'
+    | 'gps_measurement'
+    | 'published_map_reference'
+    | 'measured_site_barometric_pressure'
+  >;
+  measuredAtmosphericPressurePa: IntakeAnswer<number>;
+  ambientTemperatureK: IntakeAnswer<number>;
+  manufacturerDeratingAvailability: IntakeAnswer<
+    | 'manufacturer_table_held'
+    | 'manufacturer_table_requested'
+    | 'manufacturer_table_unavailable'
+  >;
+  manufacturerDeratingReference: IntakeAnswer<string>;
+}
+
+export interface AuditTariffInputs {
+  supplier: IntakeAnswer<string>;
+  supplyAuthority: IntakeAnswer<string>;
+  tariffName: IntakeAnswer<string>;
+  customerCategory: IntakeAnswer<string>;
+  voltageCategory: IntakeAnswer<string>;
+  transmissionZone: IntakeAnswer<string>;
+  vatBasis: IntakeAnswer<'excluding_vat' | 'including_vat'>;
+  effectiveDate: IntakeAnswer<string>;
+  tariffYear: IntakeAnswer<string>;
+  billEvidenceReference: IntakeAnswer<string>;
+  suppliedEnergyRateRandPerKwh: IntakeAnswer<number>;
+}
+
+export interface AuditInvestment {
+  itemDescription: IntakeAnswer<string>;
+  pricingStatus: IntakeAnswer<
+    | 'ars_quotation'
+    | 'approved_price_list'
+    | 'approved_budget_price'
+    | 'price_not_available_yet'
+  >;
+  priceSourceReference: IntakeAnswer<string>;
+  unitPriceRand: IntakeAnswer<number>;
+  quantity: IntakeAnswer<number>;
+  installationRand: IntakeAnswer<number>;
+  electricalWorkRand: IntakeAnswer<number>;
+  pipingWorkRand: IntakeAnswer<number>;
+  deliveryRand: IntakeAnswer<number>;
+  commissioningRand: IntakeAnswer<number>;
+  buyBackRand: IntakeAnswer<number>;
+  discountRand: IntakeAnswer<number>;
+  refurbishmentRand: IntakeAnswer<number>;
+  otherCostsRand: IntakeAnswer<number>;
+}
+
 export interface AuditIntakeDocument {
-  intakeSchemaVersion: string;
+  intakeSchemaVersion: 'bouwa-audit-intake-1.0.0';
+  method: AuditMethod;
+  identity: AuditIdentity;
+  logger: AuditLoggerDetails;
+  flowSensor: AuditFlowSensor;
+  pressureSensor: AuditPressureSensor;
+  temperatureSensor: AuditTemperatureSensor;
+  existingMachine: AuditExistingMachine;
+  proposedMachine: AuditProposedMachine;
+  operatingConditions: AuditOperatingConditions;
+  siteConditions: AuditSiteConditions;
+  tariff: AuditTariffInputs;
+  investment: AuditInvestment;
+  equipmentGroups: AuditEquipmentGroup[];
+  operatingProfileSegments: AuditOperatingProfileSegment[];
+  recurringCommercialCostComponents: AuditRecurringCommercialCostComponent[];
+  commercialScenarios: AuditCommercialScenario[];
+  sourceStatedValues: SourceStatedValueRecord[];
+  claimAssessments: ClaimAssessmentInput[];
   evidence: AuditEvidenceReference[];
-  [section: string]: unknown;
 }
 
 export type ScientificProvenance =

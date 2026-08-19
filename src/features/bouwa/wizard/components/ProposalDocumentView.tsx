@@ -16,11 +16,28 @@ import {
   addressBlock,
   investmentRows,
   longDate,
+  proposalNumericFigureText,
+  proposalReleaseState,
 } from '../proposalDocumentPresentation';
 import { ARS_DEFAULT_HEADER } from '../../../../utils/arsJobCardHeaderDefaults';
+import { BaofnCalculatorComparison, CagiReferenceSection, ExistingPerformanceSensitivitySection } from './BaofnCalculatorComparison';
 
 /** A4 at 96dpi, less a 12mm margin each side. Matches the job card reports. */
 const PAGE_WIDTH_PX = 794;
+
+const SALES_PROPOSAL_SECTION_IDS = [
+  'existing_vs_proposed',
+  'existing_performance_sensitivity',
+  'cagi_reference',
+  'electricity_tariff',
+  'existing_energy_cost',
+  'proposed_energy_cost',
+  'component_comparison',
+  'five_year',
+  'savings_roi',
+  'discrepancies',
+  'professional_conclusion',
+] as const;
 
 interface ProposalDocumentViewProps {
   document: WizardProposalDocument;
@@ -90,9 +107,64 @@ function SectionTable({
   );
 }
 
+function DetailedSection({
+  section,
+}: {
+  section: WizardProposalDocument['detailedSections'][number];
+}) {
+  return (
+    <section
+      data-proposal-section={section.id}
+      className="break-inside-avoid"
+    >
+      <h2 className="mb-1.5 border-b border-gray-300 pb-1 text-[11px] font-bold uppercase tracking-wide text-ars-heading">
+        {section.title}
+      </h2>
+      {section.figures.length > 0 && (
+        <table className="w-full text-[10px]">
+          <tbody>
+            {section.figures.map((figure, index) => (
+              <tr key={`${figure.label}-${index}`} className="align-top">
+                <th scope="row" className="w-[42%] py-1 pr-3 text-left font-normal text-gray-600">
+                  {figure.label}
+                  {figure.hypothetical && (
+                    <span className="ml-1 rounded bg-amber-100 px-1 py-0.5 text-[8px] font-bold uppercase text-amber-800">
+                      Hypothetical
+                    </span>
+                  )}
+                </th>
+                <td className={`py-1 font-medium ${figure.available ? 'text-black' : 'text-rose-800'}`}>
+                  {proposalNumericFigureText(figure)}
+                </td>
+                <td className="w-[24%] py-1 pl-3 text-right text-[9px] text-gray-500">
+                  {figure.source ?? ''}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {section.statements.length > 0 && (
+        <ul className="mt-1 space-y-1 text-[10px] leading-relaxed text-gray-700">
+          {section.statements.map((statement, index) => (
+            <li key={`${statement}-${index}`}>{statement}</li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 export function ProposalDocumentView({ document }: ProposalDocumentViewProps) {
   const investment = document.investment;
   const stated = document.figures.filter(figure => figure.available);
+  const release = proposalReleaseState(document);
+  const salesMode = document.sourceCalculatorComparison?.cagiReference != null;
+  const detailedSections = salesMode
+    ? SALES_PROPOSAL_SECTION_IDS.map(id =>
+        document.detailedSections.find(section => section.id === id),
+      ).filter((section): section is NonNullable<typeof section> => section !== undefined)
+    : document.detailedSections;
 
   return (
     <article
@@ -100,6 +172,17 @@ export function ProposalDocumentView({ document }: ProposalDocumentViewProps) {
       style={{ width: `${PAGE_WIDTH_PX}px`, maxWidth: '100%' }}
     >
       <Letterhead reference={document.reference} />
+
+      {!document.preliminaryNotice && document.internalOnlyNotice !== null && (
+        <p className="mt-4 border-2 border-rose-500 bg-rose-50 px-3 py-2 text-[10px] font-bold leading-relaxed text-rose-900">
+          {document.internalOnlyNotice}
+        </p>
+      )}
+      {!document.preliminaryNotice && (
+        <p className={`mt-2 border-l-4 px-3 py-2 text-[10px] font-semibold ${release.allowed ? 'border-emerald-500 bg-emerald-50 text-emerald-900' : 'border-rose-500 bg-rose-50 text-rose-900'}`}>
+          {release.label}{release.reason === null ? '' : ` — ${release.reason}`}
+        </p>
+      )}
 
       <header className="mt-5">
         <h1 className="text-lg font-bold text-ars-heading">
@@ -138,7 +221,7 @@ export function ProposalDocumentView({ document }: ProposalDocumentViewProps) {
           the evidence-level statement carry the same warning in different
           words, so a preliminary document shows the notice and every other
           document shows the statement. */}
-      {document.preliminaryNotice !== null ? (
+      {document.preliminaryNotice ? (
         <p className="mt-4 border-l-4 border-ars-secondary bg-amber-50 px-3 py-2 text-[10px] leading-relaxed text-amber-900">
           {document.preliminaryNotice}
         </p>
@@ -147,6 +230,19 @@ export function ProposalDocumentView({ document }: ProposalDocumentViewProps) {
           {document.evidenceLevelStatement}
         </p>
       )}
+
+      {document.sensitivityNotice !== null && (
+        <p className="mt-2 border-l-4 border-amber-400 bg-amber-50 px-3 py-2 text-[10px] leading-relaxed text-amber-900">
+          {document.sensitivityNotice}
+        </p>
+      )}
+
+      <div className="mt-5">
+        <BaofnCalculatorComparison
+          comparison={document.sourceCalculatorComparison}
+          compact
+        />
+      </div>
 
       {stated.length > 0 && (
         <section className="mt-5 break-inside-avoid">
@@ -164,14 +260,40 @@ export function ProposalDocumentView({ document }: ProposalDocumentViewProps) {
         </section>
       )}
 
+      {!salesMode && (
+        <div className="mt-5 space-y-5">
+          {document.sections.map(section => (
+            <SectionTable
+              key={section.id}
+              title={section.title}
+              rows={section.lines}
+            />
+          ))}
+        </div>
+      )}
+
       <div className="mt-5 space-y-5">
-        {document.sections.map(section => (
-          <SectionTable
-            key={section.id}
-            title={section.title}
-            rows={section.lines}
-          />
-        ))}
+        {detailedSections.map(section =>
+          section.id === 'existing_performance_sensitivity' ? (
+            <ExistingPerformanceSensitivitySection
+              key={section.id}
+              section={section}
+              sensitivity={
+                document.sourceCalculatorComparison?.performanceSensitivity ??
+                document.sourceCalculatorComparison?.savingsComparison
+                  ?.performanceSensitivity
+              }
+            />
+          ) : section.id === 'cagi_reference' ? (
+            <CagiReferenceSection
+              key={section.id}
+              section={section}
+              exhibit={document.sourceCalculatorComparison?.cagiReference}
+            />
+          ) : (
+            <DetailedSection key={section.id} section={section} />
+          ),
+        )}
       </div>
 
       <section className="mt-5 break-inside-avoid">
@@ -270,7 +392,7 @@ export function ProposalDocumentView({ document }: ProposalDocumentViewProps) {
       {document.outstandingEvidence.length > 0 && (
         <section className="mt-5 break-inside-avoid">
           <h2 className="mb-1.5 border-b border-gray-300 pb-1 text-[11px] font-bold uppercase tracking-wide text-ars-heading">
-            Still to be confirmed
+            Notes
           </h2>
           <ul className="space-y-1 text-[10px] text-gray-700">
             {document.outstandingEvidence.map(entry => (

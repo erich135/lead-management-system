@@ -13,6 +13,7 @@
 import { getAuthToken } from '../../../lib/api';
 import { resolveApiBaseUrl } from '../../../lib/resolveApiBaseUrl';
 import type {
+  WizardCalculationSnapshot,
   WizardConflict,
   WizardDraftSummary,
   WizardDraftView,
@@ -39,7 +40,11 @@ import type {
   WizardTariffRoute,
   WizardTariffSelectionResult,
 } from './wizardTypes';
-import type { AuditIntakeDocument, AuditIntakeFormModel } from '../auditIntakeTypes';
+import type {
+  AuditEvidenceType,
+  AuditIntakeDocument,
+  AuditIntakeFormModel,
+} from '../auditIntakeTypes';
 
 export const WIZARD_BASE_PATH = '/api/bouwa/wizard';
 
@@ -158,6 +163,23 @@ export async function fetchWizardDraft(
   return (await requestJson(
     `/drafts/${encodeURIComponent(draftId)}`,
   )) as unknown as WizardDraftView;
+}
+
+/** Reads the immutable accepted result without asking the browser to calculate it. */
+export async function fetchWizardCalculationSnapshot(
+  draftId: string,
+): Promise<{
+  draftId: string;
+  revision: number;
+  calculationSnapshot: WizardCalculationSnapshot;
+}> {
+  return (await requestJson(
+    `/drafts/${encodeURIComponent(draftId)}/calculation-snapshot`,
+  )) as unknown as {
+    draftId: string;
+    revision: number;
+    calculationSnapshot: WizardCalculationSnapshot;
+  };
 }
 
 export interface WizardSaveRequest {
@@ -317,7 +339,7 @@ export async function uploadWizardDocument(
   draftId: string,
   revision: number,
   file: File,
-  options?: { evidenceId?: string | null; evidenceType?: string | null },
+  options?: { evidenceId?: string | null; evidenceType?: AuditEvidenceType | null },
 ): Promise<WizardDraftView> {
   const response = await fetch(
     wizardUrl(`/drafts/${encodeURIComponent(draftId)}/documents`),

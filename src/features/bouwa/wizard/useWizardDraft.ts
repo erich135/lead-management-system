@@ -24,7 +24,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { writeAnswerAtPath } from '../auditIntakeState';
-import type { AuditIntakeDocument, IntakeAnswer } from '../auditIntakeTypes';
+import type {
+  AuditEvidenceType,
+  AuditIntakeDocument,
+  IntakeAnswer,
+} from '../auditIntakeTypes';
 import {
   WizardRequestError,
   fetchWizardDraft,
@@ -64,6 +68,18 @@ interface PendingChange {
   currentPageIndex?: number;
 }
 
+export type WizardIntakeCollectionPatch = Partial<
+  Pick<
+    AuditIntakeDocument,
+    | 'equipmentGroups'
+    | 'operatingProfileSegments'
+    | 'recurringCommercialCostComponents'
+    | 'commercialScenarios'
+    | 'sourceStatedValues'
+    | 'claimAssessments'
+  >
+>;
+
 export interface WizardDraftController {
   view: WizardDraftView;
   intake: AuditIntakeDocument;
@@ -78,6 +94,8 @@ export interface WizardDraftController {
    * selection stored is worse than none.
    */
   answerMany: (entries: readonly [string, IntakeAnswer<unknown>][]) => void;
+  /** Replaces server-owned benchmark input collections; no value is calculated here. */
+  setIntakeCollections: (patch: WizardIntakeCollectionPatch) => void;
   setProposalType: (type: WizardProposalType) => void;
   setManualBasis: (basis: WizardManualBasis) => void;
   setCustomer: (customer: NonNullable<WizardSaveRequest['customer']>) => void;
@@ -121,7 +139,7 @@ export interface WizardDraftController {
   uploadSource: (file: File) => Promise<boolean>;
   uploadDocument: (
     file: File,
-    options?: { evidenceId?: string | null; evidenceType?: string | null },
+    options?: { evidenceId?: string | null; evidenceType?: AuditEvidenceType | null },
   ) => Promise<boolean>;
   reloadFromServer: () => Promise<void>;
   keepServerVersion: () => void;
@@ -257,6 +275,15 @@ export function useWizardDraft(initial: WizardDraftView): WizardDraftController 
       answerMany([[path, value]]);
     },
     [answerMany],
+  );
+
+  const setIntakeCollections = useCallback(
+    (patch: WizardIntakeCollectionPatch) => {
+      const next = { ...held.current, ...patch };
+      applyIntake(next);
+      queue({ intake: next });
+    },
+    [applyIntake, queue],
   );
 
   const setProposalType = useCallback(
@@ -489,7 +516,7 @@ export function useWizardDraft(initial: WizardDraftView): WizardDraftController 
   const uploadDocument = useCallback(
     async (
       file: File,
-      options?: { evidenceId?: string | null; evidenceType?: string | null },
+      options?: { evidenceId?: string | null; evidenceType?: AuditEvidenceType | null },
     ): Promise<boolean> => {
       if (!(await flush())) return false;
       setBusy(true);
@@ -571,6 +598,7 @@ export function useWizardDraft(initial: WizardDraftView): WizardDraftController 
     mayEdit: view.mayEdit !== false && view.draft.status === 'draft',
     answer,
     answerMany,
+    setIntakeCollections,
     setProposalType,
     setManualBasis,
     setCustomer,

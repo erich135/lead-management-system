@@ -1796,6 +1796,8 @@ function proposalDocument(
     customerName: 'Kloof Engineering',
     siteName: 'Kloof Works',
     siteAddress: '14 Vlei Road, Germiston',
+    siteGps: null,
+    siteLocationRemark: null,
     sections: [],
     figures: [],
     investment: {

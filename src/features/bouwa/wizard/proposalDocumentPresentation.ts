@@ -15,6 +15,8 @@ import type {
   WizardProposalDocument,
   WizardProposalDocumentVersion,
   WizardProposalInvestmentLine,
+  WizardProposalNumericFigure,
+  WizardProposalDetailedSectionId,
 } from './wizardTypes';
 /* Rands are formatted once, by the module the investment panel uses, so the
    figure a rep watches add up and the figure the customer reads are written the
@@ -22,6 +24,115 @@ import type {
    directly by the check scripts under Node's ESM resolver, which does not
    guess one. */
 import { rands } from './investmentPresentation.ts';
+
+export const PROPOSAL_DETAILED_SECTION_IDS: WizardProposalDetailedSectionId[] = [
+  'customer_site',
+  'evidence',
+  'fleet_spec_condition',
+  'existing_vs_proposed',
+  'existing_performance_sensitivity',
+  'cagi_reference',
+  'logger_manual_basis',
+  'electricity_tariff',
+  'existing_energy_cost',
+  'proposed_energy_cost',
+  'proposed_scope',
+  'source_scenario',
+  'independent_scenario',
+  'component_comparison',
+  'five_year',
+  'savings_roi',
+  'assumptions',
+  'missing_evidence',
+  'discrepancies',
+  'professional_conclusion',
+];
+
+/** Prints an accepted value or its backend blocker; missing never becomes zero. */
+export function proposalNumericFigureText(
+  figure: WizardProposalNumericFigure,
+): string {
+  if (!figure.available || figure.value === null)
+    return figure.blockedReason?.trim() || 'No accepted calculation result is available.';
+  const isCurrency = figure.unit.startsWith('R/');
+  const value = figure.value.toLocaleString('en-ZA', {
+    maximumFractionDigits: isCurrency ? 2 : 6,
+  });
+  return `${value}${figure.unit === '' ? '' : ` ${figure.unit}`}`;
+}
+
+export function proposalReleaseState(document: WizardProposalDocument): {
+  allowed: boolean;
+  label: string;
+  reason: string | null;
+} {
+  if (document.preliminaryNotice)
+    return {
+      allowed: false,
+      label: 'Preliminary estimate',
+      reason:
+        'Based on supplied customer, site and machine information. Subject to final technical confirmation.',
+    };
+  if (document.internalOnlyNotice !== null)
+    return { allowed: false, label: 'Internal only', reason: document.internalOnlyNotice };
+  if (!document.customerQuoteSafe)
+    return {
+      allowed: false,
+      label: 'Customer release blocked',
+      reason: 'The server has not released this document as customer-quote safe.',
+    };
+  return { allowed: true, label: 'Customer release allowed', reason: null };
+}
+
+/** Text that must survive the same DOM-to-PDF capture used by the preview. */
+export function proposalPdfContentContract(document: WizardProposalDocument): string[] {
+  const release = proposalReleaseState(document);
+  return [
+    document.reference,
+    document.calculationSnapshotId,
+    document.calculationConfigurationSha256,
+    release.label,
+    ...(release.reason === null ? [] : [release.reason]),
+    ...(document.internalOnlyNotice === null ? [] : [document.internalOnlyNotice]),
+    ...(document.sensitivityNotice === null ? [] : [document.sensitivityNotice]),
+    ...document.detailedSections.flatMap(section => [
+      section.title,
+      ...section.figures.flatMap(figure => [
+        figure.label,
+        proposalNumericFigureText(figure),
+        ...(figure.hypothetical ? ['Hypothetical'] : []),
+        ...(figure.source === null ? [] : [figure.source]),
+      ]),
+      ...section.statements,
+    ]),
+    ...(document.sourceCalculatorComparison?.rows
+      .filter(row => row.clientFacing)
+      .flatMap(row => [
+        row.item,
+        row.baofnClaim,
+        row.bouwaResult,
+        row.difference ?? '',
+        row.finding,
+        row.remark,
+      ]) ?? []),
+    ...(document.sourceCalculatorComparison?.performanceSensitivity
+      ? [
+          'EXISTING EQUIPMENT PERFORMANCE SENSITIVITY',
+          document.sourceCalculatorComparison.performanceSensitivity
+            .customerExplanation,
+          document.sourceCalculatorComparison.performanceSensitivity.factorMeaning,
+          document.sourceCalculatorComparison.performanceSensitivity
+            .estimateDisclaimer,
+          ...document.sourceCalculatorComparison.performanceSensitivity.scenarios.flatMap(
+            scenario => [
+              `${scenario.percent}% — ${scenario.label} (estimate)`,
+              String(scenario.estimatedExistingFlowM3PerMin),
+            ],
+          ),
+        ]
+      : []),
+  ];
+}
 
 /** The date as a South African reader writes it: 2 August 2026. */
 export function longDate(iso: string | null): string {
@@ -159,7 +270,10 @@ export function newVersionAction(
 export function addressBlock(document: WizardProposalDocument): string[] {
   return [
     document.customerName,
-    document.siteName,
-    document.siteAddress,
+    document.siteAddress ?? document.siteName,
+    document.siteGps === null || document.siteGps === ''
+      ? null
+      : `GPS: ${document.siteGps}`,
+    document.siteLocationRemark,
   ].filter((line): line is string => typeof line === 'string' && line !== '');
 }

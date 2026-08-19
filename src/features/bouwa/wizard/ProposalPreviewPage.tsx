@@ -34,6 +34,7 @@ import {
   documentStatusLine,
   newVersionAction,
   proposalFilename,
+  proposalReleaseState,
 } from './proposalDocumentPresentation';
 import {
   ensureProposalVersion,
@@ -162,6 +163,7 @@ export function ProposalPreviewPage({
     );
 
   const action = newVersionAction(view.document, view.versions, view.stale);
+  const release = proposalReleaseState(view.document);
 
   return (
     <div className="space-y-4">
@@ -181,7 +183,8 @@ export function ProposalPreviewPage({
             <button
               type="button"
               onClick={() => window.print()}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-ars-heading hover:bg-slate-50"
+              disabled={!release.allowed}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-ars-heading hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Printer className="h-4 w-4" />
               Print
@@ -189,8 +192,8 @@ export function ProposalPreviewPage({
             <button
               type="button"
               onClick={download}
-              disabled={busy !== 'idle'}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-ars-heading hover:bg-slate-50 disabled:opacity-50"
+              disabled={busy !== 'idle' || !release.allowed}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-ars-heading hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy === 'pdf' ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -225,6 +228,12 @@ export function ProposalPreviewPage({
         </div>
 
         <p className="text-xs text-slate-500">{action.detail}</p>
+
+        {!release.allowed && (
+          <Problem
+            message={`${release.label}. ${release.reason ?? 'Customer-facing print and download are disabled.'}`}
+          />
+        )}
 
         {problem !== '' && <Problem message={problem} />}
       </div>

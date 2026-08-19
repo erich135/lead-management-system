@@ -18,6 +18,7 @@
     "test:bouwa-provenance": "set \"TS_NODE_PROJECT=tsconfig.app.json\" && node --loader ts-node/esm/transpile-only scripts/checkBouwaProvenancePresentation.ts",
     "test:bouwa-state": "set \"TS_NODE_PROJECT=tsconfig.app.json\" && node --loader ts-node/esm/transpile-only scripts/checkBouwaProposalEditorState.ts",
     "test:bouwa-wizard": "set \"TS_NODE_PROJECT=tsconfig.app.json\" && node --loader ts-node/esm/transpile-only scripts/checkBouwaGuidedWizardState.ts",
+    "test:bouwa-benchmark": "set \"TS_NODE_PROJECT=tsconfig.app.json\" && node --loader ts-node/esm/transpile-only scripts/checkBouwaBenchmarkPresentation.ts",
     "test:bouwa-pilot-access": "set \"TS_NODE_PROJECT=tsconfig.app.json\" && node --loader ts-node/esm/transpile-only scripts/checkBouwaPilotAccess.ts",
     "test:bouwa-pilot-browser": "node scripts/bouwaPilotBrowserAcceptance.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.app.json"

@@ -9,8 +9,14 @@
 import type {
   AuditIntakeDocument,
   AuditIntakeHistoryEntry,
+  AuditEvidenceType,
   AuditReadinessAssessment,
   AuditReadinessStage,
+  ClaimAssessmentInput,
+  CommercialComponentKind,
+  CommercialPayer,
+  CommercialScenarioKind,
+  SourceStatedValueRecord,
 } from '../auditIntakeTypes';
 
 export type WizardProposalType = 'air_audit' | 'manual';
@@ -66,7 +72,7 @@ export interface WizardAttachment {
   attachmentId: string;
   storageId: string;
   evidenceId: string | null;
-  evidenceType: string | null;
+  evidenceType: AuditEvidenceType | null;
   filename: string;
   contentType: string;
   byteSize: number;
@@ -166,6 +172,42 @@ export interface WizardAnswerProvenance {
 
 export type WizardMachineRole = 'existingMachine' | 'proposedMachine';
 
+export interface WizardSpecSnapshotValues {
+  manufacturer: string;
+  model: string;
+  modelVariant: string | null;
+  equipmentType: string;
+  compressorType: string | null;
+  controlMethod: string | null;
+  ratedPressureBarG: number | null;
+  ratedFadM3PerMin: number | null;
+  flowReferenceBasis: string | null;
+  packageInputPowerKw: number | null;
+  motorShaftPowerKw: number | null;
+  motorEfficiencyFraction: number | null;
+  specificPowerKwPerM3PerMin: number | null;
+  vsdMinimumFlowM3PerMin: number | null;
+  vsdMaximumFlowM3PerMin: number | null;
+  partLoadPoints: WizardSpecPartLoadPoint[];
+  referenceAbsolutePressurePa: number | null;
+  referenceTemperatureK: number | null;
+  referenceHumidityBasis: string | null;
+  referenceStandardDefinition: string | null;
+  allowableAmbientMinimumC: number | null;
+  allowableAmbientMaximumC: number | null;
+  deratingTableStatus: string;
+}
+
+export interface WizardSpecOverride {
+  field: keyof WizardSpecSnapshotValues;
+  sourceValue: unknown;
+  proposalValue: unknown;
+  reason: string;
+  byUserId: string;
+  byName: string;
+  at: string;
+}
+
 /** The library record a proposal quotes, exactly as it read when chosen. */
 export interface WizardSpecSnapshot {
   recordId: string;
@@ -173,7 +215,8 @@ export interface WizardSpecSnapshot {
   libraryKey: string;
   contentFingerprint: string;
   source: WizardSpecSource;
-  values: Record<string, unknown>;
+  values: WizardSpecSnapshotValues;
+  overrides: WizardSpecOverride[];
   takenAt: string;
   takenByUserId: string;
 }
@@ -376,6 +419,307 @@ export interface WizardProposalFigure {
   unavailableReason: string | null;
 }
 
+export type ScientificCalculationStatus =
+  | 'complete'
+  | 'requires_review'
+  | 'unavailable'
+  | 'invalid_input';
+
+export type ScientificCalculationProvenance =
+  | 'exact_mathematics'
+  | 'established_engineering'
+  | 'manufacturer_specification'
+  | 'approved_assumption'
+  | 'business_input'
+  | 'user_input';
+
+export type ScientificUncertainty =
+  | 'measured'
+  | 'derived_exact'
+  | 'derived_manufacturer'
+  | 'estimated'
+  | 'estimated_from_short_record'
+  | 'unavailable';
+
+export type ScientificCalculationId =
+  | 'CALC-007' | 'CALC-008' | 'CALC-021' | 'CALC-023' | 'CALC-025'
+  | 'CALC-030' | 'CALC-031' | 'CALC-032' | 'CALC-033' | 'CALC-034'
+  | 'CALC-035' | 'CALC-036' | 'CALC-041' | 'CALC-042' | 'CALC-043'
+  | 'CALC-045' | 'CALC-046' | 'CALC-047' | 'CALC-051' | 'CALC-052'
+  | 'CALC-053' | 'CALC-056' | 'CALC-058' | 'CALC-059' | 'CALC-060'
+  | 'CALC-061' | 'CALC-062' | 'CALC-063' | 'CALC-067' | 'CALC-068'
+  | 'CALC-069' | 'CALC-070' | 'CALC-071' | 'CALC-072' | 'CALC-073';
+
+export interface WizardScientificCalculationResult {
+  value: number | null;
+  unit: string;
+  status: ScientificCalculationStatus;
+  provenance: ScientificCalculationProvenance;
+  uncertainty: ScientificUncertainty;
+  calculationId: ScientificCalculationId;
+  numericUncertainty: {
+    plusMinus: number;
+    unit: string;
+    basis: 'counter_quantisation';
+  } | null;
+  messages: string[];
+}
+
+export interface WizardOperatingProfileResult {
+  perUnitDailyVolumeM3: WizardScientificCalculationResult;
+  fleetDailyVolumeM3: WizardScientificCalculationResult;
+  fleetMonthlyVolumeM3: WizardScientificCalculationResult;
+  fleetAverageFlowM3PerMin24h: WizardScientificCalculationResult;
+  totalProfileHoursPerDay: number | null;
+  segmentFlowBases: {
+    segmentId: string;
+    basis: 'flow_fraction' | 'measured_flow_m3_per_min';
+    resolvedFlowM3PerMin: number | null;
+  }[];
+}
+
+export interface WizardCommercialComponentResult {
+  componentId: string;
+  label: string;
+  kind: CommercialComponentKind;
+  payer: CommercialPayer;
+  responsibility: 'customer' | 'provider' | 'shared' | 'confirmation_required';
+  inputAmountRand: number | null;
+  inputUnit: 'R/month' | 'R/m3';
+  monthlyCostRand: WizardScientificCalculationResult;
+}
+
+export interface WizardCommercialScenarioResult {
+  scenarioId: string;
+  scenarioKind: CommercialScenarioKind;
+  combinationStatus:
+    | 'confirmed_additive'
+    | 'confirmed_alternative'
+    | 'unconfirmed_stacking';
+  finalChargeConfirmed: boolean;
+  baseYear: number;
+  escalationBasis: 'annual_compound_from_base_year';
+  roundingPolicy: 'unrounded_calculation_display_2dp';
+  contractTermMonths: number | null;
+  annualEscalationFraction: number | null;
+  sourceStatedMonthlyTotalRand: number | null;
+  sourceStatedFiveYearTotalRand: number | null;
+  sourceTotalReconciliation: {
+    monthly:
+      | 'not_supplied'
+      | 'matches_within_rounding'
+      | 'calculation_discrepancy'
+      | 'confirmation_required';
+    fiveYear:
+      | 'not_supplied'
+      | 'matches_within_rounding'
+      | 'calculation_discrepancy'
+      | 'confirmation_required';
+    monthlyDifferenceRand: number | null;
+    fiveYearDifferenceRand: number | null;
+  };
+  components: WizardCommercialComponentResult[];
+  totalMonthlyCustomerCostRand: WizardScientificCalculationResult;
+  fiveYearSchedule: {
+    year: number;
+    annualCustomerCostRand: WizardScientificCalculationResult;
+  }[];
+  blockers: string[];
+}
+
+export interface WizardClaimAssessment extends ClaimAssessmentInput {
+  customerStatementPermitted: boolean;
+  blockers: string[];
+}
+
+export type WizardSourceCalculatorFinding =
+  | 'matched'
+  | 'close_match'
+  | 'differs'
+  | 'accepted_preliminary'
+  | 'accepted_datasheet'
+  | 'estimated'
+  | 'indicative'
+  | 'conflict'
+  | 'unsupported_at_8_bar'
+  | 'not_supported'
+  | 'impossible'
+  | 'unusable';
+
+export interface WizardSourceCalculatorComparisonRow {
+  item: string;
+  baofnClaim: string;
+  bouwaResult: string;
+  difference?: string;
+  finding: WizardSourceCalculatorFinding;
+  remark: string;
+  usedInFinalCalculation: boolean;
+  clientFacing: boolean;
+}
+
+export type WizardCostDifferenceKind = 'saving' | 'increase' | 'unchanged';
+
+export interface WizardExistingPerformanceScenarioResult {
+  id: 'good' | 'typical' | 'older';
+  percent: number;
+  label: string;
+  estimatedExistingFlowM3PerMin: number;
+  existingRatedKw: number;
+  existingAnnualKwh: number;
+  existingAnnualCostRand: number;
+  proposedTechnicalKw: number;
+  proposedAnnualKwh: number;
+  proposedAnnualCostRand: number;
+  annualDifferenceRand: number;
+  fiveYearDifferenceRand: number;
+  electricityDifferencePercent: number;
+  costDifferenceKind: WizardCostDifferenceKind;
+}
+
+export interface WizardExistingPerformanceSensitivity {
+  nameplateFlowM3PerMin: number;
+  existingRatedKw: number;
+  technicalProposedQuantity: number;
+  technicalProposedKw: number;
+  commercialProposedQuantity: number | null;
+  commercialProposedKw: number | null;
+  defaultPercent: number;
+  factorMeaning: string;
+  customerExplanation: string;
+  estimateDisclaimer: string;
+  technicalVsCommercialStatement: string;
+  correctedSavingEstablished?: boolean;
+  correctedSavingReason?: string;
+  scenarios: WizardExistingPerformanceScenarioResult[];
+}
+
+export interface WizardIllustrativeListedPowerScenario {
+  label: string;
+  existingListedKw: number | null;
+  proposedListedKw: number | null;
+  classification: string;
+  limitation: string;
+  annualDifferenceRand: number | null;
+  fiveYearDifferenceRand: number | null;
+  electricityDifferencePercent: number | null;
+}
+
+export interface WizardSalesSavingsComparison {
+  claimedText: string | null;
+  claimedPercentMin: number | null;
+  claimedPercentMax: number | null;
+  bouwaSavingPercent: number | null;
+  differencePercentagePoints: number | null;
+  estimatedAnnualSavingRand: number | null;
+  estimatedFiveYearSavingRand: number | null;
+  costDifferenceKind?: WizardCostDifferenceKind | null;
+  annualDifferenceLabel?: string;
+  fiveYearDifferenceLabel?: string;
+  performanceSensitivity?: WizardExistingPerformanceSensitivity | null;
+  bouwaAssessment?: string;
+  correctedSavingEstablished?: boolean;
+  illustrativeListedPower?: WizardIllustrativeListedPowerScenario | null;
+  finding: string;
+}
+
+export interface WizardCagiReferenceRow {
+  model: string;
+  pressurePsig: number;
+  pressureBarApprox: number;
+  maxFadAcfm: number;
+  maxFadM3PerMin: number;
+  totalInputKw: number | null;
+  motorHp: string;
+  control: string;
+  notes: string;
+}
+
+export interface WizardCagiTechnicalReferenceExhibit {
+  heading: 'CAGI technical reference';
+  notSerialMatched: string;
+  statements: string[];
+  rows: WizardCagiReferenceRow[];
+}
+
+export interface WizardSourceCalculatorComparison {
+  heading: 'BAOFN Source Claims vs Bouwa Calculator Results';
+  selectedWorkingRateRandPerM3: number;
+  rows: WizardSourceCalculatorComparisonRow[];
+  savingsComparison?: WizardSalesSavingsComparison;
+  performanceSensitivity?: WizardExistingPerformanceSensitivity | null;
+  cagiReference?: WizardCagiTechnicalReferenceExhibit | null;
+}
+
+export interface WizardCalculationSnapshot {
+  schemaVersion: 'bouwa-calculation-snapshot-1.2.0' | 'bouwa-calculation-snapshot-1.3.0';
+  snapshotId: string;
+  draftRevision: number;
+  generatedAt: string;
+  configurationSha256: string;
+  sourceHashes: string[];
+  calculationIds: string[];
+  units: string[];
+  status: 'complete' | 'requires_review' | 'blocked';
+  uncertainty: string[];
+  operatingProfiles: {
+    equipmentGroupId: string;
+    quantity: number;
+    manufacturer: string;
+    model: string;
+    calculation: WizardOperatingProfileResult;
+  }[];
+  commercialScenarios: WizardCommercialScenarioResult[];
+  scenarioDeltas: {
+    fromScenarioId: string;
+    toScenarioId: string;
+    monthlyCustomerCostDeltaRand: WizardScientificCalculationResult;
+    fiveYearCustomerCostDeltaRand: WizardScientificCalculationResult;
+  }[];
+  claimAssessments: WizardClaimAssessment[];
+  sourceStatedValues: SourceStatedValueRecord[];
+  sourceCalculatorComparison?: WizardSourceCalculatorComparison;
+  blockers: string[];
+}
+
+export interface WizardProposalNumericFigure {
+  label: string;
+  value: number | null;
+  unit: string;
+  available: boolean;
+  blockedReason: string | null;
+  hypothetical: boolean;
+  source: string | null;
+}
+
+export type WizardProposalDetailedSectionId =
+  | 'customer_site'
+  | 'evidence'
+  | 'fleet_spec_condition'
+  | 'logger_manual_basis'
+  | 'electricity_tariff'
+  | 'existing_vs_proposed'
+  | 'existing_performance_sensitivity'
+  | 'cagi_reference'
+  | 'existing_energy_cost'
+  | 'proposed_energy_cost'
+  | 'proposed_scope'
+  | 'source_scenario'
+  | 'independent_scenario'
+  | 'component_comparison'
+  | 'five_year'
+  | 'savings_roi'
+  | 'assumptions'
+  | 'missing_evidence'
+  | 'discrepancies'
+  | 'professional_conclusion';
+
+export interface WizardProposalDetailedSection {
+  id: WizardProposalDetailedSectionId;
+  title: string;
+  figures: WizardProposalNumericFigure[];
+  statements: string[];
+}
+
 export interface WizardProposalInvestmentLine {
   label: string;
   amountRand: number | null;
@@ -398,6 +742,9 @@ export interface WizardProposalDocument {
   issuedByName: string | null;
   preparedByName: string;
   preparedAt: string;
+  calculationSnapshotId: string;
+  calculationConfigurationSha256: string;
+  calculationSnapshot: WizardCalculationSnapshot;
   proposalTypeLabel: string;
   evidenceLevel: WizardEvidenceLevel;
   evidenceLevelLabel: string;
@@ -406,7 +753,10 @@ export interface WizardProposalDocument {
   customerName: string;
   siteName: string | null;
   siteAddress: string | null;
+  siteGps: string | null;
+  siteLocationRemark: string | null;
   sections: WizardProposalSection[];
+  detailedSections: WizardProposalDetailedSection[];
   figures: WizardProposalFigure[];
   investment: {
     itemDescription: string | null;
@@ -425,6 +775,10 @@ export interface WizardProposalDocument {
   /** What is still to be supplied, and by when where that is recorded. */
   outstandingEvidence: WizardProposalOutstandingEvidence[];
   limitations: string[];
+  customerQuoteSafe: boolean;
+  sensitivityNotice: string | null;
+  internalOnlyNotice: string | null;
+  sourceCalculatorComparison?: WizardSourceCalculatorComparison;
   contentFingerprint: string;
 }
 
@@ -457,6 +811,10 @@ export interface WizardProposalDocumentVersion {
   evidenceLevel: WizardEvidenceLevel;
   contentFingerprint: string;
   draftRevision: number;
+  calculationSnapshotId: string;
+  calculationConfigurationSha256: string;
+  calculationSnapshot?: WizardCalculationSnapshot | null;
+  customerReleasePermitted?: boolean;
   pdf: WizardProposalDocumentPdf | null;
 }
 
@@ -471,7 +829,7 @@ export interface WizardProposalDocumentView {
 
 export interface WizardDraft {
   draftId: string;
-  schemaVersion: string;
+  schemaVersion: 'bouwa-wizard-draft-1.0.0';
   reference: string;
   proposalType: WizardProposalType;
   manualBasis: WizardManualBasis | null;
@@ -487,6 +845,8 @@ export interface WizardDraft {
   answerProvenance: Record<string, WizardAnswerProvenance>;
   machineSelections: WizardMachineSelections;
   tariffSelection: WizardTariffSelection;
+  documentVersions: WizardProposalDocumentVersion[];
+  calculationSnapshot: WizardCalculationSnapshot;
   fileParsed: boolean;
   sourceFile: WizardSourceFile | null;
   attachments: WizardAttachment[];
@@ -616,11 +976,19 @@ export type WizardSpecEquipmentType =
   | 'reference_drawing'
   | 'other';
 
+export type WizardSpecSourceType =
+  | 'cagi_verified_datasheet'
+  | 'cagi_directory'
+  | 'oem_datasheet'
+  | 'iso_1217_certificate'
+  | 'ars_curated_register'
+  | 'customer_document';
+
 export interface WizardSpecSource {
-  sourceType: string;
+  sourceType: WizardSpecSourceType;
   sourceDocumentId: string;
   sourceTitle: string;
-  sourceOrganisation: string;
+  sourceOrganisation: string | null;
   sourceVersion: string | null;
   sourceDate: string | null;
   sourcePageReference: string | null;

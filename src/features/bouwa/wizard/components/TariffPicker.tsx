@@ -49,6 +49,7 @@ export function TariffPicker({
   onChoose,
   onUnavailable,
   onClear,
+  onUploadBill,
 }: {
   snapshot: WizardTariffSnapshot | null;
   route: WizardTariffRoute | null;
@@ -56,9 +57,11 @@ export function TariffPicker({
   onChoose: (
     record: WizardTariffRecord,
     route: WizardTariffRoute,
+    evidenceReference: string | null,
   ) => void;
   onUnavailable: () => void;
   onClear: () => void;
+  onUploadBill: (file: File) => Promise<boolean>;
 }) {
   const [chosenRoute, setChosenRoute] = useState<WizardTariffRoute | null>(route);
   const [choices, setChoices] = useState<TariffCascadeChoices>({});
@@ -68,6 +71,8 @@ export function TariffPicker({
   const [loading, setLoading] = useState(false);
   const [problem, setProblem] = useState('');
   const [preview, setPreview] = useState<WizardTariffRecord | null>(null);
+  const [billReference, setBillReference] = useState('');
+  const [uploadingBill, setUploadingBill] = useState(false);
 
   const searching =
     chosenRoute === 'searched_tariff_library' ||
@@ -188,6 +193,48 @@ export function TariffPicker({
         <UnavailableNotice />
       ) : null}
 
+      {chosenRoute === 'customer_bill_supplied' ? (
+        <div className="mt-2 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-2">
+          <p className="text-[11px] font-medium text-blue-900">
+            Upload the billed electricity account
+          </p>
+          <p className="text-[11px] text-blue-800">
+            The account identifies the customer’s tariff. GPS and municipality
+            boundaries are not tariff evidence.
+          </p>
+          <input
+            type="file"
+            accept=".pdf,image/*"
+            disabled={disabled || uploadingBill}
+            onChange={event => {
+              const file = event.target.files?.[0];
+              if (file === undefined) return;
+              setUploadingBill(true);
+              void onUploadBill(file)
+                .then(saved => {
+                  if (saved) setBillReference(file.name);
+                })
+                .finally(() => setUploadingBill(false));
+            }}
+            className="mt-1.5 block w-full text-[11px] text-slate-600"
+          />
+          <input
+            value={billReference}
+            disabled={disabled}
+            onChange={event => setBillReference(event.target.value)}
+            placeholder="Bill or electricity-account reference"
+            className="mt-1.5 w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs disabled:bg-slate-100"
+          />
+        </div>
+      ) : null}
+
+      {chosenRoute === 'previously_confirmed_for_customer' ? (
+        <p className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-600">
+          Choose a tariff previously confirmed against this customer’s electricity
+          account. Location alone does not qualify a tariff.
+        </p>
+      ) : null}
+
       {searching ? (
         <div className="mt-2 border-t border-slate-200 pt-2">
           <Cascade
@@ -262,7 +309,11 @@ export function TariffPicker({
               record={preview}
               disabled={disabled}
               onConfirm={() =>
-                onChoose(preview, chosenRoute ?? 'searched_tariff_library')
+                onChoose(
+                  preview,
+                  chosenRoute ?? 'searched_tariff_library',
+                  billReference.trim() || null,
+                )
               }
             />
           )}

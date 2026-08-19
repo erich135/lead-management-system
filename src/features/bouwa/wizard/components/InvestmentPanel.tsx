@@ -13,11 +13,11 @@
  */
 
 import { Banknote, Check, Clock } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import { WizardAnswerField } from './WizardAnswerField';
 import {
   PRICE_DEPENDENT_FIGURES,
-  investmentRunningTotal,
   priceUnavailable,
   rands,
 } from '../investmentPresentation';
@@ -52,6 +52,7 @@ export function InvestmentPanel({
   onOverride,
   onRestore,
   onUseSuggestion,
+  children,
 }: {
   fields: WizardFieldView[];
   intake: AuditIntakeDocument;
@@ -61,6 +62,7 @@ export function InvestmentPanel({
   onOverride?: (path: string, answer: unknown, reason: string) => void;
   onRestore?: (path: string) => void;
   onUseSuggestion: (suggestion: WizardPriceSuggestion) => void;
+  children?: ReactNode;
 }) {
   const held = new Map(fields.map(view => [view.field.code, view]));
   const ordered = [
@@ -72,7 +74,6 @@ export function InvestmentPanel({
   const answerAt = (path: string) =>
     (readAnswerAtPath(intake, path) as IntakeAnswer<unknown> | null) ?? null;
   const waiting = priceUnavailable(answerAt);
-  const total = investmentRunningTotal(answerAt);
 
   const field = (view: WizardFieldView) => (
     <WizardAnswerField
@@ -153,47 +154,12 @@ export function InvestmentPanel({
           </p>
         </div>
       ) : (
-        <dl className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs">
-          <p className="text-[11px] text-slate-500">
-            Running total of what is entered above. The proposal states the
-            figure the server calculates from the saved answers.
-          </p>
-          <Row label="Equipment subtotal" value={rands(total.equipmentSubtotalRand)} />
-          <Row label="Additional costs" value={rands(total.additionalCostsRand)} />
-          <Row label="Credits" value={`− ${rands(total.creditsRand)}`} />
-          <Row
-            label="Net initial investment"
-            value={rands(total.netInitialInvestmentRand)}
-            strong
-          />
-          {total.notIncluded.length === 0 ? null : (
-            <p className="mt-1 text-[11px] text-slate-500">
-              Not included: {total.notIncluded.join(', ')}.
-            </p>
-          )}
-        </dl>
+        <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[11px] text-slate-600">
+          Saved amounts are sent unchanged to the server. Totals, payback and return
+          are shown only from the server calculation snapshot.
+        </p>
       )}
-    </div>
-  );
-}
-
-function Row({
-  label,
-  value,
-  strong,
-}: {
-  label: string;
-  value: string;
-  strong?: boolean;
-}) {
-  return (
-    <div
-      className={`mt-1 flex justify-between gap-3 ${
-        strong ? 'border-t border-slate-200 pt-1 font-medium text-slate-800' : 'text-slate-600'
-      }`}
-    >
-      <dt>{label}</dt>
-      <dd>{value}</dd>
+      {children}
     </div>
   );
 }

@@ -22,6 +22,7 @@ import type { ChosenCustomer, ChosenSite } from '../customerSiteSelection';
 import { WizardAnswerField } from '../components/WizardAnswerField';
 import type { WizardFieldView } from '../wizardState';
 import type { WizardCustomerLink } from '../wizardTypes';
+import { MapPin } from 'lucide-react';
 
 function answered(value: string): IntakeAnswer<unknown> {
   return { state: 'answered', value, note: null };
@@ -91,6 +92,14 @@ export function CustomerSiteStep({
         onChooseSite={chooseSite}
         onMachinesLoaded={onMachinesLoaded}
       />
+      <p className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-600">
+        <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ars-primary" />
+        Record the GPS reference and municipality below. Coordinates and
+        municipality identify a mine or plant location; a conventional street
+        address is not required unless the customer specifically needs one for
+        their internal records. The site electricity account and billed tariff
+        are separate evidence and are never inferred from GPS.
+      </p>
       {fields.length === 0 ? null : (
         <div className="space-y-2">
           {fields.map(view => (

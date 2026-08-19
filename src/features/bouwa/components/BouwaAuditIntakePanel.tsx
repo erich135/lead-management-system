@@ -31,6 +31,7 @@ import {
 } from '../auditIntakeState';
 import type {
   AuditEvidenceReference,
+  AuditEvidenceType,
   AuditFormField,
   AuditIntakeDocument,
   AuditIntakeFormModel,
@@ -485,7 +486,7 @@ function OutstandingEvidenceWorkspace({
 }: {
   readiness: AuditReadinessAssessment;
   formModel: AuditIntakeFormModel;
-  onReferenceDocument: (evidenceType: string) => void;
+  onReferenceDocument: (evidenceType: AuditEvidenceType) => void;
 }) {
   const rows = outstandingEvidenceRows(readiness, formModel);
   const documentTypeFor = (code: string) =>
@@ -571,7 +572,7 @@ function OutstandingEvidenceWorkspace({
                 <button
                   type="button"
                   onClick={() =>
-                    onReferenceDocument(documentTypeFor(row.code) as string)
+                    onReferenceDocument(documentTypeFor(row.code)!)
                   }
                   className="mt-3 inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900"
                 >
@@ -699,7 +700,9 @@ function EvidencePanel({
                 value={entry.evidenceType}
                 disabled={locked}
                 onChange={event =>
-                  update(index, { evidenceType: event.target.value })
+                  update(index, {
+                    evidenceType: event.target.value as AuditEvidenceType,
+                  })
                 }
               >
                 {formModel.evidenceTypes.map(option => (
@@ -818,7 +821,8 @@ function EvidencePanel({
             {
               id: `evidence-${evidence.length + 1}-${Date.now()}`,
               evidenceType:
-                formModel.evidenceTypes[0]?.value ?? 'other_supporting_document',
+                (formModel.evidenceTypes[0]?.value ??
+                  'other_supporting_document') as AuditEvidenceType,
               filename: null,
               documentReference: null,
               sourceOrganisation: null,
@@ -1020,7 +1024,7 @@ export function BouwaAuditIntakePanel({
    * as requested rather than confirmed, so referencing a document never counts
    * as having received one.
    */
-  function trackDocument(evidenceType: string) {
+  function trackDocument(evidenceType: AuditEvidenceType) {
     if (intake === null) return;
     const existing = Array.isArray(intake.evidence) ? intake.evidence : [];
     if (existing.some(entry => entry.evidenceType === evidenceType)) return;

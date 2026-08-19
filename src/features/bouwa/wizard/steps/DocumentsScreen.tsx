@@ -14,7 +14,10 @@
 import { useRef, useState } from 'react';
 import { Download, FileUp, Loader2, Paperclip } from 'lucide-react';
 
-import type { AuditIntakeFormModel } from '../../auditIntakeTypes';
+import type {
+  AuditEvidenceType,
+  AuditIntakeFormModel,
+} from '../../auditIntakeTypes';
 import { downloadWizardFile, wizardUrl } from '../wizardApi';
 import { formatSavedAt } from '../wizardState';
 import type { WizardDraft } from '../wizardTypes';
@@ -26,7 +29,7 @@ export interface DocumentsScreenProps {
   busy: boolean;
   onUpload: (
     file: File,
-    options: { evidenceType: string | null },
+    options: { evidenceType: AuditEvidenceType | null },
   ) => Promise<boolean>;
 }
 
@@ -38,7 +41,7 @@ export function DocumentsScreen({
   onUpload,
 }: DocumentsScreenProps) {
   const input = useRef<HTMLInputElement>(null);
-  const [evidenceType, setEvidenceType] = useState('');
+  const [evidenceType, setEvidenceType] = useState<AuditEvidenceType | ''>('');
   const [problem, setProblem] = useState('');
 
   const typeLabel = new Map(
@@ -72,7 +75,9 @@ export function DocumentsScreen({
             id="wizard-evidence-type"
             disabled={disabled || busy}
             value={evidenceType}
-            onChange={event => setEvidenceType(event.target.value)}
+            onChange={event =>
+              setEvidenceType(event.target.value as AuditEvidenceType | '')
+            }
             className="min-w-[18rem] flex-1 rounded-md border border-slate-300 px-2.5 py-1.5 text-sm disabled:bg-slate-100"
           >
             <option value="">Choose the kind of document…</option>

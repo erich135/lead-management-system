@@ -33,6 +33,10 @@ import {
 import { MachineEvidencePanel } from './components/MachineEvidencePanel';
 import { TariffPicker } from './components/TariffPicker';
 import { InvestmentPanel } from './components/InvestmentPanel';
+import { FleetGroupsEditor } from './components/FleetGroupsEditor';
+import { OperatingProfileEditor } from './components/OperatingProfileEditor';
+import { CommercialScenarioEditor } from './components/CommercialScenarioEditor';
+import { SourceStatedValuesEditor } from './components/SourceStatedValuesEditor';
 import { fetchPriceSuggestions } from './wizardApi';
 import { EquipmentPicker } from './components/EquipmentPicker';
 import {
@@ -86,6 +90,7 @@ type Screen =
   | { kind: 'proposed_machine'; fields: WizardFieldView[] }
   | { kind: 'tariff'; fields: WizardFieldView[] }
   | { kind: 'investment'; fields: WizardFieldView[] }
+  | { kind: 'benchmark_profile' }
   | {
       kind: 'equipment';
       equipmentType: WizardEquipmentType;
@@ -173,6 +178,8 @@ function screensForStep(
     ];
   if (step.id === 'existing_system') return withPicker('existing_machine');
   if (step.id === 'proposed_solution') return withPicker('proposed_machine');
+  if (step.id === 'operating_profile')
+    return [{ kind: 'benchmark_profile' }, ...moreFieldScreens(all)];
   // The documents belong with the questions whose evidence they are, and the
   // tariff and investment answers are the last ones asked before the review.
   // The tariff is chosen from the register rather than described, so its
@@ -235,7 +242,7 @@ export function GuidedProposalWizard({
         void draft.restoreAnswer(path);
       },
     }),
-    [draft.answer, draft.overrideAnswer, draft.restoreAnswer],
+    [draft],
   );
 
   /**
@@ -590,6 +597,18 @@ export function GuidedProposalWizard({
             <MachineEvidencePanel
               snapshot={view.draft.machineSelections?.existingMachine ?? null}
             />
+            <FleetGroupsEditor
+              groups={intake.equipmentGroups}
+              evidence={intake.evidence}
+              exactSelection={
+                view.draft.machineSelections?.existingMachine ?? null
+              }
+              role="existing"
+              disabled={!mayEdit}
+              onChange={equipmentGroups =>
+                draft.setIntakeCollections({ equipmentGroups })
+              }
+            />
             <div className="space-y-2">
               {screen.fields.map(fieldView => (
                 <WizardAnswerField
@@ -632,6 +651,18 @@ export function GuidedProposalWizard({
             <MachineEvidencePanel
               snapshot={view.draft.machineSelections?.proposedMachine ?? null}
             />
+            <FleetGroupsEditor
+              groups={intake.equipmentGroups}
+              evidence={intake.evidence}
+              exactSelection={
+                view.draft.machineSelections?.proposedMachine ?? null
+              }
+              role="proposed"
+              disabled={!mayEdit}
+              onChange={equipmentGroups =>
+                draft.setIntakeCollections({ equipmentGroups })
+              }
+            />
             <div className="space-y-2">
               {screen.fields.map(fieldView => (
                 <WizardAnswerField
@@ -650,16 +681,20 @@ export function GuidedProposalWizard({
               snapshot={view.draft.tariffSelection?.snapshot ?? null}
               route={view.draft.tariffSelection?.route ?? null}
               disabled={!mayEdit}
-              onChoose={(record, route) =>
+              onChoose={(record, route, evidenceReference) =>
                 void draft.selectTariff({
                   route,
                   tariffRecordId: record.recordId,
+                  evidenceReference,
                 })
               }
               onUnavailable={() =>
                 void draft.selectTariff({ route: 'not_available_yet' })
               }
               onClear={() => void draft.selectTariff({ clear: true })}
+              onUploadBill={file =>
+                draft.uploadDocument(file, { evidenceType: 'electricity_bill' })
+              }
             />
             <div className="space-y-2">
               {screen.fields.map(fieldView => (
@@ -700,7 +735,29 @@ export function GuidedProposalWizard({
               ])
             }
             {...answering}
-          />
+          >
+            <CommercialScenarioEditor
+              components={intake.recurringCommercialCostComponents}
+              scenarios={intake.commercialScenarios}
+              groups={intake.equipmentGroups}
+              evidence={intake.evidence}
+              disabled={!mayEdit}
+              onComponentsChange={recurringCommercialCostComponents =>
+                draft.setIntakeCollections({ recurringCommercialCostComponents })
+              }
+              onScenariosChange={commercialScenarios =>
+                draft.setIntakeCollections({ commercialScenarios })
+              }
+            />
+            <SourceStatedValuesEditor
+              values={intake.sourceStatedValues}
+              evidence={intake.evidence}
+              disabled={!mayEdit}
+              onChange={sourceStatedValues =>
+                draft.setIntakeCollections({ sourceStatedValues })
+              }
+            />
+          </InvestmentPanel>
         ) : screen.kind === 'equipment' ? (
           <div className="space-y-3">
             <EquipmentPicker
@@ -735,6 +792,15 @@ export function GuidedProposalWizard({
               ))}
             </div>
           </div>
+        ) : screen.kind === 'benchmark_profile' ? (
+          <OperatingProfileEditor
+            segments={intake.operatingProfileSegments}
+            evidence={intake.evidence}
+            disabled={!mayEdit}
+            onChange={operatingProfileSegments =>
+              draft.setIntakeCollections({ operatingProfileSegments })
+            }
+          />
         ) : screen.kind === 'manual_basis' ? (
           <ManualBasisStep
             manualBasis={view.draft.manualBasis}
@@ -776,6 +842,12 @@ export function GuidedProposalWizard({
                         if (saved) onPreview(view.draft.draftId);
                       });
                   }
+            }
+            snapshot={view.draft.calculationSnapshot}
+            claims={intake.claimAssessments}
+            disabled={!mayEdit}
+            onClaimsChange={claimAssessments =>
+              draft.setIntakeCollections({ claimAssessments })
             }
             onOpenTechnicalReview={() => {
               // The review reads the stored draft, so anything outstanding is

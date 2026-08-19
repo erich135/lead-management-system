@@ -355,6 +355,8 @@ export function SpecLibrarySearch({
   const [records, setRecords] = useState<WizardSpecRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [problem, setProblem] = useState('');
+  const [preview, setPreview] = useState<WizardSpecRecord | null>(null);
+  const [referenceOnlyId, setReferenceOnlyId] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -408,7 +410,10 @@ export function SpecLibrarySearch({
             <ChoiceButton
               chosen={selectedRecordId === record.recordId}
               disabled={disabled}
-              onClick={() => onSelect(record)}
+              onClick={() => {
+                setPreview(record);
+                setReferenceOnlyId(null);
+              }}
               heading={specHeading(record)}
               detail={specDetail(record)}
               caution={absenceCaution(record)}
@@ -416,6 +421,41 @@ export function SpecLibrarySearch({
           </li>
         ))}
       </ul>
+      {preview === null ? null : (
+        <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2">
+          <p className="text-xs font-medium text-slate-700">
+            Is {specHeading(preview)} the exact model?
+          </p>
+          <p className="mt-0.5 text-[11px] text-slate-500">
+            An exact choice may populate published fields. A nearest or ambiguous
+            record is reference only and populates nothing.
+          </p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => onSelect(preview)}
+              className="rounded-md bg-ars-primary px-2.5 py-1 text-[11px] font-medium text-white disabled:opacity-50"
+            >
+              Use exact model
+            </button>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => setReferenceOnlyId(preview.recordId)}
+              className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800 disabled:opacity-50"
+            >
+              Nearest / ambiguous — reference only
+            </button>
+          </div>
+          {referenceOnlyId === preview.recordId && (
+            <p className="mt-1.5 text-[11px] text-amber-700">
+              Kept as a visual reference only. No machine or specification value was
+              copied. Record the actual group below when it is known.
+            </p>
+          )}
+        </div>
+      )}
     </>
   );
 }

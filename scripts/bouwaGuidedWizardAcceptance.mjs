@@ -127,6 +127,22 @@ async function clickByText(page, selector, text) {
   return true;
 }
 
+async function clickProposalAction(page) {
+  for (const text of [
+    'Generate commercially complete proposal',
+    'Generate audit-backed proposal',
+    'Generate engineering proposal',
+    'Generate preliminary proposal',
+    'Finish draft with outstanding items',
+    'Preview captured answers',
+    'Preliminary customer proposal',
+    'Preview proposal',
+  ]) {
+    if (await clickByText(page, 'button', text)) return true;
+  }
+  return false;
+}
+
 /** Opens the one proposal in the list that carries this reference. */
 async function openDraft(page, reference) {
   const handle = await page.evaluateHandle(reference_ => {
@@ -331,12 +347,13 @@ async function main() {
 
     const lower = review.toLowerCase();
     check(
-      lower.includes('available now') && lower.includes('still to answer'),
-      'the review page sorts what is available from what is outstanding',
+      (lower.includes('ready now') || lower.includes('not ready yet')) &&
+        lower.includes('can generate'),
+      'the review page leads with what can be generated now',
     );
     check(
-      lower.includes('not applicable to this proposal'),
-      'a figure a manual proposal never produces is stated as not applicable',
+      !lower.includes('still to answer') || lower.includes('would raise'),
+      'logger-only gaps are not listed as outstanding sales work',
     );
     check(
       review.includes('Fix now') || /→/.test(review) || review.includes('and'),
@@ -347,7 +364,9 @@ async function main() {
       'no field code or intake path is shown to a rep',
     );
     check(
-      review.includes('Preview proposal') &&
+      (review.includes('Generate preliminary proposal') ||
+        review.includes('Preliminary customer proposal') ||
+        review.includes('Finish draft with outstanding items')) &&
         !review.includes('there is no proposal to preview'),
       'the last button offers the proposal rather than denying there is one',
     );
@@ -367,7 +386,7 @@ async function main() {
 
     process.stdout.write('Opening the proposal preview\n');
     check(
-      await clickByText(page, 'button', 'Preview proposal'),
+      await clickProposalAction(page),
       'the proposal can be read at any point, not only once it is complete',
     );
     await waitForText(page, 'Download PDF');
@@ -614,7 +633,7 @@ async function main() {
       'an air audit is asked for the measurements a manual proposal is not',
     );
     check(
-      await clickByText(page, 'button', 'Preview proposal'),
+      await clickProposalAction(page),
       'an air audit reaches the proposal the same way',
     );
     await waitForText(page, 'Download PDF');

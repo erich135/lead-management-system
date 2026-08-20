@@ -323,7 +323,12 @@ export function GuidedProposalWizard({
   );
   const lastScreen =
     stepIndex === steps.length - 1 && safePage === screens.length - 1;
-  const finishAction = finishActionLabel(triage, onPreview !== undefined);
+  const finishAction = finishActionLabel(
+    triage,
+    onPreview !== undefined,
+    view.evidenceLevel,
+    view.draft.readinessSummary.outstandingQuestionCount,
+  );
 
   const screenFields =
     screen === undefined || !('fields' in screen) ? [] : screen.fields;
@@ -826,6 +831,12 @@ export function GuidedProposalWizard({
             formModel={formModel}
             steps={steps}
             fileParsed={view.draft.fileParsed}
+            salesOutstandingCount={
+              view.draft.readinessSummary.outstandingQuestionCount
+            }
+            salesOutstandingCodes={
+              view.draft.readinessSummary.outstandingQuestionCodes ?? []
+            }
             onFixNow={fixNow}
             onPreview={
               onPreview === undefined

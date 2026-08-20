@@ -8,8 +8,8 @@
  * blockers that belong to them.
  *
  * A manual proposal must also say what it rests on, because a site survey and a
- * preliminary estimate are not the same claim, and the provenance recorded
- * against every later figure follows from it.
+ * preliminary estimate are not the same claim, and every later figure is
+ * labelled from that choice.
  */
 
 import { CheckCircle2, FileSpreadsheet, PencilLine } from 'lucide-react';
@@ -128,7 +128,7 @@ export function ProposalTypeStep({
             summary="No logger export exists. The proposal rests on stated information."
             includes={[
               'No file upload and no logger questions',
-              'Figures keep the provenance you give them',
+              'Figures are labelled as supplied, estimated or specification',
               'Measured results stay unavailable, because nothing was measured',
             ]}
             onSelect={() => onChangeType('manual')}

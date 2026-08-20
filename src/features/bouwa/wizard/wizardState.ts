@@ -204,6 +204,8 @@ export function outstandingOnScreen(
     // A locked value is the file's to state. It can never hold a user's step,
     // because there is nothing they could do about it on this screen.
     if (entry.sourceDerived) return false;
+    if (entry.status.confirmedForStage === 'commercial_proposal_ready')
+      return false;
     if (entry.status.status === 'invalid') return true;
     if (entry.status.status !== 'missing') return false;
     const state = answerStateAt(entry.field.path);
@@ -290,9 +292,12 @@ export function readinessLines(
       ? (eligibility.reasons[0] ?? 'Does not apply to this proposal')
       : eligibility.eligible
         ? 'Ready'
-        : outstandingCount === 1
-          ? '1 item required'
-          : `${outstandingCount} items required`;
+        : stage === 'engineering_comparison_ready' ||
+            stage === 'commercial_proposal_ready'
+          ? 'Raises proposal level'
+          : outstandingCount === 1
+            ? '1 item required'
+            : `${outstandingCount} items required`;
     return {
       stage,
       label: WIZARD_STAGE_LABELS[stage],

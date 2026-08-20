@@ -63,6 +63,7 @@ import {
 } from '../src/features/bouwa/wizard/investmentPresentation.ts';
 import {
   finishActionLabel,
+  proposalOutcomeCopy,
   reviewTriage,
 } from '../src/features/bouwa/wizard/reviewTriage.ts';
 import {
@@ -531,7 +532,7 @@ assert.equal(lines[0].applicable, false);
 assert.equal(lines[0].state, 'This proposal was not created from a logger record.');
 assert.equal(lines[2].state, 'Ready');
 assert.equal(lines[2].ready, true);
-assert.equal(lines[3].state, '2 items required');
+assert.equal(lines[3].state, 'Raises proposal level');
 assert.deepEqual(lines[3].nextActions, [
   'Annual operating hours',
   'Electricity tariff',
@@ -1711,8 +1712,13 @@ assert.deepEqual(
 );
 assert.deepEqual(
   triaged.outstanding.map(entry => entry.outputId),
+  [],
+  'a commercial-stage figure does not block the current preliminary proposal',
+);
+assert.deepEqual(
+  triaged.raisesLevel.map(entry => entry.outputId),
   ['annual_electricity_cost'],
-  'only a figure the rep can release from a question they can reach is outstanding',
+  'a commercial-stage figure is listed as a higher-evidence improvement',
 );
 assert.deepEqual(
   triaged.waiting.map(entry => entry.outputId),
@@ -1720,16 +1726,16 @@ assert.deepEqual(
   'a figure waiting on a calculation nobody has accepted is not the rep’s to fix',
 );
 assert.match(
-  triaged.outstanding[0]?.reason ?? '',
-  /^One question stands/,
-  'an outstanding figure says how far off it is, and lets the buttons name the questions',
+  triaged.raisesLevel[0]?.reason ?? '',
+  /raise the evidence level/,
+  'a higher-grade figure says it raises the proposal rather than blocking it',
 );
 assert.ok(
-  !(triaged.outstanding[0]?.reason ?? '').includes('so results are not stored'),
+  !(triaged.raisesLevel[0]?.reason ?? '').includes('so results are not stored'),
   'the guidance for a question is not repeated beside the button that opens it',
 );
 assert.deepEqual(
-  triaged.outstanding[0]?.fixes.map(fix => ({
+  triaged.raisesLevel[0]?.fixes.map(fix => ({
     code: fix.code,
     stepId: fix.stepId,
     pageIndex: fix.pageIndex,
@@ -1746,8 +1752,8 @@ assert.deepEqual(
 
 assert.equal(
   finishActionLabel(triaged, true).label,
-  'Preview proposal',
-  'the last button says what it does',
+  'Generate preliminary proposal',
+  'the last button names the document it will produce',
 );
 assert.equal(
   finishActionLabel(triaged, false).label,
@@ -1755,12 +1761,18 @@ assert.equal(
   'without a preview to open, the button does not promise one',
 );
 const nothingReleased = finishActionLabel(
-  { available: [], outstanding: [], waiting: [], notApplicable: [] },
+  {
+    available: [],
+    outstanding: [],
+    raisesLevel: [],
+    waiting: [],
+    notApplicable: [],
+  },
   true,
 );
 assert.equal(
   nothingReleased.label,
-  'Preview proposal',
+  'Generate preliminary proposal',
   'a proposal with no released figure is still a proposal a rep can show',
 );
 assert.match(
@@ -1769,9 +1781,132 @@ assert.match(
   'the rep is told what kind of document they are about to open',
 );
 assert.equal(
+  finishActionLabel(triaged, true, null, 3).label,
+  'Finish draft with outstanding items',
+  'genuinely required sales answers keep the action as a draft finish',
+);
+assert.equal(
+  finishActionLabel(triaged, true, {
+    level: 'commercially_complete',
+    label: 'Commercially complete',
+    statement: '',
+    levels: [],
+    nextLevel: null,
+    nextLevelLabel: null,
+    toReachNextLevel: [],
+    blockingFieldCodesForNextLevel: [],
+  }, 0).label,
+  'Generate commercially complete proposal',
+  'a commercially complete proposal is distinguishable from a preliminary one',
+);
+assert.equal(
   finishActionLabel(triaged, false).detail,
   'Your answers are already saved.',
   'where no preview can be opened, the button promises nothing about one',
+);
+
+const outcomeCopy = proposalOutcomeCopy({
+  level: 'preliminary',
+  label: 'Preliminary',
+  statement: 'Early indication.',
+  levels: [],
+  nextLevel: 'engineering',
+  nextLevelLabel: 'Engineering',
+  toReachNextLevel: [
+    'Engineering: Add manufacturer ratings for the existing machine.',
+  ],
+  blockingFieldCodesForNextLevel: [],
+});
+assert.equal(outcomeCopy.readyNow, 'Preliminary');
+assert.equal(outcomeCopy.canGenerate, 'Preliminary customer proposal');
+assert.match(
+  outcomeCopy.nextImprovement ?? '',
+  /Add manufacturer ratings/,
+  'the review page states the minimum next improvement',
+);
+
+const draftOutcome = proposalOutcomeCopy(
+  {
+    level: 'preliminary',
+    label: 'Preliminary',
+    statement: 'Early indication.',
+    levels: [],
+    nextLevel: 'engineering',
+    nextLevelLabel: 'Engineering',
+    toReachNextLevel: [
+      'Engineering: Existing machine control method has not been answered.',
+    ],
+    blockingFieldCodesForNextLevel: ['AUDIT.EXISTING_MACHINE.CONTROL_METHOD'],
+  },
+  8,
+  'Existing machine manufacturer',
+);
+assert.equal(draftOutcome.readyNow, 'Draft');
+assert.equal(
+  draftOutcome.canGenerate,
+  'Draft only — preliminary proposal not yet ready',
+);
+assert.equal(draftOutcome.heading, 'Not ready yet');
+assert.match(
+  draftOutcome.nextImprovement ?? '',
+  /existing machine manufacturer/i,
+  'a thin draft points at the missing CORE input, not the next evidence level',
+);
+assert.equal(
+  /engineering|control method/i.test(draftOutcome.nextImprovement ?? ''),
+  false,
+  'engineering evidence is not the immediate next action on a thin draft',
+);
+assert.equal(
+  finishActionLabel(triaged, true, null, 8).label,
+  'Finish draft with outstanding items',
+);
+
+const readyOutcome = proposalOutcomeCopy(
+  {
+    level: 'preliminary',
+    label: 'Preliminary',
+    statement: 'Early indication.',
+    levels: [],
+    nextLevel: 'engineering',
+    nextLevelLabel: 'Engineering',
+    toReachNextLevel: [
+      'Engineering: Existing machine control method has not been answered.',
+    ],
+    blockingFieldCodesForNextLevel: ['AUDIT.EXISTING_MACHINE.CONTROL_METHOD'],
+  },
+  0,
+);
+assert.equal(readyOutcome.readyNow, 'Preliminary');
+assert.equal(readyOutcome.canGenerate, 'Preliminary customer proposal');
+assert.match(
+  readyOutcome.nextImprovement ?? '',
+  /To reach Engineering: Existing machine control method/,
+);
+
+const engineeringEvidence = {
+  level: 'engineering' as const,
+  label: 'Engineering',
+  statement: 'Manufacturer data.',
+  levels: [],
+  nextLevel: 'audit_backed' as const,
+  nextLevelLabel: 'Audit-backed',
+  toReachNextLevel: [
+    'Measured demand: no logger export has been parsed.',
+  ],
+  blockingFieldCodesForNextLevel: ['AUDIT.LOGGER.MANUFACTURER'],
+};
+const engineeringOutcome = proposalOutcomeCopy(engineeringEvidence, 0);
+assert.equal(engineeringOutcome.readyNow, 'Engineering');
+assert.equal(engineeringOutcome.canGenerate, 'Engineering proposal');
+assert.match(
+  engineeringOutcome.nextImprovement ?? '',
+  /Audit-backed/,
+  'logger evidence is the path to audit-backed, not a current engineering blocker',
+);
+assert.equal(
+  finishActionLabel(triaged, true, engineeringEvidence, 0).label,
+  'Generate engineering proposal',
 );
 
 /* ------------------------------------------------------------------ *

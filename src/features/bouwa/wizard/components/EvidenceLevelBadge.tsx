@@ -20,11 +20,15 @@ import type { WizardEvidenceLevelAssessment } from '../wizardTypes';
 export function EvidenceLevelBadge({
   assessment,
   compact,
+  currentReady = true,
 }: {
   assessment: WizardEvidenceLevelAssessment;
   compact?: boolean;
+  currentReady?: boolean;
 }) {
-  const tone = EVIDENCE_LEVEL_TONE[assessment.level];
+  const tone = currentReady
+    ? EVIDENCE_LEVEL_TONE[assessment.level]
+    : 'border-slate-200 bg-slate-50 text-slate-800';
   if (compact)
     return (
       <span
@@ -35,32 +39,36 @@ export function EvidenceLevelBadge({
       </span>
     );
 
-  const next = nextLevelSentence(assessment);
+  const next = currentReady ? nextLevelSentence(assessment) : null;
   return (
     <div className={`rounded-xl border px-3 py-2.5 ${tone}`}>
       <p className="flex items-center gap-2 text-sm font-medium">
         <ShieldCheck className="h-4 w-4" />
-        {EVIDENCE_LEVEL_SHORT[assessment.level]}
+        {currentReady
+          ? EVIDENCE_LEVEL_SHORT[assessment.level]
+          : 'Draft — more answers needed'}
       </p>
       {/* The level is on the line above, so the statement is shown without the
           name it opens with. */}
       <p className="mt-1 text-[11px] leading-relaxed">
-        {statementBody(assessment)}
+        {currentReady
+          ? statementBody(assessment)
+          : 'A preliminary proposal cannot be generated until the remaining required inputs are captured.'}
       </p>
       <ol className="mt-2 flex flex-wrap gap-1">
         {evidenceLevelSteps(assessment).map(entry => (
           <li
             key={entry.level}
             className={`rounded-full border px-2 py-0.5 text-[10px] ${
-              entry.held
+              currentReady && entry.held
                 ? 'border-current font-medium'
-                : entry.met
+                : currentReady && entry.met
                   ? 'border-transparent bg-white/60'
                   : 'border-transparent bg-white/30 opacity-60'
             }`}
           >
             {entry.label}
-            {entry.met && !entry.held ? ' ✓' : ''}
+            {currentReady && entry.met && !entry.held ? ' ✓' : ''}
           </li>
         ))}
       </ol>

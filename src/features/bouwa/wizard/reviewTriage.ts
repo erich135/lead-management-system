@@ -22,6 +22,7 @@ import type {
   AuditReadinessAssessment,
 } from '../auditIntakeTypes';
 import type { QuestionLocation } from './wizardState';
+import type { WizardEvidenceLevelAssessment } from './wizardTypes';
 
 export interface ReviewBlocker {
   outputId: string;
@@ -46,12 +47,24 @@ export interface ReviewTriage {
   /** Blocked on a question this proposal still has to answer. */
   outstanding: ReviewBlocker[];
   /**
+   * Missing evidence that would raise the proposal level. It does not block
+   * the document that can be generated now.
+   */
+  raisesLevel: ReviewBlocker[];
+  /**
    * Blocked on a document somebody must supply, or on a calculation that has no
    * accepted implementation. Not the rep's to clear on this screen.
    */
   waiting: ReviewBlocker[];
   /** Never part of this kind of proposal. Not a gap. */
   notApplicable: { outputId: string; label: string; reason: string }[];
+}
+
+function raisesEvidenceLevel(requiredStage: string): boolean {
+  return (
+    requiredStage === 'engineering_comparison_ready' ||
+    requiredStage === 'commercial_proposal_ready'
+  );
 }
 
 export function reviewTriage(
@@ -76,6 +89,7 @@ export function reviewTriage(
       label: outputLabel.get(id) ?? id,
     })),
     outstanding: [],
+    raisesLevel: [],
     waiting: [],
     notApplicable: [],
   };
@@ -103,21 +117,29 @@ export function reviewTriage(
         pageIndex: where.pageIndex,
       });
     }
-    if (fixes.length > 0) {
-      // The backend's reason names the first missing field and then explains
-      // why that field is asked for. Both are already on this row: the fields
-      // are the buttons beneath, and the explanation belongs beside the
-      // question rather than here. What is left to say is how far off the
-      // figure is.
-      triage.outstanding.push({
-        outputId: output.outputId,
-        label: output.label,
+    const blocker: ReviewBlocker = {
+      outputId: output.outputId,
+      label: output.label,
+      reason:
+        fixes.length === 1
+          ? 'One question stands between this proposal and this figure.'
+          : fixes.length > 1
+            ? `${fixes.length} questions stand between this proposal and this figure.`
+            : reason,
+      fixes,
+    };
+    if (raisesEvidenceLevel(output.requiredStage) && fixes.length > 0) {
+      triage.raisesLevel.push({
+        ...blocker,
         reason:
           fixes.length === 1
-            ? 'One question stands between this proposal and this figure.'
-            : `${fixes.length} questions stand between this proposal and this figure.`,
-        fixes,
+            ? 'One question would raise the evidence level of this proposal.'
+            : `${fixes.length} questions would raise the evidence level of this proposal.`,
       });
+      continue;
+    }
+    if (fixes.length > 0) {
+      triage.outstanding.push(blocker);
       continue;
     }
     triage.waiting.push({
@@ -131,46 +153,127 @@ export function reviewTriage(
   return triage;
 }
 
+export interface ProposalOutcomeCopy {
+  currentReady: boolean;
+  heading: 'Ready now' | 'Not ready yet';
+  readyNow: string;
+  canGenerate: string;
+  nextActionLabel: 'Needed now' | 'Next improvement';
+  nextImprovement: string | null;
+  previewLabel: string;
+}
+
+function addRequiredInput(label: string | null): string {
+  if (label === null || label.trim() === '')
+    return 'Add the remaining required inputs for a preliminary proposal.';
+  const body = label.trim();
+  const lowered = body.charAt(0).toLowerCase() + body.slice(1);
+  return lowered.endsWith('.') ? `Add ${lowered}` : `Add ${lowered}.`;
+}
+
+export function firstOutstandingFieldLabel(
+  readiness: AuditReadinessAssessment,
+  outstandingCodes: readonly string[],
+): string | null {
+  const first = outstandingCodes[0];
+  if (first === undefined) return null;
+  return (
+    readiness.fieldStatuses.find(status => status.code === first)?.label ??
+    first
+  );
+}
+
 /**
  * What the last button on the wizard actually does.
  *
- * It said "Save & Finish", which was untrue twice over: nothing was finished,
- * and what happened was that the proposal closed. The answers are saved as they
- * are given, so the honest thing the button can offer at the end is a look at
- * the proposal that has been built.
- *
- * It once closed instead wherever no figure had been released, on the reasoning
- * that there was nothing to preview. That is no longer true. A proposal with no
- * released figure still names the customer, the machines and the price, and
- * states on its face what it is waiting on, which is worth more in front of a
- * customer than a rep with nothing to show. The button now offers the proposal
- * whenever there is one to open and says which of the three it is.
+ * The label names the document that will be produced, so the salesperson knows
+ * before clicking whether this is a preliminary estimate, an engineering
+ * comparison, or a priced proposal. Outstanding sales answers keep the action
+ * as a draft finish rather than pretending the document is complete.
  */
 export function finishActionLabel(
   triage: ReviewTriage,
   canPreview: boolean,
+  evidence: WizardEvidenceLevelAssessment | null = null,
+  salesOutstandingCount = 0,
 ): { label: string; detail: string } {
   if (!canPreview)
     return {
       label: 'Save and close',
       detail: 'Your answers are already saved.',
     };
-  if (triage.available.length === 0)
+  if (salesOutstandingCount > 0)
     return {
-      label: 'Preview proposal',
-      detail:
-        'No figure has been released yet. The proposal reads as preliminary: what has been captured so far, and what it is still waiting on.',
+      label: 'Finish draft with outstanding items',
+      detail: `${salesOutstandingCount} answer${
+        salesOutstandingCount === 1 ? '' : 's'
+      } still needed for this proposal. Preview shows what has been captured so far.`,
     };
-  if (triage.outstanding.length === 0)
+  const level = evidence?.level ?? 'preliminary';
+  if (level === 'commercially_complete')
     return {
-      label: 'Preview proposal',
+      label: 'Generate commercially complete proposal',
+      detail: 'The priced proposal is ready to generate.',
+    };
+  if (level === 'audit_backed')
+    return {
+      label: 'Generate audit-backed proposal',
       detail:
-        'Every question this proposal needs has been answered. The preview shows exactly what the customer would receive.',
+        'Measured site demand is in place. The preview is the document the customer would receive.',
+    };
+  if (level === 'engineering')
+    return {
+      label: 'Generate engineering proposal',
+      detail:
+        'The manufacturer-data comparison is ready. Logger measurement would raise this to an audit-backed proposal.',
     };
   return {
-    label: 'Preview proposal',
-    detail: `${triage.outstanding.length} figure${
-      triage.outstanding.length === 1 ? '' : 's'
-    } cannot be shown yet. The preview states which, rather than leaving them blank.`,
+    label: 'Generate preliminary proposal',
+    detail:
+      triage.available.length === 0
+        ? 'A preliminary customer proposal can be generated from the answers given so far.'
+        : 'A preliminary customer proposal can be generated now. Remaining items raise the evidence level rather than blocking this document.',
+  };
+}
+
+export function proposalOutcomeCopy(
+  evidence: WizardEvidenceLevelAssessment,
+  salesOutstandingCount = 0,
+  firstOutstandingLabel: string | null = null,
+): ProposalOutcomeCopy {
+  if (salesOutstandingCount > 0)
+    return {
+      currentReady: false,
+      heading: 'Not ready yet',
+      readyNow: 'Draft',
+      canGenerate: 'Draft only — preliminary proposal not yet ready',
+      nextActionLabel: 'Needed now',
+      nextImprovement: addRequiredInput(firstOutstandingLabel),
+      previewLabel: 'Preview captured answers',
+    };
+
+  const next = evidence.nextLevelLabel;
+  const firstGap = evidence.toReachNextLevel[0] ?? null;
+  const canGenerate =
+    evidence.level === 'commercially_complete'
+      ? 'Commercially complete customer proposal'
+      : evidence.level === 'audit_backed'
+        ? 'Audit-backed customer proposal'
+        : evidence.level === 'engineering'
+          ? 'Engineering proposal'
+          : 'Preliminary customer proposal';
+  return {
+    currentReady: true,
+    heading: 'Ready now',
+    readyNow: evidence.label,
+    canGenerate,
+    nextActionLabel: 'Next improvement',
+    nextImprovement:
+      next === null
+        ? null
+        : firstGap === null
+          ? `Add the remaining ${next.toLowerCase()} inputs.`
+          : `To reach ${next}: ${firstGap.replace(/^[^:]+:\s*/, '')}`,
+    previewLabel: canGenerate,
   };
 }

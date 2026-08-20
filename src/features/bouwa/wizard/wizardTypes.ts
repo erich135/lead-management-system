@@ -118,6 +118,7 @@ export interface WizardReadinessSummary {
   permittedOutputCount: number;
   blockedOutputCount: number;
   outstandingQuestionCount: number;
+  outstandingQuestionCodes?: string[];
   outstandingEvidenceCount: number;
   evaluatedAt: string;
 }

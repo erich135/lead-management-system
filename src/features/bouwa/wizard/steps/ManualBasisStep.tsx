@@ -5,7 +5,7 @@
  * out loud rather than left for a reader to work out. The basis chosen on the
  * first screen decides how every figure entered later is described — a site
  * survey and a preliminary estimate are different claims — so it is repeated
- * here, in full, with the provenance it carries and the outputs it cannot
+ * here, in full, with the label it carries and the outputs it cannot
  * release.
  *
  * Nothing on this screen can turn a stated figure into a measured one.

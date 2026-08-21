@@ -61,6 +61,7 @@ export function proposalNumericFigureText(
   return `${value}${figure.unit === '' ? '' : ` ${figure.unit}`}`;
 }
 
+/** Customer-quote status printed on the document. It does not gate Print or Download. */
 export function proposalReleaseState(document: WizardProposalDocument): {
   allowed: boolean;
   label: string;
@@ -82,6 +83,39 @@ export function proposalReleaseState(document: WizardProposalDocument): {
       reason: 'The server has not released this document as customer-quote safe.',
     };
   return { allowed: true, label: 'Customer release allowed', reason: null };
+}
+
+/**
+ * Whether the preview is looking at a generated version that still matches the
+ * current answers. Print and download follow this, not customer-quote release:
+ * a preliminary proposal is a real generated document and may be printed as
+ * one. What it may claim is already written on the page.
+ */
+export type ProposalVersionUiState = 'never_generated' | 'current' | 'stale';
+
+export function proposalVersionUiState(
+  document: WizardProposalDocument,
+  versions: readonly WizardProposalDocumentVersion[],
+  stale: boolean,
+): ProposalVersionUiState {
+  if (document.version === 0 || versions.length === 0) return 'never_generated';
+  return stale ? 'stale' : 'current';
+}
+
+export function proposalPrintDownloadEnabled(
+  state: ProposalVersionUiState,
+): boolean {
+  return state === 'current';
+}
+
+export function proposalPrintDownloadReason(
+  state: ProposalVersionUiState,
+): string {
+  if (state === 'never_generated')
+    return 'Generate a proposal version first. Print and download use that generated version.';
+  if (state === 'stale')
+    return 'Current answers have changed since the last generated version. Generate an updated version before printing or downloading the current proposal.';
+  return 'Print and download the current generated proposal.';
 }
 
 /** Text that must survive the same DOM-to-PDF capture used by the preview. */
@@ -164,14 +198,14 @@ export function documentStatusLine(
   stale: boolean,
 ): string {
   if (document.version === 0)
-    return 'Preview. No version of this proposal has been generated yet.';
+    return 'No proposal version has been generated yet. Generate one to print or download.';
   if (stale)
-    return `Version ${document.version} was generated on ${longDate(
+    return `Current answers have changed since Version ${document.version} (generated on ${longDate(
       document.issuedAt,
-    )}. Answers have changed since, so what is shown here is newer than that version.`;
+    )}). Generate an updated proposal version before printing or downloading the current proposal.`;
   return `Version ${document.version}, generated on ${longDate(
     document.issuedAt,
-  )} by ${document.issuedByName ?? 'ARS'}.`;
+  )} by ${document.issuedByName ?? 'ARS'}. Print and download are available.`;
 }
 
 /** The amount, or the sentence that explains why there is no amount. */
@@ -231,38 +265,39 @@ export function investmentRows(
 }
 
 /**
- * Whether generating another version would say anything new.
+ * The generate action for the current version state.
  *
- * The button is always offered under the same words, because a rep looking for
- * it should not have to find it under a different name depending on what the
- * proposal happens to contain. It is disabled where nothing has changed: the
- * backend refuses a second identical version, and a version number a customer
- * quotes has to mean that something moved.
+ * Never generated and stale are different jobs, so they are labelled
+ * differently: the first produces version 1, the second updates a version the
+ * answers have moved on from. An unchanged current version is not offered
+ * again, because the backend refuses an identical fingerprint.
  */
 export function newVersionAction(
   document: WizardProposalDocument,
   versions: readonly WizardProposalDocumentVersion[],
   stale: boolean,
 ): { label: string; enabled: boolean; detail: string } {
+  const state = proposalVersionUiState(document, versions, stale);
   const latest = versions[versions.length - 1] ?? null;
-  if (latest === null)
+  if (state === 'never_generated' || latest === null)
     return {
-      label: 'Generate new version',
+      label: 'Generate proposal',
       enabled: true,
-      detail: 'Produces version 1 of this proposal.',
+      detail:
+        'Produces version 1 of this proposal. Print and download become available afterwards.',
     };
-  if (!stale)
+  if (state === 'current')
     return {
       label: 'Generate new version',
       enabled: false,
-      detail: `Version ${latest.version} already says exactly this. Change an answer to generate another version.`,
+      detail: `Version ${latest.version} already matches the current answers. Print and download are available.`,
     };
   return {
-    label: 'Generate new version',
+    label: 'Generate updated version',
     enabled: true,
-    detail: `Answers have changed since version ${latest.version} was generated on ${longDate(
+    detail: `Current answers have changed since Version ${latest.version} (generated on ${longDate(
       latest.issuedAt,
-    )}. Generating version ${latest.version + 1} records what the proposal now says.`,
+    )}). Generating Version ${latest.version + 1} records what the proposal now says, then Print and Download become available.`,
   };
 }
 

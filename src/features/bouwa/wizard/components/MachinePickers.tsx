@@ -25,10 +25,18 @@ import {
 
 import {
   listInstalledMachines,
+  matchSpecLibrary,
   searchSpecLibrary,
 } from '../wizardApi';
+import {
+  installedMachineDetail,
+  specMatchCandidates,
+  specMatchNotice,
+  specPickerDiscriminators,
+} from '../machineSelection';
 import type {
   WizardInstalledMachine,
+  WizardSpecMatch,
   WizardSpecRecord,
 } from '../wizardTypes';
 
@@ -137,7 +145,10 @@ function absenceCaution(record: WizardSpecRecord): string | null {
 }
 
 function specDetail(record: WizardSpecRecord): string {
-  return `${record.summary} · ${record.source.sourceTitle}`;
+  const discriminators = specPickerDiscriminators(record);
+  const ratings =
+    discriminators.length === 0 ? record.summary : discriminators.join(' · ');
+  return `${ratings} · ${record.source.sourceTitle}`;
 }
 
 function specHeading(record: WizardSpecRecord): string {
@@ -179,6 +190,7 @@ export function ExistingMachinePicker({
   const [loading, setLoading] = useState(false);
   const [problem, setProblem] = useState('');
   const [route, setRoute] = useState<ExistingMachineRoute>('ars_register');
+  const [specMatch, setSpecMatch] = useState<WizardSpecMatch | null>(null);
 
   useEffect(() => {
     if (customerId === null) {
@@ -198,8 +210,6 @@ export function ExistingMachinePicker({
         if (!live) return;
         setMachines(found.machines);
         setNoneRegistered(found.noneRegistered);
-        // An empty register is not an error; it is a different set of choices,
-        // so the screen moves the rep straight to the ones that apply.
         if (found.noneRegistered) setRoute('search_spec_library');
       })
       .catch(() => {
@@ -213,11 +223,34 @@ export function ExistingMachinePicker({
     };
   }, [customerId, siteName]);
 
+  const selected = machines.find(machine => machine.machineId === selectedMachineId) ?? null;
+
+  useEffect(() => {
+    if (selected === null) {
+      setSpecMatch(null);
+      return;
+    }
+    let live = true;
+    matchSpecLibrary({
+      manufacturer: selected.manufacturer,
+      model: selected.model,
+    })
+      .then(found => {
+        if (live) setSpecMatch(found);
+      })
+      .catch(() => {
+        if (live) setSpecMatch(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, [selected]);
+
   return (
     <Panel
       title="Installed machine"
       icon={<Server className="h-4 w-4 text-ars-primary" />}
-      note="Choosing a registered machine fills its make, model, serial number and location. Its published ratings come from the specification library, which is searched next."
+      note="Choosing a registered machine fills its make, model and serial. Published ratings are filled only where the specification library holds one exact compatible record."
     >
       {customerId === null ? (
         <p className="mt-1.5 text-xs text-slate-500">
@@ -229,8 +262,7 @@ export function ExistingMachinePicker({
           {noneRegistered ? (
             <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2">
               <p className="text-xs font-medium text-slate-700">
-                No machines are registered for this customer
-                {siteName === null ? '' : ` at ${siteName}`}.
+                No machines are registered for this customer.
               </p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 <RouteButton
@@ -265,18 +297,46 @@ export function ExistingMachinePicker({
                       disabled={disabled}
                       onClick={() => onSelectInstalled(machine)}
                       heading={`${machine.manufacturer} ${machine.model}`}
-                      detail={[
-                        machine.serialNumber === null
-                          ? 'No serial recorded'
-                          : `Serial ${machine.serialNumber}`,
-                        machine.location,
-                      ]
-                        .filter(part => part !== null && part !== '')
-                        .join(' · ')}
+                      detail={installedMachineDetail(machine)}
                     />
                   </li>
                 ))}
               </ul>
+              {specMatch === null || selected === null ? null : (
+                <div
+                  data-testid="existing-machine-spec-match"
+                  data-outcome={specMatch.outcome}
+                  className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2"
+                >
+                  <p className="text-xs font-medium text-slate-700">
+                    {specMatchNotice(specMatch.outcome)}
+                  </p>
+                  {specMatch.outcome === 'candidates_require_confirmation' ? (
+                    <ul className="mt-1.5 space-y-1">
+                      {specMatchCandidates(specMatch).map(candidate => (
+                        <li key={candidate.recordId}>
+                          <ChoiceButton
+                            chosen={selectedSpecId === candidate.recordId}
+                            disabled={disabled}
+                            onClick={() => onSelectSpec(candidate)}
+                            heading={specHeading(candidate)}
+                            detail={[
+                              specDetail(candidate),
+                              candidate.distinguishedBy.join(' · '),
+                            ]
+                              .filter(part => part !== '')
+                              .join(' · ')}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                      {specMatch.explanation}
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 <RouteButton
                   active={route === 'search_spec_library'}

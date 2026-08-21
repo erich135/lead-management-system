@@ -24,7 +24,7 @@ const PROVENANCE_OPTIONS: { value: AuditMachineSpecProvenance; label: string }[]
   { value: 'customer_supplied', label: 'Customer supplied' },
   { value: 'source_document', label: 'Source document' },
   { value: 'nearest_model_reference_only', label: 'Nearest model — reference only' },
-  { value: 'unconfirmed', label: 'Unknown / confirmation required' },
+  { value: 'unconfirmed', label: 'Unknown' },
 ];
 
 function emptyProvenance(): RecordValueProvenance {

@@ -11,12 +11,25 @@
  */
 
 import type {
+  WizardTariffCandidateOrigin,
   WizardTariffFacetField,
   WizardTariffPeriod,
   WizardTariffRecord,
   WizardTariffRoute,
   WizardTariffSnapshot,
 } from './wizardTypes';
+
+export const TARIFF_LIBRARY_CAPTURE_CODES = [
+  'AUDIT.TARIFF.SUPPLIER',
+  'AUDIT.TARIFF.SUPPLY_AUTHORITY',
+  'AUDIT.TARIFF.TARIFF_NAME',
+  'AUDIT.TARIFF.CUSTOMER_CATEGORY',
+  'AUDIT.TARIFF.VOLTAGE_CATEGORY',
+  'AUDIT.TARIFF.TRANSMISSION_ZONE',
+  'AUDIT.TARIFF.VAT_BASIS',
+  'AUDIT.TARIFF.EFFECTIVE_DATE',
+  'AUDIT.TARIFF.TARIFF_YEAR',
+] as const;
 
 export const TARIFF_ROUTE_OPTIONS: {
   id: WizardTariffRoute;
@@ -197,6 +210,39 @@ export function tariffRateLines(
 /** How the tariff on a proposal reads once it has been chosen. */
 export function tariffSnapshotLine(snapshot: WizardTariffSnapshot): string {
   return `${snapshot.values.supplier} · ${snapshot.values.tariffName} · ${snapshot.values.tariffYearLabel}`;
+}
+
+export const MAX_TARIFF_SUGGESTIONS = 5;
+
+export function selectedTariffOriginLabel(
+  route: WizardTariffRoute | null,
+): string {
+  if (route === 'previously_confirmed_for_customer')
+    return 'Previously used for this site';
+  if (route === 'searched_tariff_library') return 'Populated from Tariff Library';
+  if (route === 'customer_bill_supplied') return 'Supplied for this proposal';
+  return 'Estimated/manual rate';
+}
+
+export function suggestionOriginLabel(
+  origin: WizardTariffCandidateOrigin,
+): string {
+  if (origin === 'previous_site') return 'Previously used for this site';
+  if (origin === 'previous_customer') return 'Previously used for this customer';
+  if (origin === 'known_supplier') return 'Populated from Tariff Library';
+  return 'Suggested from site location';
+}
+
+export function shouldAutoApplyTariffSuggestion(input: {
+  autoSelectRecordId: string | null;
+  snapshot: WizardTariffSnapshot | null;
+  suppliedRate: number | null;
+  suggestionDeclined: boolean;
+}): boolean {
+  if (input.snapshot !== null) return false;
+  if (input.suggestionDeclined) return false;
+  if (input.suppliedRate !== null) return false;
+  return input.autoSelectRecordId !== null;
 }
 
 export function tariffRouteLabel(route: WizardTariffRoute): string {

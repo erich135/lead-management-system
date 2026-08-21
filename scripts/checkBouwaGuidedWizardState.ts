@@ -21,17 +21,30 @@ import {
 } from '../src/features/bouwa/wizard/wizardState.ts';
 import {
   absenceCaution,
+  installedMachineDetail,
   machineEvidenceLines,
   machineEvidenceLink,
+  MAX_EXISTING_MACHINE_SPEC_CANDIDATES,
+  MACHINE_PICKER_CAPTURE_CODES,
+  populatedAnswerCaption,
+  salesDisplayNumber,
+  snapshotRatingLines,
   sourceReference,
+  specMatchCandidates,
+  specMatchNotice,
   specModelName,
+  specPickerDiscriminators,
 } from '../src/features/bouwa/wizard/machineSelection.ts';
 import type { WizardSpecRecord } from '../src/features/bouwa/wizard/wizardTypes.ts';
 import { answerCitations } from '../src/features/bouwa/wizard/answerCitations.ts';
 import {
+  MAX_TARIFF_SUGGESTIONS,
   TARIFF_DEPENDENT_FIGURES,
+  TARIFF_LIBRARY_CAPTURE_CODES,
   TARIFF_ROUTE_OPTIONS,
   nextCascadeStep,
+  selectedTariffOriginLabel,
+  shouldAutoApplyTariffSuggestion,
   tariffDetailLines,
   tariffRateLines,
   tariffResultLine,
@@ -78,6 +91,9 @@ import {
   newVersionAction,
   longDate,
   proposalFilename,
+  proposalPrintDownloadEnabled,
+  proposalPrintDownloadReason,
+  proposalVersionUiState,
 } from '../src/features/bouwa/wizard/proposalDocumentPresentation.ts';
 import {
   EVIDENCE_LEVEL_ORDER,
@@ -87,6 +103,28 @@ import {
   nextLevelSentence,
   statementBody,
 } from '../src/features/bouwa/wizard/evidenceLevelPresentation.ts';
+import { readFileSync } from 'node:fs';
+import {
+  altitudeCaption,
+  composeAddress,
+  formatGpsReference,
+  intakeEntriesForLocation,
+  MANUAL_ALTITUDE_NOTE,
+  parseGpsReference,
+  shouldReplaceAltitude,
+  SITE_LOCATION_CAPTURE_CODES,
+  TERRAIN_ALTITUDE_NOTE,
+} from '../src/features/bouwa/wizard/siteLocation.ts';
+import {
+  derivedAnnualHours,
+  derivedWeeklyHours,
+  daysPerWeekProblem,
+  estimatedAnnualUsageKwh,
+  hoursPerDayProblem,
+  OPERATING_SCHEDULE_CAPTURE_CODES,
+  PRELIMINARY_DAYS_PER_MONTH,
+  PRELIMINARY_MONTHS_PER_YEAR,
+} from '../src/features/bouwa/wizard/operatingSchedule.ts';
 import type {
   AuditFieldStatus,
   AuditFormField,
@@ -847,6 +885,34 @@ assert.deepEqual(
   ],
 );
 
+assert.equal(salesDisplayNumber(8.61845, 'bar(g)'), '8.62');
+assert.equal(salesDisplayNumber(19.1988219948, 'm³/min'), '19.20');
+assert.equal(salesDisplayNumber(7, 'bar(g)'), '7');
+assert.equal(salesDisplayNumber(250, 'kW'), '250');
+assert.deepEqual(
+  specPickerDiscriminators({
+    ...bareRecord(),
+    ratedPressureBarG: 8.61845,
+    ratedFadM3PerMin: 19.1988219948,
+    controlMethod: 'fixed_speed_load_unload',
+  }),
+  ['8.62 bar(g)', '19.20 m³/min', 'Fixed speed'],
+);
+assert.deepEqual(
+  snapshotRatingLines({
+    ratedPressureBarG: 8.61845,
+    ratedFadM3PerMin: 19.1988219948,
+    packageInputPowerKw: null,
+    motorShaftPowerKw: null,
+    controlMethod: null,
+  }),
+  [
+    { label: 'Pressure', value: '8.62 bar(g)' },
+    { label: 'FAD', value: '19.20 m³/min' },
+    { label: 'Package input', value: 'Not published by source' },
+  ],
+);
+
 /* A directory line held only on disk has nowhere to send anybody, and a dead
    "View document" link is worse than none. */
 assert.equal(machineEvidenceLink(snapshotOf()), null);
@@ -1448,6 +1514,46 @@ assert.equal(
   1,
   '"not available yet" is offered as a real answer rather than a dead end',
 );
+
+assert.equal(
+  shouldAutoApplyTariffSuggestion({
+    autoSelectRecordId: 'cape-mv-2025',
+    snapshot: null,
+    suppliedRate: null,
+    suggestionDeclined: false,
+  }),
+  true,
+  'a unique remainder may be filled in',
+);
+assert.equal(
+  shouldAutoApplyTariffSuggestion({
+    autoSelectRecordId: 'cape-mv-2025',
+    snapshot: null,
+    suppliedRate: 0.62,
+    suggestionDeclined: false,
+  }),
+  false,
+  'a supplied rate is not overwritten by a library suggestion',
+);
+assert.equal(
+  shouldAutoApplyTariffSuggestion({
+    autoSelectRecordId: 'cape-mv-2025',
+    snapshot: null,
+    suppliedRate: null,
+    suggestionDeclined: true,
+  }),
+  false,
+  'a declined suggestion is not written back',
+);
+assert.equal(
+  selectedTariffOriginLabel('searched_tariff_library'),
+  'Populated from Tariff Library',
+);
+assert.equal(
+  selectedTariffOriginLabel('previously_confirmed_for_customer'),
+  'Previously used for this site',
+);
+assert.equal(MAX_TARIFF_SUGGESTIONS, 5);
 
 /* ------------------------------------------------------------------ *
  * The investment adds up on screen the way the backend adds it up
@@ -2060,7 +2166,7 @@ assert.equal(
 
 assert.match(
   documentStatusLine(proposalDocument(), false),
-  /no version .* has been generated/i,
+  /no proposal version has been generated/i,
   'a document with no version says so plainly',
 );
 assert.match(
@@ -2068,13 +2174,18 @@ assert.match(
     proposalDocument({ version: 2, issuedAt: '2026-08-01T08:00:00.000Z' }),
     true,
   ),
-  /newer than that version/i,
-  'a changed proposal warns that what is shown is ahead of the last version',
+  /generate an updated proposal version/i,
+  'a changed proposal tells the rep to regenerate before printing',
 );
 
 const firstIssue = newVersionAction(proposalDocument(), [], false);
-assert.equal(firstIssue.label, 'Generate new version');
+assert.equal(firstIssue.label, 'Generate proposal');
 assert.equal(firstIssue.enabled, true);
+assert.equal(
+  proposalVersionUiState(proposalDocument(), [], false),
+  'never_generated',
+);
+assert.equal(proposalPrintDownloadEnabled('never_generated'), false);
 
 const issuedVersion = {
   version: 1,
@@ -2099,25 +2210,48 @@ assert.equal(
 );
 assert.match(
   unchanged.detail,
-  /already says exactly this/i,
-  'the rep is told why the button is not available rather than left guessing',
+  /print and download are available/i,
+  'the rep is told the current version can be printed',
 );
+assert.equal(
+  proposalVersionUiState(proposalDocument({ version: 1 }), [issuedVersion], false),
+  'current',
+);
+assert.equal(proposalPrintDownloadEnabled('current'), true);
+
 const changedSince = newVersionAction(
   proposalDocument({ version: 1 }),
   [issuedVersion],
   true,
 );
-assert.equal(
-  changedSince.label,
-  'Generate new version',
-  'the button reads the same wherever a rep finds it',
-);
+assert.equal(changedSince.label, 'Generate updated version');
 assert.equal(changedSince.enabled, true);
 assert.match(
   changedSince.detail,
-  /version 2/,
+  /version 2/i,
   'the rep is told which version generating would produce',
 );
+assert.equal(
+  proposalVersionUiState(proposalDocument({ version: 1 }), [issuedVersion], true),
+  'stale',
+);
+assert.equal(proposalPrintDownloadEnabled('stale'), false);
+assert.match(
+  proposalPrintDownloadReason('stale'),
+  /generate an updated version/i,
+);
+
+const previewSource = readFileSync(
+  'src/features/bouwa/wizard/ProposalPreviewPage.tsx',
+  'utf8',
+);
+assert.match(previewSource, /proposalPrintDownloadEnabled/);
+assert.doesNotMatch(
+  previewSource,
+  /Customer-facing print and download are disabled/,
+);
+assert.match(previewSource, /generatingRef/);
+assert.match(previewSource, /Advanced Technical Review/);
 
 /* ------------------------------------------------------------------ *
  * Where the preview lives
@@ -2227,5 +2361,336 @@ assert.equal(
   }),
   'dates are written the way a South African reader writes them',
 );
+
+/* ------------------------------------------------------------------ *
+ * Phase 1 — map-driven site location
+ * ------------------------------------------------------------------ */
+
+const unanswered = { state: 'unanswered' as const, value: null, note: null };
+const answered = <T,>(value: T, note: string | null = null) => ({
+  state: 'answered' as const,
+  value,
+  note,
+});
+
+assert.deepEqual(parseGpsReference('-24.658238, 30.169335'), {
+  latitude: -24.658238,
+  longitude: 30.169335,
+});
+assert.equal(parseGpsReference('behind the workshop'), null);
+assert.equal(
+  formatGpsReference(-24.6582384, 30.1693351),
+  '-24.658238, 30.169335',
+);
+
+const enrichment = {
+  coordinates: { latitude: -24.658238, longitude: 30.169335 },
+  address: {
+    formatted: 'Steelpoort, Limpopo, South Africa',
+    road: null,
+    houseNumber: null,
+    suburb: null,
+    locality: 'Steelpoort',
+    municipality: 'Greater Tubatse Local Municipality',
+    district: null,
+    province: 'Limpopo',
+    postcode: null,
+    country: 'South Africa',
+    countryCode: 'ZA',
+  },
+  geocodeFailed: false,
+  elevation: {
+    metres: 879,
+    source: 'published_map_reference' as const,
+    provider: 'open_meteo' as const,
+    latitude: -24.658238,
+    longitude: 30.169335,
+    lookedUpAt: '2026-08-21T10:00:00.000Z',
+  },
+  elevationFailed: false,
+};
+
+const fromSearch = intakeEntriesForLocation({
+  enrichment,
+  gpsSource: 'map_lookup',
+  previousGps: null,
+  currentAltitude: unanswered,
+  currentAddress: unanswered,
+});
+assert.deepEqual(
+  Object.fromEntries(fromSearch),
+  {
+    'identity.gpsReference': answered('-24.658238, 30.169335'),
+    'identity.gpsSource': answered('map_lookup'),
+    'identity.physicalAddress': answered('Steelpoort, Limpopo, South Africa'),
+    'identity.municipality': answered('Greater Tubatse Local Municipality'),
+    'siteConditions.altitudeM': answered(879, TERRAIN_ALTITUDE_NOTE),
+    'siteConditions.altitudeSource': answered(
+      'published_map_reference',
+      TERRAIN_ALTITUDE_NOTE,
+    ),
+  },
+  'search/map selection hydrates GPS, address, municipality and terrain altitude',
+);
+
+const clicked = intakeEntriesForLocation({
+  enrichment: {
+    ...enrichment,
+    coordinates: { latitude: -24.7, longitude: 30.2 },
+    elevation: { ...enrichment.elevation!, metres: 900, latitude: -24.7, longitude: 30.2 },
+  },
+  gpsSource: 'map_lookup',
+  previousGps: { latitude: -24.658238, longitude: 30.169335 },
+  currentAltitude: answered(879, TERRAIN_ALTITUDE_NOTE),
+  currentAddress: answered('Steelpoort, Limpopo, South Africa'),
+});
+assert.equal(
+  Object.fromEntries(clicked)['identity.gpsReference']?.value,
+  '-24.700000, 30.200000',
+  'a map click writes the new coordinates',
+);
+assert.equal(
+  Object.fromEntries(clicked)['siteConditions.altitudeM']?.value,
+  900,
+  'moving the pin replaces the previous terrain estimate',
+);
+
+assert.equal(
+  shouldReplaceAltitude(
+    answered(910, MANUAL_ALTITUDE_NOTE),
+    { latitude: -24.658238, longitude: 30.169335 },
+    { latitude: -24.658238, longitude: 30.169335 },
+  ),
+  false,
+  'a typed altitude survives a repeat lookup of the same coordinates',
+);
+assert.equal(
+  shouldReplaceAltitude(
+    answered(910, MANUAL_ALTITUDE_NOTE),
+    { latitude: -24.658238, longitude: 30.169335 },
+    { latitude: -24.7, longitude: 30.2 },
+  ),
+  true,
+  'a new pin still takes the new terrain estimate',
+);
+
+const failed = intakeEntriesForLocation({
+  enrichment: {
+    coordinates: { latitude: -24.658238, longitude: 30.169335 },
+    address: null,
+    geocodeFailed: true,
+    elevation: null,
+    elevationFailed: true,
+  },
+  gpsSource: 'map_lookup',
+  previousGps: null,
+  currentAltitude: unanswered,
+  currentAddress: unanswered,
+});
+assert.equal(
+  Object.fromEntries(failed)['identity.gpsReference']?.value,
+  '-24.658238, 30.169335',
+);
+assert.equal(Object.fromEntries(failed)['siteConditions.altitudeM'], undefined);
+assert.equal(Object.fromEntries(failed)['identity.physicalAddress'], undefined);
+assert.match(
+  altitudeCaption(unanswered, true),
+  /not estimated/i,
+  'API failure leaves altitude for the rep to type',
+);
+
+assert.equal(
+  composeAddress({
+    formatted: null,
+    road: 'Main Road',
+    houseNumber: '123',
+    suburb: null,
+    locality: 'Boksburg',
+    municipality: null,
+    district: null,
+    province: 'Gauteng',
+    postcode: '1459',
+    country: 'South Africa',
+    countryCode: 'ZA',
+  }),
+  '123 Main Road, Boksburg, Gauteng, 1459, South Africa',
+);
+
+assert.ok(SITE_LOCATION_CAPTURE_CODES.includes('AUDIT.SITE.ALTITUDE'));
+assert.ok(SITE_LOCATION_CAPTURE_CODES.includes('AUDIT.IDENTITY.GPS_REFERENCE'));
+
+const siteStepSource = readFileSync(
+  'src/features/bouwa/wizard/steps/CustomerSiteStep.tsx',
+  'utf8',
+);
+const mapSource = readFileSync(
+  'src/features/bouwa/wizard/components/SiteLocationCapture.tsx',
+  'utf8',
+);
+const wizardSource = readFileSync(
+  'src/features/bouwa/wizard/GuidedProposalWizard.tsx',
+  'utf8',
+);
+assert.match(siteStepSource, /SiteLocationCapture/);
+assert.match(mapSource, /react-leaflet/);
+assert.match(mapSource, /geocodeSearch/);
+assert.match(mapSource, /geocodeEnrich/);
+assert.match(mapSource, /useMapEvents/);
+assert.match(mapSource, /draggable/);
+assert.match(mapSource, /dragend/);
+assert.match(mapSource, /MANUAL_ALTITUDE_NOTE/);
+assert.match(mapSource, /site-location-manual-altitude/);
+assert.match(wizardSource, /SITE_LOCATION_CAPTURE_CODES/);
+assert.doesNotMatch(
+  wizardSource,
+  /PHYSICAL_ADDRESS.*engineering/i,
+);
+
+assert.equal(MAX_EXISTING_MACHINE_SPEC_CANDIDATES, 5);
+assert.equal(
+  installedMachineDetail({
+    machineId: 'ars-1',
+    manufacturer: 'Atlas Copco',
+    model: 'GA90-125AP',
+    machineType: 'Compressor',
+    serialNumber: 'API-900-1',
+    assetNumber: null,
+    location: 'Plant 1',
+    ownership: 'customer',
+    yearOfManufacture: 2019,
+    label: 'Atlas Copco GA90-125AP',
+  }),
+  'Serial API-900-1 · Year 2019 · Plant 1',
+);
+assert.equal(
+  populatedAnswerCaption({
+    origin: 'populated_from_source',
+    sourceKind: 'ars_machine_register',
+    sourceLabel: 'ARS machine register — Atlas Copco GA90-125AP',
+    sourceRecordId: 'ars-1',
+    sourceRecordVersion: null,
+    sourceDocumentId: null,
+    sourceValue: 'Atlas Copco',
+    reason: null,
+    byUserId: 'user-rep',
+    byName: 'Rae Rep',
+    at: '2026-08-01T09:00:00.000Z',
+  }),
+  'Populated from ARS machine',
+);
+assert.equal(
+  populatedAnswerCaption({
+    origin: 'populated_from_source',
+    sourceKind: 'machine_spec_library',
+    sourceLabel: 'GA90 CAGI data sheet',
+    sourceRecordId: 'ga90',
+    sourceRecordVersion: 1,
+    sourceDocumentId: 'doc-ga90',
+    sourceValue: 16.14,
+    reason: null,
+    byUserId: 'user-rep',
+    byName: 'Rae Rep',
+    at: '2026-08-01T09:00:00.000Z',
+  }),
+  'Populated from Machine Specification Library',
+);
+assert.equal(
+  specMatchNotice('candidates_require_confirmation'),
+  'Multiple technical configurations found',
+);
+assert.equal(
+  specMatchCandidates({
+    outcome: 'candidates_require_confirmation',
+    explanation: 'Several records',
+    record: null,
+    candidates: Array.from({ length: 7 }, (_, index) => ({
+      recordId: `c-${String(index)}`,
+      distinguishedBy: ['8 bar'],
+    })),
+  } as unknown as Parameters<typeof specMatchCandidates>[0]).length,
+  5,
+);
+
+const pickerSource = readFileSync(
+  'src/features/bouwa/wizard/components/MachinePickers.tsx',
+  'utf8',
+);
+assert.match(pickerSource, /matchSpecLibrary/);
+assert.match(pickerSource, /specMatchNotice/);
+assert.match(pickerSource, /installedMachineDetail/);
+assert.match(pickerSource, /onSelectSpec/);
+
+const fieldSource = readFileSync(
+  'src/features/bouwa/wizard/components/WizardAnswerField.tsx',
+  'utf8',
+);
+assert.match(pickerSource, /specPickerDiscriminators/);
+assert.match(fieldSource, /populatedAnswerCaption/);
+assert.match(fieldSource, /Change for this proposal/);
+assert.match(fieldSource, /salesLockedAnswerText/);
+
+assert.equal(PRELIMINARY_DAYS_PER_MONTH, 30);
+assert.equal(PRELIMINARY_MONTHS_PER_YEAR, 12);
+assert.equal(derivedWeeklyHours(12, 5), 60);
+assert.equal(derivedAnnualHours(12, 5), 12 * ((30 * 5) / 7) * 12);
+assert.equal(derivedWeeklyHours(16, 6), 96);
+assert.equal(derivedAnnualHours(16, 6), 16 * ((30 * 6) / 7) * 12);
+assert.equal(derivedWeeklyHours(24, 7), 168);
+assert.equal(derivedAnnualHours(24, 7), 8640);
+assert.equal(derivedWeeklyHours(10, 4), 40);
+assert.match(hoursPerDayProblem(25) ?? '', /at most 24/);
+assert.match(hoursPerDayProblem(0) ?? '', /greater than 0/);
+assert.match(daysPerWeekProblem(8) ?? '', /at most 7/);
+assert.equal(estimatedAnnualUsageKwh(100_000), 1_200_000);
+assert.ok(
+  OPERATING_SCHEDULE_CAPTURE_CODES.includes('AUDIT.OPERATING.ANNUAL_HOURS'),
+);
+
+const scheduleSource = readFileSync(
+  'src/features/bouwa/wizard/components/OperatingScheduleCapture.tsx',
+  'utf8',
+);
+const scheduleLibSource = readFileSync(
+  'src/features/bouwa/wizard/operatingSchedule.ts',
+  'utf8',
+);
+assert.match(wizardSource, /operating_schedule/);
+assert.match(wizardSource, /OperatingScheduleCapture/);
+assert.match(wizardSource, /OPERATING_SCHEDULE_CAPTURE_CODES/);
+assert.match(scheduleSource, /Hours per operating day/);
+assert.match(scheduleLibSource, /Mon–Fri/);
+assert.match(scheduleLibSource, /Mon–Sat/);
+assert.match(scheduleLibSource, /Every day/);
+assert.match(scheduleSource, /30-day month/);
+assert.doesNotMatch(scheduleSource, /52 weeks/);
+assert.doesNotMatch(scheduleSource, /confirmer|approver/i);
+
+assert.ok(
+  MACHINE_PICKER_CAPTURE_CODES.includes('AUDIT.EXISTING_MACHINE.SELECTION_MODE'),
+);
+assert.ok(
+  MACHINE_PICKER_CAPTURE_CODES.includes('AUDIT.PROPOSED_MACHINE.ARS_MACHINE_ID'),
+);
+assert.equal(TARIFF_LIBRARY_CAPTURE_CODES.length, 9);
+assert.ok(TARIFF_LIBRARY_CAPTURE_CODES.includes('AUDIT.TARIFF.SUPPLIER'));
+assert.ok(!TARIFF_LIBRARY_CAPTURE_CODES.includes('AUDIT.TARIFF.SUPPLIED_ENERGY_RATE'));
+assert.match(wizardSource, /MACHINE_PICKER_CAPTURE_CODES/);
+assert.match(wizardSource, /TARIFF_LIBRARY_CAPTURE_CODES/);
+assert.doesNotMatch(wizardSource, /SourceStatedValuesEditor/);
+
+const reviewSource = readFileSync(
+  'src/features/bouwa/wizard/steps/ReviewStep.tsx',
+  'utf8',
+);
+assert.match(reviewSource, /SourceStatedValuesEditor/);
+assert.match(reviewSource, /Technical records \(optional\)/);
+assert.match(reviewSource, /nextActionLabel/);
+
+const fleetSource = readFileSync(
+  'src/features/bouwa/wizard/components/FleetGroupsEditor.tsx',
+  'utf8',
+);
+assert.match(fleetSource, /label: 'Unknown'/);
+assert.doesNotMatch(fleetSource, /confirmation required/);
 
 console.log('Bouwa guided-wizard state checks passed.');

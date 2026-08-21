@@ -238,6 +238,8 @@ export interface WizardMachineSelectionResult extends WizardDraftView {
   populated: string[];
   /** Intake paths the chosen source was consulted for and left unanswered. */
   notPublished: string[];
+  /** Present when an ARS machine was selected. Never chooses a variant itself. */
+  specMatch?: WizardSpecMatch;
 }
 
 export interface WizardSpecValueChange {
@@ -362,6 +364,42 @@ export interface WizardTariffSnapshot {
 export interface WizardTariffSelection {
   route: WizardTariffRoute | null;
   snapshot: WizardTariffSnapshot | null;
+  suggestionDeclined?: boolean;
+}
+
+export type WizardTariffCandidateOrigin =
+  | 'previous_site'
+  | 'previous_customer'
+  | 'known_supplier'
+  | 'location_supplier';
+
+export interface WizardTariffSuggestion {
+  recordId: string;
+  tariffKey: string;
+  supplier: string;
+  tariffName: string;
+  tariffYearLabel: string;
+  voltageCategory: string | null;
+  customerCategory: string | null;
+  origin: WizardTariffCandidateOrigin;
+  reasons: string[];
+  record: WizardTariffRecord | null;
+}
+
+export interface WizardTariffSuggestions {
+  autoSelectRecordId: string | null;
+  autoSelectRoute: WizardTariffRoute | null;
+  noConfidentMatch: boolean;
+  needsDiscriminator: 'supply_authority' | 'voltage' | null;
+  voltageOptions: string[];
+  basedOn: string[];
+  matchedSuppliers: { name: string; supplierType: string; reason: string }[];
+  maxCandidates: number;
+  candidates: WizardTariffSuggestion[];
+  fallback: {
+    suppliedRateAvailable: boolean;
+    manualSearchAvailable: boolean;
+  };
 }
 
 export interface WizardTariffSelectionResult extends WizardDraftView {
@@ -1070,6 +1108,7 @@ export interface WizardInstalledMachine {
   assetNumber: string | null;
   location: string | null;
   ownership: string | null;
+  yearOfManufacture: number | null;
   label: string;
 }
 

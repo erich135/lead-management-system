@@ -35,8 +35,8 @@ import { TariffPicker } from './components/TariffPicker';
 import { InvestmentPanel } from './components/InvestmentPanel';
 import { FleetGroupsEditor } from './components/FleetGroupsEditor';
 import { OperatingProfileEditor } from './components/OperatingProfileEditor';
+import { OperatingScheduleCapture } from './components/OperatingScheduleCapture';
 import { CommercialScenarioEditor } from './components/CommercialScenarioEditor';
-import { SourceStatedValuesEditor } from './components/SourceStatedValuesEditor';
 import { fetchPriceSuggestions } from './wizardApi';
 import { EquipmentPicker } from './components/EquipmentPicker';
 import {
@@ -50,6 +50,10 @@ import { WizardEvidenceGroups } from './components/WizardEvidenceGroups';
 import { WizardReadinessStrip } from './components/WizardReadinessSummary';
 import { WizardFooter, WizardShell } from './components/WizardShell';
 import { CUSTOMER_SITE_SELECTOR_CODES } from './customerSiteSelection';
+import { SITE_LOCATION_CAPTURE_CODES } from './siteLocation';
+import { OPERATING_SCHEDULE_CAPTURE_CODES } from './operatingSchedule';
+import { MACHINE_PICKER_CAPTURE_CODES } from './machineSelection';
+import { TARIFF_LIBRARY_CAPTURE_CODES } from './tariffSelection';
 import { CustomerSiteStep } from './steps/CustomerSiteStep';
 import { DocumentsScreen } from './steps/DocumentsScreen';
 import { ManualBasisStep } from './steps/ManualBasisStep';
@@ -91,6 +95,7 @@ type Screen =
   | { kind: 'tariff'; fields: WizardFieldView[] }
   | { kind: 'investment'; fields: WizardFieldView[] }
   | { kind: 'benchmark_profile' }
+  | { kind: 'operating_schedule' }
   | {
       kind: 'equipment';
       equipmentType: WizardEquipmentType;
@@ -130,18 +135,36 @@ function screensForStep(
     // The four questions the selectors answer are never shown as boxes, and
     // what remains of the identity section shares the selectors' screen.
     const remaining = all.filter(
-      view => !CUSTOMER_SITE_SELECTOR_CODES.includes(view.field.code),
+      view =>
+        !CUSTOMER_SITE_SELECTOR_CODES.includes(view.field.code) &&
+        !(SITE_LOCATION_CAPTURE_CODES as readonly string[]).includes(
+          view.field.code,
+        ),
     );
     const identity = remaining.filter(view => view.status.section === 'identity');
     const rest = remaining.filter(view => view.status.section !== 'identity');
     return [{ kind: 'customer_site', fields: identity }, ...fieldScreens(rest)];
   }
 
+  if (step.id === 'existing_system' || step.id === 'proposed_solution') {
+    const visible = all.filter(
+      view =>
+        !(MACHINE_PICKER_CAPTURE_CODES as readonly string[]).includes(
+          view.field.code,
+        ),
+    );
+    const kind =
+      step.id === 'existing_system' ? 'existing_machine' : 'proposed_machine';
+    return [
+      {
+        kind,
+        fields: visible.slice(0, 3),
+      },
+      ...fieldScreens(visible.slice(3)),
+    ];
+  }
+
   const pages = fieldScreens(all);
-  const withPicker = (kind: 'existing_machine' | 'proposed_machine'): Screen[] => [
-    { kind, fields: pages[0]?.kind === 'fields' ? pages[0].fields.slice(0, 3) : [] },
-    ...fieldScreens(all.slice(3)),
-  ];
 
   // Each instrument is offered from the catalogue where its own questions
   // start, so the picker is next to the answers it fills rather than at the
@@ -176,16 +199,31 @@ function screensForStep(
       },
       ...pages.slice(1),
     ];
-  if (step.id === 'existing_system') return withPicker('existing_machine');
-  if (step.id === 'proposed_solution') return withPicker('proposed_machine');
-  if (step.id === 'operating_profile')
-    return [{ kind: 'benchmark_profile' }, ...moreFieldScreens(all)];
+  if (step.id === 'operating_profile') {
+    const remaining = all.filter(
+      view =>
+        !(OPERATING_SCHEDULE_CAPTURE_CODES as readonly string[]).includes(
+          view.field.code,
+        ),
+    );
+    return [
+      { kind: 'operating_schedule' },
+      { kind: 'benchmark_profile' },
+      ...moreFieldScreens(remaining),
+    ];
+  }
   // The documents belong with the questions whose evidence they are, and the
   // tariff and investment answers are the last ones asked before the review.
   // The tariff is chosen from the register rather than described, so its
   // questions sit under the selector that answers them.
   if (step.id === 'tariff_investment') {
-    const tariff = all.filter(view => view.status.section === 'tariff');
+    const tariff = all.filter(
+      view =>
+        view.status.section === 'tariff' &&
+        !(TARIFF_LIBRARY_CAPTURE_CODES as readonly string[]).includes(
+          view.field.code,
+        ),
+    );
     const investment = all.filter(view => view.status.section === 'investment');
     const rest = all.filter(
       view =>
@@ -683,8 +721,24 @@ export function GuidedProposalWizard({
         ) : screen.kind === 'tariff' ? (
           <div className="space-y-3">
             <TariffPicker
+              draftId={view.draft.draftId}
               snapshot={view.draft.tariffSelection?.snapshot ?? null}
               route={view.draft.tariffSelection?.route ?? null}
+              suggestionDeclined={
+                view.draft.tariffSelection?.suggestionDeclined === true
+              }
+              suppliedRate={
+                (() => {
+                  const answer = readAnswerAtPath(
+                    intake,
+                    'tariff.suppliedEnergyRateRandPerKwh',
+                  );
+                  return answer?.state === 'answered' &&
+                    typeof answer.value === 'number'
+                    ? answer.value
+                    : null;
+                })()
+              }
               disabled={!mayEdit}
               onChoose={(record, route, evidenceReference) =>
                 void draft.selectTariff({
@@ -754,14 +808,6 @@ export function GuidedProposalWizard({
                 draft.setIntakeCollections({ commercialScenarios })
               }
             />
-            <SourceStatedValuesEditor
-              values={intake.sourceStatedValues}
-              evidence={intake.evidence}
-              disabled={!mayEdit}
-              onChange={sourceStatedValues =>
-                draft.setIntakeCollections({ sourceStatedValues })
-              }
-            />
           </InvestmentPanel>
         ) : screen.kind === 'equipment' ? (
           <div className="space-y-3">
@@ -797,6 +843,12 @@ export function GuidedProposalWizard({
               ))}
             </div>
           </div>
+        ) : screen.kind === 'operating_schedule' ? (
+          <OperatingScheduleCapture
+            intake={intake}
+            disabled={!mayEdit}
+            onAnswerMany={draft.answerMany}
+          />
         ) : screen.kind === 'benchmark_profile' ? (
           <OperatingProfileEditor
             segments={intake.operatingProfileSegments}
@@ -859,6 +911,11 @@ export function GuidedProposalWizard({
             disabled={!mayEdit}
             onClaimsChange={claimAssessments =>
               draft.setIntakeCollections({ claimAssessments })
+            }
+            sourceStatedValues={intake.sourceStatedValues}
+            evidence={intake.evidence}
+            onSourceStatedValuesChange={sourceStatedValues =>
+              draft.setIntakeCollections({ sourceStatedValues })
             }
             onOpenTechnicalReview={() => {
               // The review reads the stored draft, so anything outstanding is

@@ -5149,6 +5149,7 @@ export default {
   // Geocoding proxy
   geocodeSearch,
   geocodeReverse,
+  geocodeEnrich,
 };
 
 // ============================================================
@@ -5166,9 +5167,12 @@ export interface GeoSearchResult {
     suburb?: string;
     city?: string;
     town?: string;
+    municipality?: string;
+    county?: string;
     state?: string;
     postcode?: string;
     country?: string;
+    country_code?: string;
   };
 }
 
@@ -5188,6 +5192,46 @@ export async function geocodeReverse(lat: number, lon: number): Promise<{ displa
   const params = new URLSearchParams({ lat: lat.toString(), lon: lon.toString() });
   const response = await apiRequest<{ display_name: string; lat: string; lon: string; address?: any }>(`/api/geocode/reverse?${params}`, { method: 'GET' });
   return response;
+}
+
+export interface SiteLocationEnrichmentResponse {
+  coordinates: { latitude: number; longitude: number };
+  address: {
+    formatted: string | null;
+    road: string | null;
+    houseNumber: string | null;
+    suburb: string | null;
+    locality: string | null;
+    municipality: string | null;
+    district: string | null;
+    province: string | null;
+    postcode: string | null;
+    country: string | null;
+    countryCode: string | null;
+  } | null;
+  geocodeFailed: boolean;
+  elevation: {
+    metres: number;
+    source: 'published_map_reference';
+    provider: 'open_meteo';
+    latitude: number;
+    longitude: number;
+    lookedUpAt: string;
+  } | null;
+  elevationFailed: boolean;
+}
+
+/**
+ * Reverse-geocode and look up terrain elevation for one map or search action.
+ */
+export async function geocodeEnrich(
+  lat: number,
+  lon: number,
+): Promise<SiteLocationEnrichmentResponse> {
+  const params = new URLSearchParams({ lat: lat.toString(), lon: lon.toString() });
+  return apiRequest<SiteLocationEnrichmentResponse>(`/api/geocode/enrich?${params}`, {
+    method: 'GET',
+  });
 }
 
 

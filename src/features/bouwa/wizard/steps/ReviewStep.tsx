@@ -9,11 +9,14 @@
 import { CheckCircle2, FileText, AlertTriangle, Microscope } from 'lucide-react';
 
 import type {
+  AuditEvidenceReference,
   AuditIntakeFormModel,
   AuditReadinessAssessment,
   ClaimAssessmentInput,
+  SourceStatedValueRecord,
 } from '../../auditIntakeTypes';
 import { ClaimAssessmentEditor } from '../components/ClaimAssessmentEditor';
+import { SourceStatedValuesEditor } from '../components/SourceStatedValuesEditor';
 import { EvidenceLevelBadge } from '../components/EvidenceLevelBadge';
 import { BaofnCalculatorComparison } from '../components/BaofnCalculatorComparison';
 import { proposalOutcomeCopy, firstOutstandingFieldLabel, reviewTriage } from '../reviewTriage';
@@ -37,6 +40,9 @@ export interface ReviewStepProps {
   claims: ClaimAssessmentInput[];
   disabled: boolean;
   onClaimsChange: (claims: ClaimAssessmentInput[]) => void;
+  sourceStatedValues?: SourceStatedValueRecord[];
+  evidence?: AuditEvidenceReference[];
+  onSourceStatedValuesChange?: (values: SourceStatedValueRecord[]) => void;
   salesOutstandingCount?: number;
   salesOutstandingCodes?: readonly string[];
 }
@@ -54,6 +60,9 @@ export function ReviewStep({
   claims,
   disabled,
   onClaimsChange,
+  sourceStatedValues = [],
+  evidence = [],
+  onSourceStatedValuesChange,
   salesOutstandingCount = 0,
   salesOutstandingCodes = [],
 }: ReviewStepProps) {
@@ -244,6 +253,14 @@ export function ReviewStep({
             disabled={disabled}
             onChange={onClaimsChange}
           />
+          {onSourceStatedValuesChange === undefined ? null : (
+            <SourceStatedValuesEditor
+              values={sourceStatedValues}
+              evidence={evidence}
+              disabled={disabled}
+              onChange={onSourceStatedValuesChange}
+            />
+          )}
           <button
             type="button"
             onClick={onOpenTechnicalReview}

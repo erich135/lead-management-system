@@ -1,21 +1,17 @@
 /**
  * Choosing the tariff the proposal is costed on.
  *
- * A rep is asked one plain question — how the tariff arrived — and then
- * narrowed down a cascade of the register's own choices. They never type a
- * supply authority, a voltage category or a transmission zone, because those
- * are the register's words and a rep guessing at them costs a proposal on a
- * tariff the customer is not on.
- *
- * "Not available yet" is a first-class answer. It says out loud which figures
- * cannot be given until a bill arrives, rather than letting the proposal print
- * a rand saving nobody can support.
+ * Suggested records from site location and previous proposals come first. The
+ * salesperson is not dropped into the full register unless they open a search.
+ * Location never proves who bills the site, so a unique remainder is the only
+ * case that is filled in automatically.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Check, Loader2, Receipt, Search } from 'lucide-react';
 
 import {
+  fetchTariffSuggestions,
   searchTariffLibrary,
   tariffLibraryFacet,
   type TariffLibraryQuery,
@@ -26,6 +22,9 @@ import {
   TARIFF_ROUTE_OPTIONS,
   cascadeQuestion,
   nextCascadeStep,
+  selectedTariffOriginLabel,
+  shouldAutoApplyTariffSuggestion,
+  suggestionOriginLabel,
   tariffDetailLines,
   tariffRateLines,
   tariffResultLine,
@@ -38,21 +37,37 @@ import type {
   WizardTariffRecord,
   WizardTariffRoute,
   WizardTariffSnapshot,
+  WizardTariffSuggestions,
 } from '../wizardTypes';
 
 type FacetState = Partial<Record<WizardTariffFacetField, WizardTariffFacetValue[]>>;
 
+const SUPPLY_AUTHORITY_OPTIONS: {
+  id: 'national_utility' | 'municipality' | 'not_sure';
+  label: string;
+}[] = [
+  { id: 'national_utility', label: 'Eskom' },
+  { id: 'municipality', label: 'Municipality' },
+  { id: 'not_sure', label: 'Not sure' },
+];
+
 export function TariffPicker({
+  draftId,
   snapshot,
   route,
+  suppliedRate,
+  suggestionDeclined,
   disabled,
   onChoose,
   onUnavailable,
   onClear,
   onUploadBill,
 }: {
+  draftId: string;
   snapshot: WizardTariffSnapshot | null;
   route: WizardTariffRoute | null;
+  suppliedRate: number | null;
+  suggestionDeclined: boolean;
   disabled: boolean;
   onChoose: (
     record: WizardTariffRecord,
@@ -73,14 +88,87 @@ export function TariffPicker({
   const [preview, setPreview] = useState<WizardTariffRecord | null>(null);
   const [billReference, setBillReference] = useState('');
   const [uploadingBill, setUploadingBill] = useState(false);
+  const [suggestions, setSuggestions] = useState<WizardTariffSuggestions | null>(
+    null,
+  );
+  const [suggesting, setSuggesting] = useState(false);
+  const [supplyAuthority, setSupplyAuthority] = useState<
+    'national_utility' | 'municipality' | 'not_sure' | null
+  >(null);
+  const [voltageFilter, setVoltageFilter] = useState<string | null>(null);
+  const [showManualSearch, setShowManualSearch] = useState(false);
+  const autoApplied = useRef(false);
 
   const searching =
     chosenRoute === 'searched_tariff_library' ||
     chosenRoute === 'customer_bill_supplied' ||
-    chosenRoute === 'previously_confirmed_for_customer';
+    chosenRoute === 'previously_confirmed_for_customer' ||
+    showManualSearch;
 
   const query: TariffLibraryQuery = { ...choices, search: search.trim() || undefined };
   const queryKey = JSON.stringify(query);
+
+  useEffect(() => {
+    if (snapshot !== null) return;
+    let live = true;
+    setSuggesting(true);
+    void fetchTariffSuggestions(draftId, {
+      supplyAuthority,
+      voltageCategory: voltageFilter,
+    })
+      .then(next => {
+        if (!live) return;
+        setSuggestions(next);
+      })
+      .catch(() => {
+        if (live) setProblem('Suggested tariffs could not be read.');
+      })
+      .finally(() => {
+        if (live) setSuggesting(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, [draftId, snapshot, supplyAuthority, voltageFilter]);
+
+  useEffect(() => {
+    if (disabled || snapshot !== null || suggestions === null) return;
+    if (autoApplied.current) return;
+    if (
+      !shouldAutoApplyTariffSuggestion({
+        autoSelectRecordId: suggestions.autoSelectRecordId,
+        snapshot,
+        suppliedRate,
+        suggestionDeclined,
+      })
+    )
+      return;
+    const chosen = suggestions.candidates.find(
+      candidate => candidate.recordId === suggestions.autoSelectRecordId,
+    )?.record;
+    const appliedRoute = suggestions.autoSelectRoute;
+    if (chosen === null || chosen === undefined || appliedRoute === null) return;
+    autoApplied.current = true;
+    onChoose(chosen, appliedRoute, null);
+  }, [
+    disabled,
+    snapshot,
+    suggestions,
+    suppliedRate,
+    suggestionDeclined,
+    onChoose,
+  ]);
+
+  useEffect(() => {
+    if (supplyAuthority !== 'national_utility') return;
+    if (suggestions === null) return;
+    if (suggestions.candidates.length > 0) return;
+    setShowManualSearch(true);
+    setChosenRoute('searched_tariff_library');
+    setChoices(held =>
+      held.supplier === 'Eskom' ? held : { ...held, supplier: 'Eskom' },
+    );
+  }, [supplyAuthority, suggestions]);
 
   useEffect(() => {
     if (!searching) return;
@@ -89,8 +177,7 @@ export function TariffPicker({
     setProblem('');
     const timer = setTimeout(() => {
       const step = nextCascadeStep(choices, facets);
-      const wanted: WizardTariffFacetField[] =
-        step === null ? [] : [step];
+      const wanted: WizardTariffFacetField[] = step === null ? [] : [step];
       Promise.all([
         searchTariffLibrary({ ...query, limit: 25 }),
         ...wanted.map(field =>
@@ -132,15 +219,27 @@ export function TariffPicker({
     return (
       <ChosenTariff
         snapshot={snapshot}
+        route={route}
         disabled={disabled}
         onClear={() => {
+          autoApplied.current = true;
           setChosenRoute(null);
           setChoices({});
           setPreview(null);
+          setShowManualSearch(false);
           onClear();
         }}
       />
     );
+
+  const suggestedRecords = (suggestions?.candidates ?? []).filter(
+    candidate => candidate.record !== null,
+  );
+  const uniqueSuggestion =
+    suggestions?.autoSelectRecordId !== null &&
+    suggestions?.candidates.length === 1
+      ? suggestions.candidates[0]
+      : null;
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
@@ -149,12 +248,156 @@ export function TariffPicker({
         Electricity tariff
       </p>
       <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
-        The rate the site actually pays. Choosing the published determination
-        fills the supplier, category, voltage, zone, rates and effective dates,
-        and records the document they came from.
+        Suggested from the site location and any tariff this site already used.
+        Location does not prove who bills the site, so a suggestion is confirmed
+        before the proposal is costed on it.
       </p>
 
-      <p className="mt-2 text-xs font-medium text-slate-700">
+      {suggesting ? (
+        <p className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-500">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          Finding likely tariffs…
+        </p>
+      ) : null}
+
+      {suggestions?.basedOn.length ? (
+        <p className="mt-2 text-[11px] text-slate-500">
+          Based on: {suggestions.basedOn.join(' / ')}
+        </p>
+      ) : null}
+
+      {suggestions?.noConfidentMatch ? (
+        <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2">
+          <p className="text-xs font-medium text-amber-900">
+            No confident tariff-library match found.
+          </p>
+          <p className="mt-0.5 text-[11px] text-amber-800">
+            Enter a supplied electricity rate below, search the library, or leave
+            the tariff outstanding. Engineering comparisons can continue.
+          </p>
+        </div>
+      ) : null}
+
+      {suggestions?.needsDiscriminator === 'supply_authority' ? (
+        <div className="mt-2">
+          <p className="text-xs font-medium text-slate-700">Supply authority</p>
+          <p className="text-[11px] text-slate-500">
+            A site inside a municipality may still be billed by Eskom.
+          </p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {SUPPLY_AUTHORITY_OPTIONS.map(option => (
+              <button
+                key={option.id}
+                type="button"
+                disabled={disabled}
+                onClick={() => setSupplyAuthority(option.id)}
+                className={`rounded-md border px-2 py-1 text-[11px] font-medium ${
+                  supplyAuthority === option.id
+                    ? 'border-ars-primary bg-blue-50 text-slate-800'
+                    : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                } disabled:opacity-50`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {suggestions?.needsDiscriminator === 'voltage' &&
+      (suggestions.voltageOptions.length > 0) ? (
+        <div className="mt-2">
+          <p className="text-xs font-medium text-slate-700">Supply voltage</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {suggestions.voltageOptions.map(value => (
+              <button
+                key={value}
+                type="button"
+                disabled={disabled}
+                onClick={() => setVoltageFilter(value)}
+                className={`rounded-md border px-2 py-1 text-[11px] font-medium ${
+                  voltageFilter === value
+                    ? 'border-ars-primary bg-blue-50 text-slate-800'
+                    : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                } disabled:opacity-50`}
+              >
+                {value}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {uniqueSuggestion?.record ? (
+        <div className="mt-2 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-2">
+          <p className="text-xs font-medium text-blue-900">Suggested tariff</p>
+          <p className="mt-0.5 text-xs font-medium text-slate-800">
+            {tariffResultLine(uniqueSuggestion.record)}
+          </p>
+          <p className="text-[11px] text-blue-800">
+            {suggestionOriginLabel(uniqueSuggestion.origin)}
+          </p>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() =>
+              uniqueSuggestion.record &&
+              onChoose(
+                uniqueSuggestion.record,
+                suggestions?.autoSelectRoute ?? 'searched_tariff_library',
+                null,
+              )
+            }
+            className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-ars-primary px-2.5 py-1 text-[11px] font-medium text-white disabled:opacity-50"
+          >
+            <Check className="h-3 w-3" />
+            Use this tariff
+          </button>
+        </div>
+      ) : suggestedRecords.length > 0 ? (
+        <div className="mt-2">
+          <p className="text-xs font-medium text-slate-700">Suggested tariffs</p>
+          <ul className="mt-1.5 space-y-1">
+            {suggestedRecords.map(candidate => (
+              <li key={candidate.recordId}>
+                <button
+                  type="button"
+                  disabled={disabled || candidate.record === null}
+                  onClick={() =>
+                    candidate.record !== null && setPreview(candidate.record)
+                  }
+                  className={`flex w-full items-start justify-between gap-3 rounded-md border px-2.5 py-1.5 text-left text-xs ${
+                    preview?.recordId === candidate.recordId
+                      ? 'border-ars-primary bg-blue-50'
+                      : 'border-slate-200 hover:bg-slate-50'
+                  } disabled:opacity-50`}
+                >
+                  <span className="min-w-0">
+                    <span className="block font-medium text-slate-800">
+                      {candidate.record
+                        ? tariffResultLine(candidate.record)
+                        : candidate.tariffName}
+                    </span>
+                    <span className="block text-[11px] text-slate-500">
+                      {suggestionOriginLabel(candidate.origin)}
+                      {candidate.reasons[0] ? ` · ${candidate.reasons[0]}` : ''}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {suppliedRate !== null && snapshot === null ? (
+        <p className="mt-2 text-[11px] text-slate-500">
+          Estimated/manual rate currently on this proposal: R{suppliedRate.toFixed(2)}/kWh
+          supplied for this proposal.
+        </p>
+      ) : null}
+
+      <p className="mt-3 text-xs font-medium text-slate-700">
         How will the electricity tariff be supplied?
       </p>
       <div className="mt-1.5 space-y-1">
@@ -166,6 +409,8 @@ export function TariffPicker({
             onClick={() => {
               setChosenRoute(option.id);
               setPreview(null);
+              if (option.id === 'searched_tariff_library')
+                setShowManualSearch(true);
               if (option.id === 'not_available_yet') onUnavailable();
             }}
             className={`flex w-full items-start justify-between gap-3 rounded-md border px-2.5 py-1.5 text-left text-xs ${
@@ -235,6 +480,25 @@ export function TariffPicker({
         </p>
       ) : null}
 
+      {!showManualSearch && chosenRoute !== 'searched_tariff_library' ? (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => {
+            setShowManualSearch(true);
+            setChosenRoute('searched_tariff_library');
+            const municipal = suggestions?.matchedSuppliers.find(
+              supplier => supplier.supplierType === 'municipality',
+            );
+            if (municipal !== undefined && choices.supplier === undefined)
+              setChoices(held => ({ ...held, supplier: municipal.name }));
+          }}
+          className="mt-2 text-[11px] font-medium text-ars-primary hover:underline disabled:opacity-50"
+        >
+          Search the tariff library
+        </button>
+      ) : null}
+
       {searching ? (
         <div className="mt-2 border-t border-slate-200 pt-2">
           <Cascade
@@ -260,7 +524,7 @@ export function TariffPicker({
               disabled={disabled}
               value={search}
               onChange={event => setSearch(event.target.value)}
-              placeholder="Tariff name or code — for example Megaflex"
+              placeholder="Supplier, municipality, tariff name, code, voltage or category"
               className="w-full rounded-md border border-slate-300 py-1.5 pl-8 pr-8 text-sm disabled:bg-slate-100"
             />
             {loading ? (
@@ -274,7 +538,7 @@ export function TariffPicker({
           {!loading && records.length === 0 ? (
             <p className="mt-1.5 text-xs text-slate-500">
               Nothing in the library matches those choices yet. Widen the
-              narrowing above, or record the tariff as not available yet.
+              narrowing above, or enter a supplied electricity rate below.
             </p>
           ) : null}
 
@@ -311,14 +575,25 @@ export function TariffPicker({
               onConfirm={() =>
                 onChoose(
                   preview,
-                  chosenRoute ?? 'searched_tariff_library',
+                  chosenRoute === 'customer_bill_supplied' ||
+                    chosenRoute === 'previously_confirmed_for_customer'
+                    ? chosenRoute
+                    : 'searched_tariff_library',
                   billReference.trim() || null,
                 )
               }
             />
           )}
         </div>
-      ) : null}
+      ) : preview === null ? null : (
+        <TariffConfirmation
+          record={preview}
+          disabled={disabled}
+          onConfirm={() =>
+            onChoose(preview, 'searched_tariff_library', null)
+          }
+        />
+      )}
     </div>
   );
 }
@@ -385,7 +660,6 @@ function Cascade({
   );
 }
 
-/** What the register printed, shown before the rep commits to it. */
 function TariffConfirmation({
   record,
   disabled,
@@ -440,10 +714,12 @@ function TariffConfirmation({
 
 function ChosenTariff({
   snapshot,
+  route,
   disabled,
   onClear,
 }: {
   snapshot: WizardTariffSnapshot;
+  route: WizardTariffRoute | null;
   disabled: boolean;
   onClear: () => void;
 }) {
@@ -452,6 +728,9 @@ function ChosenTariff({
       <p className="flex items-center gap-2 text-sm font-medium text-slate-800">
         <Receipt className="h-4 w-4 text-ars-primary" />
         Electricity tariff
+      </p>
+      <p className="mt-1 text-[11px] font-medium text-ars-primary">
+        {selectedTariffOriginLabel(route)}
       </p>
       <p className="mt-1 text-xs font-medium text-slate-700">
         {tariffSnapshotLine(snapshot)}
@@ -472,7 +751,7 @@ function ChosenTariff({
         onClick={onClear}
         className="mt-1.5 text-[11px] font-medium text-ars-primary hover:underline disabled:opacity-50"
       >
-        Choose a different tariff
+        Change for this proposal
       </button>
     </div>
   );

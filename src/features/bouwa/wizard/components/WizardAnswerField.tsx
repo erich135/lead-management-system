@@ -30,9 +30,9 @@ import type {
   IntakeAnswer,
   IntakeAnswerState,
 } from '../../auditIntakeTypes';
+import { populatedAnswerCaption, salesLockedAnswerText } from '../machineSelection';
 import { acceptedFormat, conceptForField, leadSentence } from '../wizardHelp';
 import type { WizardFieldView } from '../wizardState';
-import { ANSWER_ORIGIN_LABELS } from '../wizardTypes';
 
 const STATE_BUTTON_LABELS: Partial<Record<IntakeAnswerState, string>> = {
   unknown_confirmation_required: 'Unknown',
@@ -70,6 +70,13 @@ function describeValue(field: AuditFormField, value: unknown): string {
   if (field.valueKind === 'selection') {
     const option = field.options.find(entry => entry.value === value);
     return option?.label ?? String(value);
+  }
+  if (typeof value === 'number') {
+    const shown = salesLockedAnswerText(value, displayUnit(field), '');
+    if (shown !== '') {
+      const unitLabel = displayUnit(field);
+      return unitLabel === null ? shown : `${shown} ${unitLabel}`;
+    }
   }
   if (field.entry !== null && typeof value === 'number')
     return `${enteredFromStored(field.entry.conversion, value)} ${field.entry.unit}`;
@@ -242,7 +249,7 @@ export function WizardAnswerField({
           }`}
         >
           <span className="font-medium">
-            {ANSWER_ORIGIN_LABELS[provenance.origin]}
+            {populatedAnswerCaption(provenance)}
           </span>
           {' — '}
           {provenance.sourceLabel}
@@ -270,7 +277,11 @@ export function WizardAnswerField({
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md bg-slate-50 px-2.5 py-1.5 text-sm text-slate-700">
               <Lock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
               <span className="font-mono text-xs">
-                {enteredTextForAnswer(field, stored) || '—'}
+                {salesLockedAnswerText(
+                  stored?.value,
+                  unit,
+                  enteredTextForAnswer(field, stored) || '—',
+                )}
               </span>
               {unit === null ? null : (
                 <span className="text-[11px] text-slate-500">{unit}</span>

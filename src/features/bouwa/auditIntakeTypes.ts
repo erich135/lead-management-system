@@ -598,8 +598,11 @@ export interface AuditOperatingConditions {
   annualOperatingHoursConfirmedOn: IntakeAnswer<string>;
   annualOperatingHoursEvidenceNotes: IntakeAnswer<string>;
   annualOperatingHoursApprover: IntakeAnswer<string>;
+  hoursPerOperatingDay: IntakeAnswer<number>;
   operatingDaysPerWeek: IntakeAnswer<number>;
   shiftsPerDay: IntakeAnswer<number>;
+  monthlyElectricityUsageKwh: IntakeAnswer<number>;
+  estimatedAnnualElectricityUsageKwh: IntakeAnswer<number>;
   representativePeriodStatus: IntakeAnswer<
     'representative_confirmed' | 'approved_assumption' | 'not_representative'
   >;

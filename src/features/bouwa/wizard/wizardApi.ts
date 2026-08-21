@@ -39,6 +39,7 @@ import type {
   WizardTariffRecord,
   WizardTariffRoute,
   WizardTariffSelectionResult,
+  WizardTariffSuggestions,
 } from './wizardTypes';
 import type {
   AuditEvidenceType,
@@ -679,6 +680,22 @@ export async function fetchTariffRecord(recordId: string): Promise<{
  * arrived. As with machines, the browser names the record and the server
  * decides what it answers.
  */
+export async function fetchTariffSuggestions(
+  draftId: string,
+  query: {
+    supplyAuthority?: string | null;
+    voltageCategory?: string | null;
+    customerCategory?: string | null;
+  } = {},
+): Promise<WizardTariffSuggestions> {
+  const body = await requestJson(
+    `/drafts/${encodeURIComponent(draftId)}/tariff-suggestions${queryString({
+      ...query,
+    })}`,
+  );
+  return body as unknown as WizardTariffSuggestions;
+}
+
 export async function selectWizardTariff(
   draftId: string,
   request: {

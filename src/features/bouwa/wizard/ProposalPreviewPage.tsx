@@ -12,9 +12,12 @@
  *
  * The document is read from the backend on every visit and is never assembled
  * here. Print and download both capture the same rendered element, so a printed
- * page and a downloaded PDF cannot disagree. The downloaded file is also sent
- * back and kept against its version, so the proposal list can hand it over
- * later and a restart does not lose it.
+ * page and a downloaded PDF cannot disagree. They are offered only when the
+ * latest generated version still matches the current answers, so a newer draft
+ * cannot be printed under an older version number. Customer-quote status is
+ * printed on the document; it does not disable those buttons. The downloaded
+ * file is also sent back and kept against its version, so the proposal list can
+ * hand it over later and a restart does not lose it.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -34,7 +37,9 @@ import {
   documentStatusLine,
   newVersionAction,
   proposalFilename,
-  proposalReleaseState,
+  proposalPrintDownloadEnabled,
+  proposalPrintDownloadReason,
+  proposalVersionUiState,
 } from './proposalDocumentPresentation';
 import {
   ensureProposalVersion,
@@ -59,6 +64,7 @@ export function ProposalPreviewPage({
   const [problem, setProblem] = useState('');
   const [busy, setBusy] = useState<'idle' | 'pdf' | 'generating'>('idle');
   const printRef = useRef<HTMLDivElement>(null);
+  const generatingRef = useRef(false);
 
   useEffect(() => {
     let live = true;
@@ -96,6 +102,12 @@ export function ProposalPreviewPage({
       '.bouwa-proposal-document',
     ) as HTMLElement | null;
     if (element === null || view === null) return;
+    if (
+      !proposalPrintDownloadEnabled(
+        proposalVersionUiState(view.document, view.versions, view.stale),
+      )
+    )
+      return;
     setBusy('pdf');
     setProblem('');
     try {
@@ -132,6 +144,9 @@ export function ProposalPreviewPage({
 
   const generate = useCallback(async () => {
     if (view === null) return;
+    const action = newVersionAction(view.document, view.versions, view.stale);
+    if (!action.enabled || generatingRef.current) return;
+    generatingRef.current = true;
     setBusy('generating');
     setProblem('');
     try {
@@ -143,6 +158,7 @@ export function ProposalPreviewPage({
           : 'A new version could not be generated.',
       );
     } finally {
+      generatingRef.current = false;
       setBusy('idle');
     }
   }, [draftId, view]);
@@ -163,7 +179,13 @@ export function ProposalPreviewPage({
     );
 
   const action = newVersionAction(view.document, view.versions, view.stale);
-  const release = proposalReleaseState(view.document);
+  const versionState = proposalVersionUiState(
+    view.document,
+    view.versions,
+    view.stale,
+  );
+  const outputEnabled = proposalPrintDownloadEnabled(versionState);
+  const outputReason = proposalPrintDownloadReason(versionState);
 
   return (
     <div className="space-y-4">
@@ -175,15 +197,23 @@ export function ProposalPreviewPage({
             <p className="text-sm font-medium text-ars-heading">
               {view.document.reference} · {view.document.customerName}
             </p>
-            <p className="text-xs text-slate-500">
+            <p
+              data-testid="proposal-version-status"
+              className="text-xs text-slate-500"
+            >
               {documentStatusLine(view.document, view.stale)}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => window.print()}
-              disabled={!release.allowed}
+              data-testid="proposal-print"
+              onClick={() => {
+                if (!outputEnabled) return;
+                window.print();
+              }}
+              disabled={!outputEnabled}
+              title={outputReason}
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-ars-heading hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Printer className="h-4 w-4" />
@@ -191,8 +221,10 @@ export function ProposalPreviewPage({
             </button>
             <button
               type="button"
+              data-testid="proposal-download"
               onClick={download}
-              disabled={busy !== 'idle' || !release.allowed}
+              disabled={busy !== 'idle' || !outputEnabled}
+              title={outputReason}
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-ars-heading hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy === 'pdf' ? (
@@ -212,6 +244,7 @@ export function ProposalPreviewPage({
             </button>
             <button
               type="button"
+              data-testid="proposal-generate"
               onClick={generate}
               disabled={!action.enabled || busy !== 'idle'}
               title={action.detail}
@@ -229,11 +262,13 @@ export function ProposalPreviewPage({
 
         <p className="text-xs text-slate-500">{action.detail}</p>
 
-        {!release.allowed && (
-          <Problem
-            message={`${release.label}. ${release.reason ?? 'Customer-facing print and download are disabled.'}`}
-          />
-        )}
+        {versionState === 'stale' ? (
+          <Problem message={outputReason} />
+        ) : null}
+
+        {versionState === 'never_generated' ? (
+          <Problem message={outputReason} />
+        ) : null}
 
         {problem !== '' && <Problem message={problem} />}
       </div>

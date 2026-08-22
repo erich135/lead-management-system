@@ -497,12 +497,10 @@ export function summarizeRfcForm(form: RfcFormData): RfcSummarySection[] {
     {
       title: 'Customer Details',
       rows: [
-        { label: 'Pastel account number', value: form.customer.pastelAccountNumber },
         { label: 'Company name', value: form.customer.companyName },
         { label: 'Physical address', value: form.customer.physicalAddress },
         { label: 'Postal address', value: form.customer.postalAddress },
         { label: 'Customer RFQ number', value: form.customer.customerRfqNumber },
-        { label: 'Job number', value: form.customer.jobNumber },
         { label: 'Rep code', value: form.customer.repCode },
         {
           label: 'Service contract',

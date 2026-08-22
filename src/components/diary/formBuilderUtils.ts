@@ -6,6 +6,87 @@ import type {
   PlannerFormFieldType,
 } from '../../lib/api';
 
+/**
+ * RFC form fields that reps must not fill: Pastel + Job Number.
+ * Job numbers are assigned automatically when a request is approved.
+ */
+const HIDDEN_RFC_PLANNER_FIELD_KEYS = new Set([
+  'pastelaccountnumber',
+  'pastelpartnumber',
+  'jobnumber',
+]);
+
+/**
+ * Returns true when a planner field/element should be hidden on the RFC form.
+ */
+export function isHiddenRfcPlannerField(
+  key?: string | null,
+  label?: string | null,
+): boolean {
+  const normalizedKey = (key || '').trim().toLowerCase().replace(/[\s_-]+/g, '');
+  if (normalizedKey && HIDDEN_RFC_PLANNER_FIELD_KEYS.has(normalizedKey)) {
+    return true;
+  }
+  const normalizedLabel = (label || '').trim().toLowerCase();
+  if (normalizedLabel.includes('pastel')) {
+    return true;
+  }
+  // Exact "job number" only — do not hide Rental "Job / Quote Ref".
+  return (
+    normalizedLabel === 'job number' ||
+    normalizedLabel === 'job no' ||
+    normalizedLabel === 'job no.'
+  );
+}
+
+/**
+ * Removes hidden RFC fields from a planner element tree (including nested sections).
+ */
+export function stripHiddenRfcPlannerElements(
+  elements: PlannerFormElement[],
+): PlannerFormElement[] {
+  return elements
+    .filter((element) => !isHiddenRfcPlannerField(element.key, element.label))
+    .map((element) => {
+      if (!Array.isArray(element.children) || element.children.length === 0) {
+        return element;
+      }
+      return {
+        ...element,
+        children: stripHiddenRfcPlannerElements(element.children),
+      };
+    });
+}
+
+/**
+ * Removes Pastel + Job Number from RFC planner schema shown to reps.
+ * Already-published Mongo templates may still contain these; this hides them without a DB migration.
+ */
+export function stripHiddenRfcPlannerFields<T extends {
+  fields?: PlannerFormField[];
+  elements?: PlannerFormElement[];
+  type?: string;
+  name?: string;
+}>(schema: T): T {
+  // Only mutate RFC sheets. Loan / Rental / New Service Level keep their fields.
+  if (schema.type && schema.type !== 'rfc') {
+    return schema;
+  }
+
+  const fields = (schema.fields || []).filter(
+    (field) => !isHiddenRfcPlannerField(field.key, field.label),
+  );
+  const elements = Array.isArray(schema.elements)
+    ? stripHiddenRfcPlannerElements(schema.elements)
+    : schema.elements;
+
+  return {
+    ...schema,
+    fields,
+    ...(elements !== undefined ? { elements } : {}),
+  };
+}
+
 /** Input element types that collect rep values. */
 export const INPUT_ELEMENT_TYPES: PlannerFormFieldType[] = [
   'text',

@@ -24,6 +24,7 @@ import {
   requiresSiteVisitPin,
   saveDiaryBookingPrefs,
 } from './diaryUtils';
+import { pickBestCrmContactRecord, mergeCrmContactFields, resolveCrmContactFields } from './crmPrefillUtils';
 
 interface DiaryNewAppointmentModalProps {
   isOpen: boolean;
@@ -324,53 +325,104 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
   }
 
   /**
-   * Applies known client details onto the open appointment form.
+   * Writes the selected business onto the appointment form: company name + address first.
    */
-  function applyClientDetailsToForm(details: {
-    location?: string;
+  function applyBusinessSelectionToForm(options: {
+    companyName: string;
+    address?: string | null;
     coordinates?: [number, number] | null;
     assignedRep?: string;
   }): void {
-    if (details.location?.trim()) {
-      handleFieldChange('location', details.location.trim());
+    const companyName = options.companyName.trim();
+    const address = (options.address || '').trim();
+
+    if (companyName) {
+      setCustomerSearch(companyName);
     }
 
-    if (details.coordinates) {
-      setLocationCoordinates(details.coordinates);
-    }
+    setFormData((current) => ({
+      ...current,
+      ...(address ? { location: address } : {}),
+      ...(options.assignedRep && allowRepAssignment
+        ? { assignedRep: options.assignedRep }
+        : {}),
+    }));
 
-    if (details.assignedRep && allowRepAssignment) {
-      handleFieldChange('assignedRep', details.assignedRep);
+    if (options.coordinates) {
+      setLocationCoordinates(options.coordinates);
+    } else if (address) {
+      // Clear a stale pin when the business address changes without coordinates.
+      setLocationCoordinates(null);
     }
   }
 
   /**
-   * Links a Reference Data customer and auto-fills the Location field from saved address.
+   * Links a Reference Data customer and fills company name + address (and matching lead data).
    */
-  function handleSelectCustomer(customer: Customer): void {
+  async function handleSelectCustomer(customer: Customer): Promise<void> {
     setSelectedCustomer(customer);
     setSelectedLead(null);
-    setCustomerSearch(customer.name);
     setClientSuggestions([]);
 
-    const savedAddress = customer.address?.trim();
-    if (savedAddress) {
-      setFormData((current) => ({
-        ...current,
-        location: savedAddress,
-      }));
+    const customerCrm = resolveCrmContactFields({
+      ...customer,
+      companyName: customer.name,
+    });
+
+    applyBusinessSelectionToForm({
+      companyName: customer.name,
+      address: customerCrm.contactAddress || customer.address,
+    });
+
+    try {
+      const { leads } = await getSalesLeads({
+        search: customer.name,
+        limit: 30,
+        sortBy: 'updatedAt',
+        sortOrder: 'desc',
+      });
+      const normalized = customer.name.trim().toLowerCase();
+      const matching = (leads || []).filter((lead) => {
+        const name = (lead.companyName || '').trim().toLowerCase();
+        return (
+          name === normalized ||
+          name.includes(normalized) ||
+          normalized.includes(name)
+        );
+      });
+      const bestLead = pickBestCrmContactRecord(matching, customer.name);
+      if (bestLead) {
+        setSelectedLead(bestLead);
+        const merged = mergeCrmContactFields(
+          customerCrm,
+          resolveCrmContactFields(bestLead, customer.name),
+        );
+        applyBusinessSelectionToForm({
+          companyName: merged.companyName || customer.name,
+          address: merged.contactAddress || customer.address,
+          coordinates: bestLead.geoLocation?.coordinates ?? null,
+          assignedRep:
+            typeof bestLead.assignedRep === 'object' && bestLead.assignedRep
+              ? bestLead.assignedRep._id
+              : typeof bestLead.assignedRep === 'string'
+                ? bestLead.assignedRep
+                : undefined,
+        });
+      }
+    } catch {
+      // Keep the customer selection even if lead lookup fails.
     }
   }
 
   /**
-   * Links an existing sales lead and auto-fills all known CRM details.
+   * Links an existing sales lead and fills company name + address from saved CRM.
    */
-  function handleSelectLead(lead: SalesLead): void {
+  async function handleSelectLead(lead: SalesLead): Promise<void> {
     setSelectedLead(lead);
     setSelectedCustomer(null);
-    setCustomerSearch(lead.companyName);
     setClientSuggestions([]);
 
+    const leadCrm = resolveCrmContactFields(lead);
     const assignedRepId =
       typeof lead.assignedRep === 'object' && lead.assignedRep
         ? lead.assignedRep._id
@@ -378,11 +430,39 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
           ? lead.assignedRep
           : undefined;
 
-    applyClientDetailsToForm({
-      location: lead.contactAddress,
+    applyBusinessSelectionToForm({
+      companyName: lead.companyName,
+      address: leadCrm.contactAddress || lead.contactAddress,
       coordinates: lead.geoLocation?.coordinates ?? null,
       assignedRep: assignedRepId,
     });
+
+    // Enrich address/contact from Reference Data when the lead row is thin.
+    try {
+      const { customers } = await getCustomers({
+        search: lead.companyName,
+        limit: 20,
+      });
+      const normalized = lead.companyName.trim().toLowerCase();
+      const match = (customers || []).find(
+        (customer) => customer.name.trim().toLowerCase() === normalized,
+      );
+      if (match) {
+        setSelectedCustomer(match);
+        const merged = mergeCrmContactFields(
+          leadCrm,
+          resolveCrmContactFields({ ...match, companyName: match.name }),
+        );
+        applyBusinessSelectionToForm({
+          companyName: merged.companyName || lead.companyName,
+          address: merged.contactAddress || lead.contactAddress || match.address,
+          coordinates: lead.geoLocation?.coordinates ?? null,
+          assignedRep: assignedRepId,
+        });
+      }
+    } catch {
+      // Lead selection still stands without customer enrichment.
+    }
   }
 
   /**
@@ -557,14 +637,42 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
 
       const geoLocation = buildGeoLocationPayload(locationCoordinates);
 
+      const customerPhone =
+        selectedCustomer?.phone?.trim() ||
+        selectedCustomer?.defaultWhatsAppNumber?.trim() ||
+        undefined;
+      const customerContact =
+        selectedCustomer?.defaultContactPerson?.trim() || undefined;
+      const customerEmail = selectedCustomer?.email?.trim() || undefined;
+      const mergedCrm = mergeCrmContactFields(
+        resolveCrmContactFields(selectedLead, selectedLead?.companyName),
+        resolveCrmContactFields(
+          selectedCustomer
+            ? { ...selectedCustomer, companyName: selectedCustomer.name }
+            : null,
+          selectedCustomer?.name,
+        ),
+      );
+      const customerAddress =
+        mergedCrm.contactAddress ||
+        selectedCustomer?.address?.trim() ||
+        trimmedLocation ||
+        undefined;
+
       await createDiaryAppointment({
-        customerName: selectedCustomer?.name || customerName,
+        customerName:
+          mergedCrm.companyName || selectedCustomer?.name || customerName,
         salesLeadId: selectedLead?._id,
+        customerId: selectedCustomer?._id,
+        contactPerson: mergedCrm.contactPerson || customerContact,
+        contactPhone: mergedCrm.contactPhone || customerPhone,
+        contactEmail: mergedCrm.contactEmail || customerEmail,
+        contactAddress: customerAddress,
         appointmentDate: formData.appointmentDate,
         appointmentTime: formData.appointmentTime,
         appointmentType,
         status: 'appointment',
-        location: trimmedLocation || undefined,
+        location: trimmedLocation || customerAddress || undefined,
         notes: formData.notes,
         assignedRep,
         ...(geoLocation ? { geoLocation } : {}),
@@ -584,17 +692,26 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
     }
   }
 
-  const linkedName = selectedCustomer?.name || selectedLead?.companyName;
-  const linkedContact =
-    selectedLead?.contactPerson || selectedCustomer?.defaultContactPerson || '';
-  const linkedPhone =
-    selectedLead?.contactPhone ||
-    selectedCustomer?.phone ||
-    selectedCustomer?.defaultWhatsAppNumber ||
-    '';
-  const linkedEmail = selectedLead?.contactEmail || selectedCustomer?.email || '';
+  const linkedCrm = mergeCrmContactFields(
+    resolveCrmContactFields(selectedLead, selectedLead?.companyName),
+    resolveCrmContactFields(
+      selectedCustomer
+        ? { ...selectedCustomer, companyName: selectedCustomer.name }
+        : null,
+      selectedCustomer?.name,
+    ),
+  );
+  const linkedName =
+    linkedCrm.companyName ||
+    selectedCustomer?.name ||
+    selectedLead?.companyName;
+  const linkedContact = linkedCrm.contactPerson || '';
+  const linkedPhone = linkedCrm.contactPhone || '';
+  const linkedEmail = linkedCrm.contactEmail || '';
   const linkedAddress =
-    selectedLead?.contactAddress || selectedCustomer?.address || '';
+    linkedCrm.contactAddress ||
+    formData.location.trim() ||
+    '';
   const showSuggestions =
     clientSuggestions.length > 0 &&
     customerSearch.trim().length >= 1 &&
@@ -812,7 +929,7 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
                 )}
               </label>
               <AddressAutocomplete
-                key={selectedCustomer?._id ?? 'appointment-location'}
+                key={`${selectedCustomer?._id || ''}-${selectedLead?._id || ''}-${formData.location}`}
                 value={formData.location}
                 coordinates={locationCoordinates}
                 onChange={(address, coordinates) => {

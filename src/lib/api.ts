@@ -3733,6 +3733,13 @@ export async function getSalesLeadAnalytics(filters?: {
 export async function createDiaryAppointment(data: {
   customerName?: string;
   salesLeadId?: string;
+  /** Reference Data customer id — used to copy saved business contact details onto the lead. */
+  customerId?: string;
+  /** Optional CRM details when booking from a Reference Data customer (no salesLeadId). */
+  contactPerson?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  contactAddress?: string;
   appointmentDate: string;
   appointmentTime: string;
   appointmentType?: string;

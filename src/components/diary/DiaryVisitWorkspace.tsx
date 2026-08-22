@@ -10,8 +10,8 @@ import {
   StickyNote,
   X,
 } from 'lucide-react';
-import { createSalesRequest, listSalesRequests, submitSalesRequest, updateAppointment, updateSalesRequest, getPublishedPlannerForm } from '../../lib/api';
-import type { SalesRequest, SalesRequestType, PlannerFormPublished } from '../../lib/api';
+import { createSalesRequest, listSalesRequests, submitSalesRequest, updateAppointment, updateSalesRequest, getPublishedPlannerForm, getSalesLead, getCustomers, getSalesLeads } from '../../lib/api';
+import type { SalesRequest, SalesRequestType, PlannerFormPublished, PlannerFormField } from '../../lib/api';
 import type { PlannerAppointment } from './DiaryDayAppointmentCard';
 import { DiaryCompletedDot } from './DiaryCompletedDot';
 import {
@@ -51,8 +51,11 @@ import {
   DynamicPlannerFormRenderer,
   createEmptyDynamicFormValues,
   getMissingRequiredDynamicFields,
+  prefillDynamicFormValuesFromCrm,
 } from './DynamicPlannerFormRenderer';
+import { stripHiddenRfcPlannerFields, deriveFieldsFromElements } from './formBuilderUtils';
 import { useAuth } from '../../contexts/AuthContext';
+import { SALES_REQUEST_PERMISSIONS } from '../../constants/salesRequestPermissions';
 import { useGeolocation } from '../../hooks/useGeolocation';
 import { reverseGeocode } from '../../utils/geocoding';
 import type { VisitGpsVerification } from '../../types';
@@ -346,20 +349,228 @@ function resolveSheetPayloadFromSession(session: VisitSession, appointment: Plan
   return null;
 }
 
+import {
+  mergeCrmContactFields,
+  pickBestCrmContactRecord,
+  resolveCrmContactFields,
+} from './crmPrefillUtils';
+
+/**
+ * Builds CRM prefill input from the appointment's linked lead and location.
+ */
+function getAppointmentCrmPrefillSource(appointment: PlannerAppointment): {
+  companyName?: string;
+  contactPerson?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  contactAddress?: string;
+  location?: string;
+  repCode?: string;
+} {
+  const rep = appointment.assignedRep;
+  const repDetails =
+    rep && typeof rep === 'object' ? (rep as { name?: string; code?: string }) : undefined;
+  const fromLead = resolveCrmContactFields(appointment.salesLead, appointment.salesLead?.companyName);
+
+  return {
+    ...fromLead,
+    location: appointment.location || fromLead.contactAddress,
+    repCode: repDetails?.code,
+  };
+}
+
+/**
+ * Resolves input fields for value maps — prefer element ids so canvas bindings match.
+ */
+function resolvePlannerValueFields(
+  schema: Pick<PlannerFormPublished, 'fields'> & { elements?: PlannerFormPublished['elements'] },
+): PlannerFormField[] {
+  if (Array.isArray(schema.elements) && schema.elements.length > 0) {
+    const derived = deriveFieldsFromElements(schema.elements);
+    if (derived.length > 0) {
+      return derived;
+    }
+  }
+  return schema.fields || [];
+}
+
+/**
+ * Loads the richest CRM details for this business: linked lead, other leads with
+ * the same company name, and Reference Data customer — then merges usable fields.
+ */
+async function resolveFreshCrmPrefillSource(
+  appointment: PlannerAppointment,
+): Promise<ReturnType<typeof getAppointmentCrmPrefillSource>> {
+  const rep = appointment.assignedRep;
+  const repDetails =
+    rep && typeof rep === 'object' ? (rep as { name?: string; code?: string }) : undefined;
+
+  const baseCompany =
+    (appointment.salesLead?.companyName || '').trim() ||
+    (appointment.location || '').trim();
+
+  const sources: Array<ReturnType<typeof resolveCrmContactFields>> = [
+    resolveCrmContactFields(appointment.salesLead, baseCompany),
+  ];
+
+  const leadId =
+    typeof appointment.salesLead === 'object' && appointment.salesLead
+      ? appointment.salesLead._id
+      : undefined;
+
+  if (leadId) {
+    try {
+      const lead = await getSalesLead(leadId);
+      sources.push(resolveCrmContactFields(lead, baseCompany || lead.companyName));
+    } catch {
+      // Keep appointment populate fallback when lead fetch fails.
+    }
+  }
+
+  const companyName =
+    sources.find((row) => row.companyName)?.companyName || baseCompany;
+
+  if (companyName) {
+    try {
+      const { leads } = await getSalesLeads({
+        search: companyName,
+        limit: 30,
+        sortBy: 'updatedAt',
+        sortOrder: 'desc',
+      });
+      const normalized = companyName.toLowerCase();
+      const matchingLeads = (leads || []).filter((lead) => {
+        const name = (lead.companyName || '').trim().toLowerCase();
+        return (
+          name === normalized ||
+          name.includes(normalized) ||
+          normalized.includes(name)
+        );
+      });
+      const bestLead = pickBestCrmContactRecord(matchingLeads, companyName);
+      if (bestLead) {
+        sources.push(resolveCrmContactFields(bestLead, companyName));
+      }
+    } catch {
+      // Lead search is best-effort.
+    }
+
+    try {
+      const { customers } = await getCustomers({
+        search: companyName,
+        limit: 30,
+      });
+      const normalized = companyName.toLowerCase();
+      const matchingCustomers = (customers || []).filter((customer) => {
+        const name = (customer.name || '').trim().toLowerCase();
+        return (
+          name === normalized ||
+          name.includes(normalized) ||
+          normalized.includes(name)
+        );
+      });
+      const bestCustomer = pickBestCrmContactRecord(
+        matchingCustomers.map((customer) => ({
+          ...customer,
+          companyName: customer.name,
+        })),
+        companyName,
+      );
+      if (bestCustomer) {
+        sources.push(resolveCrmContactFields(bestCustomer, companyName));
+      }
+    } catch {
+      // Customer lookup is best-effort enrichment.
+    }
+  }
+
+  const merged = mergeCrmContactFields(...sources);
+  return {
+    ...merged,
+    location: appointment.location || merged.contactAddress,
+    repCode: repDetails?.code,
+  };
+}
+
 /**
  * Builds a visit dynamic form state from a published Super Admin template.
+ * RFC Pastel + Job Number fields are stripped; job numbers are assigned on Approve.
+ * Empty customer fields are filled from the linked sales lead / appointment location.
  */
 function buildDynamicFormState(
   published: PlannerFormPublished & { type?: string },
+  appointment: PlannerAppointment,
   existingValues?: VisitDynamicFormState['values'],
 ): VisitDynamicFormState {
   const type = (published.type || 'rfc') as VisitDynamicFormState['formTemplateType'];
+  const schema = stripHiddenRfcPlannerFields({ ...published, type: published.type || type });
+  const fields = resolvePlannerValueFields(schema);
+  const emptyValues = createEmptyDynamicFormValues(fields);
+  const values = prefillDynamicFormValuesFromCrm(
+    fields,
+    existingValues || emptyValues,
+    getAppointmentCrmPrefillSource(appointment),
+  );
   return {
     formTemplateType: type,
     formTemplateVersion: published.version,
-    formSchemaSnapshot: published,
-    values: existingValues || createEmptyDynamicFormValues(published.fields || []),
+    formSchemaSnapshot: schema as PlannerFormPublished,
+    values,
   };
+}
+
+/**
+ * Finds an editable draft/declined sales request for this appointment.
+ * Soft-fails on permission/network errors so Visit/RFC/Notes never hard-block.
+ */
+async function findEditableSalesRequestForAppointment(
+  appointmentId: string,
+): Promise<SalesRequest | null> {
+  try {
+    const { requests } = await listSalesRequests({
+      appointment: appointmentId,
+      limit: 20,
+      sortBy: 'updatedAt',
+      sortOrder: 'desc',
+    });
+    return (
+      requests.find((item) => item.status === 'draft' || item.status === 'declined') ||
+      null
+    );
+  } catch (error) {
+    console.warn(
+      'Could not load existing sales request for visit; continuing without linked draft.',
+      error,
+    );
+    return null;
+  }
+}
+
+/**
+ * Returns true when an API error is the Visit-breaking sales_requests.read Forbidden.
+ */
+function isSalesRequestsReadForbidden(error: unknown): boolean {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : String((error as { message?: string })?.message || error || '');
+  return /sales_requests\.read/i.test(message) && /forbidden|requires permission/i.test(message);
+}
+
+/**
+ * Maps Visit save/submit errors to a user-facing message.
+ * Never surfaces sales_requests.read Forbidden as a Visit blocker.
+ */
+function getVisitWorkflowErrorMessage(error: unknown, fallback: string): string {
+  if (isSalesRequestsReadForbidden(error)) {
+    return 'Could not sync the approval draft yet. Your visit notes and form are still saved — please try Submit for Approval again.';
+  }
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return fallback;
 }
 
 /**
@@ -372,7 +583,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
   onFinished,
   onCompletionAction,
 }) => {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { getCurrentPosition, isSupported: isGeolocationSupported, permissionState } =
     useGeolocation({
       enableHighAccuracy: true,
@@ -512,7 +723,10 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
     void (async () => {
       try {
         if (plannerFormType && !isCompletedVisit) {
-          const published = await getPublishedPlannerForm(plannerFormType);
+          const [published, crmSource] = await Promise.all([
+            getPublishedPlannerForm(plannerFormType),
+            resolveFreshCrmPrefillSource(appointment),
+          ]);
           if (!cancelled) {
             setSession((current) => {
               if (!current) return current;
@@ -521,9 +735,14 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
 
               const previousValues = current.dynamicForm?.values || {};
               const previousFields = current.dynamicForm?.formSchemaSnapshot?.fields || [];
-              const nextValues = createEmptyDynamicFormValues(published.fields || []);
+              const publishedForVisit = stripHiddenRfcPlannerFields({
+                ...published,
+                type: plannerFormType,
+              });
+              const valueFields = resolvePlannerValueFields(publishedForVisit);
+              let nextValues = createEmptyDynamicFormValues(valueFields);
 
-              for (const field of published.fields || []) {
+              for (const field of valueFields) {
                 if (previousValues[field.id] != null && previousValues[field.id] !== '') {
                   nextValues[field.id] = previousValues[field.id];
                   continue;
@@ -534,12 +753,23 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
                 }
               }
 
+              // Always pull saved business CRM into still-empty form fields on Start.
+              nextValues = prefillDynamicFormValuesFromCrm(
+                valueFields,
+                nextValues,
+                crmSource,
+              );
+
               const next: VisitSession = {
                 ...current,
                 dynamicForm: {
                   formTemplateType: plannerFormType,
                   formTemplateVersion: published.version,
-                  formSchemaSnapshot: { ...published, type: plannerFormType },
+                  formSchemaSnapshot: {
+                    ...publishedForVisit,
+                    type: plannerFormType,
+                    fields: valueFields,
+                  },
                   values: nextValues,
                 },
                 rfcForm: undefined,
@@ -552,49 +782,54 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
           }
         }
 
-        const { requests } = await listSalesRequests({
-          appointment: appointment._id,
-          limit: 20,
-          sortBy: 'updatedAt',
-          sortOrder: 'desc',
-        });
-        if (cancelled) return;
-        const editable = requests.find(
-          (item) => item.status === 'draft' || item.status === 'declined',
-        );
-        if (!editable?._id) return;
+        // Optional: resume an existing draft. Never block Visit if this list call fails
+        // (e.g. missing sales_requests.read) — create/update/submit still handle submit flow.
+        const canLookupSalesRequestDraft =
+          hasPermission(SALES_REQUEST_PERMISSIONS.READ) ||
+          hasPermission(SALES_REQUEST_PERMISSIONS.CREATE) ||
+          hasPermission(SALES_REQUEST_PERMISSIONS.UPDATE) ||
+          hasPermission(SALES_REQUEST_PERMISSIONS.SUBMIT) ||
+          Boolean(user?.isSuperAdmin);
 
-        setSession((current) => {
-          if (!current) return current;
-          const formData = editable.formData || {};
-          const hasDynamic =
-            Boolean(formData.formSchemaSnapshot) &&
-            Boolean(formData.values) &&
-            typeof formData.values === 'object';
+        if (canLookupSalesRequestDraft) {
+          const editable = await findEditableSalesRequestForAppointment(appointment._id);
+          if (cancelled) return;
+          if (!editable?._id) {
+            // No existing draft — Visit continues with local session only.
+          } else {
+            setSession((current) => {
+              if (!current) return current;
+              const formData = editable.formData || {};
+              const hasDynamic =
+                Boolean(formData.formSchemaSnapshot) &&
+                Boolean(formData.values) &&
+                typeof formData.values === 'object';
 
-          // Prefer latest published schema; keep draft answers when keys match.
-          const next: VisitSession = {
-            ...current,
-            salesRequestId: editable._id,
-            notes: current.notes || editable.visitNotes || '',
-            dynamicForm:
-              current.dynamicForm ||
-              (hasDynamic
-                ? {
-                    formTemplateType:
-                      (formData.formTemplateType as VisitDynamicFormState['formTemplateType']) ||
-                      plannerFormType ||
-                      'rfc',
-                    formTemplateVersion: Number(formData.formTemplateVersion) || 1,
-                    formSchemaSnapshot: formData.formSchemaSnapshot as PlannerFormPublished,
-                    values: formData.values as VisitDynamicFormState['values'],
-                    completedAt: undefined,
-                  }
-                : current.dynamicForm),
-          };
-          saveVisitSession(next);
-          return next;
-        });
+              // Prefer latest published schema; keep draft answers when keys match.
+              const next: VisitSession = {
+                ...current,
+                salesRequestId: editable._id,
+                notes: current.notes || editable.visitNotes || '',
+                dynamicForm:
+                  current.dynamicForm ||
+                  (hasDynamic
+                    ? {
+                        formTemplateType:
+                          (formData.formTemplateType as VisitDynamicFormState['formTemplateType']) ||
+                          plannerFormType ||
+                          'rfc',
+                        formTemplateVersion: Number(formData.formTemplateVersion) || 1,
+                        formSchemaSnapshot: formData.formSchemaSnapshot as PlannerFormPublished,
+                        values: formData.values as VisitDynamicFormState['values'],
+                        completedAt: undefined,
+                      }
+                    : current.dynamicForm),
+              };
+              saveVisitSession(next);
+              return next;
+            });
+          }
+        }
       } catch {
         if (plannerFormType) {
           setSession((current) => {
@@ -632,7 +867,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [appointment]);
+  }, [appointment, hasPermission, user?.isSuperAdmin]);
 
   /**
    * When the visit form opens, prompt for location if it is not already granted.
@@ -891,15 +1126,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
 
     let requestId = currentSession.salesRequestId;
     if (!requestId) {
-      const { requests } = await listSalesRequests({
-        appointment: currentAppointment._id,
-        limit: 20,
-        sortBy: 'updatedAt',
-        sortOrder: 'desc',
-      });
-      const editable = requests.find(
-        (item) => item.status === 'draft' || item.status === 'declined',
-      );
+      const editable = await findEditableSalesRequestForAppointment(currentAppointment._id);
       requestId = editable?._id;
     }
 
@@ -1082,7 +1309,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
       setLastSavedAt(new Date());
       setActiveTab('notes');
     } catch (saveError: any) {
-      setError(saveError.message || 'Failed to save the form');
+      setError(getVisitWorkflowErrorMessage(saveError, 'Failed to save the form'));
     } finally {
       setIsSaving(false);
     }
@@ -1120,7 +1347,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
       setLastSavedAt(new Date());
       setActiveTab('notes');
     } catch (saveError: any) {
-      setError(saveError.message || 'Failed to save the RFC sheet');
+      setError(getVisitWorkflowErrorMessage(saveError, 'Failed to save the RFC sheet'));
       setActiveTab('rfc');
     } finally {
       setIsSaving(false);
@@ -1158,7 +1385,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
       setLastSavedAt(new Date());
       setActiveTab('notes');
     } catch (saveError: any) {
-      setError(saveError.message || 'Failed to save the Loan & Rental sheet');
+      setError(getVisitWorkflowErrorMessage(saveError, 'Failed to save the Loan & Rental sheet'));
       setActiveTab('loan_rental');
     } finally {
       setIsSaving(false);
@@ -1196,7 +1423,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
       setLastSavedAt(new Date());
       setActiveTab('notes');
     } catch (saveError: any) {
-      setError(saveError.message || 'Failed to save the New Service Level sheet');
+      setError(getVisitWorkflowErrorMessage(saveError, 'Failed to save the New Service Level sheet'));
       setActiveTab('new_service_level');
     } finally {
       setIsSaving(false);
@@ -1378,11 +1605,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
       const gpsProof = await captureVisitLocationAutomatically();
       await handleFinishVisit(gpsProof);
     } catch (finishError: unknown) {
-      const message =
-        finishError instanceof Error && finishError.message.trim()
-          ? finishError.message
-          : 'Failed to finish visit';
-      setError(message);
+      setError(getVisitWorkflowErrorMessage(finishError, 'Failed to finish visit'));
       setIsSaving(false);
     }
   }
@@ -1443,7 +1666,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
       setShowCompletionDialog(true);
       await onFinished();
     } catch (finishError: any) {
-      setError(finishError.message || 'Failed to finish visit');
+      setError(getVisitWorkflowErrorMessage(finishError, 'Failed to finish visit'));
     } finally {
       setIsSaving(false);
     }
@@ -1463,7 +1686,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
       await onFinished();
       onClose();
     } catch (saveError: any) {
-      setError(saveError.message || 'Failed to save visit changes');
+      setError(getVisitWorkflowErrorMessage(saveError, 'Failed to save visit changes'));
     } finally {
       setIsSaving(false);
     }

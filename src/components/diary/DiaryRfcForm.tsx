@@ -554,12 +554,6 @@ const DiaryRfcForm: React.FC<DiaryRfcFormProps> = ({
                   onChange={(next) => updatePart(part.id, { qty: next })}
                   disabled={disabled}
                 />
-                <RfcTextField
-                  label="Pastel part number"
-                  value={part.pastelPartNumber}
-                  onChange={(next) => updatePart(part.id, { pastelPartNumber: next })}
-                  disabled={disabled}
-                />
               </div>
               <div className="mt-3">
                 <RfcTextField

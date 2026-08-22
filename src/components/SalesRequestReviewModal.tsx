@@ -348,9 +348,13 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
     if (!detail) return null;
 
     if (isDynamicPlannerFormData(formData)) {
+      const snapshot = formData.formSchemaSnapshot as PlannerFormPublished;
       return (
         <DynamicPlannerFormRenderer
-          schema={formData.formSchemaSnapshot as PlannerFormPublished}
+          schema={{
+            ...snapshot,
+            type: snapshot.type || detail.requestType,
+          }}
           values={formData.values as DynamicFormValues}
           onChange={(next) => setFormData({ ...formData, values: next })}
           disabled={!fieldsEditable}

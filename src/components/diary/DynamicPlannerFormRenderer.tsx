@@ -10,12 +10,13 @@ import {
   buildElementsFromFields,
   deriveFieldsFromElements,
   ensureDraftElements,
+  stripHiddenRfcPlannerFields,
 } from './formBuilderUtils';
 import type { DynamicFormValues } from './dynamicFormValues';
 import { isDynamicFieldEmpty } from './dynamicFormValues';
 
 export type { DynamicFormValues } from './dynamicFormValues';
-export { isDynamicFieldEmpty } from './dynamicFormValues';
+export { isDynamicFieldEmpty, prefillDynamicFormValuesFromCrm } from './dynamicFormValues';
 
 interface DynamicPlannerFormRendererProps {
   schema: Pick<
@@ -105,7 +106,14 @@ export function DynamicPlannerFormRenderer({
   selectedFieldId = null,
   onSelectField,
 }: DynamicPlannerFormRendererProps): React.ReactElement {
-  const elements = useMemo(() => resolveElements(schema), [schema]);
+  /**
+   * Rep-facing RFC render hides Pastel + Job Number; Super Admin edit keeps full schema.
+   */
+  const visibleSchema = useMemo(
+    () => (adminMode ? schema : stripHiddenRfcPlannerFields(schema)),
+    [adminMode, schema],
+  );
+  const elements = useMemo(() => resolveElements(visibleSchema), [visibleSchema]);
 
   // Admin editing should use VisualFormBuilder; keep a selectable canvas fallback.
   if (adminMode) {
@@ -131,9 +139,9 @@ export function DynamicPlannerFormRenderer({
 
   return (
     <div className="space-y-2">
-      {schema.version ? (
+      {visibleSchema.version ? (
         <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-          {schema.name} · v{schema.version}
+          {visibleSchema.name} · v{visibleSchema.version}
         </p>
       ) : null}
       <FormBuilderCanvas

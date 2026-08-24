@@ -355,10 +355,7 @@ import {
   resolveCrmContactFields,
 } from './crmPrefillUtils';
 
-/**
- * Builds CRM prefill input from the appointment's linked lead and location.
- */
-function getAppointmentCrmPrefillSource(appointment: PlannerAppointment): {
+type AppointmentCrmPrefillSource = {
   companyName?: string;
   contactPerson?: string;
   contactPhone?: string;
@@ -366,18 +363,7 @@ function getAppointmentCrmPrefillSource(appointment: PlannerAppointment): {
   contactAddress?: string;
   location?: string;
   repCode?: string;
-} {
-  const rep = appointment.assignedRep;
-  const repDetails =
-    rep && typeof rep === 'object' ? (rep as { name?: string; code?: string }) : undefined;
-  const fromLead = resolveCrmContactFields(appointment.salesLead, appointment.salesLead?.companyName);
-
-  return {
-    ...fromLead,
-    location: appointment.location || fromLead.contactAddress,
-    repCode: repDetails?.code,
-  };
-}
+};
 
 /**
  * Resolves input fields for value maps — prefer element ids so canvas bindings match.
@@ -400,7 +386,7 @@ function resolvePlannerValueFields(
  */
 async function resolveFreshCrmPrefillSource(
   appointment: PlannerAppointment,
-): Promise<ReturnType<typeof getAppointmentCrmPrefillSource>> {
+): Promise<AppointmentCrmPrefillSource> {
   const rep = appointment.assignedRep;
   const repDetails =
     rep && typeof rep === 'object' ? (rep as { name?: string; code?: string }) : undefined;
@@ -489,33 +475,6 @@ async function resolveFreshCrmPrefillSource(
     ...merged,
     location: appointment.location || merged.contactAddress,
     repCode: repDetails?.code,
-  };
-}
-
-/**
- * Builds a visit dynamic form state from a published Super Admin template.
- * RFC Pastel + Job Number fields are stripped; job numbers are assigned on Approve.
- * Empty customer fields are filled from the linked sales lead / appointment location.
- */
-function buildDynamicFormState(
-  published: PlannerFormPublished & { type?: string },
-  appointment: PlannerAppointment,
-  existingValues?: VisitDynamicFormState['values'],
-): VisitDynamicFormState {
-  const type = (published.type || 'rfc') as VisitDynamicFormState['formTemplateType'];
-  const schema = stripHiddenRfcPlannerFields({ ...published, type: published.type || type });
-  const fields = resolvePlannerValueFields(schema);
-  const emptyValues = createEmptyDynamicFormValues(fields);
-  const values = prefillDynamicFormValuesFromCrm(
-    fields,
-    existingValues || emptyValues,
-    getAppointmentCrmPrefillSource(appointment),
-  );
-  return {
-    formTemplateType: type,
-    formTemplateVersion: published.version,
-    formSchemaSnapshot: schema as PlannerFormPublished,
-    values,
   };
 }
 
@@ -1234,7 +1193,6 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
   const leadId = getAppointmentLeadId(appointment);
   const isEditingCompletedVisit =
     appointment.status === 'completed' || Boolean(appointment.attended);
-  const plannerFormType = appointmentTypeToPlannerFormType(appointment.appointmentType);
   const hasDynamicForm = Boolean(session.dynamicForm);
   const isRfcVisit =
     isRfcSheetAppointmentType(appointment.appointmentType) &&

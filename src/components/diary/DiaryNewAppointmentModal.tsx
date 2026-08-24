@@ -213,6 +213,18 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
   ]);
 
   useEffect(() => {
+    if (!isOpen || !allowRepAssignment || repCodes.length === 0) {
+      return;
+    }
+
+    setFormData((current) =>
+      current.assignedRep
+        ? current
+        : { ...current, assignedRep: repCodes[0]._id },
+    );
+  }, [allowRepAssignment, isOpen, repCodes]);
+
+  useEffect(() => {
     if (!isOpen) {
       return;
     }

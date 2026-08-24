@@ -21,7 +21,7 @@ export { isDynamicFieldEmpty, prefillDynamicFormValuesFromCrm } from './dynamicF
 interface DynamicPlannerFormRendererProps {
   schema: Pick<
     PlannerFormPublished,
-    'name' | 'title' | 'description' | 'logoUrl' | 'fields' | 'version'
+    'name' | 'title' | 'description' | 'logoUrl' | 'fields' | 'version' | 'type'
   > & {
     elements?: PlannerFormElement[];
   };

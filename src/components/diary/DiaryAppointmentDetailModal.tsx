@@ -34,6 +34,7 @@ import {
   toWhatsAppNumber,
 } from './diaryUtils';
 import { loadVisitSession } from './visitUtils';
+import { getVisitStartActionLabel } from './visitFormSelection';
 import { resolveAppointmentMapCoordinates } from './DiaryAppointmentLocationPanel';
 
 type DetailView = 'details' | 'reschedule' | 'notify';
@@ -115,7 +116,8 @@ const DiaryAppointmentDetailModal: React.FC<DiaryAppointmentDetailModalProps> = 
     appointment.status === 'cancelled' ||
     isPendingApproval;
   const isCompleted = appointment.status === 'completed';
-  const hasActiveVisit = Boolean(loadVisitSession(appointment._id));
+  const hasActiveVisit =
+    Boolean(loadVisitSession(appointment._id)) || appointment.status === 'in_progress';
   const address = appointment.location || appointment.salesLead?.contactAddress || '';
 
   /**
@@ -437,7 +439,10 @@ const DiaryAppointmentDetailModal: React.FC<DiaryAppointmentDetailModalProps> = 
                     className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
                   >
                     <PlayCircle className="h-5 w-5" />
-                    {hasActiveVisit ? 'Resume Visit' : 'Start Visit'}
+                    {getVisitStartActionLabel({
+                      appointmentStatus: appointment.status,
+                      hasVisitSession: Boolean(loadVisitSession(appointment._id)),
+                    })}
                   </button>
                   <button
                     type="button"

@@ -14,6 +14,7 @@ import { useAuth } from '../contexts/AuthContext';
 import type { PlannerAppointment } from '../components/diary/DiaryDayAppointmentCard';
 import { loadVisitSession } from '../components/diary/visitUtils';
 import { getAppointmentTypeBadgeLabel } from '../components/diary/diaryUtils';
+import { getVisitStartActionLabel } from '../components/diary/visitFormSelection';
 import {
   addDays,
   buildNavigateUrl,
@@ -222,7 +223,12 @@ const MobileRepHome: React.FC<MobileRepHomeProps> = ({
             className="mobile-rep-action inline-flex min-h-[3.4rem] items-center justify-center gap-2 rounded-2xl bg-[#0969a9] px-3 py-3 text-sm font-bold text-white shadow-[0_8px_20px_rgba(9,105,169,0.28)] disabled:opacity-40"
           >
             <Play className="h-4 w-4 fill-current" />
-            Start Visit
+            {nextAppointment
+              ? getVisitStartActionLabel({
+                  appointmentStatus: nextAppointment.status,
+                  hasVisitSession: Boolean(loadVisitSession(nextAppointment._id)),
+                })
+              : 'Start Visit'}
           </button>
           <button
             type="button"

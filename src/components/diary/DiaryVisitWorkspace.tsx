@@ -10,7 +10,7 @@ import {
   StickyNote,
   X,
 } from 'lucide-react';
-import { createSalesRequest, listSalesRequests, submitSalesRequest, updateAppointment, updateSalesRequest, getPublishedPlannerForm, getSalesLead, getCustomers, getSalesLeads } from '../../lib/api';
+import { createSalesRequest, listSalesRequests, submitSalesRequest, updateAppointment, updateSalesRequest, getPublishedPlannerForm, listPublishedPlannerForms, getSalesLead, getCustomers, getSalesLeads } from '../../lib/api';
 import type { SalesRequest, SalesRequestType, PlannerFormPublished, PlannerFormField } from '../../lib/api';
 import type { PlannerAppointment } from './DiaryDayAppointmentCard';
 import { DiaryCompletedDot } from './DiaryCompletedDot';
@@ -44,6 +44,20 @@ import {
   isRfcSheetAppointmentType,
   normalizeDiaryAppointmentType,
 } from './diaryUtils';
+import {
+  filterVisitChooserPublishedForms,
+  isVisitSystemPlannerFormType,
+  plannerFormTypeToVisitTab,
+  resolveSalesRequestDraftWrite,
+  resolveVisitPlannerFormType,
+  resolveVisitSalesRequestType,
+  resolveVisitWorkspaceSurface,
+  visitAllowsNotesPhotosAndSubmit,
+  visitNeedsPublishedFormChooser,
+  type PublishedVisitFormMeta,
+  type VisitSystemPlannerFormType,
+} from './visitFormSelection';
+import DiaryVisitFormChooser from './DiaryVisitFormChooser';
 import DiaryRfcForm from './DiaryRfcForm';
 import DiaryLoanRentalForm from './DiaryLoanRentalForm';
 import DiaryNewServiceLevelForm from './DiaryNewServiceLevelForm';
@@ -312,7 +326,10 @@ function resolveSheetPayloadFromSession(session: VisitSession, appointment: Plan
   formData: Record<string, unknown>;
 } | null {
   if (session.dynamicForm) {
-    const requestType = appointmentTypeToSalesRequestType(appointment.appointmentType);
+    const requestType = resolveVisitSalesRequestType(
+      appointment.appointmentType,
+      session.dynamicForm.formTemplateType || session.selectedPlannerFormType,
+    );
     if (!requestType) return null;
     return {
       requestType,
@@ -569,6 +586,13 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
   /** When true, the rep chose to continue without enabling location for this visit. */
   const [locationDeclined, setLocationDeclined] = useState(false);
   const locationPromptShownRef = useRef<string | null>(null);
+  const [chooserForms, setChooserForms] = useState<PublishedVisitFormMeta[]>([]);
+  const [chooserLoading, setChooserLoading] = useState(false);
+  const [chooserError, setChooserError] = useState<string | null>(null);
+  const [selectingFormType, setSelectingFormType] = useState<VisitSystemPlannerFormType | null>(
+    null,
+  );
+  const [templateLoadError, setTemplateLoadError] = useState<string | null>(null);
 
   const photoInputRef = useRef<HTMLInputElement>(null);
   const notesRef = useRef<HTMLTextAreaElement>(null);
@@ -635,29 +659,38 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
         newServiceLevelCompletedAt:
           localSession.newServiceLevelCompletedAt ?? serverSession.newServiceLevelCompletedAt,
         dynamicForm: localSession.dynamicForm ?? serverSession.dynamicForm,
+        selectedPlannerFormType:
+          localSession.selectedPlannerFormType ?? serverSession.selectedPlannerFormType,
       };
     }
 
+    const restoredSelection =
+      restoredSession.selectedPlannerFormType ||
+      restoredSession.dynamicForm?.formTemplateType;
     const isRfcVisit = isRfcSheetAppointmentType(appointment.appointmentType);
     const isLoanRentalVisit = isLoanRentalAppointmentType(appointment.appointmentType);
     const isNewServiceLevelVisit = isNewServiceLevelAppointmentType(appointment.appointmentType);
-    const plannerFormType = appointmentTypeToPlannerFormType(appointment.appointmentType);
+    const plannerFormType = resolveVisitPlannerFormType(
+      appointment.appointmentType,
+      restoredSelection,
+    );
     setSession({
       ...restoredSession,
       rfcForm: undefined,
       loanRentalForm: undefined,
       newServiceLevelForm: undefined,
       dynamicForm: restoredSession.dynamicForm,
+      selectedPlannerFormType: isVisitSystemPlannerFormType(restoredSelection)
+        ? restoredSelection
+        : plannerFormType || undefined,
     });
     setActiveTab(
-      (isRfcVisit || isLoanRentalVisit || isNewServiceLevelVisit) && !isCompletedVisit
-        ? isRfcVisit
-          ? 'rfc'
-          : isLoanRentalVisit
-            ? 'loan_rental'
-            : 'new_service_level'
+      plannerFormType && !isCompletedVisit
+        ? plannerFormTypeToVisitTab(plannerFormType)
         : 'notes',
     );
+    setChooserError(null);
+    setTemplateLoadError(null);
 
     setError(null);
     setShowCompletionDialog(false);
@@ -775,8 +808,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
                     ? {
                         formTemplateType:
                           (formData.formTemplateType as VisitDynamicFormState['formTemplateType']) ||
-                          plannerFormType ||
-                          'rfc',
+                          plannerFormType,
                         formTemplateVersion: Number(formData.formTemplateVersion) || 1,
                         formSchemaSnapshot: formData.formSchemaSnapshot as PlannerFormPublished,
                         values: formData.values as VisitDynamicFormState['values'],
@@ -791,34 +823,41 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
         }
       } catch {
         if (plannerFormType) {
-          setSession((current) => {
-            if (!current || current.dynamicForm) return current;
-            if (isRfcVisit) {
-              return {
-                ...current,
-                rfcForm: resolveRfcFormForAppointment(appointment, current.rfcForm),
-              };
-            }
-            if (isLoanRentalVisit) {
-              return {
-                ...current,
-                loanRentalForm: resolveLoanRentalFormForAppointment(
-                  appointment,
-                  current.loanRentalForm,
-                ),
-              };
-            }
-            if (isNewServiceLevelVisit) {
-              return {
-                ...current,
-                newServiceLevelForm: resolveNewServiceLevelFormForAppointment(
-                  appointment,
-                  current.newServiceLevelForm,
-                ),
-              };
-            }
-            return current;
-          });
+          const isTypedSheetAppointment = isRfcVisit || isLoanRentalVisit || isNewServiceLevelVisit;
+          if (!isTypedSheetAppointment) {
+            setTemplateLoadError(
+              'Could not load the published form. Your selection is saved. Retry to continue.',
+            );
+          } else {
+            setSession((current) => {
+              if (!current || current.dynamicForm) return current;
+              if (isRfcVisit) {
+                return {
+                  ...current,
+                  rfcForm: resolveRfcFormForAppointment(appointment, current.rfcForm),
+                };
+              }
+              if (isLoanRentalVisit) {
+                return {
+                  ...current,
+                  loanRentalForm: resolveLoanRentalFormForAppointment(
+                    appointment,
+                    current.loanRentalForm,
+                  ),
+                };
+              }
+              if (isNewServiceLevelVisit) {
+                return {
+                  ...current,
+                  newServiceLevelForm: resolveNewServiceLevelFormForAppointment(
+                    appointment,
+                    current.newServiceLevelForm,
+                  ),
+                };
+              }
+              return current;
+            });
+          }
         }
       }
     })();
@@ -1053,6 +1092,111 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
     });
   }, []);
 
+  const draftUpsertPromiseRef = useRef<Promise<SalesRequest> | null>(null);
+
+  const loadChooserPublishedForms = useCallback(async (): Promise<void> => {
+    setChooserLoading(true);
+    setChooserError(null);
+    try {
+      const result = await listPublishedPlannerForms();
+      setChooserForms(filterVisitChooserPublishedForms(result.forms));
+    } catch {
+      setChooserForms([]);
+      setChooserError(
+        'Could not load published forms. Check your connection and retry. Notes and photos stay hidden until a form can be selected.',
+      );
+    } finally {
+      setChooserLoading(false);
+    }
+  }, []);
+
+  const applyPublishedPlannerTemplate = useCallback(
+    async (plannerFormType: VisitSystemPlannerFormType): Promise<void> => {
+      const currentAppointment = appointmentRef.current;
+      if (!currentAppointment) {
+        throw new Error('Visit appointment is not ready.');
+      }
+      const [published, crmSource] = await Promise.all([
+        getPublishedPlannerForm(plannerFormType),
+        resolveFreshCrmPrefillSource(currentAppointment),
+      ]);
+      setTemplateLoadError(null);
+      setSession((current) => {
+        if (!current) return current;
+        if (current.dynamicForm?.completedAt) {
+          const kept: VisitSession = {
+            ...current,
+            selectedPlannerFormType: plannerFormType,
+          };
+          saveVisitSession(kept);
+          return kept;
+        }
+
+        const previousValues = current.dynamicForm?.values || {};
+        const previousFields = current.dynamicForm?.formSchemaSnapshot?.fields || [];
+        const publishedForVisit = stripHiddenRfcPlannerFields({
+          ...published,
+          type: plannerFormType,
+        });
+        const valueFields = resolvePlannerValueFields(publishedForVisit);
+        let nextValues = createEmptyDynamicFormValues(valueFields);
+
+        for (const field of valueFields) {
+          if (previousValues[field.id] != null && previousValues[field.id] !== '') {
+            nextValues[field.id] = previousValues[field.id];
+            continue;
+          }
+          const byKey = previousFields.find((row) => row.key === field.key);
+          if (byKey && previousValues[byKey.id] != null && previousValues[byKey.id] !== '') {
+            nextValues[field.id] = previousValues[byKey.id];
+          }
+        }
+
+        nextValues = prefillDynamicFormValuesFromCrm(valueFields, nextValues, crmSource);
+
+        const next: VisitSession = {
+          ...current,
+          selectedPlannerFormType: plannerFormType,
+          dynamicForm: {
+            formTemplateType: plannerFormType,
+            formTemplateVersion: published.version,
+            formSchemaSnapshot: {
+              ...publishedForVisit,
+              type: plannerFormType,
+              fields: valueFields,
+            },
+            values: nextValues,
+          },
+          rfcForm: undefined,
+          loanRentalForm: undefined,
+          newServiceLevelForm: undefined,
+        };
+        saveVisitSession(next);
+        return next;
+      });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!appointment || !session) return;
+    if (
+      !visitNeedsPublishedFormChooser({
+        appointmentType: appointment.appointmentType,
+        appointmentStatus: appointment.status,
+        attended: appointment.attended,
+        selectedPlannerFormType: session.selectedPlannerFormType,
+      })
+    ) {
+      return;
+    }
+    void loadChooserPublishedForms();
+  }, [
+    appointment,
+    session?.selectedPlannerFormType,
+    loadChooserPublishedForms,
+  ]);
+
   /**
    * Creates or updates a draft sales request for the active sheet visit.
    * Does not submit or lock — locking only happens on Submit for Approval.
@@ -1060,6 +1204,11 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
   const upsertDraftSalesRequest = useCallback(async (
     sessionOverride?: VisitSession,
   ): Promise<SalesRequest> => {
+    if (draftUpsertPromiseRef.current) {
+      return draftUpsertPromiseRef.current;
+    }
+
+    const run = (async (): Promise<SalesRequest> => {
     const currentAppointment = appointmentRef.current;
     const currentSession = sessionOverride ?? sessionRef.current;
 
@@ -1088,6 +1237,8 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
       const editable = await findEditableSalesRequestForAppointment(currentAppointment._id);
       requestId = editable?._id;
     }
+    const draftWrite = resolveSalesRequestDraftWrite(requestId, requestId);
+    requestId = draftWrite.action === 'update' ? draftWrite.id : undefined;
 
     const saved = requestId
       ? await updateSalesRequest(requestId, {
@@ -1114,6 +1265,14 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
     setSession(nextSession);
     saveVisitSession(nextSession);
     return saved;
+    })();
+
+    draftUpsertPromiseRef.current = run;
+    try {
+      return await run;
+    } finally {
+      draftUpsertPromiseRef.current = null;
+    }
   }, []);
 
   useEffect(() => {
@@ -1166,6 +1325,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
     session?.newServiceLevelForm,
     session?.newServiceLevelCompletedAt,
     session?.dynamicForm,
+    session?.selectedPlannerFormType,
     appointment,
     showCompletionDialog,
     persistVisitProgress,
@@ -1193,17 +1353,45 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
   const leadId = getAppointmentLeadId(appointment);
   const isEditingCompletedVisit =
     appointment.status === 'completed' || Boolean(appointment.attended);
+  const effectivePlannerFormType = resolveVisitPlannerFormType(
+    appointment.appointmentType,
+    session.selectedPlannerFormType,
+  );
+  const hasLoadedSheetForm = Boolean(
+    session.dynamicForm ||
+      session.rfcForm ||
+      session.loanRentalForm ||
+      session.newServiceLevelForm,
+  );
+  const needsChooser = visitNeedsPublishedFormChooser({
+    appointmentType: appointment.appointmentType,
+    appointmentStatus: appointment.status,
+    attended: appointment.attended,
+    selectedPlannerFormType: session.selectedPlannerFormType,
+  });
+  const allowsNotesPhotosAndSubmit = visitAllowsNotesPhotosAndSubmit({
+    appointmentType: appointment.appointmentType,
+    appointmentStatus: appointment.status,
+    attended: appointment.attended,
+    selectedPlannerFormType: session.selectedPlannerFormType,
+    hasLoadedSheetForm,
+  });
+  const workspaceSurface = resolveVisitWorkspaceSurface({
+    appointmentType: appointment.appointmentType,
+    appointmentStatus: appointment.status,
+    attended: appointment.attended,
+    selectedPlannerFormType: session.selectedPlannerFormType,
+    hasLoadedSheetForm,
+    chooserError,
+    templateLoadError,
+  });
   const hasDynamicForm = Boolean(session.dynamicForm);
-  const isRfcVisit =
-    isRfcSheetAppointmentType(appointment.appointmentType) &&
-    (hasDynamicForm || Boolean(session.rfcForm));
+  const isRfcVisit = effectivePlannerFormType === 'rfc' && hasLoadedSheetForm;
   const isLoanRentalVisit =
-    isLoanRentalAppointmentType(appointment.appointmentType) &&
-    (hasDynamicForm || Boolean(session.loanRentalForm));
+    effectivePlannerFormType === 'loan_rental' && hasLoadedSheetForm;
   const isNewServiceLevelVisit =
-    isNewServiceLevelAppointmentType(appointment.appointmentType) &&
-    (hasDynamicForm || Boolean(session.newServiceLevelForm));
-  const hasSheetForm = isRfcVisit || isLoanRentalVisit || isNewServiceLevelVisit;
+    effectivePlannerFormType === 'new_service_level' && hasLoadedSheetForm;
+  const hasSheetForm = Boolean(effectivePlannerFormType && hasLoadedSheetForm);
   const rfcProgress = session.rfcForm ? getRfcFormProgress(session.rfcForm) : null;
   const loanRentalProgress = session.loanRentalForm
     ? getLoanRentalFormProgress(session.loanRentalForm)
@@ -1226,6 +1414,49 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
    */
   function updateSession(changes: Partial<VisitSession>): void {
     setSession((current) => (current ? { ...current, ...changes } : current));
+  }
+
+  async function handleSelectPublishedForm(type: VisitSystemPlannerFormType): Promise<void> {
+    setSelectingFormType(type);
+    setTemplateLoadError(null);
+    const next: VisitSession = {
+      ...session,
+      selectedPlannerFormType: type,
+    };
+    setSession(next);
+    sessionRef.current = next;
+    saveVisitSession(next);
+    setActiveTab(plannerFormTypeToVisitTab(type));
+    try {
+      await persistVisitProgress(false, next);
+      await applyPublishedPlannerTemplate(type);
+      await persistVisitProgress(false);
+    } catch {
+      setTemplateLoadError(
+        'Could not load the published form. Your selection is saved. Retry to continue.',
+      );
+    } finally {
+      setSelectingFormType(null);
+    }
+  }
+
+  async function handleRetryPublishedTemplate(): Promise<void> {
+    const type = resolveVisitPlannerFormType(
+      appointment.appointmentType,
+      session.selectedPlannerFormType,
+    );
+    if (!type) {
+      await loadChooserPublishedForms();
+      return;
+    }
+    setTemplateLoadError(null);
+    try {
+      await applyPublishedPlannerTemplate(type);
+    } catch {
+      setTemplateLoadError(
+        'Could not load the published form. Your selection is saved. Retry to continue.',
+      );
+    }
   }
 
   /**
@@ -1759,6 +1990,37 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
           </div>
         )}
 
+        {needsChooser && (
+          <DiaryVisitFormChooser
+            forms={chooserForms}
+            loading={chooserLoading}
+            error={chooserError}
+            selectingType={selectingFormType}
+            onRetry={() => void loadChooserPublishedForms()}
+            onSelect={(type) => void handleSelectPublishedForm(type)}
+          />
+        )}
+
+        {workspaceSurface === 'form_loading' && (
+          <div className="mb-3 flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-8 text-sm font-medium text-slate-500 shadow-sm">
+            <Loader2 className="h-5 w-5 animate-spin text-[#0969a9]" />
+            Loading the published form…
+          </div>
+        )}
+
+        {workspaceSurface === 'form_error' && (
+          <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-800 shadow-sm">
+            <p className="font-medium">{templateLoadError}</p>
+            <button
+              type="button"
+              onClick={() => void handleRetryPublishedTemplate()}
+              className="mt-3 inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-white px-4 text-sm font-bold text-red-800 ring-1 ring-red-200"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         {hasSheetForm && (
           <div className="mb-3 flex gap-1 rounded-2xl bg-white p-1 shadow-sm">
             {isRfcVisit && (
@@ -2024,6 +2286,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
 
         <div
           className={`space-y-3 ${
+            !allowsNotesPhotosAndSubmit ||
             (isRfcVisit && activeTab === 'rfc') ||
             (isLoanRentalVisit && activeTab === 'loan_rental') ||
             (isNewServiceLevelVisit && activeTab === 'new_service_level')
@@ -2126,6 +2389,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
       </div>
 
       {!showCompletionDialog &&
+        allowsNotesPhotosAndSubmit &&
         !(
           (isRfcVisit && activeTab === 'rfc') ||
           (isLoanRentalVisit && activeTab === 'loan_rental') ||

@@ -10,6 +10,10 @@ import {
 } from './newServiceLevelFormUtils';
 import { normalizeRfcForm, type RfcFormData } from './rfcFormUtils';
 import type { PlannerFormPublished, PlannerFormType } from '../../lib/api';
+import {
+  isVisitSystemPlannerFormType,
+  type VisitSystemPlannerFormType,
+} from './visitFormSelection';
 import type { DynamicFormValues } from './DynamicPlannerFormRenderer';
 
 export type VisitCompletionAction = 'finish_close' | 'book_next_visit';
@@ -108,6 +112,8 @@ export interface StoredVisitRecord {
   newServiceLevelCompletedAt?: string;
   /** Dynamic Super Admin form payload (preferred over legacy sheet fields). */
   dynamicForm?: VisitDynamicFormState;
+  /** Published form chosen on a generic Visit; survives local + server restore. */
+  selectedPlannerFormType?: VisitSystemPlannerFormType;
 }
 
 /**
@@ -147,6 +153,8 @@ export interface VisitSession {
    * Submission for approval happens separately and locks the appointment.
    */
   salesRequestId?: string;
+  /** Published form chosen after Start Visit on a generic Visit appointment. */
+  selectedPlannerFormType?: VisitSystemPlannerFormType;
 }
 
 /**
@@ -191,6 +199,11 @@ function normalizeVisitSession(raw: Partial<VisitSession> & { appointmentId: str
         ? (raw.dynamicForm as VisitDynamicFormState)
         : undefined,
     salesRequestId: typeof raw.salesRequestId === 'string' ? raw.salesRequestId : undefined,
+    selectedPlannerFormType: isVisitSystemPlannerFormType(raw.selectedPlannerFormType)
+      ? raw.selectedPlannerFormType
+      : isVisitSystemPlannerFormType(raw.dynamicForm?.formTemplateType)
+        ? raw.dynamicForm.formTemplateType
+        : undefined,
   };
 }
 
@@ -255,6 +268,7 @@ export function sessionFromStoredRecord(
     newServiceLevelForm: record.newServiceLevelForm,
     newServiceLevelCompletedAt: record.newServiceLevelCompletedAt,
     dynamicForm: record.dynamicForm,
+    selectedPlannerFormType: record.selectedPlannerFormType,
   });
 }
 
@@ -414,6 +428,7 @@ export function buildVisitRecord(
     newServiceLevelForm: session.newServiceLevelForm,
     newServiceLevelCompletedAt: session.newServiceLevelCompletedAt,
     dynamicForm: session.dynamicForm,
+    selectedPlannerFormType: session.selectedPlannerFormType,
   };
 }
 
@@ -470,6 +485,11 @@ export function parseStoredVisitRecord(feedback?: string | null): StoredVisitRec
         raw.dynamicForm.formSchemaSnapshot &&
         raw.dynamicForm.values
           ? raw.dynamicForm
+          : undefined,
+      selectedPlannerFormType: isVisitSystemPlannerFormType(raw.selectedPlannerFormType)
+        ? raw.selectedPlannerFormType
+        : isVisitSystemPlannerFormType(raw.dynamicForm?.formTemplateType)
+          ? raw.dynamicForm.formTemplateType
           : undefined,
     };
   } catch {

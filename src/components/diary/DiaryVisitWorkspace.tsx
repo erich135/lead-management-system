@@ -591,7 +591,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
   const [locationDeclined, setLocationDeclined] = useState(false);
   const locationPromptShownRef = useRef<string | null>(null);
   const [chooserForms, setChooserForms] = useState<PublishedVisitFormMeta[]>([]);
-  const [chooserLoading, setChooserLoading] = useState(false);
+  const [chooserLoading, setChooserLoading] = useState(true);
   const [chooserError, setChooserError] = useState<string | null>(null);
   const [selectingFormType, setSelectingFormType] = useState<string | null>(
     null,
@@ -1202,6 +1202,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
     void loadChooserPublishedForms();
   }, [
     appointment,
+    session?.appointmentId,
     session?.selectedPlannerFormType,
     loadChooserPublishedForms,
   ]);

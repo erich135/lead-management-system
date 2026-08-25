@@ -1,6 +1,8 @@
 ﻿import React, { useCallback, useEffect, useState } from 'react';
 import {
+  Archive,
   ArrowLeft,
+  ClipboardList,
   FileText,
   Loader2,
   Pencil,
@@ -11,10 +13,14 @@ import {
   X,
 } from 'lucide-react';
 import {
+  archiveAdminPlannerForm,
+  createAdminPlannerForm,
   getAdminPlannerForm,
   listAdminPlannerForms,
   publishAdminPlannerForm,
+  restoreAdminPlannerForm,
   saveAdminPlannerFormDraft,
+  unpublishAdminPlannerForm,
   type PlannerFormAdminTemplate,
   type PlannerFormContent,
   type PlannerFormType,
@@ -26,14 +32,16 @@ import {
   syncContentFromElements,
 } from './formBuilderUtils';
 import { VisualFormBuilder } from './VisualFormBuilder';
+import {
+  generalVisitFormStatusLabel,
+  isGeneralVisitAdminForm,
+  splitAdminPlannerForms,
+} from './plannerFormEditorUtils';
 
 interface PlannerFormEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
-
-/** System forms shown on the Form Editor home screen. */
-const SYSTEM_FORM_TYPES: PlannerFormType[] = ['rfc', 'loan_rental', 'new_service_level'];
 
 /**
  * Returns an icon for a known system form type.
@@ -41,6 +49,7 @@ const SYSTEM_FORM_TYPES: PlannerFormType[] = ['rfc', 'loan_rental', 'new_service
 function formTypeIcon(type: string): React.ReactNode {
   if (type === 'loan_rental') return <Truck className="h-5 w-5" />;
   if (type === 'new_service_level') return <Wrench className="h-5 w-5" />;
+  if (type.startsWith('general_visit_')) return <ClipboardList className="h-5 w-5" />;
   return <FileText className="h-5 w-5" />;
 }
 
@@ -65,17 +74,24 @@ export function PlannerFormEditorModal({
   onClose,
 }: PlannerFormEditorModalProps): React.ReactElement | null {
   const [forms, setForms] = useState<PlannerFormAdminTemplate[]>([]);
+  const [generalVisitForms, setGeneralVisitForms] = useState<PlannerFormAdminTemplate[]>([]);
   const [listLoading, setListLoading] = useState(false);
   const [selectedType, setSelectedType] = useState<PlannerFormType | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<PlannerFormAdminTemplate | null>(null);
   const [draft, setDraft] = useState<PlannerFormContent | null>(null);
   const [publishedVersion, setPublishedVersion] = useState<number | null>(null);
   const [hasUnpublishedChanges, setHasUnpublishedChanges] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [mutating, setMutating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [showDonePrompt, setShowDonePrompt] = useState(false);
+  const [showCreateGeneralVisit, setShowCreateGeneralVisit] = useState(false);
+  const [createName, setCreateName] = useState('');
+  const [createDescription, setCreateDescription] = useState('');
+  const [creating, setCreating] = useState(false);
 
   /**
    * Loads Form Editor list (draft flag from backend).
@@ -85,23 +101,9 @@ export function PlannerFormEditorModal({
     setError(null);
     try {
       const result = await listAdminPlannerForms();
-      const byType = new Map((result.forms || []).map((form) => [form.type, form]));
-      setForms(
-        SYSTEM_FORM_TYPES.map(
-          (type) =>
-            byType.get(type) || {
-              type,
-              draft: {
-                name: fallbackMeta(type).name,
-                title: fallbackMeta(type).name,
-                description: fallbackMeta(type).description,
-                fields: [],
-              },
-              published: null,
-              hasUnpublishedChanges: false,
-            },
-        ),
-      );
+      const split = splitAdminPlannerForms(result.forms || []);
+      setForms(split.systemForms);
+      setGeneralVisitForms(split.generalVisitForms);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load forms');
     } finally {
@@ -135,6 +137,7 @@ export function PlannerFormEditorModal({
       setDraft(nextDraft);
       setPublishedVersion(template.published?.version ?? null);
       setHasUnpublishedChanges(Boolean(template.hasUnpublishedChanges));
+      setSelectedTemplate(template);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load form template');
       setSelectedType(null);
@@ -147,10 +150,12 @@ export function PlannerFormEditorModal({
   useEffect(() => {
     if (!isOpen) {
       setSelectedType(null);
+      setSelectedTemplate(null);
       setDraft(null);
       setError(null);
       setMessage(null);
       setShowDonePrompt(false);
+      setShowCreateGeneralVisit(false);
       return;
     }
     const previousOverflow = document.body.style.overflow;
@@ -166,6 +171,7 @@ export function PlannerFormEditorModal({
    */
   function goBackToFormList(): void {
     setSelectedType(null);
+    setSelectedTemplate(null);
     setDraft(null);
     setError(null);
     setMessage(null);
@@ -255,11 +261,99 @@ export function PlannerFormEditorModal({
     }
   }
 
-  const selectedListItem = forms.find((form) => form.type === selectedType);
+  /**
+   * Creates a draft General Visit form from the name/description dialog.
+   */
+  async function handleCreateGeneralVisit(): Promise<void> {
+    const name = createName.trim();
+    if (!name) {
+      setError('Enter a form name.');
+      return;
+    }
+    setCreating(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const created = await createAdminPlannerForm({
+        name,
+        description: createDescription.trim() || undefined,
+        category: 'general_visit',
+      });
+      setShowCreateGeneralVisit(false);
+      setCreateName('');
+      setCreateDescription('');
+      setMessage('Draft General Visit form created. It stays hidden from reps until you publish.');
+      await loadFormList();
+      await loadType(created.type);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to create General Visit form');
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleUnpublish(): Promise<void> {
+    if (!selectedType) return;
+    setMutating(true);
+    setError(null);
+    try {
+      const updated = await unpublishAdminPlannerForm(selectedType);
+      setSelectedTemplate(updated);
+      setPublishedVersion(null);
+      setHasUnpublishedChanges(true);
+      setMessage('Form unpublished. Representatives will not see it.');
+      await loadFormList();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to unpublish form');
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  async function handleArchive(): Promise<void> {
+    if (!selectedType) return;
+    if (!window.confirm('Archive this form? Representatives will not see it.')) return;
+    setMutating(true);
+    setError(null);
+    try {
+      const updated = await archiveAdminPlannerForm(selectedType);
+      setSelectedTemplate(updated);
+      setMessage('Form archived. It is hidden from representatives.');
+      await loadFormList();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to archive form');
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  async function handleRestore(): Promise<void> {
+    if (!selectedType) return;
+    setMutating(true);
+    setError(null);
+    try {
+      const updated = await restoreAdminPlannerForm(selectedType);
+      setSelectedTemplate(updated);
+      setMessage('Form restored. Publish it again if representatives should see it.');
+      await loadFormList();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to restore form');
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  const selectedListItem =
+    forms.find((form) => form.type === selectedType) ||
+    generalVisitForms.find((form) => form.type === selectedType) ||
+    selectedTemplate;
+  const isSelectedGeneralVisit = Boolean(
+    selectedListItem && isGeneralVisitAdminForm(selectedListItem),
+  );
   const headerTitle = selectedType
     ? selectedListItem?.published?.name ||
       selectedListItem?.draft?.name ||
-      fallbackMeta(selectedType).name
+      (isSelectedGeneralVisit ? 'General Visit Form' : fallbackMeta(selectedType).name)
     : 'Form Editor';
 
   return (
@@ -367,6 +461,74 @@ export function PlannerFormEditorModal({
                   })}
                 </div>
               )}
+
+              <div className="mt-6 border-t border-slate-200 pt-4">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900">General Visit forms</h3>
+                    <p className="text-xs text-slate-500">
+                      Create custom visit forms. Drafts stay hidden from representatives until
+                      published.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateGeneralVisit(true);
+                      setError(null);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-ars-primary px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-ars-primary/90"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Create General Visit Form
+                  </button>
+                </div>
+
+                {generalVisitForms.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-6 text-center text-sm text-slate-500">
+                    No custom General Visit forms yet.
+                  </p>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {generalVisitForms.map((item) => {
+                      const name = item.published?.name || item.draft?.name || 'General Visit';
+                      const description =
+                        item.published?.description || item.draft?.description || '';
+                      return (
+                        <button
+                          key={item.type}
+                          type="button"
+                          onClick={() => void loadType(item.type)}
+                          className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:border-ars-primary hover:shadow-sm"
+                        >
+                          <span className="flex items-start gap-3">
+                            <span className="rounded-xl bg-slate-50 p-2 text-ars-primary shadow-sm">
+                              {formTypeIcon(item.type)}
+                            </span>
+                            <span>
+                              <span className="block text-base font-extrabold text-slate-900">
+                                {name}
+                              </span>
+                              {description ? (
+                                <span className="mt-0.5 block text-sm text-slate-500">
+                                  {description}
+                                </span>
+                              ) : null}
+                            </span>
+                          </span>
+                          <p className="text-xs font-bold text-slate-600">
+                            {generalVisitFormStatusLabel(item)}
+                          </p>
+                          <span className="inline-flex w-fit items-center gap-1.5 rounded-lg bg-ars-primary/10 px-2.5 py-1 text-xs font-bold text-ars-primary">
+                            <Pencil className="h-3.5 w-3.5" />
+                            Open builder
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           ) : loading || !draft ? (
             <div className="flex items-center justify-center py-16 text-slate-500">
@@ -408,6 +570,37 @@ export function PlannerFormEditorModal({
               Back to Form Editor
             </button>
             <div className="flex flex-wrap gap-2">
+              {isSelectedGeneralVisit && selectedListItem?.published ? (
+                <button
+                  type="button"
+                  disabled={saving || publishing || mutating}
+                  onClick={() => void handleUnpublish()}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Unpublish
+                </button>
+              ) : null}
+              {isSelectedGeneralVisit && selectedListItem?.isActive !== false ? (
+                <button
+                  type="button"
+                  disabled={saving || publishing || mutating}
+                  onClick={() => void handleArchive()}
+                  className="inline-flex items-center gap-2 rounded-xl border border-amber-300 px-4 py-2.5 text-sm font-bold text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+                >
+                  <Archive className="h-4 w-4" />
+                  Archive
+                </button>
+              ) : null}
+              {isSelectedGeneralVisit && selectedListItem?.isActive === false ? (
+                <button
+                  type="button"
+                  disabled={saving || publishing || mutating}
+                  onClick={() => void handleRestore()}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Restore
+                </button>
+              ) : null}
               <button
                 type="button"
                 disabled={saving || publishing}
@@ -419,7 +612,7 @@ export function PlannerFormEditorModal({
               </button>
               <button
                 type="button"
-                disabled={saving || publishing}
+                disabled={saving || publishing || selectedListItem?.isActive === false}
                 onClick={() => void handlePublish()}
                 className="inline-flex items-center gap-2 rounded-xl bg-ars-primary px-4 py-2.5 text-sm font-bold text-white hover:bg-ars-primary/90 disabled:opacity-50"
               >
@@ -428,6 +621,55 @@ export function PlannerFormEditorModal({
               </button>
             </div>
           </footer>
+        ) : null}
+
+        {showCreateGeneralVisit ? (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+              <h3 className="text-lg font-extrabold text-slate-900">Create General Visit Form</h3>
+              <p className="mt-2 text-sm text-slate-600">
+                Creates a draft only. Representatives will not see it until you publish.
+              </p>
+              <label className="mt-4 block text-xs font-bold uppercase tracking-wide text-slate-500">
+                Form name
+                <input
+                  type="text"
+                  value={createName}
+                  onChange={(event) => setCreateName(event.target.value)}
+                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-900"
+                  placeholder="Site safety walk"
+                />
+              </label>
+              <label className="mt-3 block text-xs font-bold uppercase tracking-wide text-slate-500">
+                Description
+                <textarea
+                  value={createDescription}
+                  onChange={(event) => setCreateDescription(event.target.value)}
+                  rows={3}
+                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-900"
+                  placeholder="Optional details shown to representatives"
+                />
+              </label>
+              <div className="mt-4 flex flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={creating}
+                  onClick={() => setShowCreateGeneralVisit(false)}
+                  className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-bold text-slate-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={creating}
+                  onClick={() => void handleCreateGeneralVisit()}
+                  className="rounded-xl bg-ars-primary px-3 py-2 text-sm font-bold text-white hover:bg-ars-primary/90 disabled:opacity-50"
+                >
+                  {creating ? 'Creating…' : 'Create draft'}
+                </button>
+              </div>
+            </div>
+          </div>
         ) : null}
 
         {showDonePrompt ? (

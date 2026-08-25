@@ -45,8 +45,10 @@ import {
   normalizeDiaryAppointmentType,
 } from './diaryUtils';
 import {
+  buildDynamicVisitSalesRequestFormData,
   filterVisitChooserPublishedForms,
-  isVisitSystemPlannerFormType,
+  isGeneralVisitPlannerFormType,
+  isVisitChooserPlannerFormType,
   plannerFormTypeToVisitTab,
   resolveSalesRequestDraftWrite,
   resolveVisitPlannerFormType,
@@ -55,7 +57,7 @@ import {
   visitAllowsNotesPhotosAndSubmit,
   visitNeedsPublishedFormChooser,
   type PublishedVisitFormMeta,
-  type VisitSystemPlannerFormType,
+  type VisitWorkspaceTab,
 } from './visitFormSelection';
 import DiaryVisitFormChooser from './DiaryVisitFormChooser';
 import DiaryRfcForm from './DiaryRfcForm';
@@ -98,9 +100,6 @@ import {
 } from './newServiceLevelFormUtils';
 
 const AUTO_SAVE_DELAY_MS = 1500;
-
-/** Tabs shown inside an active visit. Sheet tabs are type-specific. */
-type VisitWorkspaceTab = 'rfc' | 'loan_rental' | 'new_service_level' | 'notes';
 
 interface DiaryVisitWorkspaceProps {
   appointment: PlannerAppointment | null;
@@ -333,12 +332,17 @@ function resolveSheetPayloadFromSession(session: VisitSession, appointment: Plan
     if (!requestType) return null;
     return {
       requestType,
-      formData: {
+      formData: buildDynamicVisitSalesRequestFormData({
         formTemplateType: session.dynamicForm.formTemplateType,
+        formTemplateName:
+          session.dynamicForm.formTemplateName ||
+          session.dynamicForm.formSchemaSnapshot.name ||
+          session.dynamicForm.formSchemaSnapshot.title,
+        formTemplateId: session.dynamicForm.formTemplateId,
         formTemplateVersion: session.dynamicForm.formTemplateVersion,
         formSchemaSnapshot: session.dynamicForm.formSchemaSnapshot,
         values: session.dynamicForm.values,
-      },
+      }),
     };
   }
 
@@ -589,7 +593,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
   const [chooserForms, setChooserForms] = useState<PublishedVisitFormMeta[]>([]);
   const [chooserLoading, setChooserLoading] = useState(false);
   const [chooserError, setChooserError] = useState<string | null>(null);
-  const [selectingFormType, setSelectingFormType] = useState<VisitSystemPlannerFormType | null>(
+  const [selectingFormType, setSelectingFormType] = useState<string | null>(
     null,
   );
   const [templateLoadError, setTemplateLoadError] = useState<string | null>(null);
@@ -680,7 +684,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
       loanRentalForm: undefined,
       newServiceLevelForm: undefined,
       dynamicForm: restoredSession.dynamicForm,
-      selectedPlannerFormType: isVisitSystemPlannerFormType(restoredSelection)
+      selectedPlannerFormType: isVisitChooserPlannerFormType(restoredSelection)
         ? restoredSelection
         : plannerFormType || undefined,
     });
@@ -754,8 +758,11 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
 
               const next: VisitSession = {
                 ...current,
+                selectedPlannerFormType: current.selectedPlannerFormType || plannerFormType,
                 dynamicForm: {
                   formTemplateType: plannerFormType,
+                  formTemplateName: published.name || published.title,
+                  formTemplateId: published.id,
                   formTemplateVersion: published.version,
                   formSchemaSnapshot: {
                     ...publishedForVisit,
@@ -1111,7 +1118,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
   }, []);
 
   const applyPublishedPlannerTemplate = useCallback(
-    async (plannerFormType: VisitSystemPlannerFormType): Promise<void> => {
+    async (plannerFormType: string): Promise<void> => {
       const currentAppointment = appointmentRef.current;
       if (!currentAppointment) {
         throw new Error('Visit appointment is not ready.');
@@ -1159,6 +1166,8 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
           selectedPlannerFormType: plannerFormType,
           dynamicForm: {
             formTemplateType: plannerFormType,
+            formTemplateName: published.name || published.title,
+            formTemplateId: published.id,
             formTemplateVersion: published.version,
             formSchemaSnapshot: {
               ...publishedForVisit,
@@ -1391,6 +1400,8 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
     effectivePlannerFormType === 'loan_rental' && hasLoadedSheetForm;
   const isNewServiceLevelVisit =
     effectivePlannerFormType === 'new_service_level' && hasLoadedSheetForm;
+  const isGeneralVisitVisit =
+    isGeneralVisitPlannerFormType(effectivePlannerFormType) && hasLoadedSheetForm;
   const hasSheetForm = Boolean(effectivePlannerFormType && hasLoadedSheetForm);
   const rfcProgress = session.rfcForm ? getRfcFormProgress(session.rfcForm) : null;
   const loanRentalProgress = session.loanRentalForm
@@ -1407,7 +1418,9 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
         ? Boolean(session.loanRentalCompletedAt)
         : isNewServiceLevelVisit
           ? Boolean(session.newServiceLevelCompletedAt)
-          : true;
+          : isGeneralVisitVisit
+            ? Boolean(session.dynamicForm?.completedAt)
+            : true;
 
   /**
    * Updates one field on the active visit session.
@@ -1416,7 +1429,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
     setSession((current) => (current ? { ...current, ...changes } : current));
   }
 
-  async function handleSelectPublishedForm(type: VisitSystemPlannerFormType): Promise<void> {
+  async function handleSelectPublishedForm(type: string): Promise<void> {
     setSelectingFormType(type);
     setTemplateLoadError(null);
     const next: VisitSession = {
@@ -2102,6 +2115,33 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
                 )}
               </button>
             )}
+            {isGeneralVisitVisit && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('general_visit')}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${
+                  activeTab === 'general_visit'
+                    ? 'bg-teal-700 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <FileText className="h-4 w-4" />
+                {session.dynamicForm?.formTemplateName ||
+                  session.dynamicForm?.formSchemaSnapshot.name ||
+                  'General Visit'}
+                {session.dynamicForm?.completedAt ? (
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
+                      activeTab === 'general_visit'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    Saved
+                  </span>
+                ) : null}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setActiveTab('notes')}
@@ -2284,12 +2324,54 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
             </>
           )}
 
+        {isGeneralVisitVisit && activeTab === 'general_visit' && session.dynamicForm && (
+          <>
+            <DynamicPlannerFormRenderer
+              schema={session.dynamicForm.formSchemaSnapshot}
+              values={session.dynamicForm.values}
+              showValidation={showDynamicValidation}
+              disabled={showCompletionDialog}
+              onChange={(nextValues) =>
+                updateSession({
+                  dynamicForm: {
+                    ...session.dynamicForm!,
+                    values: nextValues,
+                    completedAt: undefined,
+                  },
+                })
+              }
+            />
+            {!showCompletionDialog && (
+              <div className="sticky bottom-0 z-10 mt-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.10)]">
+                <button
+                  type="button"
+                  disabled={isSaving}
+                  onClick={() => void handleFinishDynamicForm()}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-teal-800 disabled:opacity-50"
+                >
+                  {isSaving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  Finish form & Continue to Notes
+                </button>
+                <p className="mt-2 text-center text-[11px] text-slate-500">
+                  Required fields must be completed. Saves as a draft until you choose Submit for
+                  Approval.
+                </p>
+              </div>
+            )}
+          </>
+        )}
+
         <div
           className={`space-y-3 ${
             !allowsNotesPhotosAndSubmit ||
             (isRfcVisit && activeTab === 'rfc') ||
             (isLoanRentalVisit && activeTab === 'loan_rental') ||
-            (isNewServiceLevelVisit && activeTab === 'new_service_level')
+            (isNewServiceLevelVisit && activeTab === 'new_service_level') ||
+            (isGeneralVisitVisit && activeTab === 'general_visit')
               ? 'hidden'
               : ''
           }`}
@@ -2393,7 +2475,8 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
         !(
           (isRfcVisit && activeTab === 'rfc') ||
           (isLoanRentalVisit && activeTab === 'loan_rental') ||
-          (isNewServiceLevelVisit && activeTab === 'new_service_level')
+          (isNewServiceLevelVisit && activeTab === 'new_service_level') ||
+          (isGeneralVisitVisit && activeTab === 'general_visit')
         ) && (
         <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] sm:px-6">
           {hasSheetForm && !sheetCompleted && (
@@ -2402,7 +2485,9 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
                 ? 'Return to the RFC Sheet and select “Finish RFC & Continue to Notes” before finishing this visit.'
                 : isLoanRentalVisit
                   ? 'Return to Loan & Rental and select “Finish Loan & Rental & Continue to Notes” before finishing this visit.'
-                  : 'Return to New Service Level and select “Finish Service Level & Continue to Notes” before finishing this visit.'}
+                  : isGeneralVisitVisit
+                    ? 'Return to the visit form and select “Finish form & Continue to Notes” before submitting.'
+                    : 'Return to New Service Level and select “Finish Service Level & Continue to Notes” before finishing this visit.'}
             </div>
           )}
           <div className="w-full">

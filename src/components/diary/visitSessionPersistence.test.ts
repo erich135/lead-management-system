@@ -47,3 +47,33 @@ test('notes, photos and start time survive attaching a selected form', () => {
   assert.equal(restored.photos[0].id, 'photo-2');
   assert.equal(restored.startedAt, startedAt);
 });
+
+test('selected custom General Visit form survives stored-record restore', () => {
+  const session = createVisitSession('appt-generic-gv');
+  session.notes = 'Gate signed in';
+  session.selectedPlannerFormType = 'general_visit_site_check';
+  session.dynamicForm = {
+    formTemplateType: 'general_visit_site_check',
+    formTemplateName: 'Site Check',
+    formTemplateVersion: 1,
+    formSchemaSnapshot: {
+      name: 'Site Check',
+      title: 'Site Check',
+      version: 1,
+      publishedAt: new Date().toISOString(),
+      fields: [],
+    },
+    values: { fld_notes: 'All clear' },
+  };
+
+  const restored = sessionFromStoredRecord(
+    'appt-generic-gv',
+    parseStoredVisitRecord(
+      JSON.stringify(buildVisitRecord(session, new Date().toISOString(), 20, { inProgress: true })),
+    )!,
+  );
+
+  assert.equal(restored.selectedPlannerFormType, 'general_visit_site_check');
+  assert.equal(restored.dynamicForm?.formTemplateName, 'Site Check');
+  assert.equal(restored.notes, 'Gate signed in');
+});

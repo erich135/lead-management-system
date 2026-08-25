@@ -1,7 +1,8 @@
 /**
  * Visit published-form selection helpers.
  * Generic Site Visit appointments choose RFC / Loan and Rental / New Service Level
- * after Start Visit. Typed appointments keep their scheduled form.
+ * plus any published custom General Visit forms after Start Visit.
+ * Typed appointments keep their scheduled form.
  */
 
 import type { SalesRequestType } from '../../lib/api';
@@ -10,6 +11,13 @@ import { appointmentTypeToPlannerFormType, appointmentTypeToSalesRequestType } f
 export const VISIT_SYSTEM_PLANNER_FORM_TYPES = ['rfc', 'loan_rental', 'new_service_level'] as const;
 
 export type VisitSystemPlannerFormType = (typeof VISIT_SYSTEM_PLANNER_FORM_TYPES)[number];
+
+export type VisitWorkspaceTab =
+  | 'rfc'
+  | 'loan_rental'
+  | 'new_service_level'
+  | 'general_visit'
+  | 'notes';
 
 export const VISIT_CHOOSER_FORM_OPTIONS: Array<{
   type: VisitSystemPlannerFormType;
@@ -45,6 +53,20 @@ export function isVisitSystemPlannerFormType(
 }
 
 /**
+ * Returns true when the value is a custom General Visit planner slug.
+ */
+export function isGeneralVisitPlannerFormType(value?: string | null): boolean {
+  return typeof value === 'string' && /^general_visit_[a-z0-9_]+$/.test(value);
+}
+
+/**
+ * Returns true when the value can be restored as the visit's selected published form.
+ */
+export function isVisitChooserPlannerFormType(value?: string | null): boolean {
+  return isVisitSystemPlannerFormType(value) || isGeneralVisitPlannerFormType(value);
+}
+
+/**
  * Maps a selected published planner form to the sales-request type used on submit.
  */
 export function plannerFormTypeToSalesRequestType(
@@ -53,6 +75,7 @@ export function plannerFormTypeToSalesRequestType(
   if (value === 'rfc') return 'rfc';
   if (value === 'loan_rental') return 'loan_rental';
   if (value === 'new_service_level') return 'rfc_new_service_level';
+  if (isGeneralVisitPlannerFormType(value)) return 'general_visit';
   return null;
 }
 
@@ -63,9 +86,9 @@ export function plannerFormTypeToSalesRequestType(
 export function resolveVisitPlannerFormType(
   appointmentType?: string,
   selectedPlannerFormType?: string | null,
-): VisitSystemPlannerFormType | null {
-  if (isVisitSystemPlannerFormType(selectedPlannerFormType)) {
-    return selectedPlannerFormType;
+): string | null {
+  if (isVisitChooserPlannerFormType(selectedPlannerFormType)) {
+    return selectedPlannerFormType as string;
   }
   const fromAppointment = appointmentTypeToPlannerFormType(appointmentType);
   return isVisitSystemPlannerFormType(fromAppointment) ? fromAppointment : null;
@@ -79,6 +102,9 @@ export function resolveVisitSalesRequestType(
   appointmentType?: string,
   plannerFormType?: string | null,
 ): SalesRequestType | null {
+  if (isGeneralVisitPlannerFormType(plannerFormType)) {
+    return 'general_visit';
+  }
   const fromAppointment = appointmentTypeToSalesRequestType(appointmentType);
   if (fromAppointment) return fromAppointment;
   return plannerFormTypeToSalesRequestType(plannerFormType);
@@ -155,10 +181,14 @@ export interface PublishedVisitFormMeta {
   title?: string;
   description?: string;
   version?: number;
+  formCategory?: string;
+  displayOrder?: number;
+  id?: string;
 }
 
 /**
- * Keeps only the three supported system forms, in RFC → Loan and Rental → New Service Level order.
+ * Keeps the three system forms in RFC → Loan and Rental → New Service Level order,
+ * then appends published custom General Visit forms. Draft/custom_* entries stay out.
  */
 export function filterVisitChooserPublishedForms(
   forms: PublishedVisitFormMeta[] | undefined | null,
@@ -168,7 +198,7 @@ export function filterVisitChooserPublishedForms(
       .filter((form) => isVisitSystemPlannerFormType(form.type))
       .map((form) => [form.type, form] as const),
   );
-  return VISIT_CHOOSER_FORM_OPTIONS.map((option) => {
+  const systemForms = VISIT_CHOOSER_FORM_OPTIONS.map((option) => {
     const published = byType.get(option.type);
     return {
       type: option.type,
@@ -176,8 +206,38 @@ export function filterVisitChooserPublishedForms(
       title: published?.title || option.title,
       description: published?.description || option.description,
       version: published?.version,
+      formCategory: 'system',
+      displayOrder: published?.displayOrder,
+      id: published?.id,
     };
   });
+
+  const generalVisitForms = (forms || [])
+    .filter(
+      (form) =>
+        isGeneralVisitPlannerFormType(form.type) || form.formCategory === 'general_visit',
+    )
+    .filter((form) => !isVisitSystemPlannerFormType(form.type))
+    .sort((left, right) => {
+      const order =
+        (left.displayOrder ?? 100) - (right.displayOrder ?? 100);
+      if (order !== 0) return order;
+      return (left.title || left.name || left.type).localeCompare(
+        right.title || right.name || right.type,
+      );
+    })
+    .map((form) => ({
+      type: form.type,
+      name: form.name || form.title || 'General Visit',
+      title: form.title || form.name || 'General Visit',
+      description: form.description || 'Custom General Visit form.',
+      version: form.version,
+      formCategory: 'general_visit',
+      displayOrder: form.displayOrder,
+      id: form.id,
+    }));
+
+  return [...systemForms, ...generalVisitForms];
 }
 
 export type VisitWorkspaceSurface =
@@ -242,10 +302,33 @@ export function resolveSalesRequestDraftWrite(
   return { action: 'create' };
 }
 
-export function plannerFormTypeToVisitTab(
-  plannerFormType: VisitSystemPlannerFormType,
-): 'rfc' | 'loan_rental' | 'new_service_level' {
+export function plannerFormTypeToVisitTab(plannerFormType: string): VisitWorkspaceTab {
   if (plannerFormType === 'loan_rental') return 'loan_rental';
   if (plannerFormType === 'new_service_level') return 'new_service_level';
+  if (isGeneralVisitPlannerFormType(plannerFormType)) return 'general_visit';
   return 'rfc';
+}
+
+/**
+ * Builds the sales-request formData payload from a selected published template.
+ */
+export function buildDynamicVisitSalesRequestFormData(options: {
+  formTemplateType: string;
+  formTemplateName?: string;
+  formTemplateId?: string;
+  formTemplateVersion: number;
+  formSchemaSnapshot: unknown;
+  values: Record<string, unknown>;
+}): Record<string, unknown> {
+  return {
+    formTemplateType: options.formTemplateType,
+    formTemplateName: options.formTemplateName,
+    formTemplateId: options.formTemplateId,
+    formTemplateVersion: options.formTemplateVersion,
+    formSchemaSnapshot: options.formSchemaSnapshot,
+    values: options.values,
+    formCategory: isGeneralVisitPlannerFormType(options.formTemplateType)
+      ? 'general_visit'
+      : undefined,
+  };
 }

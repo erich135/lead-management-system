@@ -4033,7 +4033,8 @@ export type SalesRequestType =
   | 'loan'
   | 'rental'
   | 'loan_rental'
-  | 'rfc_new_service_level';
+  | 'rfc_new_service_level'
+  | 'general_visit';
 
 /** Planner form template types controlled by Super Admin (system + custom_*). */
 export type PlannerFormType = string;
@@ -4143,6 +4144,8 @@ export interface PlannerFormPublished extends PlannerFormContent {
   type?: PlannerFormType;
   version: number;
   publishedAt: string;
+  id?: string;
+  formCategory?: 'system' | 'general_visit';
 }
 
 export interface PlannerFormAdminTemplate {
@@ -4154,6 +4157,7 @@ export interface PlannerFormAdminTemplate {
   isActive?: boolean;
   displayOrder?: number;
   isSystem?: boolean;
+  formCategory?: 'system' | 'general_visit';
   updatedAt?: string | null;
   updatedBy?: string | null;
 }
@@ -4173,7 +4177,9 @@ export async function listPublishedPlannerForms(): Promise<{
     fieldCount: number;
     elementCount?: number;
     isSystem?: boolean;
+    formCategory?: 'system' | 'general_visit';
     displayOrder?: number;
+    id?: string;
   }>;
 }> {
   return apiRequest('/api/planner-form-templates/published');
@@ -4202,6 +4208,7 @@ export async function createAdminPlannerForm(payload: {
   name: string;
   description?: string;
   logoUrl?: string;
+  category?: 'general_visit';
 }): Promise<PlannerFormAdminTemplate> {
   return apiRequest('/api/planner-form-templates/admin', {
     method: 'POST',
@@ -4251,6 +4258,42 @@ export async function discardAdminPlannerFormDraft(
   type: PlannerFormType,
 ): Promise<PlannerFormAdminTemplate> {
   return apiRequest(`/api/planner-form-templates/admin/${type}/discard`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+/**
+ * Unpublishes a custom General Visit form so representatives no longer see it.
+ */
+export async function unpublishAdminPlannerForm(
+  type: PlannerFormType,
+): Promise<PlannerFormAdminTemplate> {
+  return apiRequest(`/api/planner-form-templates/admin/${type}/unpublish`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+/**
+ * Archives a custom General Visit form (hidden from representatives).
+ */
+export async function archiveAdminPlannerForm(
+  type: PlannerFormType,
+): Promise<PlannerFormAdminTemplate> {
+  return apiRequest(`/api/planner-form-templates/admin/${type}/archive`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+/**
+ * Restores an archived General Visit form without publishing it.
+ */
+export async function restoreAdminPlannerForm(
+  type: PlannerFormType,
+): Promise<PlannerFormAdminTemplate> {
+  return apiRequest(`/api/planner-form-templates/admin/${type}/restore`, {
     method: 'POST',
     body: JSON.stringify({}),
   });
@@ -4324,6 +4367,11 @@ export interface SalesRequest {
   approvedBy?: string | { _id: string; firstName?: string; lastName?: string; email?: string };
   approvedAt?: string;
   approvedJob?: string | { _id: string; jobNumber?: string; status?: string; startDate?: string };
+  approvalOutcome?: 'job_created' | 'accepted_no_job';
+  acceptedWithoutJob?: boolean;
+  acceptedWithoutJobAt?: string;
+  acceptedWithoutJobBy?: string | { _id: string; firstName?: string; lastName?: string; email?: string };
+  reviewNotes?: string;
   declinedBy?: string | { _id: string; firstName?: string; lastName?: string; email?: string };
   declinedAt?: string;
   declineReason?: string;
@@ -4452,6 +4500,19 @@ export async function declineSalesRequest(
   data?: { formData?: Record<string, unknown>; declineReason?: string },
 ): Promise<SalesRequest> {
   return apiRequest<SalesRequest>(`/api/sales-requests/${id}/decline`, {
+    method: 'POST',
+    body: JSON.stringify(data ?? {}),
+  });
+}
+
+/**
+ * Accepts a pending General Visit request without creating a Job.
+ */
+export async function acceptSalesRequestWithoutJob(
+  id: string,
+  data?: { formData?: Record<string, unknown>; reviewNotes?: string },
+): Promise<{ request: SalesRequest; job: null; acceptedWithoutJob: true }> {
+  return apiRequest(`/api/sales-requests/${id}/accept-without-job`, {
     method: 'POST',
     body: JSON.stringify(data ?? {}),
   });

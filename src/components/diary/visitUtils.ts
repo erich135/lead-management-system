@@ -10,10 +10,7 @@ import {
 } from './newServiceLevelFormUtils';
 import { normalizeRfcForm, type RfcFormData } from './rfcFormUtils';
 import type { PlannerFormPublished, PlannerFormType } from '../../lib/api';
-import {
-  isVisitSystemPlannerFormType,
-  type VisitSystemPlannerFormType,
-} from './visitFormSelection';
+import { isVisitChooserPlannerFormType } from './visitFormSelection';
 import type { DynamicFormValues } from './DynamicPlannerFormRenderer';
 
 export type VisitCompletionAction = 'finish_close' | 'book_next_visit';
@@ -113,7 +110,7 @@ export interface StoredVisitRecord {
   /** Dynamic Super Admin form payload (preferred over legacy sheet fields). */
   dynamicForm?: VisitDynamicFormState;
   /** Published form chosen on a generic Visit; survives local + server restore. */
-  selectedPlannerFormType?: VisitSystemPlannerFormType;
+  selectedPlannerFormType?: string;
 }
 
 /**
@@ -125,6 +122,8 @@ export interface VisitDynamicFormState {
   formSchemaSnapshot: PlannerFormPublished;
   values: DynamicFormValues;
   completedAt?: string;
+  formTemplateName?: string;
+  formTemplateId?: string;
 }
 
 export interface VisitSession {
@@ -154,7 +153,7 @@ export interface VisitSession {
    */
   salesRequestId?: string;
   /** Published form chosen after Start Visit on a generic Visit appointment. */
-  selectedPlannerFormType?: VisitSystemPlannerFormType;
+  selectedPlannerFormType?: string;
 }
 
 /**
@@ -199,9 +198,9 @@ function normalizeVisitSession(raw: Partial<VisitSession> & { appointmentId: str
         ? (raw.dynamicForm as VisitDynamicFormState)
         : undefined,
     salesRequestId: typeof raw.salesRequestId === 'string' ? raw.salesRequestId : undefined,
-    selectedPlannerFormType: isVisitSystemPlannerFormType(raw.selectedPlannerFormType)
+    selectedPlannerFormType: isVisitChooserPlannerFormType(raw.selectedPlannerFormType)
       ? raw.selectedPlannerFormType
-      : isVisitSystemPlannerFormType(raw.dynamicForm?.formTemplateType)
+      : isVisitChooserPlannerFormType(raw.dynamicForm?.formTemplateType)
         ? raw.dynamicForm.formTemplateType
         : undefined,
   };
@@ -486,9 +485,9 @@ export function parseStoredVisitRecord(feedback?: string | null): StoredVisitRec
         raw.dynamicForm.values
           ? raw.dynamicForm
           : undefined,
-      selectedPlannerFormType: isVisitSystemPlannerFormType(raw.selectedPlannerFormType)
+      selectedPlannerFormType: isVisitChooserPlannerFormType(raw.selectedPlannerFormType)
         ? raw.selectedPlannerFormType
-        : isVisitSystemPlannerFormType(raw.dynamicForm?.formTemplateType)
+        : isVisitChooserPlannerFormType(raw.dynamicForm?.formTemplateType)
           ? raw.dynamicForm.formTemplateType
           : undefined,
     };

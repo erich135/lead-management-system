@@ -28,6 +28,9 @@ import {
 import {
   SALES_REQUEST_PERMISSIONS,
   SALES_REQUEST_TYPE_LABELS,
+  getApprovedJobNumber,
+  getSalesRequestOutcomeLabel,
+  isAcceptedWithoutJob,
 } from '../constants/salesRequestPermissions';
 import SalesRequestReviewModal from './SalesRequestReviewModal';
 import SalesRequestAttachmentsSheet from './SalesRequestAttachmentsSheet';
@@ -135,17 +138,20 @@ function requestTitle(item: SalesRequest): string {
 /**
  * Returns Tailwind classes for the enterprise status pill on approval cards.
  */
-function statusPillClasses(status: SalesRequestStatus): string {
-  switch (status) {
-    case 'pending':
-      return 'rep-approval-waiting-badge bg-amber-500 text-white ring-2 ring-amber-300/70 shadow-sm shadow-amber-500/25';
-    case 'approved':
-      return 'bg-emerald-600 text-white ring-1 ring-emerald-700/25';
-    case 'declined':
-      return 'bg-rose-600 text-white ring-1 ring-rose-800/25';
-    default:
-      return 'bg-slate-500 text-white ring-1 ring-slate-600/25';
+function statusPillClasses(item: SalesRequest): string {
+  if (item.status === 'pending') {
+    return 'rep-approval-waiting-badge bg-amber-500 text-white ring-2 ring-amber-300/70 shadow-sm shadow-amber-500/25';
   }
+  if (item.status === 'declined') {
+    return 'bg-rose-600 text-white ring-1 ring-rose-800/25';
+  }
+  if (item.status === 'approved' && isAcceptedWithoutJob(item)) {
+    return 'bg-sky-700 text-white ring-1 ring-sky-800/25';
+  }
+  if (item.status === 'approved') {
+    return 'bg-emerald-600 text-white ring-1 ring-emerald-700/25';
+  }
+  return 'bg-slate-500 text-white ring-1 ring-slate-600/25';
 }
 
 /**
@@ -297,10 +303,11 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
     job?: Job;
   }): void {
     const { request, job } = payload;
-    const label = REP_APPROVAL_STATUS_LABELS[request.status] || request.status;
-    if (job?.jobNumber) {
+    const label = getSalesRequestOutcomeLabel(request);
+    const jobNumber = getApprovedJobNumber(request.approvedJob) || job?.jobNumber;
+    if (jobNumber) {
       setSuccessMessage(
-        `Request ${request.requestNumber} is now ${label}. Job ${job.jobNumber} was created — opening it now.`,
+        `Request ${request.requestNumber} is now ${label}. Job ${jobNumber} was created — opening it now.`,
       );
     } else {
       setSuccessMessage(`Request ${request.requestNumber} is now ${label}.`);
@@ -372,6 +379,8 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
         item.customerCompanyName,
         item.customerContactPerson,
         SALES_REQUEST_TYPE_LABELS[item.requestType],
+        getSalesRequestOutcomeLabel(item),
+        getApprovedJobNumber(item.approvedJob),
         repDisplayName(item),
         REP_APPROVAL_STATUS_LABELS[item.status],
       ]
@@ -710,14 +719,23 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
                               {item.requestNumber}
                             </h2>
                             <span
-                              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${statusPillClasses(item.status)}`}
+                              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${statusPillClasses(item)}`}
                             >
-                              {REP_APPROVAL_STATUS_LABELS[item.status] || item.status}
+                              {getSalesRequestOutcomeLabel(item)}
                             </span>
                           </div>
                           <p className="mt-1 text-sm font-medium leading-snug text-slate-700">
                             {requestTitle(item)}
                           </p>
+                          {tab === 'history' && item.status === 'approved' ? (
+                            <p className="mt-1 text-sm font-semibold text-slate-800">
+                              {isAcceptedWithoutJob(item)
+                                ? 'Accepted — no job created'
+                                : getApprovedJobNumber(item.approvedJob)
+                                  ? `Approved — job ${getApprovedJobNumber(item.approvedJob)} created`
+                                  : 'Approved — job created'}
+                            </p>
+                          ) : null}
                           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-slate-600">
                             <span className="inline-flex items-center gap-1.5">
                               <span className="font-semibold text-slate-500">Rep:</span>

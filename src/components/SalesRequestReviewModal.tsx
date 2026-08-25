@@ -9,6 +9,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import {
+  acceptSalesRequestWithoutJob,
   approveSalesRequest,
   declineSalesRequest,
   getSalesRequest,
@@ -18,7 +19,9 @@ import {
   type SalesRequest,
 } from '../lib/api';
 import {
-  SALES_REQUEST_STATUS_LABELS,
+  canShowAcceptWithoutJob,
+  getApprovedJobNumber,
+  getSalesRequestOutcomeLabel,
   SALES_REQUEST_TYPE_LABELS,
 } from '../constants/salesRequestPermissions';
 import DiaryRfcForm from './diary/DiaryRfcForm';
@@ -299,6 +302,59 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
   }
 
   /**
+   * Accepts a pending General Visit without creating a job.
+   */
+  async function handleAcceptWithoutJob(): Promise<void> {
+    if (!detail?._id) {
+      setError('Request is still loading. Please wait and try again.');
+      return;
+    }
+    if (isEditing) {
+      setError('Save or Cancel your edits before accepting.');
+      return;
+    }
+    if (!isPending) {
+      setError(
+        `Only Pending Approval requests can be accepted (current status: ${detail.status}).`,
+      );
+      return;
+    }
+    if (!canDecide) {
+      setError('You do not have permission to review requests.');
+      return;
+    }
+    if (!canShowAcceptWithoutJob(detail)) {
+      setError('Accept without creating a job is only available for General Visit requests.');
+      return;
+    }
+
+    const notes = window.prompt(
+      'Optional review notes for accepting without creating a job (Cancel to abort):',
+    );
+    if (notes === null) return;
+
+    setActing(true);
+    setError(null);
+    try {
+      const result = await acceptSalesRequestWithoutJob(detail._id, {
+        formData: originalFormDataRef.current,
+        reviewNotes: notes.trim() || undefined,
+      });
+      if (!result?.request) {
+        throw new Error(
+          'Accept succeeded but the server did not return the updated request. Please refresh.',
+        );
+      }
+      onDecisionComplete({ request: result.request });
+    } catch (acceptError: unknown) {
+      console.error('Accept without job failed:', acceptError);
+      setError(getErrorMessage(acceptError, 'Failed to accept request without creating a job'));
+    } finally {
+      setActing(false);
+    }
+  }
+
+  /**
    * Rejects the pending request using the last saved form data.
    */
   async function handleReject(): Promise<void> {
@@ -401,8 +457,8 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
             </h2>
             {detail && (
               <p className="truncate text-xs text-gray-500">
-                {SALES_REQUEST_TYPE_LABELS[detail.requestType]} ·{' '}
-                {SALES_REQUEST_STATUS_LABELS[detail.status]}
+                {SALES_REQUEST_TYPE_LABELS[detail.requestType] || detail.requestType} ·{' '}
+                {getSalesRequestOutcomeLabel(detail)}
                 {isEditing ? ' · Editing' : ' · Read-only'}
               </p>
             )}
@@ -619,13 +675,34 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
                   {(detail.approvedAt || (detail.status === 'approved' && detail.reviewedAt)) && (
                     <>
                       <div>
-                        <dt className="text-xs font-semibold uppercase text-gray-500">Approved</dt>
+                        <dt className="text-xs font-semibold uppercase text-gray-500">
+                          {detail.acceptedWithoutJob ? 'Accepted' : 'Approved'}
+                        </dt>
                         <dd>{formatDate(detail.approvedAt || detail.reviewedAt)}</dd>
                       </div>
                       <div>
-                        <dt className="text-xs font-semibold uppercase text-gray-500">Approved by</dt>
+                        <dt className="text-xs font-semibold uppercase text-gray-500">
+                          {detail.acceptedWithoutJob ? 'Accepted by' : 'Approved by'}
+                        </dt>
                         <dd>{userName(detail.approvedBy || detail.reviewedBy)}</dd>
                       </div>
+                      <div className="sm:col-span-2">
+                        <dt className="text-xs font-semibold uppercase text-gray-500">Outcome</dt>
+                        <dd className="font-semibold text-slate-900">
+                          {getSalesRequestOutcomeLabel(detail)}
+                          {getApprovedJobNumber(detail.approvedJob)
+                            ? ` · Job ${getApprovedJobNumber(detail.approvedJob)}`
+                            : ''}
+                        </dd>
+                      </div>
+                      {detail.reviewNotes ? (
+                        <div className="sm:col-span-2">
+                          <dt className="text-xs font-semibold uppercase text-gray-500">
+                            Review notes
+                          </dt>
+                          <dd>{detail.reviewNotes}</dd>
+                        </div>
+                      ) : null}
                     </>
                   )}
                   {(detail.declinedAt || (detail.status === 'declined' && detail.reviewedAt)) && (
@@ -807,6 +884,21 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
                     )}
                     Reject
                   </button>
+                  {canShowAcceptWithoutJob(detail) ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleAcceptWithoutJob();
+                      }}
+                      disabled={acting}
+                      className="inline-flex items-center gap-1 rounded-lg border border-sky-300 bg-white px-4 py-2 text-sm font-semibold text-sky-800 hover:bg-sky-50 disabled:opacity-50"
+                    >
+                      {acting ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : null}
+                      Accept without creating a job
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => {

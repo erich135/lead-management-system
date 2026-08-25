@@ -96,6 +96,13 @@ export function validateSalesRequestForm(
         total: progress.total,
       };
     }
+    case 'general_visit':
+      return {
+        valid: false,
+        missingFields: ['Published General Visit form data is missing'],
+        filled: 0,
+        total: 0,
+      };
     default:
       return { valid: false, missingFields: ['Unknown request type'], filled: 0, total: 0 };
   }
@@ -116,6 +123,8 @@ export function createEmptyFormForRequestType(
       return normalizeLoanRentalForm(null) as unknown as Record<string, unknown>;
     case 'rfc_new_service_level':
       return normalizeNewServiceLevelForm(null) as unknown as Record<string, unknown>;
+    case 'general_visit':
+      return {};
     default:
       return {};
   }
@@ -143,6 +152,8 @@ export function normalizeFormForRequestType(
       return normalizeNewServiceLevelForm(
         formData as Partial<NewServiceLevelFormData>,
       ) as unknown as Record<string, unknown>;
+    case 'general_visit':
+      return formData;
     default:
       return formData;
   }

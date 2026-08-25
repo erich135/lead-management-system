@@ -87,6 +87,7 @@ const WIZARD_STEPS: Record<SalesRequestType, FormWizardStep[]> = {
     { id: 'site', label: 'Site' },
     { id: 'signoff', label: 'Sign-off' },
   ],
+  general_visit: [{ id: 'form', label: 'Form' }],
 };
 
 /**

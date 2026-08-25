@@ -246,3 +246,50 @@ test('chooser cards are large enough for a mobile viewport', () => {
     assert.ok(option.description.length > 0);
   }
 });
+
+test('published General Visit forms appear in the chooser after the three system forms', () => {
+  const filtered = filterVisitChooserPublishedForms([
+    { type: 'custom_extra', title: 'Custom' },
+    { type: 'general_visit_site_check', title: 'Site Check', formCategory: 'general_visit' },
+    { type: 'rfc', title: 'RFC published' },
+  ]);
+  assert.deepEqual(
+    filtered.map((form) => form.type),
+    ['rfc', 'loan_rental', 'new_service_level', 'general_visit_site_check'],
+  );
+});
+
+test('General Visit selection maps to general_visit sales request and survives restore helpers', () => {
+  assert.equal(
+    plannerFormTypeToSalesRequestType('general_visit_site_check'),
+    'general_visit',
+  );
+  assert.equal(
+    resolveVisitSalesRequestType('site_visit', 'general_visit_site_check'),
+    'general_visit',
+  );
+  assert.equal(
+    resolveVisitPlannerFormType('site_visit', 'general_visit_site_check'),
+    'general_visit_site_check',
+  );
+  assert.equal(
+    visitNeedsPublishedFormChooser({
+      appointmentType: 'site_visit',
+      appointmentStatus: 'in_progress',
+      selectedPlannerFormType: 'general_visit_site_check',
+    }),
+    false,
+  );
+});
+
+test('draft custom forms are not treated as chooser selections', () => {
+  assert.equal(isVisitSystemPlannerFormType('general_visit_site_check'), false);
+  assert.equal(plannerFormTypeToSalesRequestType('custom_other'), null);
+});
+
+test('retry still reuses one draft when submitting a General Visit', () => {
+  assert.deepEqual(resolveSalesRequestDraftWrite('gv-draft-1', null), {
+    action: 'update',
+    id: 'gv-draft-1',
+  });
+});

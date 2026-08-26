@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginPage } from './components/LoginPage';
@@ -6,6 +6,8 @@ import { SetPasswordPage } from './components/SetPasswordPage';
 import { ResetPasswordPage } from './components/ResetPasswordPage';
 import { Dashboard } from './components/Dashboard';
 import { ChatWidget } from './components/ChatWidget';
+import { CustomerProposalPreviewPage } from './features/salesProposalTool/pages/CustomerProposalPreviewPage';
+import { isCustomerProposalPreviewPath } from './features/salesProposalTool/navigation';
 // import { AutoLocationTracker } from './components/AutoLocationTracker'; // disabled
 import { MachineScanPage } from './components/MachineScanPage';
 import PwaInstallPrompt from './components/PwaInstallPrompt';
@@ -75,6 +77,7 @@ function SetPasswordRoute({ children }: { children: React.ReactNode }) {
 function AppContent() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   /**
    * Handles Service Worker "Open Appointment" clicks when a tab is already open.
@@ -186,6 +189,21 @@ function AppContent() {
             <Dashboard view="pendingSalesRequests" />
           </ProtectedRoute>
         } />
+        <Route path="/sales-proposal-tool" element={
+          <ProtectedRoute>
+            <Dashboard view="salesProposalTool" />
+          </ProtectedRoute>
+        } />
+        <Route path="/sales-proposal-tool/:proposalId/proposal" element={
+          <ProtectedRoute>
+            <CustomerProposalPreviewPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/sales-proposal-tool/:proposalId" element={
+          <ProtectedRoute>
+            <Dashboard view="salesProposalTool" />
+          </ProtectedRoute>
+        } />
         {/* Hidden Bouwa route — authenticated + permission-gated.
             Wildcard because a proposal and its preview are addressable: a rep
             who refreshes on a preview must land back on that preview. */}
@@ -202,7 +220,7 @@ function AppContent() {
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
 
-      {user && <ChatWidget />}
+      {user && !isCustomerProposalPreviewPath(location.pathname) && <ChatWidget />}
 
       {/* Auto-start GPS tracking for enabled users */}
       {/* AutoLocationTracker disabled — re-enable when location tracking is needed */}

@@ -245,3 +245,514 @@
     page-break-inside: avoid;
   }
 }
+
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  body:has(.spt-customer-proposal-print-root) * {
+    visibility: hidden;
+  }
+
+  body:has(.spt-customer-proposal-print-root) .spt-customer-proposal-print-root,
+  body:has(.spt-customer-proposal-print-root) .spt-customer-proposal-print-root * {
+    visibility: visible;
+  }
+
+  .spt-customer-proposal-toolbar {
+    display: none !important;
+  }
+
+  .spt-customer-proposal-print-root {
+    position: absolute !important;
+    top: 0;
+    left: 0;
+    right: 0;
+    min-height: 0 !important;
+    background: white !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+}
+
+/* Sales Proposal Tool customer proposal — screen A4 sheets */
+.spt-customer-proposal-print-root {
+  min-height: 100vh;
+  background: #dbe3ea;
+}
+
+.spt-customer-proposal-toolbar {
+  border-bottom: 1px solid #d4dce4;
+  background: #ffffff;
+  padding: 12px 16px;
+}
+
+.spt-customer-proposal-toolbar-inner {
+  margin: 0 auto;
+  max-width: 210mm;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .spt-customer-proposal-toolbar-inner {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.spt-customer-proposal-back {
+  font-size: 14px;
+  font-weight: 500;
+  color: #0969a9;
+}
+
+.spt-customer-proposal-print-button {
+  border: 0;
+  border-radius: 8px;
+  background: #f7c12b;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #383838;
+  cursor: pointer;
+}
+
+.spt-customer-proposal-print-button:hover {
+  filter: brightness(0.95);
+}
+
+.spt-customer-proposal-back:hover {
+  text-decoration: underline;
+}
+
+.spt-customer-proposal-print-hint {
+  margin: 8px auto 0;
+  max-width: 210mm;
+  font-size: 12px;
+  color: #727272;
+}
+
+.spt-customer-proposal-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 24px auto;
+  max-width: 210mm;
+  font-size: 14px;
+  color: #727272;
+}
+
+.spt-customer-proposal-error {
+  color: #b91c1c;
+}
+
+.spt-customer-proposal-canvas {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  padding: 28px 16px 48px;
+}
+
+.spt-customer-proposal-sheet {
+  width: 210mm;
+  min-height: 297mm;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding: 16mm;
+  background: #ffffff;
+  color: #383838;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.12);
+}
+
+.spt-proposal-letterhead-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 14px;
+}
+
+.spt-proposal-logo {
+  height: 52px;
+  width: auto;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.spt-proposal-company {
+  font-size: 8.5px;
+  line-height: 1.35;
+  color: #4b5563;
+}
+
+.spt-proposal-company-name {
+  margin-bottom: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.spt-proposal-letterhead-meta {
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 9px;
+  line-height: 1.4;
+  color: #4b5563;
+}
+
+.spt-proposal-kicker {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #0969a9;
+}
+
+.spt-proposal-letterhead-date {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.spt-proposal-rule {
+  margin-top: 8px;
+  height: 2px;
+  background: #0969a9;
+}
+
+.spt-proposal-title {
+  margin: 12px 0 0;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  color: #111827;
+}
+
+.spt-proposal-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px 20px;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.spt-proposal-meta dt {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #727272;
+}
+
+.spt-proposal-meta dd {
+  font-weight: 600;
+  color: #111827;
+}
+
+.spt-proposal-section {
+  margin-top: 12px;
+}
+
+.spt-proposal-h2 {
+  margin: 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #d7e6f2;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #0969a9;
+}
+
+.spt-proposal-section-body {
+  margin-top: 8px;
+}
+
+.spt-proposal-body,
+.spt-proposal-closing,
+.spt-proposal-machine p,
+.spt-proposal-compare-col p {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.spt-proposal-closing {
+  font-weight: 600;
+}
+
+.spt-proposal-bullets,
+.spt-proposal-steps {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.spt-proposal-steps li + li,
+.spt-proposal-bullets li + li {
+  margin-top: 3px;
+}
+
+.spt-proposal-kicker-inline {
+  margin: 0 0 6px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #727272;
+}
+
+.spt-proposal-quiet,
+.spt-proposal-basis {
+  margin: 6px 0 0;
+  font-size: 10px;
+  line-height: 1.4;
+  color: #727272;
+}
+
+.spt-proposal-section-muted .spt-proposal-h2 {
+  color: #64748b;
+  border-bottom-color: #e2e8f0;
+}
+
+.spt-proposal-metric-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px 12px;
+}
+
+.spt-proposal-performance {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+}
+
+.spt-proposal-metric-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #727272;
+}
+
+.spt-proposal-metric-value {
+  margin-top: 2px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.spt-proposal-reduction {
+  grid-column: 1 / -1;
+  padding-top: 2px;
+}
+
+.spt-proposal-reduction-value {
+  margin-top: 2px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0969a9;
+}
+
+.spt-proposal-machine-name {
+  margin: 0 0 2px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.spt-proposal-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.spt-proposal-compare-col {
+  padding: 8px 10px;
+  background: #f5f8fb;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.spt-proposal-compare-col h3 {
+  margin: 0 0 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #0969a9;
+}
+
+.spt-proposal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+}
+
+.spt-proposal-table th {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #727272;
+  text-align: left;
+  background: #f5f8fb;
+}
+
+.spt-proposal-table th,
+.spt-proposal-table td {
+  padding: 5px 8px;
+}
+
+.spt-proposal-table td {
+  border-top: 1px solid #edf1f5;
+  vertical-align: top;
+}
+
+.spt-proposal-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.spt-proposal-total-row td {
+  border-top: 1px solid #96b9d4;
+  font-weight: 700;
+}
+
+.spt-proposal-payback-row td {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0969a9;
+}
+
+.spt-proposal-figure-strip {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #f5f8fb;
+}
+
+.spt-proposal-figure-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #727272;
+}
+
+.spt-proposal-figure-value {
+  margin-top: 3px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.spt-proposal-callout {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid #f7c12b;
+  background: #fff8dc;
+}
+
+.spt-proposal-callout-title {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #383838;
+}
+
+.spt-proposal-callout ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.spt-proposal-page-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid #d7e6f2;
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  color: #727272;
+}
+
+.spt-proposal-letterhead,
+.spt-proposal-callout,
+.spt-proposal-figure-strip,
+.spt-proposal-compare-col,
+.spt-proposal-rule,
+.spt-proposal-table th {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+@media print {
+  .spt-customer-proposal-canvas {
+    gap: 0;
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .spt-customer-proposal-sheet {
+    width: auto;
+    min-height: 0;
+    box-shadow: none;
+    padding: 5mm;
+  }
+
+  /* One break only: start page 2 at the commercial story. Do not force a
+     break after page 1 — that stranded a short leftover page. */
+  .spt-customer-proposal-page-2 {
+    margin-top: 0 !important;
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .spt-keep-together {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .spt-customer-proposal-document h2 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .spt-customer-proposal-document table {
+    page-break-inside: auto;
+  }
+
+  .spt-customer-proposal-document tr {
+    page-break-inside: avoid;
+  }
+
+  .spt-proposal-title {
+    font-size: 14pt;
+  }
+
+  .spt-proposal-figure-value {
+    font-size: 12pt;
+  }
+
+  .spt-proposal-page-footer {
+    margin-top: 10mm;
+  }
+}

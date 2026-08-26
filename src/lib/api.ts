@@ -857,6 +857,8 @@ export interface Machine {
   lastReadingReceivedAt?: string;
   /** Stamped when a WhatsApp reading reminder is sent */
   lastReadingRequestSentAt?: string;
+  /** Salesperson-selected Machine Spec Library record for this physical machine. */
+  specLibraryRecordId?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }

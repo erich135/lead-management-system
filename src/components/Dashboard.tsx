@@ -74,10 +74,14 @@ import { helpContent } from '../config/helpContent';
 import { ProfileSettingsModal } from './ProfileSettingsModal';
 import { RepDashboardHome } from './RepDashboardHome';
 import { isRepUser } from '../mobile-rep/mobileRepUtils';
-import { useBouwaPilotAccess } from '../features/bouwa/BouwaPilotAccessContext';
-import { canShowBouwaNavigation } from '../features/bouwa/bouwaPilotPresentation';
+import { SalesProposalToolApp } from '../features/salesProposalTool/SalesProposalToolApp';
+import {
+  SALES_PROPOSAL_TOOL_LABEL,
+  SALES_PROPOSAL_TOOL_PATH,
+  isSalesProposalToolPath,
+} from '../features/salesProposalTool/navigation';
 
-type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady' | 'pendingReadings' | 'pendingSalesRequests' | 'techApp';
+type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady' | 'pendingReadings' | 'pendingSalesRequests' | 'techApp' | 'salesProposalTool';
 
 interface DashboardProps {
   view?: View;
@@ -85,12 +89,6 @@ interface DashboardProps {
 
 export function Dashboard({ view: initialView }: DashboardProps = {}) {
   const { user, signOut, isSuperAdmin, hasPermission } = useAuth();
-  const bouwaPilotAccess = useBouwaPilotAccess();
-  const showBouwaNavigation = canShowBouwaNavigation(
-    bouwaPilotAccess.state,
-    bouwaPilotAccess.loading,
-    bouwaPilotAccess.unavailable,
-  );
   const isTechnician = user?.role?.name?.toLowerCase() === 'technician';
   const canViewTechApp = isSuperAdmin || isTechnician;
   const showJobsDropdown =
@@ -117,6 +115,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
     if (path === '/pending-machine-readings') return 'pendingReadings';
     if (path === '/pending-sales-requests') return 'pendingSalesRequests';
     if (path === '/tech-app') return 'techApp';
+    if (isSalesProposalToolPath(path)) return 'salesProposalTool';
     return 'dashboard';
   };
   
@@ -140,6 +139,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
       pendingReadings: '/pending-machine-readings',
       pendingSalesRequests: '/pending-sales-requests',
       techApp: '/tech-app',
+      salesProposalTool: SALES_PROPOSAL_TOOL_PATH,
     };
     navigate(routes[newView]);
   };
@@ -917,15 +917,17 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                     )}
                   </Link>
                 )}
-                {showBouwaNavigation && (
-                  <Link
-                    to="/bouwa"
-                    className="group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 text-[#383838] hover:text-[#f7c12b]"
-                  >
-                    <Gauge className="w-4 h-4 transition-transform group-hover:scale-110" />
-                    <span>Bouwa</span>
-                  </Link>
-                )}
+                <Link
+                  to={SALES_PROPOSAL_TOOL_PATH}
+                  className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
+                    view === 'salesProposalTool'
+                      ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
+                      : 'text-[#383838] hover:text-[#f7c12b]'
+                  }`}
+                >
+                  <Gauge className={`w-4 h-4 transition-transform ${view === 'salesProposalTool' ? 'scale-110' : ''}`} />
+                  <span>{SALES_PROPOSAL_TOOL_LABEL}</span>
+                </Link>
                 {isSuperAdmin && (
                   <Link
                     to="/admin"
@@ -2167,6 +2169,8 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
             <p className="text-slate-600 mb-6">You do not have permission to review sales requests.</p>
           </div>
         )}
+
+        {view === 'salesProposalTool' && <SalesProposalToolApp />}
       </main>
 
       {showLeadForm && (

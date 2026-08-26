@@ -4,10 +4,12 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import PwaInstallButton from './PwaInstallButton';
 import { canAccessMachineReadingWorkflow } from '../lib/readingAccess';
-import { useBouwaPilotAccess } from '../features/bouwa/BouwaPilotAccessContext';
-import { canShowBouwaNavigation } from '../features/bouwa/bouwaPilotPresentation';
+import {
+  SALES_PROPOSAL_TOOL_LABEL,
+  SALES_PROPOSAL_TOOL_PATH,
+} from '../features/salesProposalTool/navigation';
 
-type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady' | 'techApp' | 'pendingReadings' | 'pendingSalesRequests';
+type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady' | 'techApp' | 'pendingReadings' | 'pendingSalesRequests' | 'salesProposalTool';
 
 interface MobileNavigationProps {
   currentView: View;
@@ -31,12 +33,6 @@ export function MobileNavigation({
   pendingSalesRequestsCount = 0,
 }: MobileNavigationProps) {
   const { user, signOut, hasPermission } = useAuth();
-  const bouwaPilotAccess = useBouwaPilotAccess();
-  const showBouwaNavigation = canShowBouwaNavigation(
-    bouwaPilotAccess.state,
-    bouwaPilotAccess.loading,
-    bouwaPilotAccess.unavailable,
-  );
   const location = useLocation();
   const [showMenu, setShowMenu] = useState(false);
 
@@ -56,6 +52,7 @@ export function MobileNavigation({
     if (path === '/tech-app') return 'techApp';
     if (path === '/pending-machine-readings') return 'pendingReadings';
     if (path === '/pending-sales-requests') return 'pendingSalesRequests';
+    if (path.startsWith('/sales-proposal-tool')) return 'salesProposalTool';
     return 'dashboard';
   };
 
@@ -202,16 +199,18 @@ export function MobileNavigation({
                   </Link>
                 )}
 
-                {showBouwaNavigation && (
-                  <Link
-                    to="/bouwa"
-                    onClick={() => setShowMenu(false)}
-                    className="w-full flex items-center gap-4 p-4 rounded-[8px] transition-all bg-gray-50 text-ars-heading hover:bg-gray-100"
-                  >
-                    <Gauge className="w-5 h-5" />
-                    <span className="font-medium">Bouwa</span>
-                  </Link>
-                )}
+                <Link
+                  to={SALES_PROPOSAL_TOOL_PATH}
+                  onClick={() => setShowMenu(false)}
+                  className={`w-full flex items-center gap-4 p-4 rounded-[8px] transition-all ${
+                    activeView === 'salesProposalTool'
+                      ? 'bg-ars-secondary/20 text-ars-heading'
+                      : 'bg-gray-50 text-ars-heading hover:bg-gray-100'
+                  }`}
+                >
+                  <Gauge className="w-5 h-5" />
+                  <span className="font-medium">{SALES_PROPOSAL_TOOL_LABEL}</span>
+                </Link>
 
                 {/* QR Readings (permission-gated) */}
                 {canVerifyReadings && (

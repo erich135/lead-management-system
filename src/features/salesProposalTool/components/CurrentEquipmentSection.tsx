@@ -187,12 +187,42 @@ function CurrentMachineCard({
   const [query, setQuery] = useState('');
   const [librarySpecs, setLibrarySpecs] = useState<PublicMachineSpec[]>([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const searchMenuRef = useRef<HTMLDivElement>(null);
   const complete = currentMachineIsComplete(row) && !row.changingSpec;
   const needsSpec = currentMachineNeedsSpec(row);
 
   useEffect(() => {
-    if (complete || row.capturingSheet) {
+    if (!menuOpen) return;
+
+    function closeOnPointerAway(event: PointerEvent) {
+      const target = event.target;
+      if (target instanceof Node && !searchMenuRef.current?.contains(target)) {
+        setMenuOpen(false);
+      }
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      setMenuOpen(false);
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && searchMenuRef.current?.contains(active)) {
+        active.blur();
+      }
+    }
+
+    document.addEventListener('pointerdown', closeOnPointerAway);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnPointerAway);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (complete || row.capturingSheet || !menuOpen) {
       setLibrarySpecs([]);
+      setLibraryLoading(false);
       return;
     }
     const term = query.trim();
@@ -219,7 +249,7 @@ function CurrentMachineCard({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [query, complete, row.capturingSheet]);
+  }, [query, complete, row.capturingSheet, menuOpen]);
 
   const dropdown = describeCurrentMachineDropdown({
     customerId,
@@ -234,6 +264,7 @@ function CurrentMachineCard({
   async function handleSelectPhysical(machine: Machine) {
     const id = machineRecordId(machine);
     if (id !== row.arsMachineId && !canAddPhysicalMachine(selectedIds, id)) return;
+    setMenuOpen(false);
     const next = applyPhysicalMachine(row, machine);
     if (next.specLibraryRecordId) {
       try {
@@ -254,6 +285,7 @@ function CurrentMachineCard({
   function handleSelectSpec(spec: PublicMachineSpec) {
     onChange(applyLibrarySpec(row, spec));
     setQuery('');
+    setMenuOpen(false);
   }
 
   if (row.capturingSheet) {
@@ -305,6 +337,7 @@ function CurrentMachineCard({
           onChangeMachine={() => {
             onChange(resetCurrentMachine(row));
             setQuery('');
+            setMenuOpen(true);
           }}
           onCapture={() => onChange({ ...row, capturingSheet: true })}
         />
@@ -320,14 +353,25 @@ function CurrentMachineCard({
           <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#383838]/70">
             Current machine
           </label>
-          <div className={searchMenuWrapClass(true)}>
+          <div ref={searchMenuRef} className={searchMenuWrapClass(menuOpen)}>
             <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
               type="text"
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setMenuOpen(true);
+              }}
+              onFocus={() => setMenuOpen(true)}
+              onKeyDown={(event) => {
+                if (event.key !== 'Escape') return;
+                event.preventDefault();
+                setMenuOpen(false);
+                event.currentTarget.blur();
+              }}
               placeholder="Search make, model or serial..."
               autoComplete="off"
+              aria-expanded={menuOpen}
               className="w-full rounded-[8px] border border-slate-300 py-2 pl-9 pr-9 text-sm focus:border-[#0969a9] focus:outline-none focus:ring-2 focus:ring-[#0969a9]/20"
             />
             {query !== '' && (
@@ -335,12 +379,16 @@ function CurrentMachineCard({
                 type="button"
                 className="absolute right-2 top-2 text-slate-400 hover:text-[#383838]"
                 title="Clear search"
-                onClick={() => setQuery('')}
+                onClick={() => {
+                  setQuery('');
+                  setMenuOpen(true);
+                }}
               >
                 <X className="h-4 w-4" />
               </button>
             )}
-            <div className={SEARCH_MENU_PANEL}>
+            {menuOpen && (
+              <div className={SEARCH_MENU_PANEL}>
               {dropdown.kind === 'loading' && (
                 <p className="flex items-center gap-2 px-3 py-2 text-xs text-slate-500">
                   <Loader2 className="h-3 w-3 animate-spin" /> {dropdown.message}
@@ -423,12 +471,16 @@ function CurrentMachineCard({
                 <button
                   type="button"
                   className="font-medium text-[#0969a9] underline"
-                  onClick={() => onChange({ ...row, capturingSheet: true })}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onChange({ ...row, capturingSheet: true });
+                  }}
                 >
                   Add from specification sheet
                 </button>
               </div>
-            </div>
+              </div>
+            )}
           </div>
         </div>
       )}

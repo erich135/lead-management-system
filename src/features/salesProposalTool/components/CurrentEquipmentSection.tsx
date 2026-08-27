@@ -31,6 +31,12 @@ import {
 } from '../specDisplay';
 import { formatMeasuredNumber } from '../formatMeasured';
 import { SEARCH_MENU_PANEL, searchMenuWrapClass } from '../searchOverlay';
+import {
+  NO_PUBLISHED_SPEC_MATCH_MESSAGE,
+  POSSIBLE_SPEC_MATCHES_HEADING,
+  physicalMachineLibrarySearchQuery,
+  rankPublishedSpecsForPhysicalMachine,
+} from '../suggestPublishedSpecs';
 import type { PublicMachineSpec, SourceBackedSpec } from '../types';
 import { SpecSheetCapture } from './SpecSheetCapture';
 
@@ -188,6 +194,9 @@ function CurrentMachineCard({
   const [librarySpecs, setLibrarySpecs] = useState<PublicMachineSpec[]>([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [suggestedSpecs, setSuggestedSpecs] = useState<PublicMachineSpec[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(true);
   const searchMenuRef = useRef<HTMLDivElement>(null);
   const complete = currentMachineIsComplete(row) && !row.changingSpec;
   const needsSpec = currentMachineNeedsSpec(row);
@@ -250,6 +259,42 @@ function CurrentMachineCard({
       window.clearTimeout(timer);
     };
   }, [query, complete, row.capturingSheet, menuOpen]);
+
+  useEffect(() => {
+    if (!needsSpec || row.capturingSheet) {
+      setSuggestedSpecs([]);
+      setSuggestionsLoading(false);
+      return;
+    }
+    const term = physicalMachineLibrarySearchQuery(row.make, row.model);
+    setSuggestedSpecs([]);
+    setSuggestionsOpen(true);
+    if (term === '') {
+      setSuggestionsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setSuggestionsLoading(true);
+    void searchSpecLibrary(term, 'all')
+      .then((specs) => {
+        if (cancelled) return;
+        setSuggestedSpecs(
+          rankPublishedSpecsForPhysicalMachine(
+            { make: row.make, model: row.model },
+            specs,
+          ),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setSuggestedSpecs([]);
+      })
+      .finally(() => {
+        if (!cancelled) setSuggestionsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [needsSpec, row.capturingSheet, row.arsMachineId, row.make, row.model]);
 
   const dropdown = describeCurrentMachineDropdown({
     customerId,
@@ -482,8 +527,98 @@ function CurrentMachineCard({
               </div>
             )}
           </div>
+          {needsSpec && (
+            <PhysicalMachineSpecSuggestions
+              specs={suggestedSpecs}
+              loading={suggestionsLoading}
+              open={suggestionsOpen}
+              onToggle={() => {
+                if (suggestionsOpen) setSuggestionsOpen(false);
+                else setSuggestionsOpen(true);
+              }}
+              onSelect={handleSelectSpec}
+              onCapture={() => onChange({ ...row, capturingSheet: true })}
+            />
+          )}
         </div>
       )}
+    </div>
+  );
+}
+
+function PhysicalMachineSpecSuggestions({
+  specs,
+  loading,
+  open,
+  onToggle,
+  onSelect,
+  onCapture,
+}: {
+  specs: PublicMachineSpec[];
+  loading: boolean;
+  open: boolean;
+  onToggle: () => void;
+  onSelect: (spec: PublicMachineSpec) => void;
+  onCapture: () => void;
+}) {
+  return (
+    <div className="mt-3 rounded-[8px] border border-slate-200 bg-slate-50 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+          {POSSIBLE_SPEC_MATCHES_HEADING}
+        </p>
+        <button
+          type="button"
+          className="shrink-0 text-xs font-medium text-[#0969a9] underline"
+          onClick={onToggle}
+        >
+          {open ? 'Hide matches' : 'Show possible specification matches'}
+        </button>
+      </div>
+      {open && (
+        <div className="mt-2">
+          {loading && (
+            <p className="flex items-center gap-2 text-xs text-slate-500">
+              <Loader2 className="h-3 w-3 animate-spin" /> Searching the Machine
+              Specification Library…
+            </p>
+          )}
+          {!loading && specs.length > 0 && (
+            <ul>
+              {specs.map((item) => {
+                const copy = specLibraryResultCopy(item);
+                return (
+                  <li key={item.recordId}>
+                    <button
+                      type="button"
+                      className="w-full rounded-[8px] px-2 py-2 text-left hover:bg-white"
+                      onClick={() => onSelect(item)}
+                    >
+                      <p className="text-sm font-medium text-[#383838]">{copy.title}</p>
+                      {copy.ratings && (
+                        <p className="text-xs text-slate-600">{copy.ratings}</p>
+                      )}
+                      {copy.source && (
+                        <p className="text-xs text-slate-500">Source: {copy.source}</p>
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {!loading && specs.length === 0 && (
+            <p className="text-sm text-slate-600">{NO_PUBLISHED_SPEC_MATCH_MESSAGE}</p>
+          )}
+        </div>
+      )}
+      <button
+        type="button"
+        className="mt-2 text-xs font-medium text-[#0969a9] underline"
+        onClick={onCapture}
+      >
+        Add from specification sheet
+      </button>
     </div>
   );
 }

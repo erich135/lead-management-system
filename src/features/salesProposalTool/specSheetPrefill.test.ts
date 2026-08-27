@@ -64,6 +64,51 @@ test('partial extraction prefills found values and leaves the rest blank', () =>
   assert.equal(formatPrefillNumber(null), '');
 });
 
+test('factory-sheet extraction prefills source identity and motor and leaves unpublished ratings blank', () => {
+  const fields = formFieldsFromExtracted(
+    {
+      manufacturer: 'Seize Compressor',
+      model: 'SVC-132A/W II',
+      modelVariant: null,
+      ratedPressureBarG: null,
+      ratedAirflowM3PerMin: null,
+      packageInputPowerKw: null,
+      motorShaftPowerKw: 132,
+      controlType: 'VSD',
+    },
+    { manufacturer: 'Bouwa', model: 'SVC-RS132A-II' },
+  );
+  assert.equal(fields.manufacturer, 'Seize Compressor');
+  assert.equal(fields.model, 'SVC-132A/W II');
+  assert.equal(fields.pressure, '');
+  assert.equal(fields.airflow, '');
+  assert.equal(fields.packageInput, '');
+  assert.equal(fields.motorRating, '132');
+  assert.equal(fields.controlType, 'VSD');
+  assert.equal(
+    hasExtractedTechnicalValues({
+      manufacturer: 'Seize Compressor',
+      model: 'SVC-132A/W II',
+      modelVariant: null,
+      ratedPressureBarG: null,
+      ratedAirflowM3PerMin: null,
+      packageInputPowerKw: null,
+      motorShaftPowerKw: 132,
+      controlType: 'VSD',
+    }),
+    true,
+  );
+});
+
+test('linked customer machine identity is not overwritten by the source-sheet manufacturer', () => {
+  const current = fs.readFileSync(
+    path.join(FEATURE_ROOT, 'components/CurrentEquipmentSection.tsx'),
+    'utf8',
+  );
+  assert.match(current, /make: row\.arsMachineId \? row\.make : values\.manufacturer/);
+  assert.match(current, /model: row\.arsMachineId \? row\.model : values\.model/);
+});
+
 test('spec-sheet capture prefills after upload without auto-applying or publishing', () => {
   const capture = fs.readFileSync(
     path.join(FEATURE_ROOT, 'components/SpecSheetCapture.tsx'),

@@ -158,6 +158,14 @@ export async function uploadAirAuditCsv(
   return data.proposal;
 }
 
+export async function removeAirAudit(id: string): Promise<SalesProposal> {
+  const data = await jsonRequest<{ proposal: SalesProposal }>(
+    `/api/sales-proposal-tool/proposals/${id}/air-audit`,
+    { method: 'DELETE' },
+  );
+  return data.proposal;
+}
+
 export async function searchSpecLibrary(
   query: string,
   scope: 'all' | 'bouwa' = 'all',

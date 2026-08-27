@@ -5,6 +5,7 @@ import { getMachinesByCustomer, type Customer } from '../../../lib/api';
 import {
   getSalesProposal,
   previewElectricityComparison,
+  removeAirAudit,
   saveSalesProposal,
   uploadAirAuditCsv,
 } from '../api';
@@ -75,6 +76,7 @@ export function SalesProposalEditorPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [removingAirAudit, setRemovingAirAudit] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
@@ -245,6 +247,27 @@ export function SalesProposalEditorPage() {
     }
   }
 
+  async function handleRemoveAirAudit() {
+    if (!proposalId || !proposal?.airAudit) return;
+    if (!window.confirm(`Remove ${proposal.airAudit.sourceFileName} from this proposal?`)) return;
+    setRemovingAirAudit(true);
+    setUploadError(null);
+    setSaveMessage(null);
+    try {
+      const updated = await removeAirAudit(proposalId);
+      setProposal(updated);
+      setAirAuditScope(DEFAULT_AIR_AUDIT_SCOPE);
+      setComparison(updated.comparison);
+      setCommercial(updated.commercial);
+      setCurrentMachinePerformance(updated.currentMachinePerformance ?? null);
+      setSaveMessage('Air Audit removed.');
+    } catch (err: unknown) {
+      setUploadError(err instanceof Error ? err.message : 'The Air Audit could not be removed.');
+    } finally {
+      setRemovingAirAudit(false);
+    }
+  }
+
   function updateSiteName(name: string) {
     setSite((current) => ({ ...current, name: name.trim() === '' ? null : name }));
   }
@@ -335,9 +358,11 @@ export function SalesProposalEditorPage() {
           </section>
           <AirAuditUpload
             uploading={uploading}
+            removing={removingAirAudit}
             error={uploadError}
             sourceFileName={proposal.airAudit?.sourceFileName ?? null}
             onFile={(file) => void handleUpload(file)}
+            onRemove={() => void handleRemoveAirAudit()}
           />
           {proposal.airAudit && (
             <AirAuditScopeFields

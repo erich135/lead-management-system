@@ -80,6 +80,23 @@ test('editor asks a compact scope question after CSV upload without blocking the
   assert.doesNotMatch(fields, /disabled/);
 });
 
+test('an attached Air Audit can be explicitly removed from the proposal', () => {
+  const editor = fs.readFileSync(
+    path.join(FEATURE_ROOT, 'pages/SalesProposalEditorPage.tsx'),
+    'utf8',
+  );
+  const upload = fs.readFileSync(
+    path.join(FEATURE_ROOT, 'components/AirAuditUpload.tsx'),
+    'utf8',
+  );
+  const api = fs.readFileSync(path.join(FEATURE_ROOT, 'api.ts'), 'utf8');
+  assert.match(editor, /handleRemoveAirAudit/);
+  assert.match(editor, /Air Audit removed\./);
+  assert.match(upload, /Remove Air Audit/);
+  assert.match(api, /method: 'DELETE'/);
+  assert.match(api, /proposals\/\$\{id\}\/air-audit/);
+});
+
 test('customer proposal uses backend measured heading and stays on two pages', () => {
   const preview = fs.readFileSync(
     path.join(FEATURE_ROOT, 'pages/CustomerProposalPreviewPage.tsx'),

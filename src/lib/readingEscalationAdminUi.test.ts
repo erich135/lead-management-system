@@ -57,7 +57,11 @@ test('importer requires dry-run acknowledgement before Confirm Import', () => {
   assert.match(importSource, /proposedLinkedRecipient/);
   assert.doesNotMatch(importSource, /Assignment Snapshot/);
   assert.doesNotMatch(importSource, /Stale rows/);
+  assert.doesNotMatch(systemSource, /Rental Department inbox/);
+  assert.match(systemSource, /Rental machines use Admin Code REN/);
   assert.doesNotMatch(systemSource, /linked Admin user/);
   assert.doesNotMatch(systemSource, /Linked User is not an ARS Admin/);
   assert.doesNotMatch(importSource, /Linked User is not an ARS Admin/);
+  assert.doesNotMatch(systemSource, /rentalsjhb@airrotoryservices\.co\.za/);
+  assert.doesNotMatch(importSource, /rentalsjhb@airrotoryservices\.co\.za/);
 });

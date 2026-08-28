@@ -4848,7 +4848,7 @@ alert((response as any).message || 'User invited successfully');
                             </p>
                           )}
                           <p className="text-xs text-gray-500 mt-1">
-                            Assign this customer to an Admin Code. Escalation emails use the User currently linked to that code. Changing the linked User later updates future unsent emails without editing this customer. Rental machines still use the Rental Department inbox.
+                            Assign this customer to an Admin Code. Escalation emails use the User currently linked to that code. Changing the linked User later updates future unsent emails without editing this customer. Rental machines use Admin Code REN and the User currently linked to that code.
                           </p>
                         </div>
                       </div>

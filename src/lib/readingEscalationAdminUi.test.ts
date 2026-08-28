@@ -52,6 +52,7 @@ test('importer requires dry-run acknowledgement before Confirm Import', () => {
   assert.match(importSource, /Customer ID/);
   assert.match(importSource, /currentAdminCode/);
   assert.match(importSource, /proposedAdminCode/);
-  assert.match(importSource, /currentLinkedRecipient/);
   assert.match(importSource, /proposedLinkedRecipient/);
+  assert.doesNotMatch(importSource, /Assignment Snapshot/);
+  assert.doesNotMatch(importSource, /Stale rows/);
 });

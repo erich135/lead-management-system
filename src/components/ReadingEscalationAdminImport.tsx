@@ -35,7 +35,6 @@ export function ReadingEscalationAdminImport({ onClose, onImportComplete }: Prop
     updated: number;
     unchanged: number;
     invalid: number;
-    stale: number;
   } | null>(null);
   const [reportCsv, setReportCsv] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -77,7 +76,6 @@ export function ReadingEscalationAdminImport({ onClose, onImportComplete }: Prop
 
   const changingPreview = dryRun?.changing.slice(0, 50) || [];
   const invalidPreview = dryRun?.invalid.slice(0, 30) || [];
-  const stalePreview = dryRun?.stale.slice(0, 30) || [];
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -107,12 +105,11 @@ export function ReadingEscalationAdminImport({ onClose, onImportComplete }: Prop
             <div className="space-y-5">
               <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
                 Rows are matched only by <span className="font-semibold">Customer ID</span>.
+                Customer Name is for reference and is never written back.
                 Only the customer Admin Code assignment is updated.
-                A blank New Admin Code cell leaves the current assignment.
-                Use <span className="font-mono">CLEAR</span> to remove an assignment.
-                Enter the exact Admin Code, for example <span className="font-mono">AC</span>.
-                Stale rows are those whose Admin Code assignment changed after export.
-                Changing the User linked to the same Admin Code does not make a row stale.
+                A blank Admin Code cell leaves the current assignment unchanged.
+                Enter the exact short Admin Code, for example <span className="font-mono">AC</span>.
+                Clear an assignment in the customer edit form, not in this workbook.
               </div>
               <div
                 onClick={() => fileInputRef.current?.click()}
@@ -129,7 +126,7 @@ export function ReadingEscalationAdminImport({ onClose, onImportComplete }: Prop
                 ) : (
                   <div>
                     <p className="font-semibold text-slate-600">Click to select the Customer Admin Code XLSX or CSV</p>
-                    <p className="text-sm text-slate-400 mt-1">Must include Customer ID and Assignment Snapshot from a Customer Admin Codes export</p>
+                    <p className="text-sm text-slate-400 mt-1">Three columns: Customer ID, Customer Name, Admin Code</p>
                   </div>
                 )}
               </div>
@@ -145,11 +142,10 @@ export function ReadingEscalationAdminImport({ onClose, onImportComplete }: Prop
 
           {step === 'review' && dryRun && (
             <div className="space-y-5">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <SummaryCard label="Unchanged" value={dryRun.summary.unchanged} tone="slate" />
                 <SummaryCard label="Will change" value={dryRun.summary.changing} tone="indigo" />
                 <SummaryCard label="Invalid" value={dryRun.summary.invalid} tone="red" />
-                <SummaryCard label="Stale" value={dryRun.summary.stale} tone="amber" />
               </div>
 
               {changingPreview.length > 0 && (
@@ -162,14 +158,6 @@ export function ReadingEscalationAdminImport({ onClose, onImportComplete }: Prop
                       Showing {changingPreview.length} of {dryRun.changing.length} changing rows
                     </p>
                   )}
-                </Section>
-              )}
-
-              {stalePreview.length > 0 && (
-                <Section title="Stale rows (will be skipped)">
-                  {stalePreview.map((row) => (
-                    <IssueRow key={`stale-${row.rowNumber}`} row={row} />
-                  ))}
                 </Section>
               )}
 
@@ -191,7 +179,7 @@ export function ReadingEscalationAdminImport({ onClose, onImportComplete }: Prop
                 <span>
                   I have reviewed this dry-run. Only the customer Admin Code will be updated for the
                   {' '}{dryRun.summary.changing} changing row{dryRun.summary.changing === 1 ? '' : 's'}.
-                  Invalid and stale rows will not be imported.
+                  Invalid rows will not be imported.
                 </span>
               </label>
             </div>
@@ -210,11 +198,10 @@ export function ReadingEscalationAdminImport({ onClose, onImportComplete }: Prop
                 <CheckCircle2 className="w-5 h-5" />
                 <p className="font-medium">Updated {result.updated} customer{result.updated === 1 ? '' : 's'}.</p>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <SummaryCard label="Updated" value={result.updated} tone="indigo" />
                 <SummaryCard label="Unchanged" value={result.unchanged} tone="slate" />
                 <SummaryCard label="Invalid" value={result.invalid} tone="red" />
-                <SummaryCard label="Stale" value={result.stale} tone="amber" />
               </div>
               {reportCsv && (
                 <button
@@ -324,11 +311,8 @@ function ChangeRow({ row }: { row: ReadingAdminPlanRow }) {
       <p className="text-slate-700 mt-1">
         <span className="text-slate-500">{row.currentAdminCode || 'Not assigned'}</span>
         {' → '}
-        <span className="text-indigo-700">{row.proposedAdminCode || 'CLEAR'}</span>
+        <span className="text-indigo-700">{row.proposedAdminCode}</span>
       </p>
-      {row.currentLinkedRecipient && (
-        <p className="text-xs text-slate-500 mt-1">Currently linked: {row.currentLinkedRecipient}</p>
-      )}
       {row.proposedLinkedRecipient && (
         <p className="text-xs text-slate-500 mt-1">Will route to: {row.proposedLinkedRecipient}</p>
       )}

@@ -747,11 +747,10 @@ export interface ReadingAdminPlanRow {
 }
 
 export interface ReadingAdminDryRun {
-  summary: { unchanged: number; changing: number; invalid: number; stale: number };
+  summary: { unchanged: number; changing: number; invalid: number };
   unchanged: ReadingAdminPlanRow[];
   changing: ReadingAdminPlanRow[];
   invalid: ReadingAdminPlanRow[];
-  stale: ReadingAdminPlanRow[];
 }
 
 export interface CashCustomer {
@@ -1201,9 +1200,8 @@ export async function validateCustomerAdminCodes(file: File): Promise<{ data: Re
 
 export async function confirmCustomerAdminCodes(file: File): Promise<{
   data: {
-    summary: { updated: number; unchanged: number; invalid: number; stale: number };
+    summary: { updated: number; unchanged: number; invalid: number };
     updated: ReadingAdminPlanRow[];
-    stale: ReadingAdminPlanRow[];
     invalid: ReadingAdminPlanRow[];
     unchangedCount: number;
     reportCsv?: string;

@@ -956,7 +956,7 @@ export interface ContactReminderFieldChange {
 }
 
 export interface ContactReminderStaleField {
-  field: 'contactPerson' | 'whatsAppNumber' | 'readingFrequencyDays' | 'whatsAppRemindersEnabled';
+  field: 'contactPerson' | 'whatsAppNumber' | 'readingFrequencyDays' | 'whatsAppRemindersEnabled' | 'customerId' | 'cashCustomer' | 'ownershipType' | 'recordStatus';
   exportedBaseline: string | number | boolean | null;
   currentDatabase: string | number | boolean | null;
   proposedSpreadsheet: string | number | boolean | null;

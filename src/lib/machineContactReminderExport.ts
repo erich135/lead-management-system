@@ -23,9 +23,17 @@ export const CONTACT_REMINDER_BASELINE_COLUMNS = [
   'Baseline Reminders Enabled',
 ] as const;
 
+export const CONTACT_REMINDER_ASSIGNMENT_BASELINE_COLUMNS = [
+  'Baseline Customer ID',
+  'Baseline Cash Customer',
+  'Baseline Ownership Type',
+  'Baseline Record Status',
+] as const;
+
 export const CONTACT_REMINDER_WORKBOOK_COLUMNS = [
   ...CONTACT_REMINDER_EXPORT_COLUMNS,
   ...CONTACT_REMINDER_BASELINE_COLUMNS,
+  ...CONTACT_REMINDER_ASSIGNMENT_BASELINE_COLUMNS,
 ] as const;
 
 export function machineRecordUpdatedAt(machine: Pick<Machine, 'updatedAt'>): string {
@@ -39,6 +47,18 @@ export function customerNameForExport(machine: Machine): string {
   if (machine.customer && typeof machine.customer === 'object') return machine.customer.name || '';
   if (typeof machine.customer === 'string') return machine.customer;
   return machine.cashCustomer || '';
+}
+
+export function linkedCustomerIdForExport(machine: Machine): string {
+  if (machine.customer && typeof machine.customer === 'object') return machine.customer._id || '';
+  if (typeof machine.customer === 'string' && /^[a-fA-F0-9]{24}$/i.test(machine.customer)) {
+    return machine.customer;
+  }
+  return '';
+}
+
+export function recordStatusForExport(machine: Machine): string {
+  return machine.dbStatus === 'archived' || machine.dbStatus === 'deleted' ? machine.dbStatus : 'active';
 }
 
 export function contactReminderVisibleValues(machine: Machine): string[] {
@@ -64,6 +84,10 @@ export function contactReminderBaselineValues(machine: Machine): string[] {
     machine.whatsAppNumber || '',
     machine.readingFrequencyDays == null ? '' : String(machine.readingFrequencyDays),
     machine.whatsAppRemindersEnabled !== false ? 'Yes' : 'No',
+    linkedCustomerIdForExport(machine),
+    machine.cashCustomer || '',
+    machine.ownershipType || '',
+    recordStatusForExport(machine),
   ];
 }
 

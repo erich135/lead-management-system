@@ -34,6 +34,10 @@ function fieldLabel(field: string): string {
     case 'whatsAppNumber': return 'WhatsApp Number';
     case 'readingFrequencyDays': return 'Reading Frequency (Days)';
     case 'whatsAppRemindersEnabled': return 'Reminders Enabled';
+    case 'customerId': return 'Customer ID';
+    case 'cashCustomer': return 'Cash Customer';
+    case 'ownershipType': return 'Ownership Type';
+    case 'recordStatus': return 'Active / Archive status';
     default: return field;
   }
 }
@@ -121,7 +125,8 @@ export function ContactReminderImport({ onClose, onImportComplete }: Props) {
               <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
                 Rows are matched only by <span className="font-semibold">Machine ID</span>.
                 Serial numbers, customers, hours, service dates and RSR documents are never changed.
-                Stale rows are only those whose contact-reminder fields changed after export.
+                Stale rows are those whose contact-reminder fields or customer assignment
+                (customer, cash customer, ownership or active/archive status) changed after export.
                 Use a fresh Contact Reminders export — earlier workbooks without baseline columns will be rejected.
                 Blank cells leave the current value. Use <span className="font-mono">CLEAR</span> to wipe Contact Person or WhatsApp Number.
               </div>

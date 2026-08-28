@@ -694,6 +694,53 @@ export interface Customer {
   address?: string;
   phone?: string;
   email?: string;
+  readingEscalationAdminUserId?: string | ReadingEscalationAdminRef | null;
+}
+
+export interface ReadingEscalationAdminRef {
+  _id: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  isActive?: boolean;
+  adminCodes?: Array<string | { code?: string }>;
+}
+
+export interface ReadingEscalationAdminOption {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  adminCodes: string[];
+  isActive: boolean;
+  roleName: string;
+  label: string;
+}
+
+export type ReadingAdminExportFilter =
+  | 'all_active'
+  | 'non_rental_machines'
+  | 'reminder_enabled_non_rental'
+  | 'missing_admin';
+
+export interface ReadingAdminPlanRow {
+  rowNumber: number;
+  customerId: string | null;
+  customerName: string;
+  status: string;
+  reason?: string;
+  currentAdmin?: string | null;
+  proposedAdmin?: string | null;
+  currentAdminUserId?: string | null;
+  proposedAdminUserId?: string | null;
+}
+
+export interface ReadingAdminDryRun {
+  summary: { unchanged: number; changing: number; invalid: number; stale: number };
+  unchanged: ReadingAdminPlanRow[];
+  changing: ReadingAdminPlanRow[];
+  invalid: ReadingAdminPlanRow[];
+  stale: ReadingAdminPlanRow[];
 }
 
 export interface CashCustomer {
@@ -1079,6 +1126,93 @@ export async function updateCustomer(id: string, data: { name?: string; defaultC
     method: 'PUT',
     body: JSON.stringify(data),
   });
+}
+
+export async function getReadingEscalationAdmins(): Promise<{ admins: ReadingEscalationAdminOption[] }> {
+  return apiRequest('/api/reading-escalation-admin/admins');
+}
+
+export async function getReadingEscalationGaps(): Promise<{ gaps: Array<{ customerId: string; customerName: string; reason: string }> }> {
+  return apiRequest('/api/reading-escalation-admin/gaps');
+}
+
+export async function assignReadingEscalationAdmin(
+  customerId: string,
+  userId: string | null,
+): Promise<{ customer: Customer; unchanged?: boolean }> {
+  return apiRequest(`/api/reading-escalation-admin/customers/${customerId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ userId }),
+  });
+}
+
+export async function exportReadingEscalationAdmins(
+  filter: ReadingAdminExportFilter = 'reminder_enabled_non_rental',
+  format: 'xlsx' | 'csv' = 'xlsx',
+): Promise<void> {
+  const token = getAuthToken();
+  if (!token) throw new Error('No authentication token found');
+  const response = await fetch(
+    `${apiBase()}/api/reading-escalation-admin/export?filter=${encodeURIComponent(filter)}&format=${format}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Export failed' } }));
+    throw new Error(error.error?.message || 'Export failed');
+  }
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `reading-escalation-admin-assignments-${filter}.${format}`;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}
+
+export async function validateReadingEscalationAdmins(file: File): Promise<{ data: ReadingAdminDryRun }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const token = getAuthToken();
+  if (!token) throw new Error('No authentication token found');
+  const response = await fetch(`${apiBase()}/api/reading-escalation-admin/import/validate`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Validation failed' } }));
+    throw new Error(error.error?.message || 'Validation failed');
+  }
+  return response.json();
+}
+
+export async function confirmReadingEscalationAdmins(file: File): Promise<{
+  data: {
+    summary: { updated: number; unchanged: number; invalid: number; stale: number };
+    updated: ReadingAdminPlanRow[];
+    stale: ReadingAdminPlanRow[];
+    invalid: ReadingAdminPlanRow[];
+    unchangedCount: number;
+    reportCsv?: string;
+  };
+}> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('confirm', 'true');
+  const token = getAuthToken();
+  if (!token) throw new Error('No authentication token found');
+  const response = await fetch(`${apiBase()}/api/reading-escalation-admin/import/confirm`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Import failed' } }));
+    throw new Error(error.error?.message || 'Import failed');
+  }
+  return response.json();
 }
 
 /**

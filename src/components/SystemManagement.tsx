@@ -74,7 +74,23 @@ import {
   createCustomer,
   updateCustomer,
   Customer,
+  getReadingEscalationAdmins,
+  getReadingEscalationGaps,
+  assignReadingEscalationAdmin,
+  exportReadingEscalationAdmins,
+  type ReadingEscalationAdminOption,
+  type ReadingAdminExportFilter,
 } from '../lib/api';
+import { ReadingEscalationAdminImport } from './ReadingEscalationAdminImport';
+import {
+  DEFAULT_READING_ADMIN_EXPORT_FILTER,
+  READING_ADMIN_CLEAR,
+  READING_ADMIN_EXPORT_FILTERS,
+  assignedReadingAdminId,
+  customerUpdatePayload,
+  readingEscalationAdminLabel,
+} from '../lib/readingEscalationAdmin';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   Users, 
   Search, 
@@ -114,6 +130,7 @@ import { ChangelogViewer } from './ChangelogViewer';
 import { ScheduledReports } from './ScheduledReports';
 
 export function SystemManagement() {
+  const { isSuperAdmin } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]); // All users for dropdowns (not paginated)
   const [roles, setRoles] = useState<Role[]>([]);
@@ -209,6 +226,12 @@ export function SystemManagement() {
   const [showArchivedCustomers, setShowArchivedCustomers] = useState(false);
   const [archivedCustomers, setArchivedCustomers] = useState<Customer[]>([]);
   const [loadingArchivedCustomers, setLoadingArchivedCustomers] = useState(false);
+  const [readingAdmins, setReadingAdmins] = useState<ReadingEscalationAdminOption[]>([]);
+  const [readingAdminGaps, setReadingAdminGaps] = useState<Array<{ customerId: string; customerName: string; reason: string }>>([]);
+  const [readingAdminDraft, setReadingAdminDraft] = useState('');
+  const [readingAdminExportFilter, setReadingAdminExportFilter] = useState<ReadingAdminExportFilter>(DEFAULT_READING_ADMIN_EXPORT_FILTER);
+  const [exportingReadingAdmins, setExportingReadingAdmins] = useState(false);
+  const [showReadingAdminImport, setShowReadingAdminImport] = useState(false);
   
   // Invite user state
   const [showInviteForm, setShowInviteForm] = useState(false);
@@ -378,6 +401,14 @@ export function SystemManagement() {
       // Load customers
       const customersResponse = await getCustomers({ limit: 10000 });
       setCustomers(customersResponse.customers || []);
+      if (isSuperAdmin) {
+        const [adminsResponse, gapsResponse] = await Promise.all([
+          getReadingEscalationAdmins().catch(() => ({ admins: [] })),
+          getReadingEscalationGaps().catch(() => ({ gaps: [] })),
+        ]);
+        setReadingAdmins(adminsResponse.admins || []);
+        setReadingAdminGaps(gapsResponse.gaps || []);
+      }
     } catch (err: any) {
       console.error('Error loading reference data:', err);
       setError(err.message || 'Failed to load reference data');
@@ -4649,6 +4680,7 @@ alert((response as any).message || 'User invited successfully');
                       onClick={() => {
                         setEditingCustomer(null);
                         setNewCustomer({ name: '', address: '', phone: '', email: '', defaultContactPerson: '', defaultWhatsAppNumber: '' });
+                        setReadingAdminDraft('');
                         setShowCustomerForm(true);
                       }}
                       className="px-4 py-2 bg-gradient-to-r from-[#f7c12b] to-[#f9d04a] text-[#383838] rounded-[8px] font-bold text-[14px] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2"
@@ -4657,6 +4689,61 @@ alert((response as any).message || 'User invited successfully');
                       ADD CUSTOMER
                     </button>
                   </div>
+
+                  {isSuperAdmin && (
+                    <div className="flex flex-wrap items-center gap-3 mb-4">
+                      <select
+                        value={readingAdminExportFilter}
+                        onChange={e => setReadingAdminExportFilter(e.target.value as ReadingAdminExportFilter)}
+                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                      >
+                        {READING_ADMIN_EXPORT_FILTERS.map(option => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                      <button
+                        disabled={exportingReadingAdmins}
+                        onClick={async () => {
+                          setExportingReadingAdmins(true);
+                          try {
+                            await exportReadingEscalationAdmins(readingAdminExportFilter, 'xlsx');
+                          } catch (err: any) {
+                            alert(err.message || 'Failed to export Reading Admin assignments');
+                          } finally {
+                            setExportingReadingAdmins(false);
+                          }
+                        }}
+                        className="px-3 py-2 border border-indigo-300 text-indigo-700 rounded-[8px] font-bold text-[13px] hover:bg-indigo-50 transition-colors flex items-center gap-2 disabled:opacity-50"
+                      >
+                        <Download className="w-4 h-4" />
+                        {exportingReadingAdmins ? 'EXPORTING...' : 'Export Reading Admin Assignments'}
+                      </button>
+                      <button
+                        onClick={() => setShowReadingAdminImport(true)}
+                        className="px-3 py-2 border border-indigo-300 text-indigo-700 rounded-[8px] font-bold text-[13px] hover:bg-indigo-50 transition-colors flex items-center gap-2"
+                      >
+                        <Upload className="w-4 h-4" />
+                        Import Reading Admin Assignments
+                      </button>
+                    </div>
+                  )}
+
+                  {isSuperAdmin && readingAdminGaps.length > 0 && (
+                    <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                      <p className="font-semibold">{readingAdminGaps.length} customer{readingAdminGaps.length === 1 ? '' : 's'} need a Reading Escalation Admin</p>
+                      <p className="text-xs mt-1">
+                        Non-rental machines with reminders enabled will not send day-10 escalation emails until an active ARS Admin with a valid email is assigned.
+                      </p>
+                      <ul className="mt-2 space-y-1 max-h-32 overflow-y-auto">
+                        {readingAdminGaps.slice(0, 20).map(gap => (
+                          <li key={gap.customerId}>
+                            <span className="font-medium">{gap.customerName}</span>
+                            <span className="text-amber-800"> — {gap.reason}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
                   {/* Customer Form */}
                   {(showCustomerForm || editingCustomer) && (
@@ -4733,6 +4820,33 @@ alert((response as any).message || 'User invited successfully');
                             placeholder="e.g., +27821234567"
                           />
                         </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-semibold text-ars-body mb-1">Reading Escalation Admin</label>
+                          {isSuperAdmin ? (
+                            <select
+                              value={readingAdminDraft}
+                              onChange={e => setReadingAdminDraft(e.target.value)}
+                              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px] bg-white"
+                            >
+                              <option value="">Keep current / not assigned</option>
+                              <option value={READING_ADMIN_CLEAR}>CLEAR — remove assignment</option>
+                              {readingAdmins.map(admin => (
+                                <option key={admin.userId} value={admin.userId}>
+                                  {admin.label}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <p className="px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-100 text-sm text-ars-body">
+                              {editingCustomer
+                                ? readingEscalationAdminLabel(editingCustomer.readingEscalationAdminUserId, readingAdmins)
+                                : 'Not assigned'}
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-500 mt-1">
+                            ARS Admin responsible for machine-reading escalation emails on this customer’s non-rental machines. Rental machines still use the Rental Department inbox.
+                          </p>
+                        </div>
                       </div>
                       <div className="flex gap-3 mt-4">
                         <button
@@ -4741,15 +4855,16 @@ alert((response as any).message || 'User invited successfully');
                             setSavingCustomer(true);
                             try {
                               if (editingCustomer) {
-                                const res = await updateCustomer(editingCustomer._id, {
-                                  name: editingCustomer.name,
-                                  address: (editingCustomer as any).address,
-                                  phone: (editingCustomer as any).phone,
-                                  email: (editingCustomer as any).email,
-                                  defaultContactPerson: editingCustomer.defaultContactPerson,
-                                  defaultWhatsAppNumber: editingCustomer.defaultWhatsAppNumber,
-                                });
-                                setCustomers(prev => prev.map(c => c._id === editingCustomer._id ? res.customer : c));
+                                const res = await updateCustomer(editingCustomer._id, customerUpdatePayload(editingCustomer));
+                                let nextCustomer = res.customer;
+                                if (isSuperAdmin && readingAdminDraft) {
+                                  const assigned = await assignReadingEscalationAdmin(
+                                    editingCustomer._id,
+                                    readingAdminDraft === READING_ADMIN_CLEAR ? null : readingAdminDraft,
+                                  );
+                                  nextCustomer = assigned.customer || nextCustomer;
+                                }
+                                setCustomers(prev => prev.map(c => c._id === editingCustomer._id ? nextCustomer : c));
                                 setEditingCustomer(null);
                               } else {
                                 const res = await createCustomer({
@@ -4760,8 +4875,14 @@ alert((response as any).message || 'User invited successfully');
                                   defaultContactPerson: newCustomer.defaultContactPerson || undefined,
                                   defaultWhatsAppNumber: newCustomer.defaultWhatsAppNumber || undefined,
                                 });
-                                setCustomers(prev => [...prev, res.customer]);
+                                let created = res.customer;
+                                if (isSuperAdmin && readingAdminDraft && readingAdminDraft !== READING_ADMIN_CLEAR) {
+                                  const assigned = await assignReadingEscalationAdmin(created._id, readingAdminDraft);
+                                  created = assigned.customer || created;
+                                }
+                                setCustomers(prev => [...prev, created]);
                                 setNewCustomer({ name: '', address: '', phone: '', email: '', defaultContactPerson: '', defaultWhatsAppNumber: '' });
+                                setReadingAdminDraft('');
                                 setShowCustomerForm(false);
                               }
                             } catch (err: any) {
@@ -4814,11 +4935,19 @@ alert((response as any).message || 'User invited successfully');
                                   <Users className="w-3 h-3" />{c.defaultContactPerson}
                                 </span>
                               )}
+                              <span className="text-xs text-ars-body flex items-center gap-1">
+                                <Shield className="w-3 h-3" />
+                                {readingEscalationAdminLabel(c.readingEscalationAdminUserId, readingAdmins)}
+                              </span>
                             </div>
                           </div>
                           <div className="flex items-center gap-1 flex-shrink-0">
                             <button
-                              onClick={() => { setShowCustomerForm(false); setEditingCustomer(c); }}
+                              onClick={() => {
+                                setShowCustomerForm(false);
+                                setEditingCustomer(c);
+                                setReadingAdminDraft(assignedReadingAdminId(c.readingEscalationAdminUserId) || '');
+                              }}
                               className="p-2 text-ars-primary hover:bg-blue-50 rounded-lg transition-colors"
                               title="Edit customer"
                             >
@@ -4915,6 +5044,15 @@ alert((response as any).message || 'User invited successfully');
           </div>
         )}
       </div>
+
+      {showReadingAdminImport && isSuperAdmin && (
+        <ReadingEscalationAdminImport
+          onClose={() => setShowReadingAdminImport(false)}
+          onImportComplete={() => {
+            void loadReferenceData();
+          }}
+        />
+      )}
 
       {/* Invite User Modal */}
       {showInviteForm && (

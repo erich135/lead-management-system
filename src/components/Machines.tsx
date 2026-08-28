@@ -40,6 +40,7 @@ import {
   csvEscapePlainText,
   generalExportProtectedPrefix,
 } from '../lib/machineContactReminderExport';
+import { copyWhatsAppRemindersEnabled } from '../lib/machineWhatsAppReminders';
 import {
   Search,
   Building2,
@@ -362,6 +363,7 @@ export function Machines() {
       contactPerson: (machine as any).contactPerson || '',
       whatsAppNumber: (machine as any).whatsAppNumber || '',
       readingFrequencyDays: (machine as any).readingFrequencyDays || 30,
+      whatsAppRemindersEnabled: copyWhatsAppRemindersEnabled(machine),
     } as any);
   };
 

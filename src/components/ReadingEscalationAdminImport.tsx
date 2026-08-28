@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import {
-  validateReadingEscalationAdmins,
-  confirmReadingEscalationAdmins,
+  validateCustomerAdminCodes,
+  confirmCustomerAdminCodes,
   type ReadingAdminDryRun,
   type ReadingAdminPlanRow,
 } from '../lib/api';
@@ -45,7 +45,7 @@ export function ReadingEscalationAdminImport({ onClose, onImportComplete }: Prop
     setValidating(true);
     setGlobalError(null);
     try {
-      const response = await validateReadingEscalationAdmins(file);
+      const response = await validateCustomerAdminCodes(file);
       setDryRun(response.data);
       setAcknowledged(false);
       setStep('review');
@@ -62,7 +62,7 @@ export function ReadingEscalationAdminImport({ onClose, onImportComplete }: Prop
     setStep('importing');
     setGlobalError(null);
     try {
-      const response = await confirmReadingEscalationAdmins(file);
+      const response = await confirmCustomerAdminCodes(file);
       setResult(response.data.summary);
       setReportCsv(response.data.reportCsv || null);
       setStep('done');
@@ -88,12 +88,12 @@ export function ReadingEscalationAdminImport({ onClose, onImportComplete }: Prop
               <Shield className="w-5 h-5 text-indigo-600" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-800">Import Reading Admin Assignments</h2>
+              <h2 className="text-lg font-bold text-slate-800">Import Customer Admin Codes</h2>
               <p className="text-xs text-slate-500">
-                {step === 'upload' && 'Updates only Reading Escalation Admin. Super Admin only.'}
+                {step === 'upload' && 'Updates only the customer Admin Code. Super Admin only.'}
                 {step === 'review' && 'Review the dry-run. Nothing has been written yet.'}
-                {step === 'importing' && 'Applying confirmed Reading Escalation Admin changes…'}
-                {step === 'done' && 'Reading Escalation Admin import complete'}
+                {step === 'importing' && 'Applying confirmed Customer Admin Code changes…'}
+                {step === 'done' && 'Customer Admin Code import complete'}
               </p>
             </div>
           </div>
@@ -107,10 +107,12 @@ export function ReadingEscalationAdminImport({ onClose, onImportComplete }: Prop
             <div className="space-y-5">
               <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
                 Rows are matched only by <span className="font-semibold">Customer ID</span>.
-                Customer name, address, phone, email, contact person, WhatsApp number, machines, jobs and documents are never changed.
-                A blank New Reading Escalation Admin cell leaves the current assignment.
+                Only the customer Admin Code assignment is updated.
+                A blank New Admin Code cell leaves the current assignment.
                 Use <span className="font-mono">CLEAR</span> to remove an assignment.
-                Stale rows are those whose Reading Escalation Admin changed after export — unrelated customer edits do not block import.
+                Enter the exact Admin Code, for example <span className="font-mono">AC</span>.
+                Stale rows are those whose Admin Code assignment changed after export.
+                Changing the User linked to the same Admin Code does not make a row stale.
               </div>
               <div
                 onClick={() => fileInputRef.current?.click()}
@@ -126,8 +128,8 @@ export function ReadingEscalationAdminImport({ onClose, onImportComplete }: Prop
                   </div>
                 ) : (
                   <div>
-                    <p className="font-semibold text-slate-600">Click to select the Reading Admin XLSX or CSV</p>
-                    <p className="text-sm text-slate-400 mt-1">Must include Customer ID and Assignment Snapshot from a Reading Admin export</p>
+                    <p className="font-semibold text-slate-600">Click to select the Customer Admin Code XLSX or CSV</p>
+                    <p className="text-sm text-slate-400 mt-1">Must include Customer ID and Assignment Snapshot from a Customer Admin Codes export</p>
                   </div>
                 )}
               </div>
@@ -187,7 +189,7 @@ export function ReadingEscalationAdminImport({ onClose, onImportComplete }: Prop
                   onChange={(event) => setAcknowledged(event.target.checked)}
                 />
                 <span>
-                  I have reviewed this dry-run. Only Reading Escalation Admin will be updated for the
+                  I have reviewed this dry-run. Only the customer Admin Code will be updated for the
                   {' '}{dryRun.summary.changing} changing row{dryRun.summary.changing === 1 ? '' : 's'}.
                   Invalid and stale rows will not be imported.
                 </span>
@@ -198,7 +200,7 @@ export function ReadingEscalationAdminImport({ onClose, onImportComplete }: Prop
           {step === 'importing' && (
             <div className="py-16 text-center text-slate-600">
               <Loader2 className="w-10 h-10 mx-auto mb-3 animate-spin text-indigo-600" />
-              Applying confirmed Reading Escalation Admin updates…
+              Applying confirmed Customer Admin Code updates…
             </div>
           )}
 
@@ -216,7 +218,7 @@ export function ReadingEscalationAdminImport({ onClose, onImportComplete }: Prop
               </div>
               {reportCsv && (
                 <button
-                  onClick={() => downloadTextFile('reading-escalation-admin-import-report.csv', reportCsv)}
+                  onClick={() => downloadTextFile('customer-admin-codes-import-report.csv', reportCsv)}
                   className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg"
                 >
                   <Download className="w-4 h-4" />
@@ -320,10 +322,16 @@ function ChangeRow({ row }: { row: ReadingAdminPlanRow }) {
       </p>
       <p className="font-medium text-slate-800 mt-1">{row.customerName}</p>
       <p className="text-slate-700 mt-1">
-        <span className="text-slate-500">{row.currentAdmin || 'Not assigned'}</span>
+        <span className="text-slate-500">{row.currentAdminCode || 'Not assigned'}</span>
         {' → '}
-        <span className="text-indigo-700">{row.proposedAdmin || 'CLEAR'}</span>
+        <span className="text-indigo-700">{row.proposedAdminCode || 'CLEAR'}</span>
       </p>
+      {row.currentLinkedRecipient && (
+        <p className="text-xs text-slate-500 mt-1">Currently linked: {row.currentLinkedRecipient}</p>
+      )}
+      {row.proposedLinkedRecipient && (
+        <p className="text-xs text-slate-500 mt-1">Will route to: {row.proposedLinkedRecipient}</p>
+      )}
     </div>
   );
 }

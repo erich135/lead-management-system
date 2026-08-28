@@ -694,34 +694,43 @@ export interface Customer {
   address?: string;
   phone?: string;
   email?: string;
-  readingEscalationAdminUserId?: string | ReadingEscalationAdminRef | null;
+  readingEscalationAdminCodeId?: string | ReadingEscalationAdminCodeRef | null;
 }
 
-export interface ReadingEscalationAdminRef {
+export interface ReadingEscalationAdminCodeRef {
   _id: string;
-  firstName?: string;
-  lastName?: string;
-  email?: string;
+  code?: string;
+  description?: string;
   isActive?: boolean;
-  adminCodes?: Array<string | { code?: string }>;
+  dbStatus?: string;
+  user?: {
+    _id: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    isActive?: boolean;
+  } | null;
 }
 
-export interface ReadingEscalationAdminOption {
-  userId: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  adminCodes: string[];
+export interface ReadingEscalationAdminCodeOption {
+  adminCodeId: string;
+  code: string;
+  description: string;
+  linkedUserId: string | null;
+  linkedUserName: string;
+  linkedUserEmail: string;
   isActive: boolean;
-  roleName: string;
+  dbStatus: string;
+  eligible: boolean;
+  ineligibleReason?: string;
   label: string;
 }
 
 export type ReadingAdminExportFilter =
   | 'all_active'
+  | 'missing_code'
   | 'non_rental_machines'
-  | 'reminder_enabled_non_rental'
-  | 'missing_admin';
+  | 'reminder_enabled_non_rental';
 
 export interface ReadingAdminPlanRow {
   rowNumber: number;
@@ -729,10 +738,12 @@ export interface ReadingAdminPlanRow {
   customerName: string;
   status: string;
   reason?: string;
-  currentAdmin?: string | null;
-  proposedAdmin?: string | null;
-  currentAdminUserId?: string | null;
-  proposedAdminUserId?: string | null;
+  currentAdminCode?: string | null;
+  proposedAdminCode?: string | null;
+  currentLinkedRecipient?: string | null;
+  proposedLinkedRecipient?: string | null;
+  currentAdminCodeId?: string | null;
+  proposedAdminCodeId?: string | null;
 }
 
 export interface ReadingAdminDryRun {
@@ -1128,26 +1139,26 @@ export async function updateCustomer(id: string, data: { name?: string; defaultC
   });
 }
 
-export async function getReadingEscalationAdmins(): Promise<{ admins: ReadingEscalationAdminOption[] }> {
-  return apiRequest('/api/reading-escalation-admin/admins');
+export async function getReadingEscalationAdminCodes(): Promise<{ adminCodes: ReadingEscalationAdminCodeOption[] }> {
+  return apiRequest('/api/reading-escalation-admin/codes');
 }
 
 export async function getReadingEscalationGaps(): Promise<{ gaps: Array<{ customerId: string; customerName: string; reason: string }> }> {
   return apiRequest('/api/reading-escalation-admin/gaps');
 }
 
-export async function assignReadingEscalationAdmin(
+export async function assignReadingEscalationAdminCode(
   customerId: string,
-  userId: string | null,
+  adminCodeId: string | null,
 ): Promise<{ customer: Customer; unchanged?: boolean }> {
   return apiRequest(`/api/reading-escalation-admin/customers/${customerId}`, {
     method: 'PUT',
-    body: JSON.stringify({ userId }),
+    body: JSON.stringify({ adminCodeId }),
   });
 }
 
-export async function exportReadingEscalationAdmins(
-  filter: ReadingAdminExportFilter = 'reminder_enabled_non_rental',
+export async function exportCustomerAdminCodes(
+  filter: ReadingAdminExportFilter = 'all_active',
   format: 'xlsx' | 'csv' = 'xlsx',
 ): Promise<void> {
   const token = getAuthToken();
@@ -1164,14 +1175,14 @@ export async function exportReadingEscalationAdmins(
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `reading-escalation-admin-assignments-${filter}.${format}`;
+  a.download = `customer-admin-codes-${filter}.${format}`;
   document.body.appendChild(a);
   a.click();
   window.URL.revokeObjectURL(url);
   document.body.removeChild(a);
 }
 
-export async function validateReadingEscalationAdmins(file: File): Promise<{ data: ReadingAdminDryRun }> {
+export async function validateCustomerAdminCodes(file: File): Promise<{ data: ReadingAdminDryRun }> {
   const formData = new FormData();
   formData.append('file', file);
   const token = getAuthToken();
@@ -1188,7 +1199,7 @@ export async function validateReadingEscalationAdmins(file: File): Promise<{ dat
   return response.json();
 }
 
-export async function confirmReadingEscalationAdmins(file: File): Promise<{
+export async function confirmCustomerAdminCodes(file: File): Promise<{
   data: {
     summary: { updated: number; unchanged: number; invalid: number; stale: number };
     updated: ReadingAdminPlanRow[];

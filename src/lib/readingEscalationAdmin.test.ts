@@ -3,12 +3,12 @@ import test from 'node:test';
 import {
   DEFAULT_READING_ADMIN_EXPORT_FILTER,
   READING_ADMIN_CLEAR,
-  assignedReadingAdminId,
+  assignedAdminCodeId,
   customerUpdatePayload,
-  readingEscalationAdminLabel,
+  readingEscalationAdminCodeLabel,
 } from './readingEscalationAdmin.ts';
 
-test('customer save payload never includes readingEscalationAdminUserId', () => {
+test('customer save payload never includes readingEscalationAdminCodeId or the obsolete User field', () => {
   const payload = customerUpdatePayload({
     _id: '507f1f77bcf86cd799439011',
     name: 'Acme',
@@ -17,45 +17,44 @@ test('customer save payload never includes readingEscalationAdminUserId', () => 
     email: 'a@b.c',
     defaultContactPerson: 'Pat',
     defaultWhatsAppNumber: '+27821234567',
-    readingEscalationAdminUserId: '507f191e810c19729de860ea',
+    readingEscalationAdminCodeId: '507f191e810c19729de860ea',
   });
+  assert.equal('readingEscalationAdminCodeId' in payload, false);
   assert.equal('readingEscalationAdminUserId' in payload, false);
   assert.equal(payload.name, 'Acme');
   assert.equal(payload.address, '1 Main');
 });
 
-test('assigned admin id unwraps populated User refs', () => {
-  assert.equal(assignedReadingAdminId(null), null);
-  assert.equal(assignedReadingAdminId('507f191e810c19729de860ea'), '507f191e810c19729de860ea');
+test('assigned Admin Code id unwraps populated AdminCode refs', () => {
+  assert.equal(assignedAdminCodeId(null), null);
+  assert.equal(assignedAdminCodeId('507f191e810c19729de860ea'), '507f191e810c19729de860ea');
   assert.equal(
-    assignedReadingAdminId({
+    assignedAdminCodeId({
       _id: '507f191e810c19729de860ea',
-      firstName: 'Ann',
-      lastName: 'Admin',
-      email: 'ann@ars.test',
-      adminCodes: [{ code: 'AA' }],
+      code: 'AC',
+      description: 'Antoinette Coetzee',
+      user: { _id: 'u1', firstName: 'Antoinette', lastName: 'Coetzee', email: 'ac@ars.test' },
     }),
     '507f191e810c19729de860ea',
   );
 });
 
-test('dropdown label uses full name — email — Admin code', () => {
+test('dropdown label uses Code — Description — Linked User', () => {
   assert.equal(
-    readingEscalationAdminLabel(
+    readingEscalationAdminCodeLabel(
       {
         _id: '507f191e810c19729de860ea',
-        firstName: 'Ann',
-        lastName: 'Admin',
-        email: 'ann@ars.test',
-        adminCodes: [{ code: 'AA' }],
+        code: 'AC',
+        description: 'Antoinette Coetzee',
+        user: { _id: 'u1', firstName: 'Antoinette', lastName: 'Coetzee' },
       },
     ),
-    'Ann Admin — ann@ars.test — AA',
+    'AC — Antoinette Coetzee — Antoinette Coetzee',
   );
-  assert.equal(readingEscalationAdminLabel(null), 'Not assigned');
+  assert.equal(readingEscalationAdminCodeLabel(null), 'Not assigned');
 });
 
-test('default export filter is reminder-enabled non-rental machines and CLEAR is explicit', () => {
-  assert.equal(DEFAULT_READING_ADMIN_EXPORT_FILTER, 'reminder_enabled_non_rental');
+test('default export filter is all active customers and CLEAR is explicit', () => {
+  assert.equal(DEFAULT_READING_ADMIN_EXPORT_FILTER, 'all_active');
   assert.equal(READING_ADMIN_CLEAR, 'CLEAR');
 });

@@ -74,11 +74,11 @@ import {
   createCustomer,
   updateCustomer,
   Customer,
-  getReadingEscalationAdmins,
+  getReadingEscalationAdminCodes,
   getReadingEscalationGaps,
-  assignReadingEscalationAdmin,
-  exportReadingEscalationAdmins,
-  type ReadingEscalationAdminOption,
+  assignReadingEscalationAdminCode,
+  exportCustomerAdminCodes,
+  type ReadingEscalationAdminCodeOption,
   type ReadingAdminExportFilter,
 } from '../lib/api';
 import { ReadingEscalationAdminImport } from './ReadingEscalationAdminImport';
@@ -86,9 +86,9 @@ import {
   DEFAULT_READING_ADMIN_EXPORT_FILTER,
   READING_ADMIN_CLEAR,
   READING_ADMIN_EXPORT_FILTERS,
-  assignedReadingAdminId,
+  assignedAdminCodeId,
   customerUpdatePayload,
-  readingEscalationAdminLabel,
+  readingEscalationAdminCodeLabel,
 } from '../lib/readingEscalationAdmin';
 import { useAuth } from '../contexts/AuthContext';
 import { 
@@ -226,7 +226,7 @@ export function SystemManagement() {
   const [showArchivedCustomers, setShowArchivedCustomers] = useState(false);
   const [archivedCustomers, setArchivedCustomers] = useState<Customer[]>([]);
   const [loadingArchivedCustomers, setLoadingArchivedCustomers] = useState(false);
-  const [readingAdmins, setReadingAdmins] = useState<ReadingEscalationAdminOption[]>([]);
+  const [readingAdminCodes, setReadingAdminCodes] = useState<ReadingEscalationAdminCodeOption[]>([]);
   const [readingAdminGaps, setReadingAdminGaps] = useState<Array<{ customerId: string; customerName: string; reason: string }>>([]);
   const [readingAdminDraft, setReadingAdminDraft] = useState('');
   const [readingAdminExportFilter, setReadingAdminExportFilter] = useState<ReadingAdminExportFilter>(DEFAULT_READING_ADMIN_EXPORT_FILTER);
@@ -402,11 +402,11 @@ export function SystemManagement() {
       const customersResponse = await getCustomers({ limit: 10000 });
       setCustomers(customersResponse.customers || []);
       if (isSuperAdmin) {
-        const [adminsResponse, gapsResponse] = await Promise.all([
-          getReadingEscalationAdmins().catch(() => ({ admins: [] })),
+        const [codesResponse, gapsResponse] = await Promise.all([
+          getReadingEscalationAdminCodes().catch(() => ({ adminCodes: [] })),
           getReadingEscalationGaps().catch(() => ({ gaps: [] })),
         ]);
-        setReadingAdmins(adminsResponse.admins || []);
+        setReadingAdminCodes(codesResponse.adminCodes || []);
         setReadingAdminGaps(gapsResponse.gaps || []);
       }
     } catch (err: any) {
@@ -4706,9 +4706,9 @@ alert((response as any).message || 'User invited successfully');
                         onClick={async () => {
                           setExportingReadingAdmins(true);
                           try {
-                            await exportReadingEscalationAdmins(readingAdminExportFilter, 'xlsx');
+                            await exportCustomerAdminCodes(readingAdminExportFilter, 'xlsx');
                           } catch (err: any) {
-                            alert(err.message || 'Failed to export Reading Admin assignments');
+                            alert(err.message || 'Failed to export Customer Admin Codes');
                           } finally {
                             setExportingReadingAdmins(false);
                           }
@@ -4716,23 +4716,23 @@ alert((response as any).message || 'User invited successfully');
                         className="px-3 py-2 border border-indigo-300 text-indigo-700 rounded-[8px] font-bold text-[13px] hover:bg-indigo-50 transition-colors flex items-center gap-2 disabled:opacity-50"
                       >
                         <Download className="w-4 h-4" />
-                        {exportingReadingAdmins ? 'EXPORTING...' : 'Export Reading Admin Assignments'}
+                        {exportingReadingAdmins ? 'EXPORTING...' : 'Export Customer Admin Codes'}
                       </button>
                       <button
                         onClick={() => setShowReadingAdminImport(true)}
                         className="px-3 py-2 border border-indigo-300 text-indigo-700 rounded-[8px] font-bold text-[13px] hover:bg-indigo-50 transition-colors flex items-center gap-2"
                       >
                         <Upload className="w-4 h-4" />
-                        Import Reading Admin Assignments
+                        Import Customer Admin Codes
                       </button>
                     </div>
                   )}
 
                   {isSuperAdmin && readingAdminGaps.length > 0 && (
                     <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                      <p className="font-semibold">{readingAdminGaps.length} customer{readingAdminGaps.length === 1 ? '' : 's'} need a Reading Escalation Admin</p>
+                      <p className="font-semibold">{readingAdminGaps.length} customer{readingAdminGaps.length === 1 ? '' : 's'} need a Reading Escalation Admin Code</p>
                       <p className="text-xs mt-1">
-                        Non-rental machines with reminders enabled will not send day-10 escalation emails until an active ARS Admin with a valid email is assigned.
+                        Non-rental machines with reminders enabled will not send day-10 escalation emails until an active Admin Code with a linked Admin user and valid email is assigned.
                       </p>
                       <ul className="mt-2 space-y-1 max-h-32 overflow-y-auto">
                         {readingAdminGaps.slice(0, 20).map(gap => (
@@ -4821,7 +4821,7 @@ alert((response as any).message || 'User invited successfully');
                           />
                         </div>
                         <div className="md:col-span-2">
-                          <label className="block text-sm font-semibold text-ars-body mb-1">Reading Escalation Admin</label>
+                          <label className="block text-sm font-semibold text-ars-body mb-1">Reading Escalation Admin Code</label>
                           {isSuperAdmin ? (
                             <select
                               value={readingAdminDraft}
@@ -4830,21 +4830,25 @@ alert((response as any).message || 'User invited successfully');
                             >
                               <option value="">Keep current / not assigned</option>
                               <option value={READING_ADMIN_CLEAR}>CLEAR — remove assignment</option>
-                              {readingAdmins.map(admin => (
-                                <option key={admin.userId} value={admin.userId}>
-                                  {admin.label}
+                              {readingAdminCodes.map(code => (
+                                <option
+                                  key={code.adminCodeId}
+                                  value={code.adminCodeId}
+                                  disabled={!code.eligible}
+                                >
+                                  {code.eligible ? code.label : `${code.label} — unavailable`}
                                 </option>
                               ))}
                             </select>
                           ) : (
                             <p className="px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-100 text-sm text-ars-body">
                               {editingCustomer
-                                ? readingEscalationAdminLabel(editingCustomer.readingEscalationAdminUserId, readingAdmins)
+                                ? readingEscalationAdminCodeLabel(editingCustomer.readingEscalationAdminCodeId, readingAdminCodes)
                                 : 'Not assigned'}
                             </p>
                           )}
                           <p className="text-xs text-gray-500 mt-1">
-                            ARS Admin responsible for machine-reading escalation emails on this customer’s non-rental machines. Rental machines still use the Rental Department inbox.
+                            Assign this customer to an Admin Code. Escalation emails use the User currently linked to that code. Changing the linked User later updates future unsent emails without editing this customer. Rental machines still use the Rental Department inbox.
                           </p>
                         </div>
                       </div>
@@ -4858,7 +4862,7 @@ alert((response as any).message || 'User invited successfully');
                                 const res = await updateCustomer(editingCustomer._id, customerUpdatePayload(editingCustomer));
                                 let nextCustomer = res.customer;
                                 if (isSuperAdmin && readingAdminDraft) {
-                                  const assigned = await assignReadingEscalationAdmin(
+                                  const assigned = await assignReadingEscalationAdminCode(
                                     editingCustomer._id,
                                     readingAdminDraft === READING_ADMIN_CLEAR ? null : readingAdminDraft,
                                   );
@@ -4877,7 +4881,7 @@ alert((response as any).message || 'User invited successfully');
                                 });
                                 let created = res.customer;
                                 if (isSuperAdmin && readingAdminDraft && readingAdminDraft !== READING_ADMIN_CLEAR) {
-                                  const assigned = await assignReadingEscalationAdmin(created._id, readingAdminDraft);
+                                  const assigned = await assignReadingEscalationAdminCode(created._id, readingAdminDraft);
                                   created = assigned.customer || created;
                                 }
                                 setCustomers(prev => [...prev, created]);
@@ -4937,7 +4941,7 @@ alert((response as any).message || 'User invited successfully');
                               )}
                               <span className="text-xs text-ars-body flex items-center gap-1">
                                 <Shield className="w-3 h-3" />
-                                {readingEscalationAdminLabel(c.readingEscalationAdminUserId, readingAdmins)}
+                                {readingEscalationAdminCodeLabel(c.readingEscalationAdminCodeId, readingAdminCodes)}
                               </span>
                             </div>
                           </div>
@@ -4946,7 +4950,7 @@ alert((response as any).message || 'User invited successfully');
                               onClick={() => {
                                 setShowCustomerForm(false);
                                 setEditingCustomer(c);
-                                setReadingAdminDraft(assignedReadingAdminId(c.readingEscalationAdminUserId) || '');
+                                setReadingAdminDraft(assignedAdminCodeId(c.readingEscalationAdminCodeId) || '');
                               }}
                               className="p-2 text-ars-primary hover:bg-blue-50 rounded-lg transition-colors"
                               title="Edit customer"

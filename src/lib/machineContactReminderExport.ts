@@ -108,6 +108,40 @@ export function buildContactReminderCsv(machines: Machine[]): string {
   return `\uFEFF${lines.join('\n')}`;
 }
 
+export const CONTACT_REMINDER_CONTACT_PERSON_COL = 8;
+export const CONTACT_REMINDER_WHATSAPP_COL = 9;
+export const CONTACT_REMINDER_FREQUENCY_COL = 10;
+export const CONTACT_REMINDER_REMINDERS_COL = 11;
+export const CONTACT_REMINDER_BASELINE_CONTACT_PERSON_COL = 12;
+export const CONTACT_REMINDER_BASELINE_WHATSAPP_COL = 13;
+export const EXCEL_TEXT_FORMAT = '@';
+
+function isExcelTextColumn(col: number): boolean {
+  return (
+    col === CONTACT_REMINDER_CONTACT_PERSON_COL
+    || col === CONTACT_REMINDER_WHATSAPP_COL
+    || col === CONTACT_REMINDER_BASELINE_CONTACT_PERSON_COL
+    || col === CONTACT_REMINDER_BASELINE_WHATSAPP_COL
+  );
+}
+
+function ensureSheetCell(
+  sheet: XLSX.WorkSheet,
+  row: number,
+  col: number,
+): XLSX.CellObject {
+  const address = XLSX.utils.encode_cell({ r: row, c: col });
+  if (!sheet[address]) sheet[address] = { t: 's', v: '' };
+  return sheet[address] as XLSX.CellObject;
+}
+
+function applyExcelTextFormat(cell: XLSX.CellObject): void {
+  cell.t = 's';
+  cell.v = cell.v == null ? '' : String(cell.v);
+  cell.z = EXCEL_TEXT_FORMAT;
+  delete cell.w;
+}
+
 export function buildContactReminderWorkbook(machines: Machine[]): XLSX.WorkBook {
   const aoa = [
     [...CONTACT_REMINDER_WORKBOOK_COLUMNS],
@@ -115,21 +149,50 @@ export function buildContactReminderWorkbook(machines: Machine[]): XLSX.WorkBook
   ];
   const sheet = XLSX.utils.aoa_to_sheet(aoa);
   const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
-  for (let row = 1; row <= range.e.r; row += 1) {
+  for (let row = 0; row <= range.e.r; row += 1) {
     for (let col = 0; col <= range.e.c; col += 1) {
-      const address = XLSX.utils.encode_cell({ r: row, c: col });
-      const cell = sheet[address];
-      if (!cell) continue;
+      const cell = ensureSheetCell(sheet, row, col);
+      if (isExcelTextColumn(col)) {
+        applyExcelTextFormat(cell);
+        continue;
+      }
+      if (row === 0) {
+        cell.t = 's';
+        cell.v = cell.v == null ? '' : String(cell.v);
+        delete cell.w;
+        continue;
+      }
+      if (col === CONTACT_REMINDER_FREQUENCY_COL) {
+        const raw = cell.v == null ? '' : String(cell.v).trim();
+        if (!raw) {
+          cell.t = 's';
+          cell.v = '';
+          delete cell.z;
+          delete cell.w;
+          continue;
+        }
+        const numeric = Number(raw);
+        if (Number.isFinite(numeric)) {
+          cell.t = 'n';
+          cell.v = numeric;
+          delete cell.z;
+          delete cell.w;
+        }
+        continue;
+      }
       cell.t = 's';
       cell.v = cell.v == null ? '' : String(cell.v);
       delete cell.w;
-      delete cell.z;
     }
   }
-  sheet['!cols'] = CONTACT_REMINDER_WORKBOOK_COLUMNS.map((header, index) => ({
-    wch: Math.max(header.length, header === 'Machine ID' ? 26 : 18),
-    hidden: index >= CONTACT_REMINDER_EXPORT_COLUMNS.length,
-  }));
+  sheet['!cols'] = CONTACT_REMINDER_WORKBOOK_COLUMNS.map((header, index) => {
+    const col: XLSX.ColInfo & { z?: string } = {
+      wch: Math.max(header.length, header === 'Machine ID' ? 26 : 18),
+      hidden: index >= CONTACT_REMINDER_EXPORT_COLUMNS.length,
+    };
+    if (isExcelTextColumn(index)) col.z = EXCEL_TEXT_FORMAT;
+    return col;
+  });
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, 'Contact Reminders');
   return workbook;

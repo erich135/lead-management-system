@@ -3,10 +3,14 @@ import test from 'node:test';
 import * as XLSX from 'xlsx';
 import type { Machine } from './api.ts';
 import {
+  CONTACT_REMINDER_BASELINE_COLUMNS,
   CONTACT_REMINDER_EXPORT_COLUMNS,
+  CONTACT_REMINDER_WORKBOOK_COLUMNS,
   buildContactReminderCsv,
   buildContactReminderWorkbook,
+  contactReminderBaselineValues,
   contactReminderExportRow,
+  contactReminderVisibleValues,
   csvEscapePlainText,
   generalExportProtectedPrefix,
   machineRecordUpdatedAt,
@@ -45,7 +49,13 @@ test('contact reminder export uses the recommended column order', () => {
     'Reading Frequency (Days)',
     'Reminders Enabled',
   ]);
-  assert.deepEqual(contactReminderExportRow(machine), [
+  assert.deepEqual([...CONTACT_REMINDER_BASELINE_COLUMNS], [
+    'Baseline Contact Person',
+    'Baseline WhatsApp Number',
+    'Baseline Reading Frequency (Days)',
+    'Baseline Reminders Enabled',
+  ]);
+  assert.deepEqual(contactReminderVisibleValues(machine), [
     '507f1f77bcf86cd799439011',
     '2026-08-20T08:00:00.123Z',
     'Atlas Copco',
@@ -58,6 +68,16 @@ test('contact reminder export uses the recommended column order', () => {
     '+27821234567',
     '30',
     'Yes',
+  ]);
+  assert.deepEqual(contactReminderBaselineValues(machine), [
+    'Jane',
+    '+27821234567',
+    '30',
+    'Yes',
+  ]);
+  assert.deepEqual(contactReminderExportRow(machine), [
+    ...contactReminderVisibleValues(machine),
+    ...contactReminderBaselineValues(machine),
   ]);
 });
 
@@ -87,4 +107,30 @@ test('XLSX cells for Machine ID and Record Updated At are strings', () => {
   const csv = XLSX.utils.sheet_to_csv(sheet);
   assert.match(csv, /507f1f77bcf86cd799439011/);
   assert.equal(csv.includes('="'), false);
+});
+
+test('XLSX hides protected baseline columns with the original exported contact values', () => {
+  const workbook = buildContactReminderWorkbook([machine]);
+  const sheet = workbook.Sheets['Contact Reminders'];
+  const cols = sheet['!cols'] || [];
+  assert.equal(CONTACT_REMINDER_WORKBOOK_COLUMNS.length, 16);
+  assert.equal(cols.length, 16);
+  for (let index = 0; index < CONTACT_REMINDER_EXPORT_COLUMNS.length; index += 1) {
+    assert.equal(cols[index]?.hidden, false);
+  }
+  for (let index = CONTACT_REMINDER_EXPORT_COLUMNS.length; index < cols.length; index += 1) {
+    assert.equal(cols[index]?.hidden, true);
+  }
+  assert.equal(sheet.M1.v, 'Baseline Contact Person');
+  assert.equal(sheet.N1.v, 'Baseline WhatsApp Number');
+  assert.equal(sheet.O1.v, 'Baseline Reading Frequency (Days)');
+  assert.equal(sheet.P1.v, 'Baseline Reminders Enabled');
+  assert.equal(sheet.I2.v, 'Jane');
+  assert.equal(sheet.M2.v, 'Jane');
+  assert.equal(sheet.J2.v, '+27821234567');
+  assert.equal(sheet.N2.v, '+27821234567');
+  assert.equal(sheet.K2.v, '30');
+  assert.equal(sheet.O2.v, '30');
+  assert.equal(sheet.L2.v, 'Yes');
+  assert.equal(sheet.P2.v, 'Yes');
 });

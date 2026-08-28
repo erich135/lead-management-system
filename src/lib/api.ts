@@ -955,6 +955,13 @@ export interface ContactReminderFieldChange {
   newValue: string | number | boolean | null;
 }
 
+export interface ContactReminderStaleField {
+  field: 'contactPerson' | 'whatsAppNumber' | 'readingFrequencyDays' | 'whatsAppRemindersEnabled';
+  exportedBaseline: string | number | boolean | null;
+  currentDatabase: string | number | boolean | null;
+  proposedSpreadsheet: string | number | boolean | null;
+}
+
 export interface ContactReminderPlanRow {
   rowNumber: number;
   machineId: string | null;
@@ -963,6 +970,7 @@ export interface ContactReminderPlanRow {
   reason?: string;
   recordUpdatedAt?: string;
   changes: ContactReminderFieldChange[];
+  staleFields?: ContactReminderStaleField[];
 }
 
 export interface ContactReminderDryRun {

@@ -121,6 +121,8 @@ export function ContactReminderImport({ onClose, onImportComplete }: Props) {
               <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
                 Rows are matched only by <span className="font-semibold">Machine ID</span>.
                 Serial numbers, customers, hours, service dates and RSR documents are never changed.
+                Stale rows are only those whose contact-reminder fields changed after export.
+                Use a fresh Contact Reminders export — earlier workbooks without baseline columns will be rejected.
                 Blank cells leave the current value. Use <span className="font-mono">CLEAR</span> to wipe Contact Person or WhatsApp Number.
               </div>
               <div
@@ -138,7 +140,7 @@ export function ContactReminderImport({ onClose, onImportComplete }: Props) {
                 ) : (
                   <div>
                     <p className="font-semibold text-slate-600">Click to select the contact-reminder CSV or XLSX</p>
-                    <p className="text-sm text-slate-400 mt-1">Must include Machine ID and Record Updated At</p>
+                    <p className="text-sm text-slate-400 mt-1">Must include Machine ID and hidden baseline columns from a new Contact Reminders export</p>
                   </div>
                 )}
               </div>
@@ -341,6 +343,20 @@ function IssueRow({ row }: { row: ContactReminderPlanRow }) {
         Row {row.rowNumber} · {row.machineId || 'no Machine ID'}
       </p>
       <p className="text-slate-700 mt-1">{row.reason}</p>
+      {row.staleFields && row.staleFields.length > 0 && (
+        <ul className="mt-2 space-y-2">
+          {row.staleFields.map((field) => (
+            <li key={field.field} className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900">
+              <p className="font-medium">{fieldLabel(field.field)} changed after export</p>
+              <p className="text-xs mt-1">
+                Exported: {formatValue(field.exportedBaseline)}
+                {' · '}Current: {formatValue(field.currentDatabase)}
+                {' · '}Spreadsheet: {formatValue(field.proposedSpreadsheet)}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

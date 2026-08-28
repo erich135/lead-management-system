@@ -16,6 +16,18 @@ export const CONTACT_REMINDER_EXPORT_COLUMNS = [
   'Reminders Enabled',
 ] as const;
 
+export const CONTACT_REMINDER_BASELINE_COLUMNS = [
+  'Baseline Contact Person',
+  'Baseline WhatsApp Number',
+  'Baseline Reading Frequency (Days)',
+  'Baseline Reminders Enabled',
+] as const;
+
+export const CONTACT_REMINDER_WORKBOOK_COLUMNS = [
+  ...CONTACT_REMINDER_EXPORT_COLUMNS,
+  ...CONTACT_REMINDER_BASELINE_COLUMNS,
+] as const;
+
 export function machineRecordUpdatedAt(machine: Pick<Machine, 'updatedAt'>): string {
   if (!machine.updatedAt) return '';
   const date = new Date(machine.updatedAt);
@@ -29,7 +41,7 @@ export function customerNameForExport(machine: Machine): string {
   return machine.cashCustomer || '';
 }
 
-export function contactReminderExportRow(machine: Machine): string[] {
+export function contactReminderVisibleValues(machine: Machine): string[] {
   return [
     machine._id || '',
     machineRecordUpdatedAt(machine),
@@ -46,6 +58,19 @@ export function contactReminderExportRow(machine: Machine): string[] {
   ];
 }
 
+export function contactReminderBaselineValues(machine: Machine): string[] {
+  return [
+    machine.contactPerson || '',
+    machine.whatsAppNumber || '',
+    machine.readingFrequencyDays == null ? '' : String(machine.readingFrequencyDays),
+    machine.whatsAppRemindersEnabled !== false ? 'Yes' : 'No',
+  ];
+}
+
+export function contactReminderExportRow(machine: Machine): string[] {
+  return [...contactReminderVisibleValues(machine), ...contactReminderBaselineValues(machine)];
+}
+
 export function csvEscapePlainText(value: unknown): string {
   const text = value == null ? '' : String(value);
   return `"${text.replace(/"/g, '""')}"`;
@@ -53,7 +78,7 @@ export function csvEscapePlainText(value: unknown): string {
 
 export function buildContactReminderCsv(machines: Machine[]): string {
   const lines = [
-    CONTACT_REMINDER_EXPORT_COLUMNS.join(','),
+    CONTACT_REMINDER_WORKBOOK_COLUMNS.join(','),
     ...machines.map((machine) => contactReminderExportRow(machine).map(csvEscapePlainText).join(',')),
   ];
   return `\uFEFF${lines.join('\n')}`;
@@ -61,7 +86,7 @@ export function buildContactReminderCsv(machines: Machine[]): string {
 
 export function buildContactReminderWorkbook(machines: Machine[]): XLSX.WorkBook {
   const aoa = [
-    [...CONTACT_REMINDER_EXPORT_COLUMNS],
+    [...CONTACT_REMINDER_WORKBOOK_COLUMNS],
     ...machines.map((machine) => contactReminderExportRow(machine)),
   ];
   const sheet = XLSX.utils.aoa_to_sheet(aoa);
@@ -77,8 +102,9 @@ export function buildContactReminderWorkbook(machines: Machine[]): XLSX.WorkBook
       delete cell.z;
     }
   }
-  sheet['!cols'] = CONTACT_REMINDER_EXPORT_COLUMNS.map((header) => ({
+  sheet['!cols'] = CONTACT_REMINDER_WORKBOOK_COLUMNS.map((header, index) => ({
     wch: Math.max(header.length, header === 'Machine ID' ? 26 : 18),
+    hidden: index >= CONTACT_REMINDER_EXPORT_COLUMNS.length,
   }));
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, 'Contact Reminders');

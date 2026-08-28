@@ -949,6 +949,36 @@ export interface ErrorMachineRow {
   skip?: boolean;
 }
 
+export interface ContactReminderFieldChange {
+  field: 'contactPerson' | 'whatsAppNumber' | 'readingFrequencyDays' | 'whatsAppRemindersEnabled';
+  oldValue: string | number | boolean | null;
+  newValue: string | number | boolean | null;
+}
+
+export interface ContactReminderPlanRow {
+  rowNumber: number;
+  machineId: string | null;
+  serialNumber: string;
+  status: 'unchanged' | 'changing' | 'invalid' | 'stale';
+  reason?: string;
+  recordUpdatedAt?: string;
+  changes: ContactReminderFieldChange[];
+}
+
+export interface ContactReminderDryRun {
+  summary: {
+    totalRows: number;
+    unchanged: number;
+    changing: number;
+    invalid: number;
+    stale: number;
+  };
+  unchanged: ContactReminderPlanRow[];
+  changing: ContactReminderPlanRow[];
+  invalid: ContactReminderPlanRow[];
+  stale: ContactReminderPlanRow[];
+}
+
 export interface Technician {
   _id: string;
   name: string;
@@ -2317,6 +2347,57 @@ export async function confirmMachinesImport(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ rows }),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Import failed' } }));
+    throw new Error(error.error?.message || 'Import failed');
+  }
+  return response.json();
+}
+
+/**
+ * Contact reminder import — Phase 1: dry-run. No database writes.
+ * Separate from the general machine overwrite importer.
+ */
+export async function validateContactReminders(file: File): Promise<{ data: ContactReminderDryRun }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const token = getAuthToken();
+  if (!token) throw new Error('No authentication token found');
+  const response = await fetch(`${apiBase()}/api/import/contact-reminders/validate`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: formData,
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Validation failed' } }));
+    throw new Error(error.error?.message || 'Validation failed');
+  }
+  return response.json();
+}
+
+/**
+ * Contact reminder import — Phase 2: explicit confirm after dry-run.
+ * Writes only the four contact-reminder fields, matched by Machine ID.
+ */
+export async function confirmContactReminders(file: File): Promise<{
+  data: {
+    summary: { updated: number; unchanged: number; invalid: number; stale: number };
+    updated: ContactReminderPlanRow[];
+    stale: ContactReminderPlanRow[];
+    invalid: ContactReminderPlanRow[];
+    unchangedCount: number;
+  };
+}> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('confirm', 'true');
+  const token = getAuthToken();
+  if (!token) throw new Error('No authentication token found');
+  const response = await fetch(`${apiBase()}/api/import/contact-reminders/confirm`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: formData,
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: { message: 'Import failed' } }));

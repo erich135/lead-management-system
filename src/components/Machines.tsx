@@ -34,6 +34,12 @@ import { MachineActivityHistory } from './MachineActivityHistory';
 import { MachineRSRMetadataEditModal } from './MachineRSRMetadataEditModal';
 import { PendingMachineReadings } from './PendingMachineReadings';
 import { UnifiedMachineImport } from './UnifiedMachineImport';
+import { ContactReminderImport } from './ContactReminderImport';
+import {
+  contactReminderXlsxArrayBuffer,
+  csvEscapePlainText,
+  generalExportProtectedPrefix,
+} from '../lib/machineContactReminderExport';
 import {
   Search,
   Building2,
@@ -59,6 +65,7 @@ import {
   ShieldAlert,
   QrCode,
   Link,
+  Bell,
 } from 'lucide-react';
 import { SmartDateInput } from './SmartDateInput';
 import {
@@ -134,6 +141,7 @@ export function Machines() {
 
   // Import wizard state
   const [showImportWizard, setShowImportWizard] = useState(false);
+  const [showContactReminderImport, setShowContactReminderImport] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [loadingReportCustomers, setLoadingReportCustomers] = useState(false);
 
@@ -480,6 +488,7 @@ export function Machines() {
       const rows = response.machines || [];
 
       const headers = [
+        'Machine ID', 'Record Updated At',
         'Make', 'Model', 'Serial Number', 'Asset Number', 'Machine Type',
         'Customer', 'Cash Customer', 'Ownership Type', 'Is Rental', 'Service Type',
         'Machine Hours', 'Next Service Hours',
@@ -504,6 +513,7 @@ export function Machines() {
       const csvLines = [
         headers.join(','),
         ...rows.map((m) => [
+          ...generalExportProtectedPrefix(m).map(csvEscapePlainText),
           m.make,
           m.model,
           escape(m.serialNumber),
@@ -540,6 +550,36 @@ export function Machines() {
       a.remove();
     } catch (error) {
       console.error('Export failed:', error);
+    }
+  };
+
+  const handleExportContactReminders = async () => {
+    try {
+      const params: any = { page: 1, limit: 99999 };
+      if (searchQuery.trim()) params.search = searchQuery.trim();
+      if (customerFilter) params.customerId = customerFilter;
+      if (ownershipFilter === 'archived') {
+        params.dbStatus = 'archived';
+      } else if (ownershipFilter) {
+        params.ownershipType = ownershipFilter;
+      }
+      const response = await getMachines(params);
+      const rows = response.machines || [];
+      const stamp = new Date().toISOString().split('T')[0];
+      const buffer = contactReminderXlsxArrayBuffer(rows);
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `machine_contact_reminders_${stamp}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      a.remove();
+    } catch (error) {
+      console.error('Contact reminder export failed:', error);
     }
   };
 
@@ -981,6 +1021,15 @@ export function Machines() {
                 Import Machines
               </button>
             )}
+            {isSuperAdmin && (
+              <button
+                onClick={() => setShowContactReminderImport(true)}
+                className="flex items-center justify-center gap-2 w-40 h-14 px-3 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-lg hover:from-indigo-700 hover:to-indigo-800 shadow-sm transition-all text-sm font-medium text-center leading-tight"
+              >
+                <Bell className="w-4 h-4 shrink-0" />
+                Import Contact Reminders
+              </button>
+            )}
             {isSuperAdmin && SHOW_DEDUP_TOOL && (
               <button
                 onClick={async () => {
@@ -1025,6 +1074,15 @@ export function Machines() {
               <Download className="w-4 h-4 shrink-0" />
               Export Machine List
             </button>
+            {isSuperAdmin && (
+              <button
+                onClick={handleExportContactReminders}
+                className="flex items-center justify-center gap-2 w-40 h-14 px-3 bg-gradient-to-r from-cyan-600 to-cyan-700 text-white rounded-lg hover:from-cyan-700 hover:to-cyan-800 shadow-sm transition-all text-sm font-medium text-center leading-tight"
+              >
+                <Download className="w-4 h-4 shrink-0" />
+                Export Contact Reminders
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -2362,6 +2420,12 @@ export function Machines() {
       {showImportWizard && (
         <UnifiedMachineImport
           onClose={() => setShowImportWizard(false)}
+          onImportComplete={() => loadMachines(1)}
+        />
+      )}
+      {showContactReminderImport && (
+        <ContactReminderImport
+          onClose={() => setShowContactReminderImport(false)}
           onImportComplete={() => loadMachines(1)}
         />
       )}

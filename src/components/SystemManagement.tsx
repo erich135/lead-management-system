@@ -4732,7 +4732,7 @@ alert((response as any).message || 'User invited successfully');
                     <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                       <p className="font-semibold">{readingAdminGaps.length} customer{readingAdminGaps.length === 1 ? '' : 's'} need a Reading Escalation Admin Code</p>
                       <p className="text-xs mt-1">
-                        Non-rental machines with reminders enabled will not send day-10 escalation emails until an active Admin Code with a linked Admin user and valid email is assigned.
+                        Non-rental machines with reminders enabled will not send day-10 escalation emails until an active Admin Code with a linked user and valid email is assigned.
                       </p>
                       <ul className="mt-2 space-y-1 max-h-32 overflow-y-auto">
                         {readingAdminGaps.slice(0, 20).map(gap => (

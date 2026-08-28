@@ -24,6 +24,8 @@ test('System Admin shows Reading Escalation Admin Code and Super-Admin-only bulk
   assert.match(systemSource, /isSuperAdmin/);
   assert.match(systemSource, /customerUpdatePayload\(editingCustomer\)/);
   assert.match(systemSource, /disabled=\{!code\.eligible\}/);
+  assert.match(systemSource, /readingAdminCodes\.map\(code =>/);
+  assert.doesNotMatch(systemSource, /readingAdminCodes\.filter/);
   assert.doesNotMatch(systemSource, /readingEscalationAdminUserId/);
   assert.doesNotMatch(systemSource, /Export Reading Admin Assignments/);
   assert.doesNotMatch(
@@ -55,4 +57,7 @@ test('importer requires dry-run acknowledgement before Confirm Import', () => {
   assert.match(importSource, /proposedLinkedRecipient/);
   assert.doesNotMatch(importSource, /Assignment Snapshot/);
   assert.doesNotMatch(importSource, /Stale rows/);
+  assert.doesNotMatch(systemSource, /linked Admin user/);
+  assert.doesNotMatch(systemSource, /Linked User is not an ARS Admin/);
+  assert.doesNotMatch(importSource, /Linked User is not an ARS Admin/);
 });

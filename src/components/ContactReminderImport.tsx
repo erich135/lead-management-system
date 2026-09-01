@@ -125,10 +125,9 @@ export function ContactReminderImport({ onClose, onImportComplete }: Props) {
               <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
                 Rows are matched only by <span className="font-semibold">Machine ID</span>.
                 Serial numbers, customers, hours, service dates and RSR documents are never changed.
-                Stale rows are those whose contact-reminder fields or customer assignment
-                (customer, cash customer, ownership or active/archive status) changed after export.
                 Use a fresh Contact Reminders export — earlier workbooks without baseline columns will be rejected.
-                Blank cells leave the current value. Use <span className="font-mono">CLEAR</span> to wipe Contact Person or WhatsApp Number.
+                Non-empty values in the four editable columns overwrite the current values.
+                Blank cells leave the database values unchanged. Use <span className="font-mono">CLEAR</span> to wipe Contact Person or WhatsApp Number.
               </div>
               <div
                 onClick={() => fileInputRef.current?.click()}
@@ -207,7 +206,7 @@ export function ContactReminderImport({ onClose, onImportComplete }: Props) {
                 <span>
                   I have reviewed this dry-run. Only the four contact-reminder fields will be updated for the
                   {' '}{dryRun.summary.changing} changing row{dryRun.summary.changing === 1 ? '' : 's'}.
-                  Invalid and stale rows will not be imported.
+                  Invalid rows will not be imported.
                 </span>
               </label>
             </div>

@@ -4,6 +4,13 @@ import { Loader2 } from 'lucide-react';
 import { ARS_DEFAULT_HEADER } from '../../../utils/arsJobCardHeaderDefaults';
 import { getSalesProposal } from '../api';
 import {
+  customerProposalCommercialFigures,
+  customerProposalElectricityFigures,
+  showsCommercialSaving,
+  showsPayback,
+  showsRevisionCallout,
+} from '../customerProposalPresentation';
+import {
   SALES_PROPOSAL_TOOL_PATH,
   salesProposalEditorPath,
 } from '../navigation';
@@ -13,10 +20,6 @@ const ARS_LOGO_SRC = '/Logo.png';
 
 function Cell({ value }: { value: string | null }) {
   return <span>{value ?? '—'}</span>;
-}
-
-function proposalRequiresRevision(doc: CustomerProposalDocument): boolean {
-  return /requires revision before savings and payback/i.test(doc.recommendation);
 }
 
 function Section({
@@ -115,48 +118,16 @@ function PageFooter({
 }
 
 function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
-  const blocked = proposalRequiresRevision(doc);
+  const revisionCallout = showsRevisionCallout(doc);
+  const savingVisible = showsCommercialSaving(doc);
+  const paybackVisible = showsPayback(doc);
   const proposedName = doc.proposed.name
     ? doc.proposed.quantity && doc.proposed.quantity > 1
       ? `${doc.proposed.quantity} × ${doc.proposed.name}`
       : doc.proposed.name
     : null;
-  const electricityFigures = [
-    {
-      label: doc.electricity.currentLabel,
-      value: doc.electricity.current ?? 'Not available',
-    },
-    {
-      label: doc.electricity.proposedLabel,
-      value: doc.electricity.proposed ?? 'Not available',
-    },
-    ...(blocked
-      ? []
-      : [
-          {
-            label: doc.electricity.savingLabel,
-            value: doc.electricity.saving ?? 'Not available',
-          },
-        ]),
-  ];
-  const commercialFigures = [
-    {
-      label: doc.commercial.currentHeadline,
-      value: doc.commercial.current ?? 'Not available',
-    },
-    {
-      label: doc.commercial.proposedHeadline,
-      value: doc.commercial.proposed ?? 'Not available',
-    },
-    ...(blocked
-      ? []
-      : [
-          {
-            label: doc.commercial.savingHeadline,
-            value: doc.commercial.saving ?? 'Not available',
-          },
-        ]),
-  ];
+  const electricityFigures = customerProposalElectricityFigures(doc);
+  const commercialFigures = customerProposalCommercialFigures(doc);
 
   return (
     <div className="spt-customer-proposal-canvas">
@@ -193,13 +164,12 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
           </ul>
         </Section>
 
+        {doc.airAudit.sourceFile && (
         <Section title="Air Audit summary">
           <p className="spt-proposal-kicker-inline">
             {doc.airAudit.measuredHeading || 'Measured site air demand'}
           </p>
-          {doc.airAudit.sourceFile && (
-            <p className="spt-proposal-quiet">Source file: {doc.airAudit.sourceFile}</p>
-          )}
+          <p className="spt-proposal-quiet">Source file: {doc.airAudit.sourceFile}</p>
           <div className="spt-proposal-metric-grid">
             <Metric label="Audit period" value={doc.airAudit.period ?? 'Not available'} />
             <Metric
@@ -224,6 +194,7 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
             />
           </div>
         </Section>
+        )}
 
         <Section title="Current compressed-air system">
           <p className="spt-proposal-kicker-inline">Published machine specification</p>
@@ -253,13 +224,56 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
             )}
             <div className="spt-proposal-performance spt-keep-together">
               <Metric
-                label={doc.currentMachinePerformance.publishedLabel}
+                label={
+                  doc.currentMachinePerformance.publishedLabel ?? 'Published airflow'
+                }
                 value={doc.currentMachinePerformance.publishedAirflow ?? 'Not available'}
               />
-              <Metric
-                label={doc.currentMachinePerformance.measuredLabel}
-                value={doc.currentMachinePerformance.measuredAirflow ?? 'Not available'}
-              />
+              {doc.currentMachinePerformance.estimatedAirflow && (
+                <Metric
+                  label={
+                    doc.currentMachinePerformance.estimatedLabel ??
+                    'Estimated airflow at site conditions'
+                  }
+                  value={doc.currentMachinePerformance.estimatedAirflow}
+                />
+              )}
+              {doc.currentMachinePerformance.presentation !== 'estimated_operating' && (
+                <Metric
+                  label={
+                    doc.currentMachinePerformance.measuredLabel ??
+                    'Highest measured airflow during Air Audit'
+                  }
+                  value={doc.currentMachinePerformance.measuredAirflow ?? 'Not available'}
+                />
+              )}
+              {doc.currentMachinePerformance.annualOperatingHoursLabel && (
+                <Metric
+                  label={doc.currentMachinePerformance.annualOperatingHoursLabel}
+                  value={doc.currentMachinePerformance.annualOperatingHours ?? 'Not available'}
+                />
+              )}
+              {doc.currentMachinePerformance.averageLoadLabel && (
+                <Metric
+                  label={doc.currentMachinePerformance.averageLoadLabel}
+                  value={doc.currentMachinePerformance.averageLoad ?? 'Not available'}
+                />
+              )}
+              {doc.currentMachinePerformance.estimatedAverageOperatingAirflowLabel && (
+                <Metric
+                  label={doc.currentMachinePerformance.estimatedAverageOperatingAirflowLabel}
+                  value={
+                    doc.currentMachinePerformance.estimatedAverageOperatingAirflow ??
+                    'Not available'
+                  }
+                />
+              )}
+              {doc.currentMachinePerformance.differenceLabel && (
+                <Metric
+                  label={doc.currentMachinePerformance.differenceLabel}
+                  value={doc.currentMachinePerformance.differenceAirflow ?? 'Not available'}
+                />
+              )}
               {doc.currentMachinePerformance.comparisonLabel && (
                 <div className="spt-proposal-reduction">
                   <div className="spt-proposal-metric-label">
@@ -271,6 +285,14 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
                 </div>
               )}
             </div>
+            {doc.currentMachinePerformance.estimatedBasisNote && (
+              <p className="spt-proposal-quiet">
+                {doc.currentMachinePerformance.estimatedBasisNote}
+              </p>
+            )}
+            {doc.currentMachinePerformance.limitationNote && (
+              <p className="spt-proposal-quiet">{doc.currentMachinePerformance.limitationNote}</p>
+            )}
             {doc.currentMachinePerformance.caveat && (
               <p className="spt-proposal-quiet">{doc.currentMachinePerformance.caveat}</p>
             )}
@@ -286,6 +308,25 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
                 pressure {doc.proposed.publishedPressure ?? 'Not available'} · Published package
                 input {doc.proposed.packageInput ?? 'Not available'}
               </p>
+              {doc.proposed.estimatedAirflow && (
+                <>
+                  <p className="spt-proposal-kicker-inline">
+                    {doc.proposed.estimatedSectionTitle ??
+                      'Estimated performance at site conditions'}
+                  </p>
+                  <p className="spt-proposal-body">
+                    {doc.proposed.estimatedLabel ?? 'Estimated airflow at site conditions'}{' '}
+                    {doc.proposed.estimatedAirflow}
+                    {doc.proposed.siteAltitude ? ` · Site altitude ${doc.proposed.siteAltitude}` : ''}
+                  </p>
+                  {doc.proposed.estimatedBasisNote && (
+                    <p className="spt-proposal-quiet">{doc.proposed.estimatedBasisNote}</p>
+                  )}
+                </>
+              )}
+              {!doc.proposed.estimatedAirflow && doc.proposed.siteUnavailableReason && (
+                <p className="spt-proposal-quiet">{doc.proposed.siteUnavailableReason}</p>
+              )}
             </div>
           ) : (
             <p className="spt-proposal-body">No proposed BOUWA machine has been selected.</p>
@@ -342,9 +383,12 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
           </table>
         </Section>
 
-        {(blocked || doc.warnings.length > 0) && (
+        {doc.siteAirflowAdvisory && (
+          <p className="spt-proposal-quiet">{doc.siteAirflowAdvisory}</p>
+        )}
+        {(revisionCallout || doc.warnings.length > 0) && (
           <div className="spt-proposal-callout spt-keep-together">
-            {blocked && (
+            {revisionCallout && (
               <p className="spt-proposal-callout-title">
                 Proposed configuration requires revision
               </p>
@@ -366,6 +410,12 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
 
         <Section title="Estimated electricity">
           <FigureStrip items={electricityFigures} />
+          {doc.electricity.suppliedAmountReference && (
+            <p className="spt-proposal-quiet">{doc.electricity.suppliedAmountReference}</p>
+          )}
+          {doc.electricity.suppliedAmountReferenceNote && (
+            <p className="spt-proposal-quiet">{doc.electricity.suppliedAmountReferenceNote}</p>
+          )}
         </Section>
 
         <Section title="Estimated annual compressed-air cost">
@@ -401,7 +451,7 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
                   <td className="spt-proposal-num">{doc.commercial.current ?? 'Not available'}</td>
                   <td className="spt-proposal-num">{doc.commercial.proposed ?? 'Not available'}</td>
                 </tr>
-                {!blocked && (
+                {savingVisible && (
                   <tr className="spt-proposal-total-row">
                     <td>{doc.commercial.savingHeadline}</td>
                     <td> </td>
@@ -433,7 +483,7 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
                     </td>
                   </tr>
                 )}
-                {!blocked && (
+                {savingVisible && (
                   <tr className="spt-proposal-total-row">
                     <td>{doc.commercial.savingHeadline}</td>
                     <td className="spt-proposal-num">
@@ -441,7 +491,7 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
                     </td>
                   </tr>
                 )}
-                {!blocked && doc.commercial.paybackHeadline && (
+                {paybackVisible && (
                   <tr className="spt-proposal-payback-row">
                     <td>{doc.commercial.paybackHeadline}</td>
                     <td className="spt-proposal-num">
@@ -475,7 +525,7 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
                     {doc.commercial.proposed ?? 'Not available'}
                   </td>
                 </tr>
-                {!blocked && (
+                {savingVisible && (
                   <tr className="spt-proposal-total-row">
                     <td>{doc.commercial.savingHeadline}</td>
                     <td className="spt-proposal-num">

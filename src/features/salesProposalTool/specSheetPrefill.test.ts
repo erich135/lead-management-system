@@ -5,10 +5,12 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
   SPEC_SHEET_MANUAL_FALLBACK_NOTE,
+  SPEC_SHEET_READ_FAILED_NOTE,
   SPEC_SHEET_VERIFY_NOTE,
   formFieldsFromExtracted,
   formatPrefillNumber,
   hasExtractedTechnicalValues,
+  specSheetStatusMessage,
 } from './specSheetPrefill.ts';
 
 const FEATURE_ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -120,8 +122,8 @@ test('spec-sheet capture prefills after upload without auto-applying or publishi
     'utf8',
   );
   assert.match(capture, /formFieldsFromExtracted/);
-  assert.match(capture, /SPEC_SHEET_VERIFY_NOTE/);
-  assert.match(capture, /SPEC_SHEET_MANUAL_FALLBACK_NOTE/);
+  assert.match(capture, /specSheetStatusMessage/);
+  assert.match(capture, /extractionStatus/);
   assert.match(capture, /Use in this proposal/);
   assert.match(capture, /Source: \{sourceFileName\}/);
   const uploadFn = capture.slice(
@@ -142,4 +144,16 @@ test('spec-sheet capture prefills after upload without auto-applying or publishi
     SPEC_SHEET_MANUAL_FALLBACK_NOTE.includes('Please enter the values shown'),
     true,
   );
+});
+
+test('extraction status maps to a distinct, non-technical message for each outcome', () => {
+  assert.equal(specSheetStatusMessage('extracted'), SPEC_SHEET_VERIFY_NOTE);
+  assert.equal(specSheetStatusMessage('no_supported_values'), SPEC_SHEET_MANUAL_FALLBACK_NOTE);
+  assert.equal(specSheetStatusMessage('read_failed'), SPEC_SHEET_READ_FAILED_NOTE);
+  assert.equal(specSheetStatusMessage(null), null);
+  assert.equal(specSheetStatusMessage(undefined), null);
+
+  assert.notEqual(SPEC_SHEET_MANUAL_FALLBACK_NOTE, SPEC_SHEET_READ_FAILED_NOTE);
+  assert.equal(SPEC_SHEET_READ_FAILED_NOTE.includes('could not read this PDF'), true);
+  assert.equal(/stack|Error:|at\s+\w+\s*\(/i.test(SPEC_SHEET_READ_FAILED_NOTE), false);
 });

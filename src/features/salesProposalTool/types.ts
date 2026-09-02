@@ -94,12 +94,22 @@ export interface ElectricityBasis {
   suppliedCurrentPeriod: 'monthly' | 'annual' | null;
 }
 
+export interface OperatingAssumptions {
+  annualOperatingHours: number | null;
+  averageLoadPercent: number | null;
+}
+
 export const EMPTY_ELECTRICITY_BASIS: ElectricityBasis = {
   type: 'none',
   flatRateRandPerKwh: null,
   tariffRecordId: null,
   suppliedCurrentAmount: null,
   suppliedCurrentPeriod: null,
+};
+
+export const EMPTY_OPERATING_ASSUMPTIONS: OperatingAssumptions = {
+  annualOperatingHours: null,
+  averageLoadPercent: null,
 };
 
 export interface AirAndElectricityComparison {
@@ -146,12 +156,23 @@ export interface AirAndElectricityComparison {
     rateRandPerKwh: number | null;
     suppliedCurrentAmount: number | null;
     suppliedCurrentPeriod: 'monthly' | 'annual' | null;
+    suppliedAmountReferenceNote?: string | null;
     estimatedSavingRand: number | null;
     estimatedIncreaseRand: number | null;
     outcome: 'saving' | 'increase' | 'unavailable';
   };
   warnings: string[];
   notes: string[];
+  operating?: {
+    used: boolean;
+    annualOperatingHours: number | null;
+    averageLoadPercent: number | null;
+    currentOperatingCapacityM3PerMin: number | null;
+    estimatedAverageOperatingAirflowM3PerMin: number | null;
+    annualDeliveredVolumeM3: number | null;
+    unavailableReason: string | null;
+    publishedCapacityFallbackNote: string | null;
+  } | null;
   basisExplanation: string;
   futureCostDisclaimer: string;
   copy: {
@@ -183,11 +204,13 @@ export interface SalesProposal {
   currentEquipment: CurrentEquipment[];
   proposedEquipment: ProposedEquipment[];
   electricityBasis: ElectricityBasis;
+  operatingAssumptions: OperatingAssumptions;
   commercialOffer: CommercialOffer;
   comparison: AirAndElectricityComparison | null;
   commercial: CommercialComparison | null;
   customerProposal?: CustomerProposalDocument | null;
   currentMachinePerformance?: CurrentMachineMeasuredPerformance | null;
+  proposedSitePerformance?: SitePerformanceView | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -303,8 +326,31 @@ export interface CommercialComparison {
   };
 }
 
+export interface SitePerformanceView {
+  status:
+    | 'estimated'
+    | 'published_airflow_unavailable'
+    | 'reference_basis_unconfirmed'
+    | 'reference_pressure_unconfirmed'
+    | 'site_altitude_unavailable'
+    | 'site_altitude_invalid';
+  publishedAirflowM3PerMin: number | null;
+  estimatedSiteAirflowM3PerMin: number | null;
+  estimatedSiteAirflowTotalM3PerMin: number | null;
+  siteAltitudeMetres: number | null;
+  factor: number | null;
+  basisNote: string | null;
+  unavailableReason: string | null;
+  sectionTitle: string;
+  estimatedLabel: string;
+  altitudeLabel: string;
+  altitudeDisplay: string | null;
+  advisory: string | null;
+}
+
 export interface CurrentMachineMeasuredPerformance {
   scopeType: 'single_machine' | 'site_header';
+  presentation?: 'measured' | 'estimated_operating';
   available: boolean;
   machineName: string | null;
   publishedFlowM3PerMin: number | null;
@@ -319,14 +365,24 @@ export interface CurrentMachineMeasuredPerformance {
   siteHeaderNote: string | null;
   comparisonCaveat: string | null;
   flowBasisNote: string | null;
+  sitePerformance?: SitePerformanceView | null;
+  annualOperatingHours?: number | null;
+  averageLoadPercent?: number | null;
+  operatingCapacityM3PerMin?: number | null;
+  estimatedAverageOperatingAirflowM3PerMin?: number | null;
+  publishedCapacityFallbackNote?: string | null;
   copy: {
     title: string;
     publishedLabel: string;
-    measuredLabel: string;
-    differenceLabel: string;
+    measuredLabel: string | null;
+    differenceLabel: string | null;
     comparisonLabel: string | null;
     comparisonDisplay: string | null;
+    limitationNote: string | null;
     unavailableReason: string | null;
+    annualOperatingHoursLabel?: string;
+    averageLoadLabel?: string;
+    estimatedAverageOperatingAirflowLabel?: string;
   };
 }
 
@@ -359,14 +415,28 @@ export interface CustomerProposalDocument {
   }>;
   currentMachinePerformance: {
     title: string;
+    presentation?: 'measured' | 'estimated_operating';
     machineName: string | null;
     publishedLabel: string;
     publishedAirflow: string | null;
-    measuredLabel: string;
+    estimatedLabel: string | null;
+    estimatedAirflow: string | null;
+    estimatedSectionTitle: string | null;
+    estimatedBasisNote: string | null;
+    measuredLabel: string | null;
     measuredAirflow: string | null;
+    differenceLabel: string | null;
+    differenceAirflow: string | null;
     comparisonLabel: string | null;
     comparisonValue: string | null;
+    limitationNote: string | null;
     caveat: string | null;
+    annualOperatingHoursLabel?: string | null;
+    annualOperatingHours?: string | null;
+    averageLoadLabel?: string | null;
+    averageLoad?: string | null;
+    estimatedAverageOperatingAirflowLabel?: string | null;
+    estimatedAverageOperatingAirflow?: string | null;
   } | null;
   proposed: {
     quantity: number | null;
@@ -374,6 +444,12 @@ export interface CustomerProposalDocument {
     publishedAirflow: string | null;
     publishedPressure: string | null;
     packageInput: string | null;
+    estimatedSectionTitle: string | null;
+    estimatedLabel: string | null;
+    estimatedAirflow: string | null;
+    siteAltitude: string | null;
+    estimatedBasisNote: string | null;
+    siteUnavailableReason: string | null;
   };
   technicalRows: Array<{
     label: string;
@@ -381,13 +457,21 @@ export interface CustomerProposalDocument {
     proposed: string | null;
   }>;
   warnings: string[];
+  siteAirflowAdvisory: string | null;
+  requiresRevision: boolean;
   electricity: {
+    currentEnergyLabel?: string;
+    proposedEnergyLabel?: string;
+    currentEnergy?: string | null;
+    proposedEnergy?: string | null;
     currentLabel: string;
     proposedLabel: string;
     savingLabel: string;
     current: string | null;
     proposed: string | null;
     saving: string | null;
+    suppliedAmountReference?: string | null;
+    suppliedAmountReferenceNote?: string | null;
   };
   commercial: {
     currentHeadline: string;

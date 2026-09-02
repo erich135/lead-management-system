@@ -15,6 +15,23 @@ export const SPEC_SHEET_VERIFY_NOTE =
 export const SPEC_SHEET_MANUAL_FALLBACK_NOTE =
   'We could not reliably read the technical values from this specification sheet. Please enter the values shown on the uploaded document.';
 
+export const SPEC_SHEET_READ_FAILED_NOTE =
+  'We could not read this PDF. Please try another copy of the specification sheet or enter the values manually.';
+
+export type SpecSheetOutcomeStatus =
+  | 'extracted'
+  | 'no_supported_values'
+  | 'read_failed';
+
+export function specSheetStatusMessage(
+  status: SpecSheetOutcomeStatus | null | undefined,
+): string | null {
+  if (status === 'extracted') return SPEC_SHEET_VERIFY_NOTE;
+  if (status === 'no_supported_values') return SPEC_SHEET_MANUAL_FALLBACK_NOTE;
+  if (status === 'read_failed') return SPEC_SHEET_READ_FAILED_NOTE;
+  return null;
+}
+
 export function emptyExtractedSpecSheetValues(): ExtractedSpecSheetValues {
   return {
     manufacturer: null,

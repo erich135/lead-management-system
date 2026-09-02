@@ -231,6 +231,17 @@ export function applyLibrarySpec(
   };
 }
 
+export function applyConfirmedLibrarySpec(
+  row: CurrentEquipmentDraft,
+  spec: PublicMachineSpec,
+  sourceBacked: SourceBackedSpec,
+): CurrentEquipmentDraft {
+  return {
+    ...applyLibrarySpec(row, spec),
+    sourceBacked,
+  };
+}
+
 export function resetCurrentMachine(row: CurrentEquipmentDraft): CurrentEquipmentDraft {
   return {
     ...newCurrentEquipmentDraft(),

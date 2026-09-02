@@ -1,8 +1,9 @@
-import type { AirAndElectricityComparison } from '../types';
+import type { AirAndElectricityComparison, SitePerformanceView } from '../types';
 import { formatMeasuredNumber } from '../formatMeasured';
 
 interface AirMachineComparisonCardProps {
   comparison: AirAndElectricityComparison | null;
+  proposedSitePerformance?: SitePerformanceView | null;
 }
 
 function airflow(value: number | null | undefined): string {
@@ -26,6 +27,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 export function AirMachineComparisonCard({
   comparison,
+  proposedSitePerformance = null,
 }: AirMachineComparisonCardProps) {
   const air = comparison?.air ?? null;
 
@@ -64,6 +66,12 @@ export function AirMachineComparisonCard({
                 label="Published capacity"
                 value={airflow(comparison.proposed.totalRatedFadM3PerMin)}
               />
+              {proposedSitePerformance?.status === 'estimated' && (
+                <Row
+                  label={proposedSitePerformance.estimatedLabel}
+                  value={airflow(proposedSitePerformance.estimatedSiteAirflowTotalM3PerMin)}
+                />
+              )}
             </dl>
           </div>
         </div>
@@ -86,6 +94,9 @@ export function AirMachineComparisonCard({
             />
           </dl>
         </div>
+      )}
+      {proposedSitePerformance?.advisory && (
+        <p className="mt-3 text-sm text-slate-600">{proposedSitePerformance.advisory}</p>
       )}
       {comparison?.warnings.map((warning) => (
         <p key={warning} className="mt-3 text-sm text-amber-800">

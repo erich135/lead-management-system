@@ -21,7 +21,9 @@
     "test:bouwa-benchmark": "set \"TS_NODE_PROJECT=tsconfig.app.json\" && node --loader ts-node/esm/transpile-only scripts/checkBouwaBenchmarkPresentation.ts",
     "test:bouwa-pilot-access": "set \"TS_NODE_PROJECT=tsconfig.app.json\" && node --loader ts-node/esm/transpile-only scripts/checkBouwaPilotAccess.ts",
     "test:bouwa-pilot-browser": "node scripts/bouwaPilotBrowserAcceptance.mjs",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "test:spt": "vitest run --config vitest.spt.config.ts",
+    "test:spt:legacy": "node scripts/run-legacy-spt-tests.mjs"
   },
   "dependencies": {
     "@types/leaflet": "^1.9.21",
@@ -61,6 +63,7 @@
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.3.0",
     "vite": "^5.4.2",
-    "vite-plugin-pwa": "^1.3.0"
+    "vite-plugin-pwa": "^1.3.0",
+    "vitest": "^2.1.9"
   }
 }

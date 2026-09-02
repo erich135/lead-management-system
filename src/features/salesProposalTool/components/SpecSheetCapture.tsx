@@ -1,19 +1,33 @@
 import { useState } from 'react';
-import { uploadSpecSheet } from '../api';
+import { confirmSpecSheet, uploadSpecSheet } from '../api';
 import {
-  SPEC_SHEET_MANUAL_FALLBACK_NOTE,
-  SPEC_SHEET_VERIFY_NOTE,
+  AUTHORITATIVE_SOURCE_CONFIRMATION_NOTE,
+  CONFIRM_SPEC_BUTTON_LABEL,
+  PROPOSAL_ONLY_LIBRARY_STATUS,
+  buildSpecSheetConfirmPayload,
+  sourceBackedFromConfirmInput,
+  type SpecSheetConfirmTarget,
+} from '../confirmSpecSheet';
+import {
   formFieldsFromExtracted,
-  hasExtractedTechnicalValues,
+  specSheetStatusMessage,
+  type SpecSheetOutcomeStatus,
 } from '../specSheetPrefill';
-import type { SourceBackedSpec } from '../types';
+import type { PublicMachineSpec, SourceBackedSpec } from '../types';
 
 interface SpecSheetCaptureProps {
   proposalId: string;
+  target: SpecSheetConfirmTarget;
+  currentEquipmentId?: string | null;
   initialManufacturer?: string;
   initialModel?: string;
   onCancel: () => void;
   onApply: (values: SourceBackedSpec) => void;
+  onConfirmed: (result: {
+    spec: PublicMachineSpec;
+    sourceBacked: SourceBackedSpec;
+    created: boolean;
+  }) => void;
 }
 
 function textOrNull(value: string): string | null {
@@ -30,17 +44,22 @@ function numberOrNull(value: string): number | null {
 
 export function SpecSheetCapture({
   proposalId,
+  target,
+  currentEquipmentId = null,
   initialManufacturer = '',
   initialModel = '',
   onCancel,
   onApply,
+  onConfirmed,
 }: SpecSheetCaptureProps) {
   const [uploading, setUploading] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sourceFileName, setSourceFileName] = useState<string | null>(null);
   const [sourceFileId, setSourceFileId] = useState<string | null>(null);
   const [sourceSha256, setSourceSha256] = useState<string | null>(null);
-  const [extractedAny, setExtractedAny] = useState(false);
+  const [extractionStatus, setExtractionStatus] =
+    useState<SpecSheetOutcomeStatus | null>(null);
   const [manufacturer, setManufacturer] = useState(initialManufacturer);
   const [model, setModel] = useState(initialModel);
   const [variant, setVariant] = useState('');
@@ -70,7 +89,7 @@ export function SpecSheetCapture({
       setPackageInput(prefill.packageInput);
       setMotorRating(prefill.motorRating);
       setControlType(prefill.controlType);
-      setExtractedAny(hasExtractedTechnicalValues(stored.extracted));
+      setExtractionStatus(stored.extractionStatus);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Could not upload the specification sheet.');
     } finally {
@@ -78,28 +97,62 @@ export function SpecSheetCapture({
     }
   }
 
-  function handleApply() {
+  function reviewedValues() {
     if (!sourceFileName || !sourceFileId) {
       setError('Upload a PDF specification sheet first.');
-      return;
+      return null;
     }
     if (!textOrNull(manufacturer) || !textOrNull(model)) {
       setError('Manufacturer and model are required.');
-      return;
+      return null;
     }
-    onApply({
-      manufacturer: textOrNull(manufacturer),
-      model: textOrNull(model),
+    return {
+      target,
+      currentEquipmentId: target === 'current' ? currentEquipmentId : null,
+      sourceFileId,
+      sourceFileName,
+      sourceSha256,
+      manufacturer: textOrNull(manufacturer) as string,
+      model: textOrNull(model) as string,
       modelVariant: textOrNull(variant),
       ratedPressureBarG: numberOrNull(pressure),
       ratedAirflowM3PerMin: numberOrNull(airflow),
       packageInputPowerKw: numberOrNull(packageInput),
       motorShaftPowerKw: numberOrNull(motorRating),
       controlType: textOrNull(controlType),
-      sourceFileName,
-      sourceFileId,
-      sourceSha256,
-    });
+    };
+  }
+
+  function handleApply() {
+    const values = reviewedValues();
+    if (!values) return;
+    onApply(sourceBackedFromConfirmInput(values));
+  }
+
+  async function handleConfirm() {
+    const values = reviewedValues();
+    if (!values) return;
+    setConfirming(true);
+    setError(null);
+    try {
+      const confirmed = await confirmSpecSheet(
+        proposalId,
+        buildSpecSheetConfirmPayload(values),
+      );
+      onConfirmed({
+        spec: confirmed.spec,
+        sourceBacked: sourceBackedFromConfirmInput(values),
+        created: confirmed.created,
+      });
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Could not add this specification to the Machine Spec Library.',
+      );
+    } finally {
+      setConfirming(false);
+    }
   }
 
   const inputClass =
@@ -129,11 +182,13 @@ export function SpecSheetCapture({
           Source: {sourceFileName}
         </p>
       )}
-      {sourceFileName && extractedAny && (
-        <p className="text-xs text-slate-600">{SPEC_SHEET_VERIFY_NOTE}</p>
+      {sourceFileName && specSheetStatusMessage(extractionStatus) && (
+        <p className="text-xs text-slate-600">
+          {specSheetStatusMessage(extractionStatus)}
+        </p>
       )}
-      {sourceFileName && !extractedAny && (
-        <p className="text-xs text-slate-600">{SPEC_SHEET_MANUAL_FALLBACK_NOTE}</p>
+      {sourceFileName && (
+        <p className="text-xs font-medium text-slate-600">{PROPOSAL_ONLY_LIBRARY_STATUS}</p>
       )}
       {sourceFileName && (
         <div className="grid gap-2 sm:grid-cols-2">
@@ -174,15 +229,26 @@ export function SpecSheetCapture({
       <p className="text-xs text-slate-500">
         Leave a field blank if the specification sheet does not publish that value. Do not copy motor rating into package input.
       </p>
+      {sourceFileName && (
+        <p className="text-xs text-slate-600">{AUTHORITATIVE_SOURCE_CONFIRMATION_NOTE}</p>
+      )}
       {error && <p className="text-xs text-red-600">{error}</p>}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <button
           type="button"
           onClick={handleApply}
-          disabled={!sourceFileName}
-          className="rounded-[8px] bg-[#f7c12b] px-3 py-1.5 text-xs font-bold text-[#383838] disabled:opacity-50"
+          disabled={!sourceFileName || confirming}
+          className="rounded-[8px] bg-white px-3 py-1.5 text-xs font-medium text-[#383838] ring-1 ring-slate-200 disabled:opacity-50"
         >
           Use in this proposal
+        </button>
+        <button
+          type="button"
+          onClick={() => void handleConfirm()}
+          disabled={!sourceFileName || confirming}
+          className="rounded-[8px] bg-[#f7c12b] px-3 py-1.5 text-xs font-bold text-[#383838] disabled:opacity-50"
+        >
+          {CONFIRM_SPEC_BUTTON_LABEL}
         </button>
         <button
           type="button"

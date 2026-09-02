@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { buildElectricityBasis } from '../electricityBasis';
+import { formatEstimatedRand } from '../formatMeasured';
 import type { ElectricityBasis } from '../types';
 
 interface ElectricityBasisSectionProps {
@@ -111,6 +112,15 @@ export function ElectricityBasisSection({
             />
           </div>
         </label>
+        {value.flatRateRandPerKwh !== null && value.suppliedCurrentAmount !== null && (
+          <p className="mt-2 text-xs text-slate-500">
+            Known compressor electricity amount supplied:{' '}
+            {formatEstimatedRand(value.suppliedCurrentAmount) ?? 'Not available'}{' '}
+            {value.suppliedCurrentPeriod === 'annual' ? 'per year' : 'per month'}.
+            This supplied amount is shown for reference and is not substituted into the
+            like-for-like estimate based on the stated operating assumptions.
+          </p>
+        )}
       </div>
     </section>
   );

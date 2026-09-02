@@ -8,6 +8,7 @@ import {
 import { machineRecordId, toSearchableMachine } from '../customerMachineSearch';
 import {
   applyLibrarySpec,
+  applyConfirmedLibrarySpec,
   applyPhysicalMachine,
   canAddPhysicalMachine,
   currentMachineCardTitle,
@@ -39,6 +40,11 @@ import {
 } from '../suggestPublishedSpecs';
 import type { PublicMachineSpec, SourceBackedSpec } from '../types';
 import { SpecSheetCapture } from './SpecSheetCapture';
+import {
+  LIBRARY_ADDED_STATUS,
+  LIBRARY_USING_STATUS,
+  PROPOSAL_ONLY_LIBRARY_STATUS,
+} from '../confirmSpecSheet';
 
 interface CurrentEquipmentSectionProps {
   proposalId: string;
@@ -346,6 +352,8 @@ function CurrentMachineCard({
         </div>
         <SpecSheetCapture
           proposalId={proposalId}
+          target="current"
+          currentEquipmentId={row.key}
           initialManufacturer={row.selectedSpec?.manufacturer || row.make}
           initialModel={row.selectedSpec?.model || row.model}
           onCancel={() => onChange({ ...row, capturingSheet: false })}
@@ -358,6 +366,9 @@ function CurrentMachineCard({
               capturingSheet: false,
               changingSpec: false,
             })
+          }
+          onConfirmed={({ spec, sourceBacked }) =>
+            onChange(applyConfirmedLibrarySpec(row, spec, sourceBacked))
           }
         />
       </div>
@@ -651,6 +662,13 @@ function SelectedCurrentMachine({
   return (
     <div>
       <p className="text-sm font-medium text-[#383838]">{title}</p>
+      <p className="mt-1 text-xs text-slate-500">
+        {row.specLibraryRecordId
+          ? row.sourceBacked
+            ? `${LIBRARY_ADDED_STATUS}. ${LIBRARY_USING_STATUS}`
+            : LIBRARY_USING_STATUS
+          : PROPOSAL_ONLY_LIBRARY_STATUS}
+      </p>
       <dl className="mt-3 space-y-2">
         <div>
           <dt className="text-xs font-medium text-slate-500">Serial</dt>

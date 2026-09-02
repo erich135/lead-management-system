@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { getMachinesByCustomer, type Customer } from '../../../lib/api';
 import {
@@ -20,6 +20,7 @@ import { CurrentEquipmentSection } from '../components/CurrentEquipmentSection';
 import { ProposedReplacementSection } from '../components/ProposedReplacementSection';
 import { MachineSummaryCard } from '../components/MachineSummaryCard';
 import { ElectricityBasisSection } from '../components/ElectricityBasisSection';
+import { OperatingAssumptionsSection } from '../components/OperatingAssumptionsSection';
 import { CommercialOfferSection } from '../components/CommercialOfferSection';
 import { AirMachineComparisonCard } from '../components/AirMachineComparisonCard';
 import { ElectricityResultCard } from '../components/ElectricityResultCard';
@@ -36,13 +37,20 @@ import {
   type ProposedEquipmentDraft,
 } from '../equipmentState';
 import { electricityBasisOrEmpty } from '../electricityBasis';
+import { operatingAssumptionsOrEmpty } from '../operatingAssumptions';
 import { commercialOfferOrEmpty } from '../commercialOffer';
 import {
   DEFAULT_AIR_AUDIT_SCOPE,
   normaliseAirAuditScope,
   type AirAuditScope,
 } from '../airAuditScope';
-import { SALES_PROPOSAL_TOOL_LABEL, SALES_PROPOSAL_TOOL_PATH, salesProposalPreviewPath } from '../navigation';
+import { SALES_PROPOSAL_TOOL_LABEL, SALES_PROPOSAL_TOOL_PATH } from '../navigation';
+import {
+  persistSalesProposalEditor,
+  PREVIEW_SAVE_FAILED_MESSAGE,
+  saveThenPreviewCustomerProposal,
+  type SalesProposalEditorState,
+} from '../salesProposalPersistence';
 import {
   EMPTY_SITE,
   type AirAndElectricityComparison,
@@ -50,13 +58,16 @@ import {
   type CommercialOffer,
   type CurrentMachineMeasuredPerformance,
   type ElectricityBasis,
+  type OperatingAssumptions,
   type SalesProposal,
   type SalesProposalSite,
+  type SitePerformanceView,
 } from '../types';
 import { effectivePackageInput } from '../specDisplay';
 
 export function SalesProposalEditorPage() {
   const { proposalId } = useParams();
+  const navigate = useNavigate();
   const [proposal, setProposal] = useState<SalesProposal | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [site, setSite] = useState<SalesProposalSite>(EMPTY_SITE);
@@ -64,6 +75,9 @@ export function SalesProposalEditorPage() {
   const [proposed, setProposed] = useState<ProposedEquipmentDraft>(emptyProposedDraft());
   const [electricityBasis, setElectricityBasis] = useState<ElectricityBasis>(
     electricityBasisOrEmpty(null),
+  );
+  const [operatingAssumptions, setOperatingAssumptions] = useState<OperatingAssumptions>(
+    operatingAssumptionsOrEmpty(null),
   );
   const [commercialOffer, setCommercialOffer] = useState<CommercialOffer>(
     commercialOfferOrEmpty(null),
@@ -73,6 +87,8 @@ export function SalesProposalEditorPage() {
   const [commercial, setCommercial] = useState<CommercialComparison | null>(null);
   const [currentMachinePerformance, setCurrentMachinePerformance] =
     useState<CurrentMachineMeasuredPerformance | null>(null);
+  const [proposedSitePerformance, setProposedSitePerformance] =
+    useState<SitePerformanceView | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -101,10 +117,12 @@ export function SalesProposalEditorPage() {
         );
         setProposed(proposedDraftFromProposal(loaded.proposedEquipment));
         setElectricityBasis(electricityBasisOrEmpty(loaded.electricityBasis));
+        setOperatingAssumptions(operatingAssumptionsOrEmpty(loaded.operatingAssumptions));
         setCommercialOffer(commercialOfferOrEmpty(loaded.commercialOffer));
         setComparison(loaded.comparison);
         setCommercial(loaded.commercial);
         setCurrentMachinePerformance(loaded.currentMachinePerformance ?? null);
+        setProposedSitePerformance(loaded.proposedSitePerformance ?? null);
         setCustomer(
           loaded.customerId && loaded.customerName
             ? { _id: loaded.customerId, name: loaded.customerName }
@@ -160,9 +178,11 @@ export function SalesProposalEditorPage() {
     const timer = window.setTimeout(() => {
       void previewElectricityComparison(proposalId, {
         customerId: customer?._id ?? null,
+        site,
         currentEquipment: toCurrentEquipmentPayload(currentEquipment),
         proposedEquipment: toProposedEquipmentPayload(proposed),
         electricityBasis,
+        operatingAssumptions,
         commercialOffer,
         airAuditScope,
       })
@@ -170,6 +190,7 @@ export function SalesProposalEditorPage() {
           setComparison(preview.comparison);
           setCommercial(preview.commercial);
           setCurrentMachinePerformance(preview.currentMachinePerformance ?? null);
+          setProposedSitePerformance(preview.proposedSitePerformance ?? null);
         })
         .catch(() => {
           /* keep the last comparison if preview cannot run yet */
@@ -182,46 +203,85 @@ export function SalesProposalEditorPage() {
     currentEquipment,
     proposed,
     electricityBasis,
+    operatingAssumptions,
     commercialOffer,
     airAuditScope,
+    site.altitudeMetres,
     proposal?.airAudit?.sourceSha256,
     customer?._id,
   ]);
 
+  function editorPersistenceState(): SalesProposalEditorState {
+    return {
+      customerId: customer?._id ?? null,
+      site,
+      currentEquipment,
+      proposed,
+      electricityBasis,
+      operatingAssumptions,
+      commercialOffer,
+      airAuditScope,
+    };
+  }
+
+  function applyPersistedProposal(saved: SalesProposal) {
+    setProposal(saved);
+    setSite(saved.site);
+    const drafts = draftsFromCurrentEquipment(saved.currentEquipment);
+    setCurrentEquipment(drafts);
+    setAirAuditScope(
+      normaliseAirAuditScope(
+        saved.airAudit?.scope,
+        drafts.filter(currentMachineHasIdentity).map((row) => row.key),
+      ),
+    );
+    setProposed(proposedDraftFromProposal(saved.proposedEquipment));
+    setElectricityBasis(electricityBasisOrEmpty(saved.electricityBasis));
+    setOperatingAssumptions(operatingAssumptionsOrEmpty(saved.operatingAssumptions));
+    setCommercialOffer(commercialOfferOrEmpty(saved.commercialOffer));
+    setComparison(saved.comparison);
+    setCommercial(saved.commercial);
+    setCurrentMachinePerformance(saved.currentMachinePerformance ?? null);
+    setProposedSitePerformance(saved.proposedSitePerformance ?? null);
+  }
+
   async function handleSave() {
-    if (!proposalId) return;
+    if (!proposalId || saving) return;
     setSaving(true);
     setSaveMessage(null);
     setError(null);
     try {
-      const saved = await saveSalesProposal(proposalId, {
-        customerId: customer?._id ?? null,
-        site: { ...site, name: site.name },
-        currentEquipment: toCurrentEquipmentPayload(currentEquipment),
-        proposedEquipment: toProposedEquipmentPayload(proposed),
-        electricityBasis,
-        commercialOffer,
-        airAuditScope,
+      const saved = await persistSalesProposalEditor({
+        proposalId,
+        state: editorPersistenceState(),
+        save: saveSalesProposal,
       });
-      setProposal(saved);
-      setSite(saved.site);
-      const drafts = draftsFromCurrentEquipment(saved.currentEquipment);
-      setCurrentEquipment(drafts);
-      setAirAuditScope(
-        normaliseAirAuditScope(
-          saved.airAudit?.scope,
-          drafts.filter(currentMachineHasIdentity).map((row) => row.key),
-        ),
-      );
-      setProposed(proposedDraftFromProposal(saved.proposedEquipment));
-      setElectricityBasis(electricityBasisOrEmpty(saved.electricityBasis));
-      setCommercialOffer(commercialOfferOrEmpty(saved.commercialOffer));
-      setComparison(saved.comparison);
-      setCommercial(saved.commercial);
-      setCurrentMachinePerformance(saved.currentMachinePerformance ?? null);
+      applyPersistedProposal(saved);
       setSaveMessage('Saved.');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Could not save.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handlePreviewCustomerProposal() {
+    if (!proposalId || saving) return;
+    setSaving(true);
+    setSaveMessage(null);
+    setError(null);
+    try {
+      const result = await saveThenPreviewCustomerProposal({
+        proposalId,
+        state: editorPersistenceState(),
+        save: saveSalesProposal,
+      });
+      if (result.kind === 'blocked') {
+        setError(PREVIEW_SAVE_FAILED_MESSAGE);
+        return;
+      }
+      applyPersistedProposal(result.proposal);
+      navigate(result.path);
     } finally {
       setSaving(false);
     }
@@ -318,12 +378,14 @@ export function SalesProposalEditorPage() {
           >
             Back to proposals
           </Link>
-          <Link
-            to={salesProposalPreviewPath(proposal.id)}
-            className="rounded-[8px] bg-slate-100 px-4 py-2 text-sm font-medium text-[#383838] hover:bg-slate-200"
+          <button
+            type="button"
+            onClick={() => void handlePreviewCustomerProposal()}
+            disabled={saving}
+            className="rounded-[8px] bg-slate-100 px-4 py-2 text-sm font-medium text-[#383838] hover:bg-slate-200 disabled:opacity-50"
           >
             Preview Customer Proposal
-          </Link>
+          </button>
           <button
             type="button"
             onClick={() => void handleSave()}
@@ -389,14 +451,27 @@ export function SalesProposalEditorPage() {
             draft={proposed}
             onChange={setProposed}
           />
+          <OperatingAssumptionsSection
+            key={proposal.airAudit?.sourceSha256 ?? 'no-air-audit'}
+            value={operatingAssumptions}
+            airAuditPresent={Boolean(proposal.airAudit)}
+            onChange={setOperatingAssumptions}
+          />
           <ElectricityBasisSection value={electricityBasis} onChange={setElectricityBasis} />
           <CommercialOfferSection value={commercialOffer} onChange={setCommercialOffer} />
         </div>
         <div className="space-y-6">
           <MeasuredAuditCard audit={proposal.airAudit} />
-          <MachineSummaryCard current={currentEquipment} proposed={proposed} />
+          <MachineSummaryCard
+            current={currentEquipment}
+            proposed={proposed}
+            proposedSitePerformance={proposedSitePerformance}
+          />
           <CurrentMachinePerformanceCard result={currentMachinePerformance} />
-          <AirMachineComparisonCard comparison={comparison} />
+          <AirMachineComparisonCard
+            comparison={comparison}
+            proposedSitePerformance={proposedSitePerformance}
+          />
           <ElectricityResultCard
             comparison={comparison}
             onAddCurrentSpecSheet={openCurrentSpecSheet}

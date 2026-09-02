@@ -1,57 +1,182 @@
-import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
+import {
+  customerProposalCommercialFigures,
+  customerProposalElectricityFigures,
+  proposalRequiresRevision,
+  showsCommercialSaving,
+  showsPayback,
+  showsRevisionCallout,
+} from './customerProposalPresentation';
 
-const FEATURE_ROOT = path.dirname(fileURLToPath(import.meta.url));
+const ELECTRICITY = {
+  currentLabel: 'Current estimated annual electricity cost',
+  proposedLabel: 'Proposed estimated annual electricity cost',
+  savingLabel: 'Estimated annual electricity saving',
+  current: 'R 1 000 000',
+  proposed: 'R 700 000',
+  saving: 'R 300 000',
+};
 
-function read(relativePath: string): string {
-  return fs.readFileSync(path.join(FEATURE_ROOT, relativePath), 'utf8');
+const COMMERCIAL = {
+  currentHeadline: 'Current estimated annual compressed-air cost',
+  proposedHeadline: 'Proposed estimated annual compressed-air cost',
+  savingHeadline: 'Estimated annual operating saving',
+  investmentHeadline: 'Net investment',
+  paybackHeadline: 'Estimated payback',
+  current: 'R 1 000 000',
+  proposed: 'R 736 000',
+  saving: 'R 264 000',
+  offerType: 'purchase',
+  investment: 'R 815 000',
+  payback: '3.09 years',
+  costRows: [{ label: 'Electricity', current: 'R 1 000 000', proposed: 'R 700 000' }],
+  purchaseLines: [{ label: 'Equipment', amount: 'R 850 000' }],
+};
+
+const VALID_RECOMMENDATION =
+  'ARS recommends the selected BOUWA solution, subject to final site and installation confirmation.';
+const CURRENT_REVISION_WORDING =
+  'Proposed configuration requires revision before savings and payback can be relied on.';
+const REWORDED_REVISION_WORDING = 'Selected equipment requires technical revision.';
+
+const INVALID_CAPACITY_WARNING =
+  'Highest recorded airflow exceeds the proposed published capacity.';
+const INVALID_PRESSURE_WARNING =
+  "The proposed machine's published pressure is below the pressure recorded during the Air Audit. Confirm the proposed configuration before relying on the comparison.";
+
+function documentState(input: {
+  requiresRevision: boolean;
+  recommendation?: string;
+  warnings?: string[];
+}) {
+  return {
+    requiresRevision: input.requiresRevision,
+    recommendation: input.recommendation ?? VALID_RECOMMENDATION,
+    warnings: input.warnings ?? [],
+    electricity: ELECTRICITY,
+    commercial: COMMERCIAL,
+  };
 }
 
-test('blocked proposed configuration keeps technical comparison and hides commercial results', () => {
-  const electricity = read('components/ElectricityResultCard.tsx');
-  const commercial = read('components/CommercialResultCard.tsx');
-  const comparison = read('components/AirMachineComparisonCard.tsx');
-  const preview = read('pages/CustomerProposalPreviewPage.tsx');
-  const performance = read('components/CurrentMachinePerformanceCard.tsx');
+function presentation(doc: ReturnType<typeof documentState>) {
+  const electricity = customerProposalElectricityFigures(doc);
+  const commercial = customerProposalCommercialFigures(doc);
+  return {
+    requiresRevision: proposalRequiresRevision(doc),
+    revisionCallout: showsRevisionCallout(doc),
+    savingsAllowed: showsCommercialSaving(doc),
+    paybackAllowed: showsPayback(doc),
+    electricityLabels: electricity.map((figure) => figure.label),
+    commercialLabels: commercial.map((figure) => figure.label),
+    showsElectricitySaving: electricity.some(
+      (figure) => figure.label === ELECTRICITY.savingLabel,
+    ),
+    showsCommercialSavingValue: commercial.some(
+      (figure) => figure.value === COMMERCIAL.saving,
+    ),
+    showsPaybackValue: Boolean(
+      doc.commercial.paybackHeadline && showsPayback(doc),
+    ),
+  };
+}
 
-  assert.match(comparison, /comparison\?\.warnings\.map/);
-  assert.match(comparison, /comparison\.proposed\.totalRatedFadM3PerMin/);
-  assert.match(comparison, /comparison\.proposed\.ratedPressureBarG/);
-  assert.match(electricity, /does not meet the audited air requirement/);
-  assert.match(electricity, /saving \?\? 'Not available'/);
-  assert.match(electricity, /comparison\.proposed\.estimatedAnnualKwh/);
-  assert.match(commercial, /does not meet the audited air requirement/);
-  assert.match(commercial, /saving \?\? 'Not available'/);
-  assert.match(commercial, /paybackUnavailableReason/);
-  assert.match(preview, /doc\.electricity\.saving \?\? 'Not available'/);
-  assert.match(preview, /doc\.commercial\.saving \?\? 'Not available'/);
-  assert.match(preview, /doc\.commercial\.payback \?\? 'Not available'/);
-  assert.match(preview, /doc\.recommendation/);
-  assert.match(preview, /doc\.warnings\.map/);
-  assert.match(preview, /doc\.proposed\.publishedAirflow/);
-  assert.match(preview, /spt-customer-proposal-page-2/);
-  assert.doesNotMatch(preview, /spt-customer-proposal-page-3/);
-  assert.match(performance, /result\.copy\.comparisonLabel/);
-  assert.doesNotMatch(performance, /Measured airflow compared with published airflow/);
-});
+describe('proposed configuration validity presentation', () => {
+  it('allows normal savings and payback when the document is valid', () => {
+    const doc = documentState({ requiresRevision: false, warnings: [] });
+    const view = presentation(doc);
 
-test('validity blocking does not add an optimiser, workflow engine or TODO 3 science', () => {
-  const files = fs.readdirSync(FEATURE_ROOT, { recursive: true }).flatMap((entry) => {
-    const relative = String(entry);
-    const full = path.join(FEATURE_ROOT, relative);
-    return fs.statSync(full).isFile() && /\.(ts|tsx)$/.test(full) && !full.endsWith('.test.ts')
-      ? [full]
-      : [];
+    expect(view.requiresRevision).toBe(false);
+    expect(view.revisionCallout).toBe(false);
+    expect(view.savingsAllowed).toBe(true);
+    expect(view.paybackAllowed).toBe(true);
+    expect(view.electricityLabels).toEqual([
+      ELECTRICITY.currentLabel,
+      ELECTRICITY.proposedLabel,
+      ELECTRICITY.savingLabel,
+    ]);
+    expect(view.commercialLabels).toEqual([
+      COMMERCIAL.currentHeadline,
+      COMMERCIAL.proposedHeadline,
+      COMMERCIAL.savingHeadline,
+    ]);
+    expect(view.showsElectricitySaving).toBe(true);
+    expect(view.showsCommercialSavingValue).toBe(true);
+    expect(view.showsPaybackValue).toBe(true);
   });
-  for (const file of files) {
-    const text = fs.readFileSync(file, 'utf8');
-    assert.equal(text.includes('assessLikeForLikeComparison'), false, file);
-    assert.equal(text.includes('comparisonGuard'), false, file);
-    assert.equal(text.includes('calcLoadUnloadMeanPower'), false, file);
-    assert.equal(text.includes('sizingOptimiser'), false, file);
-    assert.equal(text.includes('statusEngine'), false, file);
-  }
+
+  it('suppresses savings and payback for an invalid-capacity document', () => {
+    const doc = documentState({
+      requiresRevision: true,
+      recommendation: CURRENT_REVISION_WORDING,
+      warnings: [INVALID_CAPACITY_WARNING],
+    });
+    const view = presentation(doc);
+
+    expect(view.requiresRevision).toBe(true);
+    expect(view.revisionCallout).toBe(true);
+    expect(view.savingsAllowed).toBe(false);
+    expect(view.paybackAllowed).toBe(false);
+    expect(view.showsElectricitySaving).toBe(false);
+    expect(view.showsCommercialSavingValue).toBe(false);
+    expect(view.showsPaybackValue).toBe(false);
+    expect(view.electricityLabels).toEqual([
+      ELECTRICITY.currentLabel,
+      ELECTRICITY.proposedLabel,
+    ]);
+    expect(view.commercialLabels).not.toContain(COMMERCIAL.savingHeadline);
+  });
+
+  it('suppresses savings and payback for an invalid-pressure document', () => {
+    const doc = documentState({
+      requiresRevision: true,
+      recommendation: CURRENT_REVISION_WORDING,
+      warnings: [INVALID_PRESSURE_WARNING],
+    });
+    const view = presentation(doc);
+
+    expect(view.requiresRevision).toBe(true);
+    expect(view.revisionCallout).toBe(true);
+    expect(view.savingsAllowed).toBe(false);
+    expect(view.paybackAllowed).toBe(false);
+    expect(view.showsElectricitySaving).toBe(false);
+    expect(view.showsCommercialSavingValue).toBe(false);
+    expect(view.showsPaybackValue).toBe(false);
+  });
+
+  it('does not let recommendation wording change the boolean-driven result', () => {
+    const capacityInvalid = documentState({
+      requiresRevision: true,
+      recommendation: CURRENT_REVISION_WORDING,
+      warnings: [INVALID_CAPACITY_WARNING],
+    });
+    const reworded = documentState({
+      requiresRevision: true,
+      recommendation: REWORDED_REVISION_WORDING,
+      warnings: [INVALID_CAPACITY_WARNING],
+    });
+    const emptyWording = documentState({
+      requiresRevision: true,
+      recommendation: '',
+      warnings: [INVALID_PRESSURE_WARNING],
+    });
+    const validWithRevisionProse = documentState({
+      requiresRevision: false,
+      recommendation: CURRENT_REVISION_WORDING,
+    });
+
+    expect(presentation(reworded)).toEqual(presentation(capacityInvalid));
+    expect(presentation(emptyWording).savingsAllowed).toBe(false);
+    expect(presentation(emptyWording).paybackAllowed).toBe(false);
+    expect(presentation(validWithRevisionProse)).toMatchObject({
+      requiresRevision: false,
+      savingsAllowed: true,
+      paybackAllowed: true,
+      showsElectricitySaving: true,
+    });
+    expect(customerProposalElectricityFigures(validWithRevisionProse)).toEqual(
+      customerProposalElectricityFigures(
+        documentState({ requiresRevision: false, recommendation: VALID_RECOMMENDATION }),
+      ),
+    );
+  });
 });

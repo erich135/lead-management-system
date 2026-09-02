@@ -1,148 +1,117 @@
-import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
 import {
   AIR_AUDIT_ELECTRICAL_NOTE,
   displayedMotorRatingKw,
   effectivePackageInput,
   MOTOR_RATING_LABEL,
   PUBLISHED_PACKAGE_INPUT_LABEL,
-} from './specDisplay.ts';
-import { formFieldsFromExtracted } from './specSheetPrefill.ts';
+  publishedPowerRatingRows,
+} from './specDisplay';
+import type { PublicMachineSpec, SourceBackedSpec } from './types';
 
-const FEATURE_ROOT = path.dirname(fileURLToPath(import.meta.url));
+const currentSource: SourceBackedSpec = {
+  manufacturer: 'Atlas Copco',
+  model: 'ZT 160 VSD+-10.4',
+  modelVariant: null,
+  ratedPressureBarG: 10.34,
+  ratedAirflowM3PerMin: 23.52,
+  packageInputPowerKw: 176.3,
+  motorShaftPowerKw: 160.03,
+  controlType: 'VSD',
+  sourceFileName: 'ZT160_CAGI.pdf',
+  sourceFileId: null,
+  sourceSha256: null,
+};
 
-function listFiles(dir: string): string[] {
-  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const full = path.join(dir, entry.name);
-    return entry.isDirectory() ? listFiles(full) : [full];
-  });
+const proposedLibrary: PublicMachineSpec = {
+  recordId: 'lib-svc-rs250a',
+  manufacturer: 'Bouwa',
+  model: 'SVC-RS250A-II',
+  modelVariant: '525V',
+  ratedPressureBarG: 8,
+  ratedAirflowM3PerMin: 55.3,
+  packageInputPowerKw: 250,
+  motorShaftPowerKw: 250,
+  controlType: null,
+  sourceTitle: 'BOUWA datasheet',
+  sourceFileName: null,
+};
+
+function row(rows: ReturnType<typeof publishedPowerRatingRows>, label: string) {
+  return rows.find((item) => item.label === label);
 }
 
-test('editor and customer proposal label package input as published, never measured', () => {
-  assert.equal(PUBLISHED_PACKAGE_INPUT_LABEL, 'Published package input');
-  assert.equal(MOTOR_RATING_LABEL, 'Motor rating');
-  const current = fs.readFileSync(
-    path.join(FEATURE_ROOT, 'components/CurrentEquipmentSection.tsx'),
-    'utf8',
-  );
-  const summary = fs.readFileSync(
-    path.join(FEATURE_ROOT, 'components/MachineSummaryCard.tsx'),
-    'utf8',
-  );
-  const preview = fs.readFileSync(
-    path.join(FEATURE_ROOT, 'pages/CustomerProposalPreviewPage.tsx'),
-    'utf8',
-  );
-  const electricity = fs.readFileSync(
-    path.join(FEATURE_ROOT, 'components/ElectricityResultCard.tsx'),
-    'utf8',
-  );
-  const upload = fs.readFileSync(
-    path.join(FEATURE_ROOT, 'components/AirAuditUpload.tsx'),
-    'utf8',
-  );
-  const performance = fs.readFileSync(
-    path.join(FEATURE_ROOT, 'components/CurrentMachinePerformanceCard.tsx'),
-    'utf8',
-  );
-  assert.match(current, /PUBLISHED_PACKAGE_INPUT_LABEL/);
-  assert.match(current, /MOTOR_RATING_LABEL/);
-  assert.match(summary, /PUBLISHED_PACKAGE_INPUT_LABEL/);
-  assert.match(summary, /Proposed replacement/);
-  assert.match(preview, /Published package/);
-  assert.doesNotMatch(preview, /Measured package input/);
-  assert.match(electricity, /published machine/);
-  assert.match(electricity, /Current published package-input\/FAD basis/);
-  assert.match(electricity, /Proposed published package-input\/FAD basis/);
-  assert.match(upload, /AIR_AUDIT_ELECTRICAL_NOTE/);
-  assert.match(AIR_AUDIT_ELECTRICAL_NOTE, /published machine specification/);
-  assert.doesNotMatch(AIR_AUDIT_ELECTRICAL_NOTE, /Did you measure electrical power/);
-  assert.match(performance, /result\.copy\.publishedLabel/);
-  assert.match(performance, /result\.copy\.measuredLabel/);
-  assert.doesNotMatch(performance, /packageInputPowerKw/);
-  assert.doesNotMatch(current, /Measured package input/);
-  assert.doesNotMatch(summary, /Measured package input/);
-});
+describe('published package input presentation', () => {
+  it('keeps current-machine published package input separate from motor rating', () => {
+    const packageInput = effectivePackageInput(null, currentSource);
+    const motor = displayedMotorRatingKw(null, currentSource);
+    const rows = publishedPowerRatingRows(null, currentSource);
 
-test('library and uploaded-spec package input stay published and motor rating stays separate', () => {
-  const library = effectivePackageInput(
-    {
-      recordId: 'lib-1',
+    expect(packageInput.value).toBe(176.3);
+    expect(packageInput.origin).toBe('source');
+    expect(motor).toBe(160.03);
+    expect(motor).not.toBe(packageInput.value);
+
+    expect(row(rows, PUBLISHED_PACKAGE_INPUT_LABEL)).toEqual({
+      label: 'Published package input',
+      value: '176,3 kW',
+    });
+    expect(row(rows, MOTOR_RATING_LABEL)).toEqual({
+      label: 'Motor rating',
+      value: '160,03 kW',
+    });
+    expect(rows.map((item) => item.label)).toEqual([
+      'Published package input',
+      'Motor rating',
+    ]);
+    expect(row(rows, 'Published package input')?.value).not.toBe('160,03 kW');
+    expect(row(rows, 'Motor rating')?.value).not.toBe('176,3 kW');
+  });
+
+  it('labels package input as published and never as measured electrical input', () => {
+    const currentRows = publishedPowerRatingRows(null, currentSource);
+    const proposedRows = publishedPowerRatingRows(proposedLibrary, null);
+    const labels = [...currentRows, ...proposedRows].map((item) => item.label).join('\n');
+    const values = [...currentRows, ...proposedRows].map((item) => item.value).join('\n');
+
+    expect(labels).toMatch(/Published package input/);
+    expect(labels).not.toMatch(/measured electrical input/i);
+    expect(labels).not.toMatch(/Measured package input/i);
+    expect(values).not.toMatch(/measured electrical input/i);
+    expect(AIR_AUDIT_ELECTRICAL_NOTE).toMatch(/published machine specification/);
+    expect(AIR_AUDIT_ELECTRICAL_NOTE).not.toMatch(/Did you measure electrical power/);
+    expect(AIR_AUDIT_ELECTRICAL_NOTE).not.toMatch(/measured electrical input/i);
+  });
+
+  it('displays proposed-machine package input as published / source-backed, not as motor rating', () => {
+    const libraryRows = publishedPowerRatingRows(proposedLibrary, null);
+    expect(effectivePackageInput(proposedLibrary, null).origin).toBe('library');
+    expect(row(libraryRows, PUBLISHED_PACKAGE_INPUT_LABEL)).toEqual({
+      label: 'Published package input',
+      value: '250,0 kW',
+    });
+    expect(row(libraryRows, MOTOR_RATING_LABEL)).toEqual({
+      label: 'Motor rating',
+      value: '250,00 kW',
+    });
+
+    const sourceBackedProposed: SourceBackedSpec = {
+      ...currentSource,
       manufacturer: 'Bouwa',
       model: 'SVC-RS250A-II',
-      modelVariant: '525V',
-      ratedPressureBarG: 8,
-      ratedAirflowM3PerMin: 55.3,
-      packageInputPowerKw: 250,
+      packageInputPowerKw: 248.5,
       motorShaftPowerKw: 250,
-      controlType: null,
-      sourceTitle: 'BOUWA datasheet',
-      sourceFileName: null,
-    },
-    null,
-  );
-  assert.equal(library.value, 250);
-  assert.equal(library.origin, 'library');
-  const uploaded = effectivePackageInput(null, {
-    manufacturer: 'Atlas Copco',
-    model: 'ZT 160 VSD+-10.4',
-    modelVariant: null,
-    ratedPressureBarG: 10.34,
-    ratedAirflowM3PerMin: 23.52,
-    packageInputPowerKw: 176.3,
-    motorShaftPowerKw: 160.03,
-    controlType: 'VSD',
-    sourceFileName: 'ZT160_CAGI.pdf',
-    sourceFileId: null,
-    sourceSha256: null,
+      sourceFileName: 'BOUWA_SVC_RS250A.pdf',
+    };
+    const sourceRows = publishedPowerRatingRows(null, sourceBackedProposed);
+    expect(effectivePackageInput(null, sourceBackedProposed).origin).toBe('source');
+    expect(row(sourceRows, PUBLISHED_PACKAGE_INPUT_LABEL)).toEqual({
+      label: 'Published package input',
+      value: '248,5 kW',
+    });
+    expect(row(sourceRows, MOTOR_RATING_LABEL)?.value).toBe('250,00 kW');
+    expect(row(sourceRows, 'Published package input')?.value).not.toBe(
+      row(sourceRows, 'Motor rating')?.value,
+    );
   });
-  assert.equal(uploaded.value, 176.3);
-  assert.equal(uploaded.origin, 'source');
-  const motor = displayedMotorRatingKw(null, {
-    manufacturer: 'Atlas Copco',
-    model: 'ZT 160 VSD+-10.4',
-    modelVariant: null,
-    ratedPressureBarG: 10.34,
-    ratedAirflowM3PerMin: 23.52,
-    packageInputPowerKw: 176.3,
-    motorShaftPowerKw: 160.03,
-    controlType: 'VSD',
-    sourceFileName: 'ZT160_CAGI.pdf',
-    sourceFileId: null,
-    sourceSha256: null,
-  });
-  assert.equal(motor, 160.03);
-  assert.notEqual(motor, uploaded.value);
-  const fields = formFieldsFromExtracted({
-    manufacturer: 'Atlas Copco',
-    model: 'ZT 160 VSD+-10.4',
-    modelVariant: null,
-    ratedPressureBarG: 10.34,
-    ratedAirflowM3PerMin: 23.52,
-    packageInputPowerKw: 176.3,
-    motorShaftPowerKw: 160.03,
-    controlType: 'VSD',
-  });
-  assert.equal(fields.packageInput, '176.3');
-  assert.equal(fields.motorRating, '160.03');
-});
-
-test('TODO 2 does not add an electrical framework, collection or TODO 3 model', () => {
-  const files = listFiles(FEATURE_ROOT).filter(
-    (file) => /\.(ts|tsx)$/.test(file) && !file.endsWith('.test.ts'),
-  );
-  for (const file of files) {
-    const text = fs.readFileSync(file, 'utf8');
-    assert.equal(text.includes('powerSourceFramework'), false, file);
-    assert.equal(text.includes('electricalEvidenceEngine'), false, file);
-    assert.equal(text.includes('measurementProvenance'), false, file);
-    assert.equal(text.includes('calcLoadUnloadMeanPower'), false, file);
-    assert.equal(/loaded hours × published full-load/i.test(text), false, file);
-    assert.equal(text.includes('Did you measure electrical power'), false, file);
-  }
-  const scope = fs.readFileSync(path.join(FEATURE_ROOT, 'airAuditScope.ts'), 'utf8');
-  assert.doesNotMatch(scope, /packageInputPowerKw|measuredPackageInput/);
 });

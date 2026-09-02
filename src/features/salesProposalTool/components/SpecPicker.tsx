@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Loader2, Search } from 'lucide-react';
 import { searchSpecLibrary } from '../api';
 import { specDisplayName, hasUsableSourceBacked, sourceBackedLabel, specLibraryResultCopy } from '../specDisplay';
+import { LIBRARY_ADDED_STATUS, LIBRARY_USING_STATUS } from '../confirmSpecSheet';
 import { specPickerSearchIsOpen } from '../specPickerSearch';
 import { SEARCH_MENU_PANEL, searchMenuWrapClass } from '../searchOverlay';
 import type { PublicMachineSpec, SourceBackedSpec } from '../types';
@@ -22,6 +23,11 @@ interface SpecPickerProps {
   onCapture: () => void;
   onCancelCapture: () => void;
   onApplySource: (values: SourceBackedSpec) => void;
+  onConfirmedSource: (result: {
+    spec: PublicMachineSpec;
+    sourceBacked: SourceBackedSpec;
+    created: boolean;
+  }) => void;
 }
 
 function formatResult(spec: PublicMachineSpec): { title: string; detail: string; source: string | null } {
@@ -44,6 +50,7 @@ export function SpecPicker({
   onCapture,
   onCancelCapture,
   onApplySource,
+  onConfirmedSource,
 }: SpecPickerProps) {
   const [query, setQuery] = useState(searchHint);
   const [results, setResults] = useState<PublicMachineSpec[]>([]);
@@ -99,10 +106,12 @@ export function SpecPicker({
     return (
       <SpecSheetCapture
         proposalId={proposalId}
+        target="proposed"
         initialManufacturer={selectedSpec?.manufacturer || searchHint.split(' ')[0] || ''}
         initialModel={selectedSpec?.model || ''}
         onCancel={onCancelCapture}
         onApply={onApplySource}
+        onConfirmed={onConfirmedSource}
       />
     );
   }
@@ -116,6 +125,10 @@ export function SpecPicker({
           <p className="text-sm font-medium text-[#383838]">{formatted.title}</p>
           {formatted.detail && <p className="text-xs text-slate-600">{formatted.detail}</p>}
           {formatted.source && <p className="mt-1 text-xs text-slate-500">Source: {formatted.source}</p>}
+          {sourceBacked && (
+            <p className="mt-1 text-xs text-slate-500">{LIBRARY_ADDED_STATUS}</p>
+          )}
+          <p className="mt-1 text-xs text-slate-500">{LIBRARY_USING_STATUS}</p>
         </div>
         {(missingPackage || missingAirflow) && (
           <p className="mt-2 text-xs text-slate-600">

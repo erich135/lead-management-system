@@ -1,12 +1,7 @@
 import {
-  displayedMotorRatingKw,
-  effectivePackageInput,
   effectiveRatedAirflow,
   effectiveRatedPressure,
-  hasUsableSourceBacked,
-  MOTOR_RATING_LABEL,
-  packageInputUnavailableCopy,
-  PUBLISHED_PACKAGE_INPUT_LABEL,
+  publishedPowerRatingRows,
   sourceBackedLabel,
   specDisplayName,
 } from '../specDisplay';
@@ -16,10 +11,12 @@ import {
   type CurrentEquipmentDraft,
   type ProposedEquipmentDraft,
 } from '../equipmentState';
+import type { SitePerformanceView } from '../types';
 
 interface MachineSummaryCardProps {
   current: CurrentEquipmentDraft[];
   proposed: ProposedEquipmentDraft;
+  proposedSitePerformance?: SitePerformanceView | null;
 }
 
 function formatAirflow(value: number | null): string | null {
@@ -32,11 +29,6 @@ function formatPressure(value: number | null): string | null {
   return formatted ? `${formatted} bar` : null;
 }
 
-function formatKw(value: number | null, digits = 1): string | null {
-  const formatted = formatMeasuredNumber(value, digits);
-  return formatted ? `${formatted} kW` : null;
-}
-
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-4 py-1">
@@ -46,7 +38,11 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function MachineSummaryCard({ current, proposed }: MachineSummaryCardProps) {
+export function MachineSummaryCard({
+  current,
+  proposed,
+  proposedSitePerformance = null,
+}: MachineSummaryCardProps) {
   const currentRows = current.filter(
     (row) => row.arsMachineId || row.specLibraryRecordId || row.sourceBacked,
   );
@@ -99,6 +95,7 @@ export function MachineSummaryCard({ current, proposed }: MachineSummaryCardProp
             subtitle={`× ${proposed.quantity}`}
             library={proposed.selectedSpec}
             source={proposed.sourceBacked}
+            sitePerformance={proposedSitePerformance}
           />
         </div>
       )}
@@ -111,16 +108,17 @@ function MachineBlock({
   subtitle,
   library,
   source,
+  sitePerformance = null,
 }: {
   title: string;
   subtitle?: string;
   library: CurrentEquipmentDraft['selectedSpec'];
   source: CurrentEquipmentDraft['sourceBacked'];
+  sitePerformance?: SitePerformanceView | null;
 }) {
   const airflow = effectiveRatedAirflow(library, source);
   const pressure = effectiveRatedPressure(library, source);
-  const packageInput = effectivePackageInput(library, source);
-  const motor = displayedMotorRatingKw(library, source);
+  const powerRows = publishedPowerRatingRows(library, source);
   const sourceNote = sourceBackedLabel(source);
   const published = library !== null;
 
@@ -135,27 +133,45 @@ function MachineBlock({
       )}
       <dl className="mt-1">
         <Row
-          label="Rated airflow"
+          label="Published airflow"
           value={formatAirflow(airflow.value) ?? 'Not available'}
         />
         <Row
-          label="Rated pressure"
+          label="Published pressure"
           value={formatPressure(pressure.value) ?? 'Not available'}
         />
-        <Row
-          label={PUBLISHED_PACKAGE_INPUT_LABEL}
-          value={
-            formatKw(packageInput.value) ??
-            packageInputUnavailableCopy({
-              hasLibrary: library !== null,
-              hasSource: hasUsableSourceBacked(source),
-            })
-          }
-        />
-        {motor !== null && (
-          <Row label={MOTOR_RATING_LABEL} value={formatKw(motor, 2) ?? 'Not available'} />
-        )}
+        {powerRows.map((row) => (
+          <Row key={row.label} label={row.label} value={row.value} />
+        ))}
       </dl>
+      {sitePerformance?.status === 'estimated' && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {sitePerformance.sectionTitle}
+          </p>
+          <dl className="mt-1">
+            <Row
+              label={sitePerformance.estimatedLabel}
+              value={
+                formatAirflow(sitePerformance.estimatedSiteAirflowM3PerMin) ??
+                'Not available'
+              }
+            />
+            {sitePerformance.altitudeDisplay && (
+              <Row
+                label={sitePerformance.altitudeLabel}
+                value={sitePerformance.altitudeDisplay}
+              />
+            )}
+          </dl>
+          {sitePerformance.basisNote && (
+            <p className="mt-1 text-xs text-slate-500">{sitePerformance.basisNote}</p>
+          )}
+        </div>
+      )}
+      {sitePerformance && sitePerformance.status !== 'estimated' && sitePerformance.unavailableReason && (
+        <p className="mt-2 text-xs text-slate-500">{sitePerformance.unavailableReason}</p>
+      )}
       {sourceNote && <p className="mt-1 text-xs text-slate-500">{sourceNote}</p>}
       {!published && sourceNote && (
         <p className="text-xs text-slate-500">These values are not published Machine Spec Library data.</p>

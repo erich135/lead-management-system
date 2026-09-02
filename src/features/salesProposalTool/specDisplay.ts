@@ -1,3 +1,4 @@
+import { formatMeasuredNumber } from './formatMeasured.ts';
 import type { PublicMachineSpec, SourceBackedSpec } from './types';
 
 export type ValueOrigin = 'library' | 'source' | 'missing';
@@ -103,6 +104,46 @@ export const PUBLISHED_PACKAGE_INPUT_LABEL = 'Published package input';
 export const MOTOR_RATING_LABEL = 'Motor rating';
 export const AIR_AUDIT_ELECTRICAL_NOTE =
   'The Air Audit measures compressed-air performance. Electrical package input shown for the current machine is from the published machine specification, not a measured electrical reading.';
+
+export interface PublishedPowerRatingRow {
+  label: string;
+  value: string;
+}
+
+function formatPublishedKw(value: number | null, digits: number): string | null {
+  const formatted = formatMeasuredNumber(value, digits);
+  return formatted ? `${formatted} kW` : null;
+}
+
+/**
+ * Editor-facing published electrical ratings. Package input and motor rating
+ * stay separate; motor is never used as package input.
+ */
+export function publishedPowerRatingRows(
+  library: PublicMachineSpec | null,
+  source: SourceBackedSpec | null,
+): PublishedPowerRatingRow[] {
+  const packageInput = effectivePackageInput(library, source);
+  const motor = displayedMotorRatingKw(library, source);
+  const rows: PublishedPowerRatingRow[] = [
+    {
+      label: PUBLISHED_PACKAGE_INPUT_LABEL,
+      value:
+        formatPublishedKw(packageInput.value, 1) ??
+        packageInputUnavailableCopy({
+          hasLibrary: library !== null,
+          hasSource: hasUsableSourceBacked(source),
+        }),
+    },
+  ];
+  if (motor !== null) {
+    rows.push({
+      label: MOTOR_RATING_LABEL,
+      value: formatPublishedKw(motor, 2) ?? 'Not available',
+    });
+  }
+  return rows;
+}
 
 export function packageInputUnavailableCopy(options: {
   hasLibrary: boolean;

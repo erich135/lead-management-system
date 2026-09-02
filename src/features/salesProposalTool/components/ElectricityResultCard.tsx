@@ -43,8 +43,9 @@ export function ElectricityResultCard({
           Electricity
         </h2>
         <p className="mt-3 text-sm text-slate-600">
-          Estimated electricity will appear here once the Air Audit, published machine
-          package-input/FAD data and electricity rate are available.
+          Estimated electricity will appear here once published machine package-input/FAD
+          data, the stated operating assumptions or a measured Air Audit, and the electricity
+          rate are available.
         </p>
       </section>
     );
@@ -139,6 +140,21 @@ export function ElectricityResultCard({
       </div>
 
       <p className="mt-4 text-sm text-slate-600">{comparison.basisExplanation}</p>
+      {comparison.electricity.suppliedAmountReferenceNote && (
+        <p className="mt-2 text-sm text-slate-600">
+          {comparison.electricity.suppliedCurrentAmount != null
+            ? `Known compressor electricity amount supplied: ${
+                formatEstimatedRand(comparison.electricity.suppliedCurrentAmount) ??
+                'Not available'
+              } ${
+                comparison.electricity.suppliedCurrentPeriod === 'annual'
+                  ? 'per year'
+                  : 'per month'
+              }. `
+            : null}
+          {comparison.electricity.suppliedAmountReferenceNote}
+        </p>
+      )}
       <p className="mt-2 text-sm text-slate-600">{comparison.futureCostDisclaimer}</p>
       {otherNotes.map((note) => (
         <p key={note} className="mt-2 text-xs text-slate-500">
@@ -151,16 +167,20 @@ export function ElectricityResultCard({
           How was this calculated?
         </summary>
         <dl className="mt-3">
+          {comparison.air && (
+            <>
+              <Row
+                label="Audit duration"
+                value={days(comparison.breakdown.auditDurationDays)}
+              />
+              <Row
+                label="Measured delivered air"
+                value={volume(comparison.breakdown.measuredDeliveredAirM3)}
+              />
+            </>
+          )}
           <Row
-            label="Audit duration"
-            value={days(comparison.breakdown.auditDurationDays)}
-          />
-          <Row
-            label="Measured delivered air"
-            value={volume(comparison.breakdown.measuredDeliveredAirM3)}
-          />
-          <Row
-            label="Annualised air volume"
+            label={comparison.air ? 'Annualised air volume' : 'Estimated annual delivered air'}
             value={volume(comparison.breakdown.annualisedAirVolumeM3)}
           />
           <Row

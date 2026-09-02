@@ -84,13 +84,18 @@ test('TODO 1/2/4 wording and spec-sheet prefill stay unchanged', () => {
     path.join(FEATURE_ROOT, 'components/CurrentMachinePerformanceCard.tsx'),
     'utf8',
   );
+  const performanceView = fs.readFileSync(
+    path.join(FEATURE_ROOT, 'currentMachinePerformanceView.ts'),
+    'utf8',
+  );
   const scope = fs.readFileSync(
     path.join(FEATURE_ROOT, 'airAuditScope.ts'),
     'utf8',
   );
   assert.equal(PUBLISHED_PACKAGE_INPUT_LABEL, 'Published package input');
-  assert.match(performance, /result\.copy\.publishedLabel/);
-  assert.match(performance, /result\.copy\.measuredLabel/);
+  assert.match(performance, /editorPerformanceView/);
+  assert.match(performanceView, /result\.copy\.publishedLabel/);
+  assert.match(performanceView, /result\.copy\.measuredLabel/);
   assert.match(scope, /single_machine/);
   assert.match(scope, /site_header/);
   const fields = formFieldsFromExtracted({

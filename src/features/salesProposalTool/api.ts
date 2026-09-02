@@ -7,11 +7,13 @@ import type {
   CurrentEquipment,
   CurrentMachineMeasuredPerformance,
   ElectricityBasis,
+  OperatingAssumptions,
   ProposedEquipment,
   PublicMachineSpec,
   SalesProposal,
   SalesProposalListItem,
   SalesProposalSite,
+  SitePerformanceView,
 } from './types';
 
 function apiUrl(path: string): string {
@@ -88,6 +90,7 @@ export async function saveSalesProposal(
     currentEquipment: CurrentEquipment[];
     proposedEquipment: ProposedEquipment[];
     electricityBasis: ElectricityBasis;
+    operatingAssumptions?: OperatingAssumptions;
     commercialOffer: CommercialOffer;
     airAuditScope?: {
       type: 'single_machine' | 'site_header';
@@ -109,9 +112,11 @@ export async function previewElectricityComparison(
   id: string,
   body: {
     customerId?: string | null;
+    site?: SalesProposalSite;
     currentEquipment: CurrentEquipment[];
     proposedEquipment: ProposedEquipment[];
     electricityBasis: ElectricityBasis;
+    operatingAssumptions?: OperatingAssumptions;
     commercialOffer: CommercialOffer;
     airAuditScope?: {
       type: 'single_machine' | 'site_header';
@@ -122,11 +127,13 @@ export async function previewElectricityComparison(
   comparison: AirAndElectricityComparison;
   commercial: CommercialComparison;
   currentMachinePerformance: CurrentMachineMeasuredPerformance | null;
+  proposedSitePerformance: SitePerformanceView | null;
 }> {
   return jsonRequest<{
     comparison: AirAndElectricityComparison;
     commercial: CommercialComparison;
     currentMachinePerformance: CurrentMachineMeasuredPerformance | null;
+    proposedSitePerformance: SitePerformanceView | null;
   }>(
     `/api/sales-proposal-tool/proposals/${id}/electricity-comparison`,
     {
@@ -203,6 +210,7 @@ export async function uploadSpecSheet(
     motorShaftPowerKw: number | null;
     controlType: string | null;
   };
+  extractionStatus: 'extracted' | 'no_supported_values' | 'read_failed';
 }> {
   const token = getAuthToken();
   const form = new FormData();
@@ -232,6 +240,7 @@ export async function uploadSpecSheet(
       motorShaftPowerKw: number | null;
       controlType: string | null;
     };
+    extractionStatus?: 'extracted' | 'no_supported_values' | 'read_failed';
   }>(response);
   return {
     ...stored,
@@ -245,5 +254,24 @@ export async function uploadSpecSheet(
       motorShaftPowerKw: null,
       controlType: null,
     },
+    extractionStatus: stored.extractionStatus ?? 'no_supported_values',
   };
+}
+
+export async function confirmSpecSheet(
+  proposalId: string,
+  body: import('./confirmSpecSheet').SpecSheetConfirmPayload,
+): Promise<{
+  proposal: SalesProposal;
+  spec: PublicMachineSpec;
+  created: boolean;
+}> {
+  return jsonRequest<{
+    proposal: SalesProposal;
+    spec: PublicMachineSpec;
+    created: boolean;
+  }>(`/api/sales-proposal-tool/proposals/${proposalId}/spec-sheet/confirm`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 }

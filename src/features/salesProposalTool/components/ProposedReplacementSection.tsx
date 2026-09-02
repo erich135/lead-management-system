@@ -93,6 +93,19 @@ export function ProposedReplacementSection({
             quantity: draft.quantity >= 1 ? draft.quantity : DEFAULT_PROPOSED_QUANTITY,
           })
         }
+        onConfirmedSource={({ spec, sourceBacked }) =>
+          onChange({
+            ...draft,
+            specLibraryRecordId: spec.recordId,
+            selectedSpec: spec,
+            sourceBacked,
+            manufacturer: spec.manufacturer,
+            model: spec.model,
+            capturingSheet: false,
+            changingSpec: false,
+            quantity: draft.quantity >= 1 ? draft.quantity : DEFAULT_PROPOSED_QUANTITY,
+          })
+        }
       />
       {(draft.selectedSpec || draft.sourceBacked) && (
         <label className="block text-xs font-semibold uppercase tracking-wide text-[#383838]/70">

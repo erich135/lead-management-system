@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { customerProposalElectricityFigures } from './customerProposalPresentation.ts';
 
 const FEATURE_ROOT = path.dirname(fileURLToPath(import.meta.url));
 
@@ -38,7 +39,21 @@ test('Phase 6 customer proposal uses print CSS and does not invent a document en
   assert.match(preview, /print:hidden/);
   assert.match(preview, /spt-customer-proposal-print-root/);
   assert.match(preview, /Download \/ Print Proposal/);
-  assert.match(preview, /doc\.electricity\.currentLabel/);
+  assert.match(preview, /customerProposalElectricityFigures\(doc\)/);
+  assert.deepEqual(
+    customerProposalElectricityFigures({
+      requiresRevision: true,
+      electricity: {
+        currentLabel: 'Backend current label',
+        proposedLabel: 'Backend proposed label',
+        savingLabel: 'Backend saving label',
+        current: 'R 1',
+        proposed: 'R 2',
+        saving: 'R 3',
+      },
+    }).map((figure) => figure.label),
+    ['Backend current label', 'Backend proposed label'],
+  );
   assert.match(preview, /doc\.commercial\.savingHeadline/);
   assert.match(preview, /doc\.airAudit\.measuredHeading/);
   assert.match(preview, /Published machine specification/);

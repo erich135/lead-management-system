@@ -486,7 +486,7 @@ export function SystemManagement() {
 
     try {
       setLoading(true);
-      await updateUser(selectedUser._id, {
+      const response = await updateUser(selectedUser._id, {
         firstName: selectedUser.firstName,
         lastName: selectedUser.lastName,
         email: selectedUser.email,
@@ -494,10 +494,14 @@ export function SystemManagement() {
         isActive: selectedUser.isActive,
         adminCodeId: selectedUser.adminCode && typeof selectedUser.adminCode === 'object' ? selectedUser.adminCode._id : (selectedUser.adminCode || null),
         locationTrackingEnabled: !!selectedUser.locationTrackingEnabled,
+        cellPhone: selectedUser.cellPhone || '',
       } as any);
       
-      // Reload users
+      // Reload users and keep the detail panel on the saved user (with resolved mobile).
       await loadData();
+      if (response?.user) {
+        setSelectedUser(response.user);
+      }
       setIsEditingUser(false);
       alert('User updated successfully');
     } catch (err: any) {
@@ -1764,6 +1768,21 @@ alert((response as any).message || 'User invited successfully');
                       />
                     </div>
                     <div>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-1">Mobile Number</label>
+                      <input
+                        type="tel"
+                        value={selectedUser.cellPhone || ''}
+                        onChange={(e) => setSelectedUser({ ...selectedUser, cellPhone: e.target.value })}
+                        placeholder="e.g. +27 82 123 4567"
+                        className="w-full pl-2 pr-2 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[13px] h-[38px]"
+                      />
+                      {selectedUser.technician && typeof selectedUser.technician === 'object' && (
+                        <p className="mt-1 text-[11px] text-gray-500">
+                          Synced with linked technician phone (Reference Data).
+                        </p>
+                      )}
+                    </div>
+                    <div>
                       <label className="block text-[11px] font-medium text-gray-600 mb-1">Role</label>
                       <select
                         value={selectedUser.role._id}
@@ -1892,6 +1911,14 @@ alert((response as any).message || 'User invited successfully');
                     <div>
                       <label className="block text-sm font-semibold text-ars-body mb-1">Email</label>
                       <p className="text-ars-heading">{selectedUser.email}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-ars-body mb-1">Mobile Number</label>
+                      <p className="text-ars-heading">
+                        {selectedUser.cellPhone?.trim()
+                          ? selectedUser.cellPhone
+                          : <span className="text-gray-400 italic">Not set</span>}
+                      </p>
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-ars-body mb-1">Role</label>

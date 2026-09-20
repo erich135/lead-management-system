@@ -42,8 +42,9 @@ function formatDate(d: string | undefined): string {
 
 /**
  * Parts Ready – Job Cards queue.
- * Shows all jobs with status "Parts Ready". Admins can assign a job card template,
- * notify the technician, and see when they started or submitted.
+ * Shows all jobs with status "Parts Ready". Admins can assign one or more job card
+ * templates per job (including the same template again), notify technicians, and
+ * track start/submit status per assignment.
  */
 export function PartsReadyJobCards() {
   const { hasPermission, isSuperAdmin } = useAuth();
@@ -166,12 +167,38 @@ export function PartsReadyJobCards() {
       .join(', ') || '—';
   };
 
-  const statusLabel = (item: PartsReadyItem) => {
-    if (item.submission) return 'Submitted';
-    if (item.assignment?.status === 'started') return 'In progress';
-    if (item.assignment?.status === 'assigned') return 'Not started';
+  /**
+   * Returns a short status label for one assignment row.
+   */
+  const assignmentStatusLabel = (
+    assignment: NonNullable<PartsReadyItem['assignments']>[number] | null | undefined,
+  ) => {
+    if (assignment?.submission) return 'Submitted';
+    if (assignment?.status === 'started') return 'In progress';
+    if (assignment?.status === 'assigned') return 'Not started';
+    if (assignment?.status === 'submitted') return 'Submitted';
     return '—';
   };
+
+  /**
+   * Flattens jobs into one table row per assignment (or one empty row when none yet).
+   */
+  const tableRows = items.flatMap((item) => {
+    const job = item.job as { _id?: string; id?: string };
+    const jobId = String(job._id ?? job.id ?? '');
+    const assignments =
+      item.assignments && item.assignments.length > 0
+        ? item.assignments
+        : item.assignment
+          ? [item.assignment]
+          : [null];
+    return assignments.map((assignment, index) => ({
+      item,
+      jobId,
+      assignment,
+      rowKey: assignment?._id ? `${jobId}-${assignment._id}` : `${jobId}-unassigned-${index}`,
+    }));
+  });
 
   if (loading) {
     return (
@@ -190,7 +217,9 @@ export function PartsReadyJobCards() {
             Parts Ready – Job Cards
           </h1>
           <p className="text-gray-600 mt-1">
-            Jobs with status &quot;Parts Ready&quot;. Assign a job card template and mark when the technician was notified (no in-app or email notifications are sent).
+            Jobs with status &quot;Parts Ready&quot;. You can assign more than one form per job
+            (including the same template again). Mark when the technician was notified (no in-app
+            or email notifications are sent).
           </p>
         </div>
         <button
@@ -234,16 +263,15 @@ export function PartsReadyJobCards() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => {
+                {tableRows.map(({ item, jobId, assignment, rowKey }) => {
                   const job = item.job as any;
-                  const jobId = job._id ?? job.id;
-                  const assignment = item.assignment;
-                  const submission = item.submission;
-                  const templateName = assignment?.template?.name ?? (assignment?.template as any)?.name ?? '—';
-                  const assignedTech = (assignment as { technician?: { name?: string } })?.technician?.name;
+                  const submission = assignment?.submission ?? null;
+                  const templateName =
+                    assignment?.template?.name ?? (assignment?.template as { name?: string } | undefined)?.name ?? '—';
+                  const assignedTech = assignment?.technician?.name;
                   return (
                     <tr
-                      key={jobId}
+                      key={rowKey}
                       className="border-b border-gray-100 hover:bg-gray-50/50"
                     >
                       <td className="py-3 px-4">
@@ -270,13 +298,11 @@ export function PartsReadyJobCards() {
                                 : 'text-gray-600'
                           }
                         >
-                          {statusLabel(item)}
+                          {assignmentStatusLabel(assignment)}
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        {assignment?.notifiedAt
-                          ? formatDate(assignment.notifiedAt)
-                          : '—'}
+                        {assignment?.notifiedAt ? formatDate(assignment.notifiedAt) : '—'}
                       </td>
                       <td className="py-3 px-4">
                         {submission ? (
@@ -293,51 +319,51 @@ export function PartsReadyJobCards() {
                       {canManage && (
                         <td className="py-3 px-4">
                           <div className="flex flex-wrap items-center gap-2">
-                            {!assignment ? (
+                            <button
+                              type="button"
+                              onClick={() => openAssign(item.job)}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded border border-amber-500 text-amber-700 hover:bg-amber-50 text-xs font-medium"
+                              title="Assign another form to this job"
+                            >
+                              <Plus className="w-3 h-3" />
+                              Assign
+                            </button>
+                            {assignment && !assignment.notifiedAt && assignment.status !== 'submitted' && !submission && (
                               <button
                                 type="button"
-                                onClick={() => openAssign(item.job)}
-                                className="inline-flex items-center gap-1 px-2 py-1 rounded border border-amber-500 text-amber-700 hover:bg-amber-50 text-xs font-medium"
+                                onClick={() => handleNotify(assignment._id)}
+                                disabled={notifyingId === assignment._id}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-400 text-gray-700 hover:bg-gray-100 text-xs font-medium disabled:opacity-50"
+                                title="Record that the technician was notified (no message or email is sent)"
                               >
-                                <Plus className="w-3 h-3" />
-                                Assign
+                                <Bell className="w-3 h-3" />
+                                {notifyingId === assignment._id ? 'Saving…' : 'Record notified'}
                               </button>
-                            ) : (
-                              <>
-                                {!assignment.notifiedAt && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleNotify(assignment._id)}
-                                    disabled={notifyingId === assignment._id}
-                                    className="inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-400 text-gray-700 hover:bg-gray-100 text-xs font-medium disabled:opacity-50"
-                                    title="Record that the technician was notified (no message or email is sent)"
-                                  >
-                                    <Bell className="w-3 h-3" />
-                                    {notifyingId === assignment._id ? 'Saving…' : 'Record notified'}
-                                  </button>
-                                )}
-                                {submission && (
-                                  <button
-                                    type="button"
-                                    onClick={() => navigate(`/job-card-submissions?submission=${submission._id}`)}
-                                    className="inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-400 text-gray-700 hover:bg-gray-100 text-xs font-medium"
-                                    title="View submission"
-                                  >
-                                    <Eye className="w-3 h-3" />
-                                    View
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveAssignment(assignment._id)}
-                                  disabled={removingId === assignment._id}
-                                  className="inline-flex items-center gap-1 px-2 py-1 rounded border border-red-200 text-red-700 hover:bg-red-50 text-xs font-medium disabled:opacity-50"
-                                  title="Remove assignment"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                  Remove
-                                </button>
-                              </>
+                            )}
+                            {submission && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  navigate(`/job-card-submissions?submission=${submission._id}`)
+                                }
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-400 text-gray-700 hover:bg-gray-100 text-xs font-medium"
+                                title="View submission"
+                              >
+                                <Eye className="w-3 h-3" />
+                                View
+                              </button>
+                            )}
+                            {assignment && assignment.status !== 'submitted' && !submission && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveAssignment(assignment._id)}
+                                disabled={removingId === assignment._id}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded border border-red-200 text-red-700 hover:bg-red-50 text-xs font-medium disabled:opacity-50"
+                                title="Remove assignment"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                Remove
+                              </button>
                             )}
                           </div>
                         </td>
@@ -366,7 +392,9 @@ export function PartsReadyJobCards() {
               </button>
             </div>
             <p className="text-sm text-gray-600 mb-4">
-              Select the form and technician. The technician will see this assignment in the mobile app.
+              Select the form and technician. You can assign multiple forms to the same job,
+              including the same form more than once. The technician will see each assignment in
+              the mobile app.
             </p>
             <label className="block text-sm font-medium text-gray-700 mb-2">Form</label>
             <select

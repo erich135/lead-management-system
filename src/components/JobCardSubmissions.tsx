@@ -229,7 +229,7 @@ export function JobCardSubmissions() {
                           <Calendar className="w-4 h-4" />
                           <span>{new Date(submission.submittedAt).toLocaleDateString()}</span>
                         </div>
-                        {submission.submissionLocation && (
+                        {submission.submissionLocation ? (
                           <div className="flex items-center gap-1">
                             <MapPin className="w-4 h-4 text-green-600" />
                             <a
@@ -241,6 +241,16 @@ export function JobCardSubmissions() {
                             >
                               View location
                             </a>
+                          </div>
+                        ) : (
+                          <div
+                            className="flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5"
+                            title="Technician did not enable location (declined, blocked, or unavailable on the device)"
+                          >
+                            <MapPin className="w-4 h-4 text-amber-700" />
+                            <span className="text-amber-900 font-medium">
+                              Location not enabled by technician
+                            </span>
                           </div>
                         )}
                       </div>
@@ -343,6 +353,7 @@ export function JobCardSubmissions() {
           job={previewData.submission.job as Record<string, unknown>}
           machine={previewData.machine}
           reportNumber={previewData.submission.reportNumber}
+          hasSubmissionLocation={!!previewData.submission.submissionLocation}
           onClose={closePreview}
         />
       )}

@@ -1945,6 +1945,8 @@ export interface User {
     email?: string;
     phone?: string;
   } | string;
+  /** Mobile number; synced with linked Technician.phone when present. */
+  cellPhone?: string;
   passwordSet?: boolean;
   locationTrackingEnabled?: boolean;
   createdAt: string;
@@ -3748,17 +3750,28 @@ export async function createBlankJobCardTemplate(data: {
 }
 
 /** Parts Ready job row: job + optional assignment + optional submission. */
+export interface PartsReadyAssignment {
+  _id: string;
+  template: { _id: string; name: string };
+  technician?: { _id?: string; name?: string };
+  status: 'assigned' | 'started' | 'submitted';
+  assignedAt: string;
+  assignedBy?: { firstName?: string; lastName?: string };
+  notifiedAt?: string;
+  submission?: {
+    _id: string;
+    submittedAt: string;
+    reportNumber?: string;
+    submittedBy?: { firstName?: string; lastName?: string };
+  } | null;
+}
+
 export interface PartsReadyItem {
   job: Job & { bookings?: Array<{ technicianId: string; technicianName?: string }> };
-  assignment: {
-    _id: string;
-    template: { _id: string; name: string };
-    status: 'assigned' | 'started' | 'submitted';
-    assignedAt: string;
-    assignedBy?: { firstName?: string; lastName?: string };
-    notifiedAt?: string;
-    submission?: string;
-  } | null;
+  /** First assignment (legacy); prefer `assignments` for multi-template jobs. */
+  assignment: PartsReadyAssignment | null;
+  /** All active assignments for this job (may include the same template more than once). */
+  assignments?: PartsReadyAssignment[];
   submission: {
     _id: string;
     submittedAt: string;

@@ -20,6 +20,8 @@ interface FixedJobCardPrintViewProps {
   machine?: Record<string, unknown>;
   reportNumber?: string;
   isPreviewSample?: boolean;
+  /** When false, shows that the technician submitted without GPS. */
+  hasSubmissionLocation?: boolean;
   onClose: () => void;
 }
 
@@ -33,6 +35,7 @@ export function FixedJobCardPrintView({
   machine,
   reportNumber,
   isPreviewSample = false,
+  hasSubmissionLocation,
   onClose,
 }: FixedJobCardPrintViewProps) {
   const printRef = useRef<HTMLDivElement>(null);
@@ -84,6 +87,16 @@ export function FixedJobCardPrintView({
           {isPreviewSample && (
             <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1 inline-block">
               Sample data — preview only, not a real submission
+            </p>
+          )}
+          {hasSubmissionLocation === false && (
+            <p className="text-xs text-amber-900 bg-amber-50 border border-amber-300 rounded px-2 py-1 mt-1 inline-block">
+              Location not enabled by technician — GPS was declined, blocked, or unavailable on their device
+            </p>
+          )}
+          {hasSubmissionLocation === true && (
+            <p className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 mt-1 inline-block">
+              Technician enabled location — GPS was attached to this submission
             </p>
           )}
         </div>

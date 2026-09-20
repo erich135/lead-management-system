@@ -510,6 +510,38 @@ export interface Job {
   }>;
   createdAt: string;
   updatedAt: string;
+  salesRequest?: string;
+  salesRequestData?: JobSalesRequestData;
+  salesRequestDataEditedBy?: string | {
+    _id: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+  };
+  salesRequestDataEditedAt?: string;
+}
+
+export interface JobSalesRequestAttachmentRef {
+  attachmentId?: string;
+  _id?: string;
+  originalName: string;
+  mimeType?: string;
+  size?: number;
+  caption?: string;
+}
+
+export interface JobSalesRequestData {
+  requestId?: string;
+  requestNumber?: string;
+  requestType?: string;
+  formData?: Record<string, unknown>;
+  visitNotes?: string;
+  customerCompanyName?: string;
+  customerContactPerson?: string;
+  attachments?: JobSalesRequestAttachmentRef[];
+  gps?: Record<string, unknown> | null;
+  approvedVersion?: number;
+  submittedAt?: string;
 }
 
 export interface JobStats {
@@ -671,6 +703,103 @@ export async function deleteJob(id: string): Promise<void> {
   await apiRequest(`/api/jobs/${id}`, {
     method: 'DELETE',
   });
+}
+
+async function downloadAuthenticatedPdf(path: string, filename: string): Promise<void> {
+  const token = getAuthToken();
+  if (!token) throw new Error('No authentication token found');
+  const response = await fetch(`${apiBase()}${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'PDF download failed' } }));
+    throw new Error(error.error?.message || 'PDF download failed');
+  }
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(link);
+}
+
+/**
+ * Downloads the server-generated RFQ PDF.
+ */
+export async function downloadSalesRequestPdf(id: string, requestNumber?: string): Promise<void> {
+  await downloadAuthenticatedPdf(
+    `/api/sales-requests/${id}/pdf`,
+    `${requestNumber || 'sales-request'}.pdf`,
+  );
+}
+
+/**
+ * Downloads the server-generated Job originating-RFQ PDF.
+ */
+export async function downloadJobRfqPdf(jobId: string, jobNumber?: string): Promise<void> {
+  await downloadAuthenticatedPdf(
+    `/api/jobs/${jobId}/rfq-pdf`,
+    `${jobNumber || 'job'}-RFQ.pdf`,
+  );
+}
+
+/**
+ * Corrects copied RFQ fields on the Job only.
+ */
+export async function updateJobSalesRequestData(
+  jobId: string,
+  data: {
+    formData?: Record<string, unknown>;
+    visitNotes?: string;
+    customerCompanyName?: string;
+    customerContactPerson?: string;
+  },
+): Promise<{ job: Job }> {
+  return apiRequest(`/api/jobs/${jobId}/sales-request-data`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Lists originating-RFQ attachments for a Job.
+ */
+export async function listJobRfqAttachments(
+  jobId: string,
+): Promise<{ attachments: JobSalesRequestAttachmentRef[] }> {
+  return apiRequest(`/api/jobs/${jobId}/rfq-attachments`);
+}
+
+/**
+ * Downloads an originating-RFQ attachment through the Job (jobs.read).
+ */
+export async function downloadJobRfqAttachment(
+  jobId: string,
+  attachmentId: string,
+  filename: string,
+): Promise<void> {
+  const token = getAuthToken();
+  if (!token) throw new Error('No authentication token found');
+  const response = await fetch(
+    `${apiBase()}/api/jobs/${jobId}/rfq-attachments/${attachmentId}/download`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Download failed' } }));
+    throw new Error(error.error?.message || 'Download failed');
+  }
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(link);
 }
 
 /**
@@ -1945,8 +2074,26 @@ export interface User {
     email?: string;
     phone?: string;
   } | string;
+  cellPhone?: string;
   passwordSet?: boolean;
   locationTrackingEnabled?: boolean;
+  whatsappConsent?: {
+    granted?: boolean;
+    agreedOn?: string | null;
+    recordedBy?: { _id: string; firstName?: string; lastName?: string; email?: string } | string | null;
+    recordedAt?: string | null;
+    withdrawnOn?: string | null;
+    withdrawnBy?: { _id: string; firstName?: string; lastName?: string; email?: string } | string | null;
+    withdrawnAt?: string | null;
+    withdrawals?: Array<{
+      agreedOn?: string | null;
+      recordedBy?: string | null;
+      recordedAt?: string | null;
+      withdrawnOn?: string;
+      withdrawnBy?: string;
+      withdrawnAt?: string;
+    }>;
+  };
   createdAt: string;
   updatedAt: string;
   lastLogin?: string;
@@ -2076,6 +2223,26 @@ export async function updateUserBranches(id: string, branches: string[]): Promis
   return apiRequest(`/api/users/${id}/branches`, {
     method: 'PUT',
     body: JSON.stringify({ branches }),
+  });
+}
+
+/**
+ * Records a representative's actual WhatsApp consent.
+ */
+export async function grantWhatsAppConsent(id: string, agreedOn: string): Promise<{ user: User }> {
+  return apiRequest(`/api/users/${id}/whatsapp-consent`, {
+    method: 'POST',
+    body: JSON.stringify({ agreedOn }),
+  });
+}
+
+/**
+ * Withdraws WhatsApp consent and preserves history.
+ */
+export async function withdrawWhatsAppConsent(id: string): Promise<{ user: User }> {
+  return apiRequest(`/api/users/${id}/whatsapp-consent/withdraw`, {
+    method: 'POST',
+    body: JSON.stringify({}),
   });
 }
 
@@ -4612,7 +4779,13 @@ export interface SalesRequest {
   reviewedBy?: string | { _id: string; firstName?: string; lastName?: string; email?: string };
   reviewedAt?: string;
   createdBy: string | { _id: string; firstName?: string; lastName?: string; email?: string };
+  assignedAdministrator?: string | { _id: string; firstName?: string; lastName?: string; email?: string } | null;
+  assignedAdminCode?: string | null;
+  assignmentSource?: 'automatic' | 'manual' | 'unassigned';
+  unassigned?: boolean;
+  archivedAt?: string;
   updatedBy?: string | { _id: string; firstName?: string; lastName?: string; email?: string };
+  currentVersion?: number;
   dbStatus: 'active' | 'deleted';
   createdAt: string;
   updatedAt: string;
@@ -4625,6 +4798,10 @@ export async function listSalesRequests(params?: {
   status?: SalesRequestStatus;
   requestType?: SalesRequestType;
   appointment?: string;
+  createdBy?: string;
+  assignedAdministrator?: string;
+  unassigned?: boolean;
+  includeArchived?: boolean;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -4637,6 +4814,12 @@ export async function listSalesRequests(params?: {
   if (params?.status) searchParams.set('status', params.status);
   if (params?.requestType) searchParams.set('requestType', params.requestType);
   if (params?.appointment) searchParams.set('appointment', params.appointment);
+  if (params?.createdBy) searchParams.set('createdBy', params.createdBy);
+  if (params?.assignedAdministrator) {
+    searchParams.set('assignedAdministrator', params.assignedAdministrator);
+  }
+  if (params?.unassigned) searchParams.set('unassigned', 'true');
+  if (params?.includeArchived) searchParams.set('includeArchived', 'true');
   if (params?.page) searchParams.set('page', String(params.page));
   if (params?.limit) searchParams.set('limit', String(params.limit));
   if (params?.sortBy) searchParams.set('sortBy', params.sortBy);
@@ -4645,11 +4828,98 @@ export async function listSalesRequests(params?: {
   return apiRequest(`/api/sales-requests${query ? `?${query}` : ''}`);
 }
 
+export interface SalesRequestVisibilityOption {
+  _id: string;
+  name: string;
+  adminCode?: string;
+}
+
+export async function getSalesRequestVisibilityOptions(): Promise<{
+  representatives: SalesRequestVisibilityOption[];
+  administrators: SalesRequestVisibilityOption[];
+}> {
+  return apiRequest('/api/sales-requests/visibility-options');
+}
+
+export async function reassignSalesRequest(
+  id: string,
+  administratorId: string,
+): Promise<SalesRequest> {
+  return apiRequest<SalesRequest>(`/api/sales-requests/${id}/reassign`, {
+    method: 'POST',
+    body: JSON.stringify({ administratorId }),
+  });
+}
+
 /**
  * Fetches a single sales request by ID.
  */
 export async function getSalesRequest(id: string): Promise<SalesRequest> {
   return apiRequest<SalesRequest>(`/api/sales-requests/${id}`);
+}
+
+export type SalesRequestSubmissionOutcome =
+  | 'pending'
+  | 'approved'
+  | 'declined'
+  | 'accepted_no_job';
+
+export interface SalesRequestSubmissionAttachmentRef {
+  attachmentId: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  source?: string;
+  clientRef?: string;
+  checksum?: string;
+  caption?: string;
+}
+
+export interface SalesRequestAdminEdit {
+  path: string;
+  before: unknown;
+  after: unknown;
+  editedBy?: string | { _id?: string; firstName?: string; lastName?: string; email?: string };
+  editedAt?: string;
+}
+
+export interface SalesRequestSubmission {
+  _id: string;
+  salesRequestId: string;
+  version: number;
+  captureSource: 'submission' | 'existing_record';
+  capturedFromExistingRecord?: boolean;
+  captureNote?: string;
+  submittedAt: string;
+  submittedBy?: string | { _id?: string; firstName?: string; lastName?: string; email?: string };
+  requestType: SalesRequestType;
+  submittedFormData: Record<string, unknown>;
+  visitNotes?: string;
+  visitPhotos?: Array<{ id?: string; caption?: string; attachmentId?: string }>;
+  attachmentRefs: SalesRequestSubmissionAttachmentRef[];
+  gps?: Record<string, unknown> | null;
+  outcome: SalesRequestSubmissionOutcome;
+  decidedAt?: string;
+  decidedBy?: string | { _id?: string; firstName?: string; lastName?: string; email?: string };
+  declineReason?: string;
+  reviewNotes?: string;
+  adminEdits: SalesRequestAdminEdit[];
+  finalFormData?: Record<string, unknown>;
+}
+
+export interface SalesRequestSubmissionHistory {
+  historyRecorded: boolean;
+  message?: string;
+  submissions: SalesRequestSubmission[];
+}
+
+/**
+ * Lists captured submission versions for a sales request.
+ */
+export async function getSalesRequestSubmissions(
+  id: string,
+): Promise<SalesRequestSubmissionHistory> {
+  return apiRequest<SalesRequestSubmissionHistory>(`/api/sales-requests/${id}/submissions`);
 }
 
 /**
@@ -4718,7 +4988,7 @@ export async function deleteSalesRequest(id: string): Promise<void> {
  */
 export async function approveSalesRequest(
   id: string,
-  data?: { formData?: Record<string, unknown> },
+  data?: { formData?: Record<string, unknown>; expectedVersion?: number },
 ): Promise<{ request: SalesRequest; job: Job }> {
   return apiRequest(`/api/sales-requests/${id}/approve`, {
     method: 'POST',
@@ -4731,7 +5001,11 @@ export async function approveSalesRequest(
  */
 export async function declineSalesRequest(
   id: string,
-  data?: { formData?: Record<string, unknown>; declineReason?: string },
+  data?: {
+    formData?: Record<string, unknown>;
+    declineReason?: string;
+    expectedVersion?: number;
+  },
 ): Promise<SalesRequest> {
   return apiRequest<SalesRequest>(`/api/sales-requests/${id}/decline`, {
     method: 'POST',
@@ -4744,7 +5018,11 @@ export async function declineSalesRequest(
  */
 export async function acceptSalesRequestWithoutJob(
   id: string,
-  data?: { formData?: Record<string, unknown>; reviewNotes?: string },
+  data?: {
+    formData?: Record<string, unknown>;
+    reviewNotes?: string;
+    expectedVersion?: number;
+  },
 ): Promise<{ request: SalesRequest; job: null; acceptedWithoutJob: true }> {
   return apiRequest(`/api/sales-requests/${id}/accept-without-job`, {
     method: 'POST',
@@ -4757,7 +5035,11 @@ export async function acceptSalesRequestWithoutJob(
  */
 export async function reviewUpdateSalesRequest(
   id: string,
-  data: { formData?: Record<string, unknown>; visitNotes?: string },
+  data: {
+    formData?: Record<string, unknown>;
+    visitNotes?: string;
+    expectedVersion?: number;
+  },
 ): Promise<SalesRequest> {
   return apiRequest<SalesRequest>(`/api/sales-requests/${id}/review`, {
     method: 'PUT',
@@ -5415,6 +5697,7 @@ export default {
   updateAppointment,
   listSalesRequests,
   getSalesRequest,
+  getSalesRequestSubmissions,
   createSalesRequest,
   updateSalesRequest,
   submitSalesRequest,
@@ -5476,6 +5759,34 @@ export interface GeoSearchResult {
     country?: string;
     country_code?: string;
   };
+}
+
+export interface PlaceSuggestion {
+  placeId: string;
+  displayName: string;
+  secondaryText?: string;
+}
+
+/**
+ * Google Places type-ahead via backend proxy. Empty when no key is configured.
+ */
+export async function geocodeAutocomplete(query: string, sessionToken: string): Promise<PlaceSuggestion[]> {
+  const params = new URLSearchParams({ q: query, sessionToken });
+  const response = await apiRequest<PlaceSuggestion[]>(`/api/geocode/autocomplete?${params}`, { method: 'GET' });
+  return response || [];
+}
+
+/**
+ * Resolves a selected Google Place into address + coordinates.
+ */
+export async function geocodePlaceDetails(placeId: string, sessionToken: string): Promise<{
+  placeId: string;
+  displayName: string;
+  lat: string;
+  lon: string;
+} | null> {
+  const params = new URLSearchParams({ placeId, sessionToken });
+  return apiRequest(`/api/geocode/place-details?${params}`, { method: 'GET' });
 }
 
 /**

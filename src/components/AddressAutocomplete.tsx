@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { MapPin, Loader2, X, Search, Navigation } from 'lucide-react';
 import { MapPinSelector } from './MapPinSelector';
-import { geocodeSearch, type GeoSearchResult } from '../lib/api';
+import { geocodeAutocomplete, geocodePlaceDetails, type PlaceSuggestion } from '../lib/api';
 
 interface AddressAutocompleteProps {
   value: string;
@@ -25,14 +25,16 @@ export function AddressAutocomplete({
   required = false,
 }: AddressAutocompleteProps) {
   const [query, setQuery] = useState(value);
-  const [results, setResults] = useState<GeoSearchResult[]>([]);
+  const [results, setResults] = useState<PlaceSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<string | null>(value || null);
   const [showMapPicker, setShowMapPicker] = useState(false);
   const [currentCoords, setCurrentCoords] = useState<[number, number] | null>(coordinates);
+  const [manualHint, setManualHint] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionTokenRef = useRef<string>(crypto.randomUUID());
 
   // Sync external value changes (e.g., editing an existing lead)
   useEffect(() => {
@@ -66,12 +68,14 @@ export function AddressAutocomplete({
 
     setIsLoading(true);
     try {
-      const data = await geocodeSearch(searchQuery);
+      const data = await geocodeAutocomplete(searchQuery, sessionTokenRef.current);
       setResults(data);
       setShowDropdown(data.length > 0);
+      setManualHint(data.length === 0 && searchQuery.length >= 3);
     } catch (err: any) {
       console.error('Address search error:', err);
       setResults([]);
+      setManualHint(true);
     } finally {
       setIsLoading(false);
     }
@@ -83,28 +87,38 @@ export function AddressAutocomplete({
     // Let parent know the text changed (without coordinates yet)
     onChange(newValue, undefined);
 
-    // Debounce the search (Nominatim fair use: 1 req/sec)
+    // Debounce Google Places suggestions
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
     debounceRef.current = setTimeout(() => {
       searchAddress(newValue);
-    }, 500);
+    }, 300);
   }
 
-  function handleSelect(result: GeoSearchResult) {
-    const address = result.display_name;
-    const coordinates: [number, number] = [
-      parseFloat(result.lon), // longitude first (GeoJSON standard)
-      parseFloat(result.lat),
-    ];
+  async function handleSelect(result: PlaceSuggestion) {
+    try {
+      const details = await geocodePlaceDetails(result.placeId, sessionTokenRef.current);
+      const address = details?.displayName || result.displayName;
+      const nextCoords: [number, number] | undefined =
+        details?.lon && details?.lat
+          ? [parseFloat(details.lon), parseFloat(details.lat)]
+          : undefined;
 
-    setQuery(address);
-    setSelectedAddress(address);
-    setShowDropdown(false);
-    setResults([]);
-    setCurrentCoords(coordinates);
-    onChange(address, coordinates);
+      setQuery(address);
+      setSelectedAddress(nextCoords ? address : null);
+      setShowDropdown(false);
+      setResults([]);
+      setManualHint(false);
+      if (nextCoords) {
+        setCurrentCoords(nextCoords);
+        onChange(address, nextCoords);
+      } else {
+        onChange(address, undefined);
+      }
+    } finally {
+      sessionTokenRef.current = crypto.randomUUID();
+    }
   }
 
   function handleMapConfirm(address: string, coordinates: [number, number]) {
@@ -122,36 +136,9 @@ export function AddressAutocomplete({
     setResults([]);
     setShowDropdown(false);
     setCurrentCoords(null);
+    setManualHint(false);
+    sessionTokenRef.current = crypto.randomUUID();
     onChange('', undefined);
-  }
-
-  // Format a more readable short address from components
-  function formatShortAddress(result: GeoSearchResult): string {
-    const parts: string[] = [];
-    const a = result.address;
-    if (!a) return result.display_name;
-
-    if (a.house_number && a.road) {
-      parts.push(`${a.house_number} ${a.road}`);
-    } else if (a.road) {
-      parts.push(a.road);
-    }
-    if (a.suburb) parts.push(a.suburb);
-    const city = a.city || a.town;
-    if (city) parts.push(city);
-    if (a.postcode) parts.push(a.postcode);
-
-    return parts.length > 0 ? parts.join(', ') : result.display_name;
-  }
-
-  // Secondary line: state, country
-  function formatSecondaryAddress(result: GeoSearchResult): string {
-    const a = result.address;
-    if (!a) return '';
-    const parts: string[] = [];
-    if (a.state) parts.push(a.state);
-    if (a.country) parts.push(a.country);
-    return parts.join(', ');
   }
 
   return (
@@ -207,12 +194,18 @@ export function AddressAutocomplete({
         </div>
       )}
 
+      {manualHint && query.length >= 3 && !showDropdown && (
+        <p className="mt-1 text-xs text-gray-500">
+          No address suggestions available. Keep typing the address or pin it on the map.
+        </p>
+      )}
+
       {/* Dropdown results */}
       {showDropdown && (
         <div className="absolute z-[9999] w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
           {results.map((result) => (
             <button
-              key={result.place_id}
+              key={result.placeId}
               type="button"
               onClick={() => handleSelect(result)}
               className="w-full text-left px-3 py-2.5 hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-b-0 flex items-start gap-2"
@@ -220,17 +213,16 @@ export function AddressAutocomplete({
               <MapPin className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
               <div className="min-w-0">
                 <div className="text-sm font-medium text-gray-900 truncate">
-                  {formatShortAddress(result)}
+                  {result.displayName}
                 </div>
-                <div className="text-xs text-gray-500 truncate">
-                  {formatSecondaryAddress(result)}
-                </div>
+                {result.secondaryText ? (
+                  <div className="text-xs text-gray-500 truncate">
+                    {result.secondaryText}
+                  </div>
+                ) : null}
               </div>
             </button>
           ))}
-          <div className="px-3 py-1.5 text-[10px] text-gray-400 bg-gray-50 text-right">
-            Powered by OpenStreetMap
-          </div>
         </div>
       )}
 

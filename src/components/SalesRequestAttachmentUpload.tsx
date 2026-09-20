@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { FileText, Loader2, Paperclip, Trash2, Upload } from 'lucide-react';
 import {
+  deleteSalesRequestAttachment,
   uploadSalesRequestAttachment,
   type SalesRequestAttachmentMeta,
 } from '../lib/api';
@@ -95,9 +96,25 @@ const SalesRequestAttachmentUpload: React.FC<SalesRequestAttachmentUploadProps> 
   }
 
   /**
-   * Removes one local attachment from the pending list.
+   * Removes one attachment. Stored files go through the backend delete endpoint
+   * so Phase 1 retirement / tombstone rules apply.
    */
-  function removeAttachment(id: string): void {
+  async function removeAttachment(id: string): Promise<void> {
+    const target = attachments.find((item) => item.id === id);
+    const storedId = target?.stored?._id;
+    if (storedId) {
+      setError(null);
+      try {
+        await deleteSalesRequestAttachment(storedId);
+      } catch (removeError: unknown) {
+        setError(
+          removeError instanceof Error
+            ? removeError.message
+            : 'Failed to remove attachment.',
+        );
+        return;
+      }
+    }
     onChange(attachments.filter((item) => item.id !== id));
   }
 
@@ -167,7 +184,9 @@ const SalesRequestAttachmentUpload: React.FC<SalesRequestAttachmentUploadProps> 
               {!disabled && (
                 <button
                   type="button"
-                  onClick={() => removeAttachment(attachment.id)}
+                  onClick={() => {
+                    void removeAttachment(attachment.id);
+                  }}
                   className="rounded-lg p-2 text-rose-600 hover:bg-rose-50"
                   aria-label={`Remove ${attachment.fileName}`}
                 >

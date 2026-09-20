@@ -80,6 +80,7 @@ export const USERS = {
   CREATE: 'users.create',
   UPDATE: 'users.update',
   DELETE: 'users.delete',
+  MANAGE_CONSENT: 'users.manage_consent',
 } as const;
 
 export const ROLES = {

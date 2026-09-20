@@ -5,8 +5,15 @@
  * Typed appointments keep their scheduled form.
  */
 
-import type { SalesRequestType } from '../../lib/api';
-import { appointmentTypeToPlannerFormType, appointmentTypeToSalesRequestType } from './diaryUtils';
+import { appointmentTypeToPlannerFormType, appointmentTypeToSalesRequestType } from './diaryUtils.ts';
+
+type SalesRequestType =
+  | 'rfc'
+  | 'loan'
+  | 'rental'
+  | 'loan_rental'
+  | 'rfc_new_service_level'
+  | 'general_visit';
 
 export const VISIT_SYSTEM_PLANNER_FORM_TYPES = ['rfc', 'loan_rental', 'new_service_level'] as const;
 

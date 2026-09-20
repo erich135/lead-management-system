@@ -12,8 +12,10 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import {
   listSalesRequests,
+  getSalesRequestVisibilityOptions,
   type SalesRequest,
   type SalesRequestStatus,
+  type SalesRequestVisibilityOption,
 } from '../lib/api';
 import {
   SALES_REQUEST_PERMISSIONS,
@@ -81,9 +83,12 @@ const STATUS_SIDEBAR_ITEMS: Array<{
 const SalesRequestsTab: React.FC<SalesRequestsTabProps> = ({ refreshKey = 0 }) => {
   const { hasPermission, isSuperAdmin } = useAuth();
   const canCreate = hasPermission(SALES_REQUEST_PERMISSIONS.CREATE);
-  const canRead = hasPermission(SALES_REQUEST_PERMISSIONS.READ);
+  const canRead =
+    hasPermission(SALES_REQUEST_PERMISSIONS.READ) ||
+    hasPermission(SALES_REQUEST_PERMISSIONS.VIEW_ALL);
   const canReviewPending =
     isSuperAdmin || hasPermission(SALES_REQUEST_PERMISSIONS.REVIEW);
+  const canViewAll = hasPermission(SALES_REQUEST_PERMISSIONS.VIEW_ALL);
 
   const [requests, setRequests] = useState<SalesRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,6 +108,24 @@ const SalesRequestsTab: React.FC<SalesRequestsTabProps> = ({ refreshKey = 0 }) =
   const [showNewWorkspace, setShowNewWorkspace] = useState(false);
   const [reviewRequestId, setReviewRequestId] = useState<string | undefined>();
   const [search, setSearch] = useState('');
+  const [representativeFilter, setRepresentativeFilter] = useState('');
+  const [administratorFilter, setAdministratorFilter] = useState('');
+  const [visibilityOptions, setVisibilityOptions] = useState<{
+    representatives: SalesRequestVisibilityOption[];
+    administrators: SalesRequestVisibilityOption[];
+  }>({ representatives: [], administrators: [] });
+
+  const visibilityQuery = useMemo(
+    () => ({
+      createdBy: representativeFilter || undefined,
+      assignedAdministrator:
+        administratorFilter && administratorFilter !== 'unassigned'
+          ? administratorFilter
+          : undefined,
+      unassigned: administratorFilter === 'unassigned',
+    }),
+    [representativeFilter, administratorFilter],
+  );
 
   /**
    * Loads counts for the side status filters.
@@ -119,7 +142,7 @@ const SalesRequestsTab: React.FC<SalesRequestsTabProps> = ({ refreshKey = 0 }) =
       ];
       const results = await Promise.all(
         statuses.map((status) =>
-          listSalesRequests({ status, limit: 1 }).then((result) => ({
+          listSalesRequests({ status, limit: 1, ...visibilityQuery }).then((result) => ({
             status,
             total: result.pagination?.total || 0,
           })),
@@ -135,13 +158,13 @@ const SalesRequestsTab: React.FC<SalesRequestsTabProps> = ({ refreshKey = 0 }) =
       };
       for (const item of results) {
         next[item.status] = item.total;
-        next.all += item.total;
       }
+      next.all = next.draft + next.pending + next.declined;
       setStatusCounts(next);
     } catch {
       // Counts are non-critical — keep previous values.
     }
-  }, [canRead]);
+  }, [canRead, visibilityQuery]);
 
   /**
    * Loads sales requests from the API for the current filter.
@@ -157,6 +180,7 @@ const SalesRequestsTab: React.FC<SalesRequestsTabProps> = ({ refreshKey = 0 }) =
         sortBy: 'updatedAt',
         sortOrder: 'desc',
         limit: 100,
+        ...visibilityQuery,
       });
       setRequests(items);
     } catch (loadError: unknown) {
@@ -166,12 +190,19 @@ const SalesRequestsTab: React.FC<SalesRequestsTabProps> = ({ refreshKey = 0 }) =
     } finally {
       setLoading(false);
     }
-  }, [canRead, statusFilter]);
+  }, [canRead, statusFilter, visibilityQuery]);
 
   useEffect(() => {
     void loadRequests();
     void loadStatusCounts();
   }, [loadRequests, loadStatusCounts, refreshKey]);
+
+  useEffect(() => {
+    if (!canViewAll) return;
+    void getSalesRequestVisibilityOptions()
+      .then(setVisibilityOptions)
+      .catch(() => undefined);
+  }, [canViewAll]);
 
   /**
    * Handles a successful rep submit: shows confirmation and reloads the list.
@@ -298,8 +329,9 @@ const SalesRequestsTab: React.FC<SalesRequestsTabProps> = ({ refreshKey = 0 }) =
           <div>
             <p className="font-semibold text-amber-900">Permission required</p>
             <p className="text-sm text-amber-800">
-              You need the <code className="rounded bg-amber-100 px-1">sales_requests.read</code>{' '}
-              permission to view requests.
+              You need <code className="rounded bg-amber-100 px-1">sales_requests.read</code> or{' '}
+              <code className="rounded bg-amber-100 px-1">sales_requests.view_all</code> to view
+              requests.
             </p>
           </div>
         </div>
@@ -362,6 +394,37 @@ const SalesRequestsTab: React.FC<SalesRequestsTabProps> = ({ refreshKey = 0 }) =
             className="crm-input !pl-10"
           />
         </div>
+        {canViewAll && (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <select
+              value={representativeFilter}
+              onChange={(event) => setRepresentativeFilter(event.target.value)}
+              className="crm-input"
+              aria-label="Filter by representative"
+            >
+              <option value="">All representatives</option>
+              {visibilityOptions.representatives.map((option) => (
+                <option key={option._id} value={option._id}>
+                  {option.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={administratorFilter}
+              onChange={(event) => setAdministratorFilter(event.target.value)}
+              className="crm-input"
+              aria-label="Filter by administrator"
+            >
+              <option value="">All administrators</option>
+              <option value="unassigned">Unassigned</option>
+              {visibilityOptions.administrators.map((option) => (
+                <option key={option._id} value={option._id}>
+                  {option.adminCode ? `${option.name} (${option.adminCode})` : option.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
@@ -522,10 +585,15 @@ const SalesRequestsTab: React.FC<SalesRequestsTabProps> = ({ refreshKey = 0 }) =
                           {SALES_REQUEST_TYPE_LABELS[item.requestType]}
                         </p>
                       </div>
-                      <StatusBadge
-                        label={SALES_REQUEST_STATUS_LABELS[item.status]}
-                        tone={statusTone(item.status)}
-                      />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StatusBadge
+                          label={SALES_REQUEST_STATUS_LABELS[item.status]}
+                          tone={statusTone(item.status)}
+                        />
+                        {item.unassigned ? (
+                          <StatusBadge label="Unassigned" tone="pending" />
+                        ) : null}
+                      </div>
                     </div>
                     <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-muted">
                       {item.customerCompanyName && (
@@ -547,7 +615,7 @@ const SalesRequestsTab: React.FC<SalesRequestsTabProps> = ({ refreshKey = 0 }) =
                     )}
                     {item.status === 'pending' && !canReviewPending && (
                       <p className="mt-2 text-xs font-medium text-ink-muted">
-                        Tap to view your submission and download attachments.
+                        Tap to view the submission and download attachments.
                       </p>
                     )}
                     {item.status === 'approved' && !canReviewPending && (

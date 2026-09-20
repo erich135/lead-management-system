@@ -91,6 +91,10 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
   const { user, signOut, isSuperAdmin, hasPermission } = useAuth();
   const isTechnician = user?.role?.name?.toLowerCase() === 'technician';
   const canViewTechApp = isSuperAdmin || isTechnician;
+  const canOpenRepApprovals =
+    isSuperAdmin ||
+    hasPermission('sales_requests.review') ||
+    hasPermission('sales_requests.view_all');
   const showJobsDropdown =
     isSuperAdmin ||
     hasPermission('job_card_templates.read') ||
@@ -264,7 +268,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
    */
   async function loadPendingSalesRequestsCount() {
     try {
-      if (!isSuperAdmin && !hasPermission('sales_requests.review')) return;
+      if (!canOpenRepApprovals) return;
       const { pagination } = await listSalesRequests({
         status: 'pending',
         limit: 1,
@@ -899,7 +903,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                     )}
                   </Link>
                 )}
-                {(isSuperAdmin || hasPermission('sales_requests.review')) && (
+                {canOpenRepApprovals && (
                   <Link
                     to="/pending-sales-requests"
                     className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
@@ -2151,7 +2155,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           <PendingMachineReadings />
         )}
 
-        {view === 'pendingSalesRequests' && (isSuperAdmin || hasPermission('sales_requests.review')) && (
+        {view === 'pendingSalesRequests' && canOpenRepApprovals && (
           <PendingSalesRequests
             onJobCreated={(job) => {
               void loadPendingSalesRequestsCount();
@@ -2163,10 +2167,10 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           />
         )}
 
-        {view === 'pendingSalesRequests' && !isSuperAdmin && !hasPermission('sales_requests.review') && (
+        {view === 'pendingSalesRequests' && !canOpenRepApprovals && (
           <div className="p-8 bg-white rounded-[8px] shadow-lg max-w-lg mx-auto mt-8">
             <h2 className="text-xl font-semibold text-[#383838] mb-2">Access restricted</h2>
-            <p className="text-slate-600 mb-6">You do not have permission to review sales requests.</p>
+            <p className="text-slate-600 mb-6">You do not have permission to view or review sales requests.</p>
           </div>
         )}
 

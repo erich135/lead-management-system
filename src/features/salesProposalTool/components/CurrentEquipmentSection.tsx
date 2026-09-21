@@ -24,10 +24,7 @@ import {
   effectivePackageInput,
   effectiveRatedAirflow,
   effectiveRatedPressure,
-  hasUsableSourceBacked,
   MOTOR_RATING_LABEL,
-  packageInputUnavailableCopy,
-  PUBLISHED_PACKAGE_INPUT_LABEL,
   specLibraryResultCopy,
 } from '../specDisplay';
 import { formatMeasuredNumber } from '../formatMeasured';
@@ -39,7 +36,7 @@ import {
   rankPublishedSpecsForPhysicalMachine,
 } from '../suggestPublishedSpecs';
 import type { PublicMachineSpec, SourceBackedSpec } from '../types';
-import { SpecSheetCapture } from './SpecSheetCapture';
+import { PublishedRatingFields } from './PublishedRatingFields';
 import {
   LIBRARY_ADDED_STATUS,
   LIBRARY_USING_STATUS,
@@ -91,9 +88,9 @@ export function CurrentEquipmentSection({
   }, [customerId]);
 
   useEffect(() => {
-    if (!customerId || rows.length > 0) return;
+    if (rows.length > 0) return;
     onChange([newCurrentEquipmentDraft()]);
-  }, [customerId, rows.length, onChange]);
+  }, [rows.length, onChange]);
 
   useEffect(() => {
     const missing = rows.filter(
@@ -131,17 +128,6 @@ export function CurrentEquipmentSection({
       cancelled = true;
     };
   }, [rows, onChange]);
-
-  if (!customerId) {
-    return (
-      <section className="space-y-3 overflow-visible">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-[#383838]/70">
-          Current machine
-        </h2>
-        <p className="text-sm text-slate-600">Select a customer first.</p>
-      </section>
-    );
-  }
 
   function updateRow(key: string, next: CurrentEquipmentDraft) {
     onChange(rows.map((row) => (row.key === key ? next : row)));
@@ -188,7 +174,7 @@ function CurrentMachineCard({
   onRemove,
 }: {
   proposalId: string;
-  customerId: string;
+  customerId: string | null;
   row: CurrentEquipmentDraft;
   machines: Machine[];
   loading: boolean;
@@ -390,6 +376,7 @@ function CurrentMachineCard({
         <SelectedCurrentMachine
           row={row}
           onSerialChange={(serialNumber) => onChange({ ...row, serialNumber })}
+          onSourceChange={(sourceBacked) => onChange({ ...row, sourceBacked })}
           onChangeMachine={() => {
             onChange(resetCurrentMachine(row));
             setQuery('');
@@ -425,7 +412,7 @@ function CurrentMachineCard({
                 setMenuOpen(false);
                 event.currentTarget.blur();
               }}
-              placeholder="Search make, model or serial..."
+              placeholder="Search make, model, serial or library..."
               autoComplete="off"
               aria-expanded={menuOpen}
               className="w-full rounded-[8px] border border-slate-300 py-2 pl-9 pr-9 text-sm focus:border-[#0969a9] focus:outline-none focus:ring-2 focus:ring-[#0969a9]/20"
@@ -457,9 +444,11 @@ function CurrentMachineCard({
                 <div>
                   {(dropdown.customerNotice || dropdown.customer.length > 0) && (
                     <div>
-                      <p className="px-3 pt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                        Customer machines
-                      </p>
+                      {dropdown.customer.length > 0 && (
+                        <p className="px-3 pt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                          Customer machines
+                        </p>
+                      )}
                       {dropdown.customerNotice && (
                         <p className="px-3 py-2 text-sm text-slate-600">{dropdown.customerNotice}</p>
                       )}
@@ -637,34 +626,38 @@ function PhysicalMachineSpecSuggestions({
 function SelectedCurrentMachine({
   row,
   onSerialChange,
+  onSourceChange,
   onChangeMachine,
   onCapture,
 }: {
   row: CurrentEquipmentDraft;
   onSerialChange: (serialNumber: string) => void;
+  onSourceChange: (sourceBacked: SourceBackedSpec) => void;
   onChangeMachine: () => void;
   onCapture: () => void;
 }) {
   const title = currentMachineCardTitle(row);
-  const pressure = effectiveRatedPressure(row.selectedSpec, row.sourceBacked);
-  const airflow = effectiveRatedAirflow(row.selectedSpec, row.sourceBacked);
-  const packageInput = effectivePackageInput(row.selectedSpec, row.sourceBacked);
   const motor = displayedMotorRatingKw(row.selectedSpec, row.sourceBacked);
   const source =
     row.selectedSpec?.sourceTitle ||
     row.selectedSpec?.sourceFileName ||
     row.sourceBacked?.sourceFileName ||
     null;
+  const pressure = effectiveRatedPressure(row.selectedSpec, row.sourceBacked);
+  const airflow = effectiveRatedAirflow(row.selectedSpec, row.sourceBacked);
+  const packageInput = effectivePackageInput(row.selectedSpec, row.sourceBacked);
   const missingPackage = packageInput.value === null;
   const missingAirflow = airflow.value === null;
+  const missingPressure = pressure.value === null;
   const libraryOnly = !row.arsMachineId;
+  const addedFromSheet = Boolean(row.sourceBacked?.sourceFileId);
 
   return (
     <div>
       <p className="text-sm font-medium text-[#383838]">{title}</p>
       <p className="mt-1 text-xs text-slate-500">
         {row.specLibraryRecordId
-          ? row.sourceBacked
+          ? addedFromSheet
             ? `${LIBRARY_ADDED_STATUS}. ${LIBRARY_USING_STATUS}`
             : LIBRARY_USING_STATUS
           : PROPOSAL_ONLY_LIBRARY_STATUS}
@@ -686,32 +679,15 @@ function SelectedCurrentMachine({
             )}
           </dd>
         </div>
-        <CardValue
-          label="Rated pressure"
-          value={
-            formatMeasuredNumber(pressure.value)
-              ? `${formatMeasuredNumber(pressure.value)} bar`
-              : 'Not available'
-          }
-        />
-        <CardValue
-          label="Rated airflow"
-          value={
-            formatMeasuredNumber(airflow.value)
-              ? `${formatMeasuredNumber(airflow.value)} m³/min`
-              : 'Not available'
-          }
-        />
-        <CardValue
-          label={PUBLISHED_PACKAGE_INPUT_LABEL}
-          value={
-            formatMeasuredNumber(packageInput.value, 1)
-              ? `${formatMeasuredNumber(packageInput.value, 1)} kW`
-              : packageInputUnavailableCopy({
-                  hasLibrary: row.selectedSpec !== null,
-                  hasSource: hasUsableSourceBacked(row.sourceBacked),
-                })
-          }
+        <PublishedRatingFields
+          library={row.selectedSpec}
+          source={row.sourceBacked}
+          identity={{
+            manufacturer: row.selectedSpec?.manufacturer ?? row.make,
+            model: row.selectedSpec?.model ?? row.model,
+            modelVariant: row.selectedSpec?.modelVariant ?? null,
+          }}
+          onSourceChange={onSourceChange}
         />
         {motor !== null && (
           <CardValue
@@ -730,15 +706,19 @@ function SelectedCurrentMachine({
           </div>
         )}
       </dl>
-      {(missingPackage || missingAirflow) && (
+      {(missingPackage || missingAirflow || missingPressure) && (
         <p className="mt-2 text-xs text-slate-600">
-          {missingPackage && row.selectedSpec && (
-            <span className="block">Published package input not available in the library record.</span>
-          )}
-          <button type="button" className="mt-1 font-medium text-[#0969a9] underline" onClick={onCapture}>
-            Add from specification sheet
+          Enter the missing published ratings, or{' '}
+          <button type="button" className="font-medium text-[#0969a9] underline" onClick={onCapture}>
+            add from a specification sheet
           </button>
+          .
         </p>
+      )}
+      {!(missingPackage || missingAirflow || missingPressure) && (
+        <button type="button" className="mt-2 text-xs font-medium text-[#0969a9] underline" onClick={onCapture}>
+          Add from specification sheet
+        </button>
       )}
       <button
         type="button"

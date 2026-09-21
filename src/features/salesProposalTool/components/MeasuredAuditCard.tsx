@@ -30,7 +30,8 @@ export function MeasuredAuditCard({ audit }: MeasuredAuditCardProps) {
           Measured Air Audit
         </h2>
         <p className="mt-3 text-sm text-slate-600">
-          Upload the site's Air Audit CSV to see the measured operating profile.
+          Upload the site's Air Audit CSV or Excel file to see the measured
+          operating profile.
         </p>
       </section>
     );

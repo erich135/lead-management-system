@@ -57,11 +57,13 @@ export function AirAuditUpload({
         ) : (
           <Upload className="mb-2 h-6 w-6 text-[#0969a9]" />
         )}
-        <span className="text-sm font-medium text-[#383838]">Drop CSV here</span>
-        <span className="mt-1 text-xs text-slate-500">or select CSV</span>
+        <span className="text-sm font-medium text-[#383838]">
+          Drop CSV or Excel here
+        </span>
+        <span className="mt-1 text-xs text-slate-500">or select CSV / XLSX</span>
         <input
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           className="hidden"
           disabled={unavailable}
           onChange={(event) => {

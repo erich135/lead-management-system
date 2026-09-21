@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Search } from 'lucide-react';
 import { searchSpecLibrary } from '../api';
-import { specDisplayName, hasUsableSourceBacked, sourceBackedLabel, specLibraryResultCopy } from '../specDisplay';
+import { specDisplayName, hasUsableSourceBacked, sourceBackedLabel, specLibraryResultCopy, effectivePackageInput, effectiveRatedAirflow, effectiveRatedPressure } from '../specDisplay';
 import { LIBRARY_ADDED_STATUS, LIBRARY_USING_STATUS } from '../confirmSpecSheet';
 import { specPickerSearchIsOpen } from '../specPickerSearch';
 import { SEARCH_MENU_PANEL, searchMenuWrapClass } from '../searchOverlay';
 import type { PublicMachineSpec, SourceBackedSpec } from '../types';
 import { SpecSheetCapture } from './SpecSheetCapture';
+import { PublishedRatingFields } from './PublishedRatingFields';
 
 interface SpecPickerProps {
   proposalId: string;
@@ -28,6 +29,7 @@ interface SpecPickerProps {
     sourceBacked: SourceBackedSpec;
     created: boolean;
   }) => void;
+  onPatchSource: (values: SourceBackedSpec) => void;
 }
 
 function formatResult(spec: PublicMachineSpec): { title: string; detail: string; source: string | null } {
@@ -51,6 +53,7 @@ export function SpecPicker({
   onCancelCapture,
   onApplySource,
   onConfirmedSource,
+  onPatchSource,
 }: SpecPickerProps) {
   const [query, setQuery] = useState(searchHint);
   const [results, setResults] = useState<PublicMachineSpec[]>([]);
@@ -99,8 +102,9 @@ export function SpecPicker({
     };
   }, [query, scope, searchOpen]);
 
-  const missingPackage = selectedSpec !== null && selectedSpec.packageInputPowerKw === null;
-  const missingAirflow = selectedSpec !== null && selectedSpec.ratedAirflowM3PerMin === null;
+  const missingPackage = effectivePackageInput(selectedSpec, sourceBacked).value === null;
+  const missingAirflow = effectiveRatedAirflow(selectedSpec, sourceBacked).value === null;
+  const missingPressure = effectiveRatedPressure(selectedSpec, sourceBacked).value === null;
 
   if (capturingSheet) {
     return (
@@ -125,22 +129,30 @@ export function SpecPicker({
           <p className="text-sm font-medium text-[#383838]">{formatted.title}</p>
           {formatted.detail && <p className="text-xs text-slate-600">{formatted.detail}</p>}
           {formatted.source && <p className="mt-1 text-xs text-slate-500">Source: {formatted.source}</p>}
-          {sourceBacked && (
+          {sourceBacked?.sourceFileId && (
             <p className="mt-1 text-xs text-slate-500">{LIBRARY_ADDED_STATUS}</p>
           )}
           <p className="mt-1 text-xs text-slate-500">{LIBRARY_USING_STATUS}</p>
         </div>
-        {(missingPackage || missingAirflow) && (
+        <dl className="mt-3 space-y-2">
+          <PublishedRatingFields
+            library={selectedSpec}
+            source={sourceBacked}
+            identity={{
+              manufacturer: selectedSpec.manufacturer,
+              model: selectedSpec.model,
+              modelVariant: selectedSpec.modelVariant,
+            }}
+            onSourceChange={onPatchSource}
+          />
+        </dl>
+        {(missingPackage || missingAirflow || missingPressure) && (
           <p className="mt-2 text-xs text-slate-600">
-            {missingPackage && (
-              <span className="block">Published package input not available in the library record.</span>
-            )}
-            {missingAirflow && (
-              <span className="block">Rated airflow not available in the library record.</span>
-            )}
-            <button type="button" className="mt-1 font-medium text-[#0969a9] underline" onClick={onCapture}>
-              Add from specification sheet
+            Enter the missing published ratings, or{' '}
+            <button type="button" className="font-medium text-[#0969a9] underline" onClick={onCapture}>
+              add from a specification sheet
             </button>
+            .
           </p>
         )}
         <button

@@ -7,6 +7,8 @@ import type { PublicMachineSpec } from './types.ts';
 export const NO_CUSTOMER_MESSAGE = 'Select a customer first.';
 export const NO_CUSTOMER_MACHINES_NOTICE =
   'No machines are recorded for this customer. Search the Machine Specification Library below.';
+export const NO_CUSTOMER_LIBRARY_NOTICE =
+  'Customer machines appear after you select a customer. Search the library, or add from a specification sheet.';
 export const NO_MATCH_MESSAGE = 'No matching machine found.';
 
 export function librarySpecHaystack(spec: PublicMachineSpec): string {
@@ -68,7 +70,33 @@ export function describeCurrentMachineDropdown(options: {
   excludeMachineIds?: readonly string[];
 }): CurrentMachineDropdownView {
   if (!options.customerId) {
-    return { kind: 'no-customer', message: NO_CUSTOMER_MESSAGE };
+    if (options.libraryLoading && options.query.trim() !== '' && options.librarySpecs.length === 0) {
+      return {
+        kind: 'loading',
+        message: 'Searching the Machine Specification Library…',
+      };
+    }
+    const grouped = groupCurrentMachineSearch({
+      ...options,
+      customerMachines: [],
+    });
+    if (grouped.library.length === 0 && options.query.trim() === '') {
+      return {
+        kind: 'results',
+        customer: [],
+        library: [],
+        customerNotice: NO_CUSTOMER_LIBRARY_NOTICE,
+      };
+    }
+    if (grouped.library.length === 0) {
+      return { kind: 'no-match', message: NO_MATCH_MESSAGE };
+    }
+    return {
+      kind: 'results',
+      customer: [],
+      library: grouped.library,
+      customerNotice: null,
+    };
   }
   if (
     options.loading &&

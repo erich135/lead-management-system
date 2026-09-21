@@ -53,7 +53,7 @@ test('current equipment uses one Current Machine search over customer records an
   assert.match(section, /getMachinesByCustomer/);
   assert.match(section, /searchSpecLibrary/);
   assert.match(section, /Current machine/);
-  assert.match(section, /Search make, model or serial/);
+  assert.match(section, /Search make, model, serial or library/);
   assert.match(section, /Customer machines/);
   assert.match(section, /Machine Specification Library/);
   assert.match(section, /Add from specification sheet/);

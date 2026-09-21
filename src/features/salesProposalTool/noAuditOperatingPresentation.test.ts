@@ -14,6 +14,7 @@ import {
 } from './customerProposalPresentation';
 import {
   ANNUAL_OPERATING_HOURS_HELPER,
+  AUDIT_ANNUAL_HOURS_HELPER,
   AUDIT_ELECTRICITY_BASIS_INFO,
   AVERAGE_LOAD_HELPER,
   buildOperatingAssumptions,
@@ -171,10 +172,13 @@ describe('no-Air-Audit operating assumptions presentation', () => {
       path.join(FEATURE_ROOT, 'components/OperatingAssumptionsSection.tsx'),
       'utf8',
     );
-    expect(section).toMatch(/if \(airAuditPresent\)/);
+    expect(section).toMatch(/Annual operating hours/);
+    expect(section).toMatch(/AUDIT_ANNUAL_HOURS_HELPER/);
     expect(section).toMatch(/AUDIT_ELECTRICITY_BASIS_INFO/);
+    expect(section).toMatch(/!airAuditPresent &&/);
     const helpers = readFileSync(path.join(FEATURE_ROOT, 'operatingAssumptions.ts'), 'utf8');
     expect(helpers).toContain(AUDIT_ELECTRICITY_BASIS_INFO);
+    expect(helpers).toContain(AUDIT_ANNUAL_HOURS_HELPER);
     expect(section).not.toMatch(/required/);
   });
 

@@ -228,6 +228,7 @@ export function applyLibrarySpec(
     selectedSpec: spec,
     changingSpec: false,
     capturingSheet: false,
+    sourceBacked: null,
   };
 }
 

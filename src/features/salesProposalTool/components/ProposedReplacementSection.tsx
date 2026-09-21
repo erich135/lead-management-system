@@ -67,6 +67,7 @@ export function ProposedReplacementSection({
             manufacturer: spec.manufacturer,
             model: spec.model,
             changingSpec: false,
+            sourceBacked: null,
             quantity: draft.quantity >= 1 ? draft.quantity : DEFAULT_PROPOSED_QUANTITY,
           })
         }
@@ -104,6 +105,12 @@ export function ProposedReplacementSection({
             capturingSheet: false,
             changingSpec: false,
             quantity: draft.quantity >= 1 ? draft.quantity : DEFAULT_PROPOSED_QUANTITY,
+          })
+        }
+        onPatchSource={(sourceBacked: SourceBackedSpec) =>
+          onChange({
+            ...draft,
+            sourceBacked,
           })
         }
       />

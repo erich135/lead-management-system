@@ -5,6 +5,8 @@ import {
   effectivePackageInput,
   effectiveRatedAirflow,
   packageInputUnavailableCopy,
+  parsePublishedRating,
+  patchSourceBackedRating,
 } from './specDisplay.ts';
 import type { PublicMachineSpec } from './types.ts';
 
@@ -53,4 +55,21 @@ test('source-backed overlay can fill a missing library value without inventing m
   });
   assert.equal(filled.value, 256);
   assert.equal(filled.origin, 'source');
+});
+
+test('typed proposal ratings fill missing library values without a specification-sheet file', () => {
+  const source = patchSourceBackedRating(
+    null,
+    { manufacturer: library.manufacturer, model: library.model },
+    'packageInputPowerKw',
+    '43.4',
+  );
+  assert.equal(source.sourceFileId, null);
+  assert.equal(source.sourceFileName, null);
+  assert.equal(source.manufacturer, 'Atlas Copco');
+  assert.equal(source.model, 'GA250');
+  assert.equal(effectivePackageInput(library, source).value, 43.4);
+  assert.equal(parsePublishedRating(''), null);
+  assert.equal(parsePublishedRating('0'), null);
+  assert.equal(parsePublishedRating('8.62'), 8.62);
 });

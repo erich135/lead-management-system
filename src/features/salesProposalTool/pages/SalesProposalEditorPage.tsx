@@ -440,6 +440,11 @@ export function SalesProposalEditorPage() {
               }
             />
           )}
+          <OperatingAssumptionsSection
+            value={operatingAssumptions}
+            airAuditPresent={Boolean(proposal.airAudit)}
+            onChange={setOperatingAssumptions}
+          />
           <CurrentEquipmentSection
             proposalId={proposal.id}
             customerId={customer?._id ?? null}
@@ -450,12 +455,6 @@ export function SalesProposalEditorPage() {
             proposalId={proposal.id}
             draft={proposed}
             onChange={setProposed}
-          />
-          <OperatingAssumptionsSection
-            key={proposal.airAudit?.sourceSha256 ?? 'no-air-audit'}
-            value={operatingAssumptions}
-            airAuditPresent={Boolean(proposal.airAudit)}
-            onChange={setOperatingAssumptions}
           />
           <ElectricityBasisSection value={electricityBasis} onChange={setElectricityBasis} />
           <CommercialOfferSection value={commercialOffer} onChange={setCommercialOffer} />

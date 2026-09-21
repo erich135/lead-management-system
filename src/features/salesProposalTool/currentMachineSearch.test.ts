@@ -178,15 +178,34 @@ test('empty register still offers the Machine Spec Library instead of a blank co
   assert.deepEqual(none, { kind: 'no-match', message: 'No matching machine found.' });
 });
 
-test('no customer selected shows a clear state', () => {
-  assert.deepEqual(
-    describeCurrentMachineDropdown({
-      customerId: null,
-      loading: false,
-      customerMachines: [],
-      librarySpecs: [],
-      query: 'Atlas',
-    }),
-    { kind: 'no-customer', message: 'Select a customer first.' },
-  );
+test('no customer still searches the Machine Spec Library and does not block the control', () => {
+  const empty = describeCurrentMachineDropdown({
+    customerId: null,
+    loading: false,
+    customerMachines: [],
+    librarySpecs: [],
+    query: '',
+  });
+  assert.equal(empty.kind, 'results');
+  if (empty.kind === 'results') {
+    assert.equal(empty.customer.length, 0);
+    assert.match(empty.customerNotice ?? '', /Search the library/);
+  }
+
+  const atlas = describeCurrentMachineDropdown({
+    customerId: null,
+    loading: false,
+    customerMachines: customerMachines,
+    librarySpecs: library,
+    query: 'Atlas',
+  });
+  assert.equal(atlas.kind, 'results');
+  if (atlas.kind === 'results') {
+    assert.equal(atlas.customer.length, 0);
+    assert.deepEqual(
+      atlas.library.map((spec) => spec.model),
+      ['GA18+ -125', 'G110-125'],
+    );
+    assert.equal(atlas.customerNotice, null);
+  }
 });

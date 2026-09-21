@@ -9,6 +9,9 @@ export const MAX_ANNUAL_OPERATING_HOURS = 8760;
 export const ANNUAL_OPERATING_HOURS_HELPER =
   'Estimated total compressor operating hours per year.';
 
+export const AUDIT_ANNUAL_HOURS_HELPER =
+  'Estimated total compressor operating hours per year. Used to scale the measured Air Audit period to a year.';
+
 export const AVERAGE_LOAD_HELPER =
   'Estimated average airflow demand as a percentage of the current installed capacity.';
 

@@ -14,6 +14,7 @@ import {
   toCurrentEquipmentPayload,
   toProposedEquipmentPayload,
 } from './equipmentState.ts';
+import { patchSourceBackedRating } from './specDisplay.ts';
 import { DEFAULT_PROPOSED_QUANTITY } from './types.ts';
 
 const machine = {
@@ -129,6 +130,65 @@ test('direct Machine Spec Library selection stores a null arsMachineId and optio
   assert.equal(payload[0].arsMachineId, null);
   assert.equal(payload[0].serialNumber, '1140347');
   assert.equal(payload[0].specLibraryRecordId, 'lib-ga18');
+});
+
+test('missing library ratings can be typed onto the proposal and persist without a spec-sheet file', () => {
+  const empty = {
+    key: 'x',
+    arsMachineId: null,
+    make: '',
+    model: '',
+    serialNumber: '',
+    specLibraryRecordId: null,
+    selectedSpec: null,
+    changingSpec: true,
+    sourceBacked: null,
+    capturingSheet: false,
+  };
+  const spec = {
+    recordId: 'lib-ga45',
+    manufacturer: 'Atlas Copco',
+    model: 'GA45 VSD-175',
+    modelVariant: null,
+    ratedPressureBarG: null,
+    ratedAirflowM3PerMin: null,
+    packageInputPowerKw: null,
+    motorShaftPowerKw: null,
+    controlType: null,
+    sourceTitle: 'CAGI directory',
+    sourceFileName: null,
+  };
+  const selected = applyLibrarySpec(empty, spec);
+  const withRatings = {
+    ...selected,
+    sourceBacked: patchSourceBackedRating(
+      patchSourceBackedRating(
+        patchSourceBackedRating(
+          selected.sourceBacked,
+          { manufacturer: spec.manufacturer, model: spec.model },
+          'ratedPressureBarG',
+          '12.07',
+        ),
+        { manufacturer: spec.manufacturer, model: spec.model },
+        'ratedAirflowM3PerMin',
+        '7.5',
+      ),
+      { manufacturer: spec.manufacturer, model: spec.model },
+      'packageInputPowerKw',
+      '52',
+    ),
+  };
+  const payload = toCurrentEquipmentPayload([withRatings]);
+  assert.equal(payload[0].sourceBacked?.ratedPressureBarG, 12.07);
+  assert.equal(payload[0].sourceBacked?.ratedAirflowM3PerMin, 7.5);
+  assert.equal(payload[0].sourceBacked?.packageInputPowerKw, 52);
+  assert.equal(payload[0].sourceBacked?.sourceFileId, null);
+  const otherSpec = applyLibrarySpec(withRatings, {
+    ...spec,
+    recordId: 'lib-other',
+    model: 'GA37+-125 (2020)',
+  });
+  assert.equal(otherSpec.sourceBacked, null);
 });
 
 test('existing ARS Machine with saved spec loads that specification without another picker', () => {

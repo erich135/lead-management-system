@@ -1,4 +1,5 @@
 import { formatMeasuredNumber } from './formatMeasured.ts';
+import { parseNonNegativeNumber } from './electricityBasis.ts';
 import type { PublicMachineSpec, SourceBackedSpec } from './types';
 
 export type ValueOrigin = 'library' | 'source' | 'missing';
@@ -98,6 +99,54 @@ export function hasUsableSourceBacked(source: SourceBackedSpec | null): boolean 
       source.packageInputPowerKw !== null ||
       source.motorShaftPowerKw !== null,
   );
+}
+
+export function emptySourceBackedSpec(): SourceBackedSpec {
+  return {
+    manufacturer: null,
+    model: null,
+    modelVariant: null,
+    ratedPressureBarG: null,
+    ratedAirflowM3PerMin: null,
+    packageInputPowerKw: null,
+    motorShaftPowerKw: null,
+    controlType: null,
+    sourceFileName: null,
+    sourceFileId: null,
+    sourceSha256: null,
+  };
+}
+
+export type SourceBackedRatingField =
+  | 'ratedPressureBarG'
+  | 'ratedAirflowM3PerMin'
+  | 'packageInputPowerKw'
+  | 'motorShaftPowerKw';
+
+export function parsePublishedRating(text: string): number | null {
+  const value = parseNonNegativeNumber(text);
+  if (value === null || value <= 0) return null;
+  return value;
+}
+
+export function patchSourceBackedRating(
+  source: SourceBackedSpec | null,
+  identity: {
+    manufacturer?: string | null;
+    model?: string | null;
+    modelVariant?: string | null;
+  },
+  field: SourceBackedRatingField,
+  text: string,
+): SourceBackedSpec {
+  const base = source ?? emptySourceBackedSpec();
+  return {
+    ...base,
+    manufacturer: base.manufacturer ?? identity.manufacturer ?? null,
+    model: base.model ?? identity.model ?? null,
+    modelVariant: base.modelVariant ?? identity.modelVariant ?? null,
+    [field]: parsePublishedRating(text),
+  };
 }
 
 export const PUBLISHED_PACKAGE_INPUT_LABEL = 'Published package input';

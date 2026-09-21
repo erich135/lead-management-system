@@ -10,7 +10,19 @@ import {
   StickyNote,
   X,
 } from 'lucide-react';
-import { createSalesRequest, listSalesRequests, submitSalesRequest, updateAppointment, updateSalesRequest, getPublishedPlannerForm, listPublishedPlannerForms, getSalesLead, getCustomers, getSalesLeads } from '../../lib/api';
+import {
+  createSalesRequest,
+  listSalesRequests,
+  submitSalesRequest,
+  updateAppointment,
+  updateSalesRequest,
+  getPublishedPlannerForm,
+  listPublishedPlannerForms,
+  getSalesLead,
+  getCustomers,
+  getSalesLeads,
+  geocodeReverse,
+} from '../../lib/api';
 import type { SalesRequest, SalesRequestType, PlannerFormPublished, PlannerFormField } from '../../lib/api';
 import type { PlannerAppointment } from './DiaryDayAppointmentCard';
 import { DiaryCompletedDot } from './DiaryCompletedDot';
@@ -73,7 +85,6 @@ import { stripHiddenRfcPlannerFields, deriveFieldsFromElements } from './formBui
 import { useAuth } from '../../contexts/AuthContext';
 import { SALES_REQUEST_PERMISSIONS } from '../../constants/salesRequestPermissions';
 import { useGeolocation } from '../../hooks/useGeolocation';
-import { reverseGeocode } from '../../utils/geocoding';
 import type { VisitGpsVerification } from '../../types';
 import { enqueueOfflineVisitSync } from '../../mobile-rep/useOfflineVisitSync';
 import VisitLocationPermissionModal from './VisitLocationPermissionModal';
@@ -1767,8 +1778,8 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
 
     let address: string | undefined;
     try {
-      const geo = await reverseGeocode(position.latitude, position.longitude);
-      address = geo?.displayName;
+      const geo = await geocodeReverse(position.latitude, position.longitude);
+      address = geo?.display_name;
     } catch {
       // Address is optional — coordinates alone satisfy verification.
     }

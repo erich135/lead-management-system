@@ -1,17 +1,25 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { Loader2, Search } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import {
+  geocodeAutocomplete,
   geocodeEnrich,
+  geocodePlaceDetails,
   geocodeSearch,
-  type GeoSearchResult,
+  type PlaceSuggestion,
   type SiteLocationEnrichmentResponse,
 } from '../../../lib/api';
 import type { SalesProposalSite } from '../types';
 import { formatAltitudeMetres, formatGps } from '../formatMeasured';
 import { SEARCH_MENU_PANEL, searchMenuWrapClass } from '../searchOverlay';
+import {
+  GOOGLE_LOOKUP_UNAVAILABLE,
+  isGoogleLookupUnavailableError,
+  pinFromPlaceDetails,
+  pinFromSearchResult,
+} from '../../../lib/googleAddressLookup';
 
 const DEFAULT_CENTER: [number, number] = [-26.2041, 28.0473];
 
@@ -86,9 +94,12 @@ interface SiteMapCaptureProps {
 
 export function SiteMapCapture({ site, onChange }: SiteMapCaptureProps) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<GeoSearchResult[]>([]);
+  const [results, setResults] = useState<PlaceSuggestion[]>([]);
   const [searching, setSearching] = useState(false);
   const [enriching, setEnriching] = useState(false);
+  const [lookupUnavailable, setLookupUnavailable] = useState(false);
+  const sessionTokenRef = useRef(crypto.randomUUID());
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selected = useMemo<[number, number] | null>(
     () =>
       site.latitude !== null && site.longitude !== null
@@ -119,14 +130,71 @@ export function SiteMapCapture({ site, onChange }: SiteMapCaptureProps) {
     [onChange],
   );
 
+  const loadSuggestions = useCallback(async (value: string) => {
+    if (value.trim().length < 3) {
+      setResults([]);
+      setLookupUnavailable(false);
+      return;
+    }
+    setSearching(true);
+    try {
+      const found = await geocodeAutocomplete(value.trim(), sessionTokenRef.current);
+      setLookupUnavailable(false);
+      setResults(found);
+    } catch (error) {
+      setResults([]);
+      setLookupUnavailable(isGoogleLookupUnavailableError(error));
+    } finally {
+      setSearching(false);
+    }
+  }, []);
+
+  function handleQueryChange(value: string) {
+    setQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      void loadSuggestions(value);
+    }, 300);
+  }
+
+  async function selectSuggestion(result: PlaceSuggestion) {
+    try {
+      const details = await geocodePlaceDetails(result.placeId, sessionTokenRef.current);
+      const pin = pinFromPlaceDetails(details);
+      sessionTokenRef.current = crypto.randomUUID();
+      if (!pin) return;
+      setResults([]);
+      setQuery(pin.address);
+      setLookupUnavailable(false);
+      void applyCoordinates(pin.latitude, pin.longitude);
+    } catch (error) {
+      setLookupUnavailable(isGoogleLookupUnavailableError(error));
+    }
+  }
+
   async function handleSearch() {
     if (query.trim().length < 3) return;
     setSearching(true);
     try {
-      const found = await geocodeSearch(query.trim(), 6);
-      setResults(found);
-    } catch {
+      const typed = query.trim();
+      const found = results.length > 0
+        ? results
+        : await geocodeAutocomplete(typed, sessionTokenRef.current);
+      if (found.length > 0) {
+        await selectSuggestion(found[0]);
+        return;
+      }
+      const geocoded = await geocodeSearch(typed, 1);
+      const pin = pinFromSearchResult(geocoded[0]);
+      if (pin) {
+        setQuery(pin.address);
+        setLookupUnavailable(false);
+        void applyCoordinates(pin.latitude, pin.longitude);
+      }
       setResults([]);
+    } catch (error) {
+      setResults([]);
+      setLookupUnavailable(isGoogleLookupUnavailableError(error));
     } finally {
       setSearching(false);
     }
@@ -147,7 +215,7 @@ export function SiteMapCapture({ site, onChange }: SiteMapCaptureProps) {
           <input
             type="search"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => handleQueryChange(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
                 event.preventDefault();
@@ -160,19 +228,16 @@ export function SiteMapCapture({ site, onChange }: SiteMapCaptureProps) {
           {results.length > 0 && (
             <ul className={SEARCH_MENU_PANEL}>
               {results.map((result) => (
-                <li key={`${result.lat}-${result.lon}-${result.display_name}`}>
+                <li key={result.placeId}>
                   <button
                     type="button"
                     className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
-                    onClick={() => {
-                      const latitude = Number(result.lat);
-                      const longitude = Number(result.lon);
-                      setResults([]);
-                      setQuery(result.display_name);
-                      void applyCoordinates(latitude, longitude);
-                    }}
+                    onClick={() => void selectSuggestion(result)}
                   >
-                    {result.display_name}
+                    <span className="block">{result.displayName}</span>
+                    {result.secondaryText ? (
+                      <span className="block text-xs text-slate-500">{result.secondaryText}</span>
+                    ) : null}
                   </button>
                 </li>
               ))}
@@ -188,6 +253,9 @@ export function SiteMapCapture({ site, onChange }: SiteMapCaptureProps) {
           {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}
         </button>
       </div>
+      {lookupUnavailable ? (
+        <p className="text-xs text-amber-700">{GOOGLE_LOOKUP_UNAVAILABLE}. You can still click the map or type the site details.</p>
+      ) : null}
       <div className="h-64 overflow-hidden rounded-[8px] border border-slate-200">
         <MapContainer
           key="spt-site-map"

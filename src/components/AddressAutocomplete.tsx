@@ -2,6 +2,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { MapPin, Loader2, X, Search, Navigation } from 'lucide-react';
 import { MapPinSelector } from './MapPinSelector';
 import { geocodeAutocomplete, geocodePlaceDetails, type PlaceSuggestion } from '../lib/api';
+import {
+  GOOGLE_LOOKUP_UNAVAILABLE,
+  isGoogleLookupUnavailableError,
+  pinFromPlaceDetails,
+} from '../lib/googleAddressLookup';
 
 interface AddressAutocompleteProps {
   value: string;
@@ -32,11 +37,11 @@ export function AddressAutocomplete({
   const [showMapPicker, setShowMapPicker] = useState(false);
   const [currentCoords, setCurrentCoords] = useState<[number, number] | null>(coordinates);
   const [manualHint, setManualHint] = useState(false);
+  const [lookupUnavailable, setLookupUnavailable] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionTokenRef = useRef<string>(crypto.randomUUID());
 
-  // Sync external value changes (e.g., editing an existing lead)
   useEffect(() => {
     setQuery(value);
     if (value) {
@@ -48,7 +53,6 @@ export function AddressAutocomplete({
     setCurrentCoords(coordinates ?? null);
   }, [coordinates]);
 
-  // Close dropdown on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -63,19 +67,28 @@ export function AddressAutocomplete({
     if (searchQuery.length < 3) {
       setResults([]);
       setShowDropdown(false);
+      setLookupUnavailable(false);
+      setManualHint(false);
       return;
     }
 
     setIsLoading(true);
     try {
       const data = await geocodeAutocomplete(searchQuery, sessionTokenRef.current);
+      setLookupUnavailable(false);
       setResults(data);
       setShowDropdown(data.length > 0);
-      setManualHint(data.length === 0 && searchQuery.length >= 3);
-    } catch (err: any) {
-      console.error('Address search error:', err);
+      setManualHint(data.length === 0);
+    } catch (err: unknown) {
       setResults([]);
-      setManualHint(true);
+      setShowDropdown(false);
+      if (isGoogleLookupUnavailableError(err)) {
+        setLookupUnavailable(true);
+        setManualHint(false);
+      } else {
+        setLookupUnavailable(false);
+        setManualHint(true);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -84,10 +97,8 @@ export function AddressAutocomplete({
   function handleInputChange(newValue: string) {
     setQuery(newValue);
     setSelectedAddress(null);
-    // Let parent know the text changed (without coordinates yet)
     onChange(newValue, undefined);
 
-    // Debounce Google Places suggestions
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
@@ -99,22 +110,27 @@ export function AddressAutocomplete({
   async function handleSelect(result: PlaceSuggestion) {
     try {
       const details = await geocodePlaceDetails(result.placeId, sessionTokenRef.current);
-      const address = details?.displayName || result.displayName;
-      const nextCoords: [number, number] | undefined =
-        details?.lon && details?.lat
-          ? [parseFloat(details.lon), parseFloat(details.lat)]
-          : undefined;
+      const pin = pinFromPlaceDetails(details);
+      const address = pin?.address || result.displayName;
+      const nextCoords: [number, number] | undefined = pin
+        ? [pin.longitude, pin.latitude]
+        : undefined;
 
       setQuery(address);
       setSelectedAddress(nextCoords ? address : null);
       setShowDropdown(false);
       setResults([]);
       setManualHint(false);
+      setLookupUnavailable(false);
       if (nextCoords) {
         setCurrentCoords(nextCoords);
         onChange(address, nextCoords);
       } else {
         onChange(address, undefined);
+      }
+    } catch (err: unknown) {
+      if (isGoogleLookupUnavailableError(err)) {
+        setLookupUnavailable(true);
       }
     } finally {
       sessionTokenRef.current = crypto.randomUUID();
@@ -122,7 +138,6 @@ export function AddressAutocomplete({
   }
 
   function handleMapConfirm(address: string, coordinates: [number, number]) {
-    // coordinates come in GeoJSON order [lon, lat] — convert to [lat, lng] for map state
     setQuery(address);
     setSelectedAddress(address);
     setCurrentCoords(coordinates);
@@ -137,6 +152,7 @@ export function AddressAutocomplete({
     setShowDropdown(false);
     setCurrentCoords(null);
     setManualHint(false);
+    setLookupUnavailable(false);
     sessionTokenRef.current = crypto.randomUUID();
     onChange('', undefined);
   }
@@ -186,7 +202,6 @@ export function AddressAutocomplete({
         </button>
       </div>
 
-      {/* Selected address indicator */}
       {selectedAddress && (
         <div className="mt-1 flex items-center gap-1 text-xs text-green-600">
           <MapPin className="h-3 w-3" />
@@ -194,13 +209,18 @@ export function AddressAutocomplete({
         </div>
       )}
 
-      {manualHint && query.length >= 3 && !showDropdown && (
+      {lookupUnavailable && query.length >= 3 && (
+        <p className="mt-1 text-xs text-amber-700">
+          {GOOGLE_LOOKUP_UNAVAILABLE}. Type the address or pin it on the map.
+        </p>
+      )}
+
+      {manualHint && query.length >= 3 && !showDropdown && !lookupUnavailable && (
         <p className="mt-1 text-xs text-gray-500">
           No address suggestions available. Keep typing the address or pin it on the map.
         </p>
       )}
 
-      {/* Dropdown results */}
       {showDropdown && (
         <div className="absolute z-[9999] w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
           {results.map((result) => (
@@ -226,12 +246,11 @@ export function AddressAutocomplete({
         </div>
       )}
 
-      {/* Map Pin Picker Modal */}
       {showMapPicker && (
         <MapPinSelector
           initialPosition={
             currentCoords
-              ? [currentCoords[1], currentCoords[0]] // Convert GeoJSON [lon,lat] to Leaflet [lat,lng]
+              ? [currentCoords[1], currentCoords[0]]
               : undefined
           }
           onConfirm={handleMapConfirm}

@@ -14,10 +14,16 @@ import { Loader2, MapPin, Search } from 'lucide-react';
 import type { AuditIntakeDocument, IntakeAnswer } from '../../auditIntakeTypes';
 import { readAnswerAtPath } from '../../auditIntakeState';
 import {
+  geocodeAutocomplete,
   geocodeEnrich,
-  geocodeSearch,
-  type GeoSearchResult,
+  geocodePlaceDetails,
+  type PlaceSuggestion,
 } from '../../../../lib/api';
+import {
+  GOOGLE_LOOKUP_UNAVAILABLE,
+  isGoogleLookupUnavailableError,
+  pinFromPlaceDetails,
+} from '../../../../lib/googleAddressLookup';
 import {
   altitudeCaption,
   formatGpsReference,
@@ -140,7 +146,9 @@ export function SiteLocationCapture({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
-  const [candidates, setCandidates] = useState<GeoSearchResult[]>([]);
+  const [candidates, setCandidates] = useState<PlaceSuggestion[]>([]);
+  const [lookupUnavailable, setLookupUnavailable] = useState(false);
+  const sessionTokenRef = useRef(crypto.randomUUID());
   const [enriching, setEnriching] = useState(false);
   const [geocodeFailed, setGeocodeFailed] = useState(false);
   const [elevationFailed, setElevationFailed] = useState(false);
@@ -274,14 +282,21 @@ export function SiteLocationCapture({
     const query = searchQuery.trim();
     if (query.length < 3) {
       setCandidates([]);
+      setLookupUnavailable(false);
       setSearching(false);
       return;
     }
     setSearching(true);
     searchTimer.current = setTimeout(() => {
-      void geocodeSearch(query, 6)
-        .then(results => setCandidates(results))
-        .catch(() => setCandidates([]))
+      void geocodeAutocomplete(query, sessionTokenRef.current)
+        .then(results => {
+          setLookupUnavailable(false);
+          setCandidates(results);
+        })
+        .catch(error => {
+          setCandidates([]);
+          setLookupUnavailable(isGoogleLookupUnavailableError(error));
+        })
         .finally(() => setSearching(false));
     }, 400);
     return () => {
@@ -299,13 +314,20 @@ export function SiteLocationCapture({
     void applyEnrichment({ latitude, longitude }, gpsSource, { fly });
   }
 
-  function selectCandidate(result: GeoSearchResult) {
-    const latitude = parseFloat(result.lat);
-    const longitude = parseFloat(result.lon);
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
-    setSearchQuery(result.display_name);
-    setCandidates([]);
-    pickCoordinates(latitude, longitude, 'map_lookup', true);
+  function selectCandidate(result: PlaceSuggestion) {
+    void geocodePlaceDetails(result.placeId, sessionTokenRef.current)
+      .then(details => {
+        const pin = pinFromPlaceDetails(details);
+        sessionTokenRef.current = crypto.randomUUID();
+        if (!pin) return;
+        setSearchQuery(pin.address);
+        setCandidates([]);
+        setLookupUnavailable(false);
+        pickCoordinates(pin.latitude, pin.longitude, 'map_lookup', true);
+      })
+      .catch(error => {
+        setLookupUnavailable(isGoogleLookupUnavailableError(error));
+      });
   }
 
   function applyManualGps() {
@@ -394,14 +416,17 @@ export function SiteLocationCapture({
             className="absolute z-[1000] mt-1 max-h-48 w-full overflow-auto rounded-md border border-slate-200 bg-white text-sm shadow-md"
           >
             {candidates.map(result => (
-              <li key={`${result.place_id}-${result.lat}-${result.lon}`}>
+              <li key={result.placeId}>
                 <button
                   type="button"
                   disabled={disabled}
                   onClick={() => selectCandidate(result)}
                   className="w-full px-3 py-2 text-left hover:bg-slate-50"
                 >
-                  {result.display_name}
+                  <span className="block">{result.displayName}</span>
+                  {result.secondaryText ? (
+                    <span className="block text-[11px] text-slate-500">{result.secondaryText}</span>
+                  ) : null}
                 </button>
               </li>
             ))}
@@ -481,6 +506,11 @@ export function SiteLocationCapture({
           <span className="font-medium text-slate-500">Province: </span>
           {lookedUpPlace?.province || 'Not identified'}
         </p>
+        {lookupUnavailable ? (
+          <p className="text-[11px] text-amber-700">
+            {GOOGLE_LOOKUP_UNAVAILABLE}. Coordinates can still be pinned. Type the address below.
+          </p>
+        ) : null}
         {geocodeFailed ? (
           <p className="text-[11px] text-amber-700">
             Address lookup did not return a result. Coordinates are kept. You can

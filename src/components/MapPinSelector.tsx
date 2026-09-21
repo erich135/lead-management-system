@@ -2,10 +2,25 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { X, Check, Loader2, LocateFixed, Search } from 'lucide-react';
-import { geocodeSearch, geocodeReverse } from '../lib/api';
+import { X, Check, Loader2, LocateFixed, Search, MapPin } from 'lucide-react';
+import {
+  geocodeAutocomplete,
+  geocodePlaceDetails,
+  geocodeReverse,
+  geocodeSearch,
+  type PlaceSuggestion,
+} from '../lib/api';
+import {
+  canConfirmMapPin,
+  confirmedPinAddress,
+  GOOGLE_LOOKUP_UNAVAILABLE,
+  isGoogleLookupUnavailableError,
+  pinFromPlaceDetails,
+  pinFromReverse,
+  pinFromSearchResult,
+  STREET_MAP_ZOOM,
+} from '../lib/googleAddressLookup';
 
-// Fix Leaflet default marker icons
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -18,7 +33,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-// Red pin icon for selected location
 const pinIcon = L.divIcon({
   className: 'custom-pin-marker',
   html: `<div style="
@@ -36,12 +50,11 @@ const pinIcon = L.divIcon({
 });
 
 interface MapPinSelectorProps {
-  initialPosition?: [number, number]; // [lat, lng]
+  initialPosition?: [number, number];
   onConfirm: (address: string, coordinates: [number, number]) => void;
   onClose: () => void;
 }
 
-// Component to handle map click events
 function MapClickHandler({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) {
   useMapEvents({
     click(e) {
@@ -51,18 +64,15 @@ function MapClickHandler({ onMapClick }: { onMapClick: (lat: number, lng: number
   return null;
 }
 
-// Invalidate map size when rendered in a modal (fixes blank tiles)
 function InvalidateSize() {
   const map = useMap();
   useEffect(() => {
-    // Force multiple invalidations and also use ResizeObserver
     const timers = [0, 100, 300, 500, 1000].map((delay) =>
       setTimeout(() => {
         map.invalidateSize({ animate: false });
       }, delay),
     );
 
-    // Also observe container resize
     const container = map.getContainer();
     let observer: ResizeObserver | null = null;
     if (container && typeof ResizeObserver !== 'undefined') {
@@ -80,37 +90,55 @@ function InvalidateSize() {
   return null;
 }
 
-// Component to recenter map
-function RecenterMap({ position }: { position: [number, number] }) {
+function RecenterMap({ position, zoom }: { position: [number, number]; zoom: number }) {
   const map = useMap();
   useEffect(() => {
-    map.flyTo(position, map.getZoom(), { duration: 0.5 });
-  }, [position, map]);
+    map.flyTo(position, zoom, { duration: 0.5 });
+  }, [position, zoom, map]);
   return null;
 }
 
 export function MapPinSelector({ initialPosition, onConfirm, onClose }: MapPinSelectorProps) {
-  // Default center: South Africa (Johannesburg area)
   const defaultCenter: [number, number] = initialPosition || [-26.2041, 28.0473];
   const [pinPosition, setPinPosition] = useState<[number, number] | null>(initialPosition || null);
-  const [address, setAddress] = useState('');
+  const [googleAddress, setGoogleAddress] = useState<string | null>(null);
   const [isReversing, setIsReversing] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [mapCenter, setMapCenter] = useState<[number, number]>(defaultCenter);
+  const [mapZoom, setMapZoom] = useState(initialPosition ? 15 : 6);
   const [searchQuery, setSearchQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [lookupUnavailable, setLookupUnavailable] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const [mapReady, setMapReady] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionTokenRef = useRef<string>(crypto.randomUUID());
 
-  // Reverse geocode a position to get an address
-  const reverseGeocode = useCallback(async (lat: number, lng: number) => {
+  const applyPin = useCallback((latitude: number, longitude: number, address: string | null) => {
+    setPinPosition([latitude, longitude]);
+    setMapCenter([latitude, longitude]);
+    setMapZoom(STREET_MAP_ZOOM);
+    setGoogleAddress(address);
+  }, []);
+
+  const reverseGeocodePosition = useCallback(async (lat: number, lng: number) => {
     setIsReversing(true);
+    setGoogleAddress(null);
     try {
       const data = await geocodeReverse(lat, lng);
-      setAddress(data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+      const pin = pinFromReverse(data);
+      if (pin) {
+        setGoogleAddress(pin.address);
+        setLookupUnavailable(false);
+      } else {
+        setGoogleAddress(null);
+      }
     } catch (err) {
-      console.error('Reverse geocode error:', err);
-      setAddress(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+      setGoogleAddress(null);
+      if (isGoogleLookupUnavailableError(err)) {
+        setLookupUnavailable(true);
+      }
     } finally {
       setIsReversing(false);
     }
@@ -118,12 +146,19 @@ export function MapPinSelector({ initialPosition, onConfirm, onClose }: MapPinSe
 
   function handleMapClick(lat: number, lng: number) {
     setPinPosition([lat, lng]);
-    reverseGeocode(lat, lng);
+    setMapCenter([lat, lng]);
+    reverseGeocodePosition(lat, lng);
   }
 
   function handleConfirm() {
     if (!pinPosition) return;
-    // Coordinates in GeoJSON order: [longitude, latitude]
+    if (!canConfirmMapPin({
+      pin: pinPosition,
+      reversing: isReversing,
+      googleAddress,
+      typedAddress: searchQuery,
+    })) return;
+    const address = confirmedPinAddress(googleAddress, searchQuery);
     const geoCoords: [number, number] = [pinPosition[1], pinPosition[0]];
     onConfirm(address, geoCoords);
   }
@@ -137,44 +172,112 @@ export function MapPinSelector({ initialPosition, onConfirm, onClose }: MapPinSe
         const lng = pos.coords.longitude;
         setPinPosition([lat, lng]);
         setMapCenter([lat, lng]);
-        reverseGeocode(lat, lng);
+        setMapZoom(STREET_MAP_ZOOM);
+        reverseGeocodePosition(lat, lng);
         setIsLocating(false);
       },
-      (err) => {
-        console.error('Geolocation error:', err);
+      () => {
         setIsLocating(false);
       },
       { enableHighAccuracy: true, timeout: 10000 },
     );
   }
 
+  const loadSuggestions = useCallback(async (query: string) => {
+    if (query.trim().length < 3) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const data = await geocodeAutocomplete(query.trim(), sessionTokenRef.current);
+      setLookupUnavailable(false);
+      setSuggestions(data);
+      setShowSuggestions(data.length > 0);
+    } catch (err) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      if (isGoogleLookupUnavailableError(err)) {
+        setLookupUnavailable(true);
+      }
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  function handleSearchQueryChange(value: string) {
+    setSearchQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      void loadSuggestions(value);
+    }, 300);
+  }
+
+  async function applySuggestion(result: PlaceSuggestion) {
+    try {
+      const details = await geocodePlaceDetails(result.placeId, sessionTokenRef.current);
+      const pin = pinFromPlaceDetails(details);
+      if (!pin) return;
+      applyPin(pin.latitude, pin.longitude, pin.address);
+      setSearchQuery(pin.address);
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setLookupUnavailable(false);
+    } catch (err) {
+      if (isGoogleLookupUnavailableError(err)) {
+        setLookupUnavailable(true);
+      }
+    } finally {
+      sessionTokenRef.current = crypto.randomUUID();
+    }
+  }
+
   async function handleSearch() {
     if (!searchQuery.trim() || searchQuery.length < 3) return;
     setIsSearching(true);
     try {
-      const data = await geocodeSearch(searchQuery, 1);
-      if (data.length > 0) {
-        const lat = parseFloat(data[0].lat);
-        const lng = parseFloat(data[0].lon);
-        setPinPosition([lat, lng]);
-        setMapCenter([lat, lng]);
-        setAddress(data[0].display_name);
+      const typed = searchQuery.trim();
+      const auto = suggestions.length > 0
+        ? suggestions
+        : await geocodeAutocomplete(typed, sessionTokenRef.current);
+      if (auto.length > 0) {
+        await applySuggestion(auto[0]);
+        return;
       }
+      const data = await geocodeSearch(typed, 1);
+      const pin = pinFromSearchResult(data[0]);
+      if (pin) {
+        applyPin(pin.latitude, pin.longitude, pin.address);
+        setSearchQuery(pin.address);
+        setLookupUnavailable(false);
+      }
+      setSuggestions([]);
+      setShowSuggestions(false);
+      sessionTokenRef.current = crypto.randomUUID();
     } catch (err) {
-      console.error('Map search error:', err);
+      if (isGoogleLookupUnavailableError(err)) {
+        setLookupUnavailable(true);
+      }
     } finally {
       setIsSearching(false);
     }
   }
 
+  const confirmEnabled = canConfirmMapPin({
+    pin: pinPosition,
+    reversing: isReversing,
+    googleAddress,
+    typedAddress: searchQuery,
+  });
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[9999] p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
-        {/* Header */}
         <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
           <div>
             <h3 className="text-lg font-bold text-gray-900">Pin on Map</h3>
-            <p className="text-sm text-gray-500 mt-0.5">Click on the map to place a pin, or use the search bar</p>
+            <p className="text-sm text-gray-500 mt-0.5">Search, use My Location, or click the map to place a pin</p>
           </div>
           <button
             type="button"
@@ -185,22 +288,42 @@ export function MapPinSelector({ initialPosition, onConfirm, onClose }: MapPinSe
           </button>
         </div>
 
-        {/* Search bar + locate */}
-        <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+        <div className="px-5 py-3 border-b border-gray-100 flex items-start gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchQueryChange(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleSearch())}
-              placeholder="Search for an area, city, or landmark..."
+              placeholder="Search for an address..."
               className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ars-primary focus:border-transparent"
             />
+            {showSuggestions && suggestions.length > 0 && (
+              <ul className="absolute z-[1000] mt-1 max-h-56 w-full overflow-auto rounded-lg border border-gray-200 bg-white text-sm shadow-lg">
+                {suggestions.map((result) => (
+                  <li key={result.placeId}>
+                    <button
+                      type="button"
+                      className="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-blue-50"
+                      onClick={() => void applySuggestion(result)}
+                    >
+                      <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+                      <span>
+                        <span className="block font-medium text-gray-900">{result.displayName}</span>
+                        {result.secondaryText ? (
+                          <span className="block text-xs text-gray-500">{result.secondaryText}</span>
+                        ) : null}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           <button
             type="button"
-            onClick={handleSearch}
+            onClick={() => void handleSearch()}
             disabled={isSearching}
             className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
           >
@@ -222,7 +345,6 @@ export function MapPinSelector({ initialPosition, onConfirm, onClose }: MapPinSe
           </button>
         </div>
 
-        {/* Map */}
         <div
           ref={mapContainerRef}
           className="relative"
@@ -232,21 +354,19 @@ export function MapPinSelector({ initialPosition, onConfirm, onClose }: MapPinSe
             center={defaultCenter}
             zoom={initialPosition ? 15 : 6}
             style={{ height: '100%', width: '100%', position: 'absolute', top: 0, left: 0 }}
-            whenReady={() => setMapReady(true)}
           >
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             <MapClickHandler onMapClick={handleMapClick} />
-            <RecenterMap position={mapCenter} />
+            <RecenterMap position={mapCenter} zoom={mapZoom} />
             <InvalidateSize />
             {pinPosition && (
               <Marker position={pinPosition} icon={pinIcon} />
             )}
           </MapContainer>
 
-          {/* Crosshair hint when no pin */}
           {!pinPosition && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black bg-opacity-70 text-white text-sm px-4 py-2 rounded-full pointer-events-none z-[1000]">
               Click anywhere on the map to drop a pin
@@ -254,8 +374,12 @@ export function MapPinSelector({ initialPosition, onConfirm, onClose }: MapPinSe
           )}
         </div>
 
-        {/* Footer with address and confirm */}
         <div className="px-5 py-4 border-t border-gray-200 bg-gray-50">
+          {lookupUnavailable && (
+            <p className="mb-3 text-sm text-amber-700">
+              {GOOGLE_LOOKUP_UNAVAILABLE}. You can still drop a pin and type the address.
+            </p>
+          )}
           {pinPosition ? (
             <div className="flex items-start gap-3">
               <div className="flex-1 min-w-0">
@@ -268,7 +392,9 @@ export function MapPinSelector({ initialPosition, onConfirm, onClose }: MapPinSe
                     Looking up address...
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-800 leading-snug">{address}</p>
+                  <p className="text-sm text-gray-800 leading-snug">
+                    {googleAddress || (searchQuery.trim().length >= 3 ? searchQuery.trim() : 'Address not confirmed yet')}
+                  </p>
                 )}
                 <p className="text-xs text-gray-400 mt-1">
                   {pinPosition[0].toFixed(6)}, {pinPosition[1].toFixed(6)}
@@ -277,7 +403,7 @@ export function MapPinSelector({ initialPosition, onConfirm, onClose }: MapPinSe
               <button
                 type="button"
                 onClick={handleConfirm}
-                disabled={isReversing}
+                disabled={!confirmEnabled}
                 className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-50 flex items-center gap-2 flex-shrink-0"
               >
                 <Check className="h-4 w-4" />
@@ -286,7 +412,7 @@ export function MapPinSelector({ initialPosition, onConfirm, onClose }: MapPinSe
             </div>
           ) : (
             <p className="text-sm text-gray-500 text-center">
-              No location selected. Click on the map to pin a location.
+              No location selected. Search or click on the map to pin a location.
             </p>
           )}
         </div>

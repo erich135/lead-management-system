@@ -1,8 +1,9 @@
 /**
- * Frontend Geocoding Utility
- * Uses OpenStreetMap Nominatim for address-to-coordinates conversion.
- * Rate limit: 1 request/second.
+ * Frontend geocoding helpers. Address lookup goes through the backend Google
+ * proxy; this file keeps local distance and coordinate conversion utilities.
  */
+
+import { geocodeReverse, geocodeSearch } from '../lib/api';
 
 export interface GeocodingResult {
   latitude: number;
@@ -10,74 +11,41 @@ export interface GeocodingResult {
   displayName: string;
 }
 
-let lastRequestTime = 0;
-const MIN_REQUEST_INTERVAL = 1100;
-
-async function rateLimitedFetch(url: string): Promise<Response> {
-  const now = Date.now();
-  const timeSinceLastRequest = now - lastRequestTime;
-
-  if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
-    await new Promise((resolve) =>
-      setTimeout(resolve, MIN_REQUEST_INTERVAL - timeSinceLastRequest)
-    );
-  }
-
-  lastRequestTime = Date.now();
-  return fetch(url, {
-    headers: { 'User-Agent': 'ARS-Lead-Management/1.0' },
-  });
-}
-
-/**
- * Geocode an address to coordinates.
- */
 export async function geocodeAddress(
   address: string,
-  countryCodes: string = 'za'
 ): Promise<GeocodingResult | null> {
   try {
-    const encoded = encodeURIComponent(address);
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encoded}&countrycodes=${countryCodes}&limit=1`;
-
-    const response = await rateLimitedFetch(url);
-    if (!response.ok) return null;
-
-    const results = await response.json();
-    if (results.length === 0) return null;
-
+    const results = await geocodeSearch(address, 1);
+    if (!results.length) return null;
+    const latitude = parseFloat(results[0].lat);
+    const longitude = parseFloat(results[0].lon);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
     return {
-      latitude: parseFloat(results[0].lat),
-      longitude: parseFloat(results[0].lon),
+      latitude,
+      longitude,
       displayName: results[0].display_name,
     };
-  } catch (error) {
-    console.error('Geocoding error:', error);
+  } catch {
     return null;
   }
 }
 
-/**
- * Reverse geocode coordinates to an address.
- */
 export async function reverseGeocode(
   latitude: number,
-  longitude: number
+  longitude: number,
 ): Promise<GeocodingResult | null> {
   try {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`;
-    
-    const response = await rateLimitedFetch(url);
-    if (!response.ok) return null;
-
-    const result = await response.json();
+    const result = await geocodeReverse(latitude, longitude);
+    if (!result?.display_name) return null;
+    const parsedLat = parseFloat(result.lat);
+    const parsedLon = parseFloat(result.lon);
+    if (!Number.isFinite(parsedLat) || !Number.isFinite(parsedLon)) return null;
     return {
-      latitude: parseFloat(result.lat),
-      longitude: parseFloat(result.lon),
+      latitude: parsedLat,
+      longitude: parsedLon,
       displayName: result.display_name,
     };
-  } catch (error) {
-    console.error('Reverse geocoding error:', error);
+  } catch {
     return null;
   }
 }

@@ -5744,17 +5744,19 @@ export default {
   getDailyOverlaps,
   apiRequest,
   // Geocoding proxy
+  geocodeAutocomplete,
+  geocodePlaceDetails,
   geocodeSearch,
   geocodeReverse,
   geocodeEnrich,
 };
 
 // ============================================================
-// Geocode Proxy (avoids browser CORS issues with Nominatim)
+// Geocode Proxy (Google Places + Geocoding via backend)
 // ============================================================
 
 export interface GeoSearchResult {
-  place_id: number;
+  place_id: string | number;
   display_name: string;
   lat: string;
   lon: string;
@@ -5780,7 +5782,7 @@ export interface PlaceSuggestion {
 }
 
 /**
- * Google Places type-ahead via backend proxy. Empty when no key is configured.
+ * Google Places type-ahead via backend proxy.
  */
 export async function geocodeAutocomplete(query: string, sessionToken: string): Promise<PlaceSuggestion[]> {
   const params = new URLSearchParams({ q: query, sessionToken });
@@ -5802,21 +5804,21 @@ export async function geocodePlaceDetails(placeId: string, sessionToken: string)
 }
 
 /**
- * Search for addresses via backend proxy.
+ * Search for addresses via Google Geocoding on the backend.
  */
 export async function geocodeSearch(query: string, limit = 6): Promise<GeoSearchResult[]> {
   const params = new URLSearchParams({ q: query, limit: limit.toString(), countrycodes: 'za' });
   const response = await apiRequest<GeoSearchResult[]>(`/api/geocode/search?${params}`, { method: 'GET' });
-  return response;
+  return response || [];
 }
 
 /**
- * Reverse geocode coordinates via backend proxy.
+ * Reverse geocode coordinates via Google Geocoding on the backend.
+ * Returns null when Google finds no address. Throws when Google lookup is unavailable.
  */
-export async function geocodeReverse(lat: number, lon: number): Promise<{ display_name: string; lat: string; lon: string; address?: any }> {
+export async function geocodeReverse(lat: number, lon: number): Promise<{ display_name: string; lat: string; lon: string; address?: any } | null> {
   const params = new URLSearchParams({ lat: lat.toString(), lon: lon.toString() });
-  const response = await apiRequest<{ display_name: string; lat: string; lon: string; address?: any }>(`/api/geocode/reverse?${params}`, { method: 'GET' });
-  return response;
+  return apiRequest<{ display_name: string; lat: string; lon: string; address?: any } | null>(`/api/geocode/reverse?${params}`, { method: 'GET' });
 }
 
 export interface SiteLocationEnrichmentResponse {

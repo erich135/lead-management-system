@@ -39,7 +39,8 @@ const SalesLeadsContainer: React.FC<SalesLeadsContainerProps> = ({ branches, rep
   const canViewRequests =
     !isSuperAdmin &&
     (hasPermission(SALES_REQUEST_PERMISSIONS.READ) ||
-      hasPermission(SALES_REQUEST_PERMISSIONS.CREATE));
+      hasPermission(SALES_REQUEST_PERMISSIONS.CREATE) ||
+      hasPermission(SALES_REQUEST_PERMISSIONS.VIEW_ALL));
   const [activeTab, setActiveTab] = useState<SalesLeadTab>('management');
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [selectedLead, setSelectedLead] = useState<SalesLead | null>(null);

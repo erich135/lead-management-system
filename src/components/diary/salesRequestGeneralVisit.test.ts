@@ -6,7 +6,7 @@ import {
   getSalesRequestOutcomeLabel,
   isAcceptedWithoutJob,
 } from '../../constants/salesRequestPermissions.ts';
-import { validateSalesRequestForm } from '../../utils/salesRequestValidation.ts';
+import { isDynamicPlannerFormData, validateSalesRequestForm } from '../../utils/salesRequestValidation.ts';
 
 test('Accept without creating a job is visible only for pending General Visit', () => {
   assert.equal(
@@ -45,14 +45,16 @@ test('history outcomes distinguish approved job, accepted no job, and rejected',
 });
 
 test('General Visit required-field validation uses the published schema', () => {
-  const missing = validateSalesRequestForm('general_visit', {
+  const payload = {
     formTemplateType: 'general_visit_site_check',
     formTemplateName: 'Site Check',
     formSchemaSnapshot: {
       fields: [{ id: 'fld_a', label: 'Plant number', required: true, enabled: true }],
     },
     values: { fld_a: '' },
-  });
+  };
+  assert.equal(isDynamicPlannerFormData(payload), true);
+  const missing = validateSalesRequestForm('general_visit', payload);
   assert.equal(missing.valid, false);
   assert.ok(missing.missingFields.includes('Plant number'));
 

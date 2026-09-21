@@ -1,3 +1,16 @@
+## Production branch policy — confirmed 21 September 2026
+
+- Frontend production uses `main` only.
+- Backend production uses `master` only.
+- Merge and test development work on those branches before deployment.
+- Server checkouts must remain on these named branches, never detached HEAD.
+- Verify server HEAD equals the corresponding published production commit.
+- Preserve other developers' changes and stashes. Never force-push production.
+- Cape Town SSH uses `ARS-CapeTown-2026.pem`, never `arsapp.pem`.
+
+This policy supersedes older branch and SSH-key references below. Historical
+release and reconciliation branches are not current production sources.
+
 # ARS App AI Instructions
 
 This is a production application used by Air Rotory Services staff and technicians.

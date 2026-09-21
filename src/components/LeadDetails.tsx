@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getJob, updateJob, getMachinesByCustomer, createMachine, updateMachine, getTechnicians, getRepCodes, getCustomers, getActivities, getServiceDescriptions, getJobSources, getMachineTypes, deleteJob, uploadRSRDocument, getRSRDocuments, getRSRDocumentUrl, createJobNote, getJobNotes, uploadJobNoteAttachment, getJobNoteAttachmentUrl, deleteJobNote, resolveCanonicalMachineSelections, type Job, type Status, type Branch, type Machine, type Technician, type RepCode, type Customer, type Activity, type ServiceDescription, type JobSource, type MachineType, type OverdueJob, type JobRSRDocument, type JobNote, type JobNoteAttachment } from '../lib/api';
 import { X, Edit, Save, Clock, User, Trash2, FileText, Paperclip, Upload, Download, Plus, ChevronDown, ChevronUp, Eye } from 'lucide-react';
+import { OriginatingRfqPanel } from './OriginatingRfqPanel';
 import { HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
 import { SmartDateInput } from './SmartDateInput';
@@ -1398,6 +1399,12 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
         )}
 
         <div className="p-6 space-y-6">
+          {job.salesRequestData?.requestNumber && (
+            <OriginatingRfqPanel
+              job={job}
+              onJobUpdated={(next) => setJob(normalizeJob(next))}
+            />
+          )}
           {/* Basic Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">

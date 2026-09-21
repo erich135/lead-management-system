@@ -3,18 +3,21 @@ import {
   getRfcFormProgress,
   getRfcMissingFields,
   normalizeRfcForm,
+  prefillRfcForm,
   type RfcFormData,
-} from '../components/diary/rfcFormUtils';
+} from '../components/diary/rfcFormUtils.ts';
 import {
   getLoanRentalFormProgress,
   normalizeLoanRentalForm,
+  prefillLoanRentalForm,
   type LoanRentalFormData,
-} from '../components/diary/loanRentalFormUtils';
+} from '../components/diary/loanRentalFormUtils.ts';
 import {
   getNewServiceLevelFormProgress,
   normalizeNewServiceLevelForm,
+  prefillNewServiceLevelForm,
   type NewServiceLevelFormData,
-} from '../components/diary/newServiceLevelFormUtils';
+} from '../components/diary/newServiceLevelFormUtils.ts';
 
 export interface SalesRequestValidationResult {
   valid: boolean;
@@ -157,4 +160,63 @@ export function normalizeFormForRequestType(
     default:
       return formData;
   }
+}
+
+/**
+ * Fills empty customer/contact form fields from stored RFQ snapshot values
+ * without overwriting captured form input. Used by the review modal so the
+ * approve payload carries customer/contact when the RFC template would
+ * otherwise post blank strings.
+ */
+export function mergeStoredCustomerIntoForm(
+  requestType: SalesRequestType,
+  formData: Record<string, unknown>,
+  companyName?: string,
+  contactPerson?: string,
+): Record<string, unknown> {
+  const source = {
+    companyName: (companyName || '').trim() || undefined,
+    contactPerson: (contactPerson || '').trim() || undefined,
+  };
+  if (!source.companyName && !source.contactPerson) {
+    return formData;
+  }
+  if (formData.formSchemaSnapshot && formData.values) {
+    return formData;
+  }
+
+  switch (requestType) {
+    case 'rfc':
+      return prefillRfcForm(formData as unknown as RfcFormData, source) as unknown as Record<
+        string,
+        unknown
+      >;
+    case 'loan':
+    case 'rental':
+    case 'loan_rental':
+      return prefillLoanRentalForm(
+        formData as unknown as LoanRentalFormData,
+        source,
+      ) as unknown as Record<string, unknown>;
+    case 'rfc_new_service_level':
+      return prefillNewServiceLevelForm(
+        formData as unknown as NewServiceLevelFormData,
+        source,
+      ) as unknown as Record<string, unknown>;
+    default:
+      return formData;
+  }
+}
+
+/**
+ * Returns true when stored form data uses the published dynamic planner schema
+ * (formSchemaSnapshot + values) rather than legacy section-based RFC fields.
+ */
+export function isDynamicPlannerFormData(data: Record<string, unknown>): boolean {
+  return (
+    Boolean(data.formSchemaSnapshot) &&
+    Boolean(data.values) &&
+    typeof data.values === 'object' &&
+    !Array.isArray(data.values)
+  );
 }

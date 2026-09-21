@@ -332,7 +332,9 @@ const MobileRepApp: React.FC = () => {
                   </button>
                 )}
 
-                {(hasPermission('sales_requests.review') || user?.isSuperAdmin) && (
+                {(hasPermission('sales_requests.review') ||
+                  hasPermission('sales_requests.view_all') ||
+                  user?.isSuperAdmin) && (
                   <button
                     type="button"
                     onClick={() => {

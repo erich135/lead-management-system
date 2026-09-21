@@ -28,6 +28,7 @@ import {
 } from '../constants/salesRequestPermissions';
 import {
   createEmptyFormForRequestType,
+  isDynamicPlannerFormData,
   normalizeFormForRequestType,
   validateSalesRequestForm,
 } from '../utils/salesRequestValidation';
@@ -37,6 +38,8 @@ import SalesRequestAttachmentUpload, {
 import type { RfcFormData } from './diary/rfcFormUtils';
 import type { LoanRentalFormData } from './diary/loanRentalFormUtils';
 import type { NewServiceLevelFormData } from './diary/newServiceLevelFormUtils';
+import { DynamicPlannerFormRenderer, type DynamicFormValues } from './diary/DynamicPlannerFormRenderer';
+import type { PlannerFormPublished } from '../lib/api';
 
 interface SalesRequestWorkspaceProps {
   requestId?: string;
@@ -359,7 +362,12 @@ const SalesRequestWorkspace: React.FC<SalesRequestWorkspaceProps> = ({
         throw new Error('Request was saved but no ID was returned from the server.');
       }
 
-      const submitted = await submitSalesRequest(current._id);
+      const submitted = await submitSalesRequest(
+        current._id,
+        current.appointmentDetails?.visitGpsVerification
+          ? { visitGpsVerification: current.appointmentDetails.visitGpsVerification }
+          : undefined,
+      );
 
       if (submitted.status !== 'pending') {
         throw new Error(
@@ -559,7 +567,7 @@ const SalesRequestWorkspace: React.FC<SalesRequestWorkspaceProps> = ({
             />
           )}
 
-          {requestType === 'rfc' && (
+          {requestType === 'rfc' && !isDynamicPlannerFormData(formData) && (
             <DiaryRfcForm
               value={formData as unknown as RfcFormData}
               onChange={(next) => setFormData(next as unknown as Record<string, unknown>)}
@@ -568,7 +576,7 @@ const SalesRequestWorkspace: React.FC<SalesRequestWorkspaceProps> = ({
             />
           )}
 
-          {requestType === 'loan_rental' && (
+          {requestType === 'loan_rental' && !isDynamicPlannerFormData(formData) && (
             <DiaryLoanRentalForm
               value={formData as unknown as LoanRentalFormData}
               onChange={(next) => setFormData(next as unknown as Record<string, unknown>)}
@@ -577,13 +585,33 @@ const SalesRequestWorkspace: React.FC<SalesRequestWorkspaceProps> = ({
             />
           )}
 
-          {requestType === 'rfc_new_service_level' && (
+          {requestType === 'rfc_new_service_level' && !isDynamicPlannerFormData(formData) && (
             <DiaryNewServiceLevelForm
               value={formData as unknown as NewServiceLevelFormData}
               onChange={(next) => setFormData(next as unknown as Record<string, unknown>)}
               disabled={isReadOnly}
               activeStep={activeStepForForm}
             />
+          )}
+
+          {isDynamicPlannerFormData(formData) && (
+            <DynamicPlannerFormRenderer
+              schema={{
+                ...(formData.formSchemaSnapshot as PlannerFormPublished),
+                type:
+                  (formData.formSchemaSnapshot as PlannerFormPublished).type ||
+                  requestType,
+              }}
+              values={formData.values as DynamicFormValues}
+              onChange={(next) => setFormData({ ...formData, values: next })}
+              disabled={isReadOnly}
+            />
+          )}
+
+          {requestType === 'general_visit' && !isDynamicPlannerFormData(formData) && (
+            <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              This general visit has no published form schema to edit.
+            </p>
           )}
         </div>
       </main>

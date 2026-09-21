@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   Loader2,
   Pencil,
+  Printer,
   Save,
   X,
   XCircle,
@@ -12,16 +13,23 @@ import {
   acceptSalesRequestWithoutJob,
   approveSalesRequest,
   declineSalesRequest,
+  downloadSalesRequestPdf,
   getSalesRequest,
+  getSalesRequestSubmissions,
+  getSalesRequestVisibilityOptions,
+  reassignSalesRequest,
   reviewUpdateSalesRequest,
   type Job,
   type PlannerFormPublished,
   type SalesRequest,
+  type SalesRequestSubmissionHistory,
+  type SalesRequestVisibilityOption,
 } from '../lib/api';
 import {
   canShowAcceptWithoutJob,
   getApprovedJobNumber,
   getSalesRequestOutcomeLabel,
+  SALES_REQUEST_PERMISSIONS,
   SALES_REQUEST_TYPE_LABELS,
 } from '../constants/salesRequestPermissions';
 import DiaryRfcForm from './diary/DiaryRfcForm';
@@ -31,9 +39,12 @@ import { DynamicPlannerFormRenderer, type DynamicFormValues } from './diary/Dyna
 import { normalizeRfcForm, type RfcFormData } from './diary/rfcFormUtils';
 import type { LoanRentalFormData } from './diary/loanRentalFormUtils';
 import type { NewServiceLevelFormData } from './diary/newServiceLevelFormUtils';
-import { normalizeFormForRequestType } from '../utils/salesRequestValidation';
+import { normalizeFormForRequestType, mergeStoredCustomerIntoForm, isDynamicPlannerFormData } from '../utils/salesRequestValidation';
 import SalesRequestAttachmentsPanel from './SalesRequestAttachmentsPanel';
+import SalesRequestHistoryPanel from './SalesRequestHistoryPanel';
+import RejectReasonDialog from './RejectReasonDialog';
 import { formatAppointmentStatusLabel } from './diary/diaryUtils';
+import { formatOutOfLocationDistance } from '../utils/salesRequestDistance';
 import { useAuth } from '../contexts/AuthContext';
 
 interface SalesRequestReviewModalProps {
@@ -87,18 +98,6 @@ function userName(
 }
 
 /**
- * Returns true when stored form data uses the published dynamic planner schema
- * (formSchemaSnapshot + values) rather than legacy section-based RFC fields.
- */
-function isDynamicPlannerFormData(data: Record<string, unknown>): boolean {
-  return (
-    Boolean(data.formSchemaSnapshot) &&
-    Boolean(data.values) &&
-    typeof data.values === 'object'
-  );
-}
-
-/**
  * Resolves a sales-lead object or id into display fields for the admin review.
  */
 function resolveLead(detail: SalesRequest): {
@@ -140,7 +139,9 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
   onClose,
   onDecisionComplete,
 }) => {
-  const { isSuperAdmin } = useAuth();
+  const { isSuperAdmin, hasPermission } = useAuth();
+  const canReassign =
+    isSuperAdmin || hasPermission(SALES_REQUEST_PERMISSIONS.REASSIGN);
   const [detail, setDetail] = useState<SalesRequest | null>(null);
   const [formData, setFormData] = useState<Record<string, unknown>>({});
   const [visitNotes, setVisitNotes] = useState('');
@@ -149,18 +150,36 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successHint, setSuccessHint] = useState<string | null>(null);
+  const [history, setHistory] = useState<SalesRequestSubmissionHistory | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [selectedVersion, setSelectedVersion] = useState<number | undefined>(undefined);
+  const [administratorOptions, setAdministratorOptions] = useState<SalesRequestVisibilityOption[]>(
+    [],
+  );
+  const [reassignAdministratorId, setReassignAdministratorId] = useState('');
+  const [reassigning, setReassigning] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
 
   /**
    * Applies a loaded sales request into local read-only / edit state.
    */
   function applyLoadedRequest(loaded: SalesRequest): void {
     setDetail(loaded);
-    const normalized = normalizeFormForRequestType(
+    const assignedId =
+      typeof loaded.assignedAdministrator === 'string'
+        ? loaded.assignedAdministrator
+        : loaded.assignedAdministrator?._id || '';
+    setReassignAdministratorId(assignedId);
+    const normalized = mergeStoredCustomerIntoForm(
       loaded.requestType,
-      loaded.formData ?? {},
+      normalizeFormForRequestType(loaded.requestType, loaded.formData ?? {}),
+      loaded.customerCompanyName,
+      loaded.customerContactPerson,
     );
     originalFormDataRef.current = normalized;
     originalVisitNotesRef.current = loaded.visitNotes || '';
@@ -174,10 +193,23 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
   const loadRequest = useCallback(async (): Promise<void> => {
     setLoading(true);
     setError(null);
+    setHistoryError(null);
     try {
       const loaded = await getSalesRequest(requestId);
       applyLoadedRequest(loaded);
       setIsEditing(false);
+      setHistoryLoading(true);
+      try {
+        const loadedHistory = await getSalesRequestSubmissions(requestId);
+        setHistory(loadedHistory);
+        const latest = loadedHistory.submissions[loadedHistory.submissions.length - 1];
+        setSelectedVersion(latest?.version);
+      } catch (historyLoadError: unknown) {
+        setHistory(null);
+        setHistoryError(getErrorMessage(historyLoadError, 'Failed to load submission history'));
+      } finally {
+        setHistoryLoading(false);
+      }
     } catch (loadError: unknown) {
       setError(getErrorMessage(loadError, 'Failed to load request'));
     } finally {
@@ -188,6 +220,13 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
   useEffect(() => {
     void loadRequest();
   }, [loadRequest]);
+
+  useEffect(() => {
+    if (!canReassign) return;
+    void getSalesRequestVisibilityOptions()
+      .then((options) => setAdministratorOptions(options.administrators))
+      .catch(() => undefined);
+  }, [canReassign]);
 
   const isPending = detail?.status === 'pending';
   /** Super Admin (and reviewers with decide rights) can enter edit mode on pending requests. */
@@ -236,6 +275,7 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
       const saved = await reviewUpdateSalesRequest(detail._id, {
         formData,
         visitNotes,
+        expectedVersion: detail.currentVersion,
       });
       applyLoadedRequest(saved);
       setIsEditing(false);
@@ -245,6 +285,25 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
       setError(getErrorMessage(saveError, 'Failed to save changes'));
     } finally {
       setSaving(false);
+    }
+  }
+
+  /**
+   * Manually assigns this RFQ to another administrator. Kept on later resubmits.
+   */
+  async function handleReassign(): Promise<void> {
+    if (!detail?._id || !canReassign || !reassignAdministratorId) return;
+    setReassigning(true);
+    setError(null);
+    setSuccessHint(null);
+    try {
+      const updated = await reassignSalesRequest(detail._id, reassignAdministratorId);
+      applyLoadedRequest(updated);
+      setSuccessHint('Administrator reassigned. This assignment is kept if the request is resubmitted.');
+    } catch (reassignError: unknown) {
+      setError(getErrorMessage(reassignError, 'Failed to reassign administrator'));
+    } finally {
+      setReassigning(false);
     }
   }
 
@@ -276,6 +335,7 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
     try {
       const result = await approveSalesRequest(detail._id, {
         formData: originalFormDataRef.current,
+        expectedVersion: detail.currentVersion,
       });
 
       if (!result?.request) {
@@ -339,6 +399,7 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
       const result = await acceptSalesRequestWithoutJob(detail._id, {
         formData: originalFormDataRef.current,
         reviewNotes: notes.trim() || undefined,
+        expectedVersion: detail.currentVersion,
       });
       if (!result?.request) {
         throw new Error(
@@ -355,27 +416,33 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
   }
 
   /**
-   * Rejects the pending request using the last saved form data.
+   * Opens the required rejection-reason dialog for a pending request.
    */
-  async function handleReject(): Promise<void> {
+  function handleReject(): void {
     if (!detail?._id || !isPending || !canDecide) return;
     if (isEditing) {
       setError('Save or Cancel your edits before rejecting.');
       return;
     }
+    setError(null);
+    setRejectOpen(true);
+  }
 
-    const reason = window.prompt(
-      'Optional: enter a reason for rejecting this submission (Cancel to abort):',
-    );
-    if (reason === null) return;
+  /**
+   * Submits a validated rejection reason to the backend.
+   */
+  async function confirmReject(reason: string): Promise<void> {
+    if (!detail?._id) return;
 
     setActing(true);
     setError(null);
     try {
       const rejected = await declineSalesRequest(detail._id, {
         formData: originalFormDataRef.current,
-        declineReason: reason.trim() || undefined,
+        declineReason: reason,
+        expectedVersion: detail.currentVersion,
       });
+      setRejectOpen(false);
       onDecisionComplete({ request: rejected });
     } catch (rejectError: unknown) {
       console.error('Reject failed:', rejectError);
@@ -464,6 +531,32 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
             )}
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {detail && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPrinting(true);
+                  void downloadSalesRequestPdf(detail._id, detail.requestNumber)
+                    .catch((printError: unknown) => {
+                      setError(
+                        printError instanceof Error
+                          ? printError.message
+                          : 'Failed to generate PDF.',
+                      );
+                    })
+                    .finally(() => setPrinting(false));
+                }}
+                disabled={loading || acting || printing}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {printing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Printer className="h-4 w-4" />
+                )}
+                Print PDF
+              </button>
+            )}
             {canEnterEditMode && !isEditing && (
               <button
                 type="button"
@@ -566,7 +659,7 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
                       <div className="sm:col-span-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">
                         Outside expected location
                         {typeof visitGps.distanceFromExpectedMeters === 'number'
-                          ? ` (${visitGps.distanceFromExpectedMeters} m from scheduled pin)`
+                          ? ` (${formatOutOfLocationDistance(visitGps.distanceFromExpectedMeters)})`
                           : ''}
                       </div>
                     )}
@@ -672,6 +765,59 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
                     <dt className="text-xs font-semibold uppercase text-gray-500">Submitted by</dt>
                     <dd>{userName(detail.submittedBy || detail.createdBy)}</dd>
                   </div>
+                  <div className="sm:col-span-2">
+                    <dt className="text-xs font-semibold uppercase text-gray-500">Administrator</dt>
+                    <dd className="font-medium text-slate-900">
+                      {detail.unassigned
+                        ? 'Unassigned'
+                        : userName(detail.assignedAdministrator) !== '—'
+                          ? userName(detail.assignedAdministrator)
+                          : detail.assignedAdminCode || '—'}
+                      {detail.assignedAdminCode && !detail.unassigned
+                        ? ` (${detail.assignedAdminCode})`
+                        : ''}
+                    </dd>
+                    {canReassign && detail.status !== 'draft' && (
+                      <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <select
+                          value={reassignAdministratorId}
+                          onChange={(event) => setReassignAdministratorId(event.target.value)}
+                          disabled={reassigning || acting}
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                          aria-label="Reassign administrator"
+                        >
+                          <option value="">Select administrator</option>
+                          {administratorOptions.map((option) => (
+                            <option key={option._id} value={option._id}>
+                              {option.adminCode
+                                ? `${option.name} (${option.adminCode})`
+                                : option.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void handleReassign();
+                          }}
+                          disabled={
+                            reassigning ||
+                            acting ||
+                            !reassignAdministratorId ||
+                            (typeof detail.assignedAdministrator === 'object' &&
+                              detail.assignedAdministrator?._id === reassignAdministratorId)
+                          }
+                          className="inline-flex shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          {reassigning ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            'Reassign'
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   {(detail.approvedAt || (detail.status === 'approved' && detail.reviewedAt)) && (
                     <>
                       <div>
@@ -727,6 +873,14 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
                   )}
                 </dl>
               </section>
+
+              <SalesRequestHistoryPanel
+                history={history}
+                loading={historyLoading}
+                error={historyError}
+                selectedVersion={selectedVersion}
+                onSelectVersion={setSelectedVersion}
+              />
 
               {appointment && (
                 <section className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4">
@@ -871,9 +1025,7 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
                 <>
                   <button
                     type="button"
-                    onClick={() => {
-                      void handleReject();
-                    }}
+                    onClick={handleReject}
                     disabled={acting}
                     className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
                   >
@@ -920,6 +1072,16 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
           </footer>
         )}
       </div>
+      <RejectReasonDialog
+        open={rejectOpen}
+        requestNumber={detail?.requestNumber}
+        submitting={acting}
+        error={error}
+        onCancel={() => {
+          if (!acting) setRejectOpen(false);
+        }}
+        onConfirm={confirmReject}
+      />
     </div>
   );
 };

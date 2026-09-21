@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   BookOpen,
@@ -21,8 +21,10 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   listSalesRequests,
   getSalesRequest,
+  getSalesRequestVisibilityOptions,
   type SalesRequest,
   type SalesRequestStatus,
+  type SalesRequestVisibilityOption,
   type Job,
 } from '../lib/api';
 import {
@@ -170,9 +172,13 @@ function attachmentCountLabel(item: SalesRequest): string {
 export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps) {
   const { hasPermission, isSuperAdmin } = useAuth();
   const canViewQueue =
-    isSuperAdmin || hasPermission(SALES_REQUEST_PERMISSIONS.REVIEW);
+    isSuperAdmin ||
+    hasPermission(SALES_REQUEST_PERMISSIONS.REVIEW) ||
+    hasPermission(SALES_REQUEST_PERMISSIONS.VIEW_ALL);
   const canDecide =
     isSuperAdmin || hasPermission(SALES_REQUEST_PERMISSIONS.REVIEW);
+  const canViewAll =
+    isSuperAdmin || hasPermission(SALES_REQUEST_PERMISSIONS.VIEW_ALL);
 
   const [tab, setTab] = useState<AdminQueueTab>('pending');
   const [requests, setRequests] = useState<SalesRequest[]>([]);
@@ -191,6 +197,15 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [showFormEditor, setShowFormEditor] = useState(false);
+  const [representativeFilter, setRepresentativeFilter] = useState('');
+  const [administratorFilter, setAdministratorFilter] = useState('');
+  const [visibilityOptions, setVisibilityOptions] = useState<{
+    representatives: SalesRequestVisibilityOption[];
+    administrators: SalesRequestVisibilityOption[];
+  }>({ representatives: [], administrators: [] });
+  const [historyHasMore, setHistoryHasMore] = useState(false);
+  const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
+  const historyPageRef = useRef(1);
 
   /**
    * Loads headline statistics without altering the main queue fetch behaviour.
@@ -223,29 +238,46 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
   /**
    * Loads sales requests for the selected queue tab.
    */
-  const loadQueue = useCallback(async () => {
+  const loadQueue = useCallback(async (appendHistory = false) => {
     if (!canViewQueue) return;
     if (tab === 'rep_diaries') {
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    if (tab === 'history' && appendHistory) {
+      setHistoryLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
     try {
       if (tab === 'history') {
+        const filter = {
+          createdBy: representativeFilter || undefined,
+          assignedAdministrator:
+            administratorFilter && administratorFilter !== 'unassigned'
+              ? administratorFilter
+              : undefined,
+          unassigned: administratorFilter === 'unassigned',
+        };
+        const page = appendHistory ? historyPageRef.current + 1 : 1;
         const [approved, declined] = await Promise.all([
           listSalesRequests({
             status: 'approved',
             sortBy: 'updatedAt',
             sortOrder: 'desc',
             limit: 100,
+            page,
+            ...filter,
           }),
           listSalesRequests({
             status: 'declined',
             sortBy: 'updatedAt',
             sortOrder: 'desc',
             limit: 100,
+            page,
+            ...filter,
           }),
         ]);
         const merged = [...approved.requests, ...declined.requests].sort((left, right) => {
@@ -267,28 +299,54 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
           ).getTime();
           return rightTime - leftTime;
         });
-        setRequests(merged);
+        historyPageRef.current = page;
+        setHistoryHasMore(
+          page < (approved.pagination?.pages || 1) ||
+            page < (declined.pagination?.pages || 1),
+        );
+        setRequests((previous) => {
+          if (!appendHistory) return merged;
+          const seen = new Set(previous.map((item) => item._id));
+          return [...previous, ...merged.filter((item) => !seen.has(item._id))];
+        });
         return;
       }
+
+      setHistoryHasMore(false);
+      historyPageRef.current = 1;
 
       const { requests: items } = await listSalesRequests({
         status: 'pending',
         sortBy: 'submittedAt',
         sortOrder: 'asc',
         limit: 100,
+        createdBy: representativeFilter || undefined,
+        assignedAdministrator:
+          administratorFilter && administratorFilter !== 'unassigned'
+            ? administratorFilter
+            : undefined,
+        unassigned: administratorFilter === 'unassigned',
       });
       setRequests(items);
     } catch (loadError: unknown) {
       setError(getErrorMessage(loadError, 'Failed to load requests'));
     } finally {
       setLoading(false);
+      setHistoryLoadingMore(false);
     }
-  }, [canViewQueue, tab]);
+  }, [canViewQueue, tab, representativeFilter, administratorFilter]);
 
   useEffect(() => {
     void loadQueue();
     void loadStats();
   }, [loadQueue, loadStats]);
+
+  useEffect(() => {
+    if (!canViewAll) return;
+    void getSalesRequestVisibilityOptions()
+      .then(setVisibilityOptions)
+      .catch(() => undefined);
+  }, [canViewAll]);
 
   useEffect(() => {
     setStatusFilter('all');
@@ -420,7 +478,7 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
           <div>
             <p className="font-semibold text-amber-900">Permission required</p>
             <p className="text-sm text-amber-800">
-              Permission to review sales requests is required to open Rep Approvals.
+              Permission to review or view sales requests is required to open Rep Approvals.
             </p>
           </div>
         </div>
@@ -643,6 +701,37 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
                   </>
                 )}
               </select>
+              {canViewAll && (
+                <>
+                  <select
+                    value={representativeFilter}
+                    onChange={(event) => setRepresentativeFilter(event.target.value)}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 shadow-sm transition focus:border-[#0969a9] focus:outline-none focus:ring-2 focus:ring-[#0969a9]/20"
+                    aria-label="Filter by representative"
+                  >
+                    <option value="">All representatives</option>
+                    {visibilityOptions.representatives.map((option) => (
+                      <option key={option._id} value={option._id}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={administratorFilter}
+                    onChange={(event) => setAdministratorFilter(event.target.value)}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 shadow-sm transition focus:border-[#0969a9] focus:outline-none focus:ring-2 focus:ring-[#0969a9]/20"
+                    aria-label="Filter by administrator"
+                  >
+                    <option value="">All administrators</option>
+                    <option value="unassigned">Unassigned</option>
+                    {visibilityOptions.administrators.map((option) => (
+                      <option key={option._id} value={option._id}>
+                        {option.adminCode ? `${option.name} (${option.adminCode})` : option.name}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
             </div>
 
             {successMessage && (
@@ -723,6 +812,11 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
                             >
                               {getSalesRequestOutcomeLabel(item)}
                             </span>
+                            {item.unassigned ? (
+                              <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-amber-900">
+                                Unassigned
+                              </span>
+                            ) : null}
                           </div>
                           <p className="mt-1 text-sm font-medium leading-snug text-slate-700">
                             {requestTitle(item)}
@@ -740,6 +834,16 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
                             <span className="inline-flex items-center gap-1.5">
                               <span className="font-semibold text-slate-500">Rep:</span>
                               <span className="font-medium text-slate-800">{repDisplayName(item)}</span>
+                            </span>
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="font-semibold text-slate-500">Admin:</span>
+                              <span className="font-medium text-slate-800">
+                                {item.unassigned
+                                  ? 'Unassigned'
+                                  : userName(item.assignedAdministrator) !== '—'
+                                    ? userName(item.assignedAdministrator)
+                                    : item.assignedAdminCode || '—'}
+                              </span>
                             </span>
                             <span className="inline-flex items-center gap-1.5">
                               <Clock className="h-3.5 w-3.5 text-slate-400" />
@@ -808,6 +912,21 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
                     </article>
                   );
                 })}
+                {tab === 'history' && historyHasMore ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void loadQueue(true);
+                    }}
+                    disabled={historyLoadingMore}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {historyLoadingMore ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : null}
+                    Load more history
+                  </button>
+                ) : null}
               </div>
             )}
               </>

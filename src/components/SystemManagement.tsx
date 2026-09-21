@@ -11,6 +11,8 @@ import {
   updateUser, 
   updateUserPermissions,
   updateUserBranches,
+  grantWhatsAppConsent,
+  withdrawWhatsAppConsent,
   resendInvitation,
   getRoles,
   getPermissions,
@@ -91,6 +93,7 @@ import {
   readingEscalationAdminCodeLabel,
 } from '../lib/readingEscalationAdmin';
 import { useAuth } from '../contexts/AuthContext';
+import { USERS } from '../constants/permissions';
 import { 
   Users, 
   Search, 
@@ -130,7 +133,7 @@ import { ChangelogViewer } from './ChangelogViewer';
 import { ScheduledReports } from './ScheduledReports';
 
 export function SystemManagement() {
-  const { isSuperAdmin } = useAuth();
+  const { isSuperAdmin, hasPermission } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]); // All users for dropdowns (not paginated)
   const [roles, setRoles] = useState<Role[]>([]);
@@ -140,6 +143,8 @@ export function SystemManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditingUser, setIsEditingUser] = useState(false);
+  const [consentAgreedOn, setConsentAgreedOn] = useState('');
+  const [consentBusy, setConsentBusy] = useState(false);
   const [activeTab, setActiveTab] = useState<'users' | 'imports' | 'reference' | 'changelog' | 'group-permissions' | 'scheduled-reports'>('users');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -472,6 +477,7 @@ export function SystemManagement() {
       console.log('[SystemManagement] User adminCode:', response.user.adminCode);
       setSelectedUser(response.user);
       setIsEditingUser(false);
+      setConsentAgreedOn(new Date().toISOString().slice(0, 10));
     } catch (err: any) {
       console.error('Error loading user:', err);
       alert('Failed to load user details');
@@ -509,6 +515,39 @@ export function SystemManagement() {
       alert('Failed to save user: ' + (err.message || 'Unknown error'));
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleGrantWhatsAppConsent() {
+    if (!selectedUser) return;
+    if (!consentAgreedOn) {
+      alert('Enter the date the representative agreed to WhatsApp notifications.');
+      return;
+    }
+    try {
+      setConsentBusy(true);
+      const response = await grantWhatsAppConsent(selectedUser._id, consentAgreedOn);
+      setSelectedUser(response.user);
+    } catch (err: any) {
+      alert('Failed to record consent: ' + (err.message || 'Unknown error'));
+    } finally {
+      setConsentBusy(false);
+    }
+  }
+
+  async function handleWithdrawWhatsAppConsent() {
+    if (!selectedUser) return;
+    if (!confirm('Withdraw WhatsApp consent for this representative? Later appointment messages will stop.')) {
+      return;
+    }
+    try {
+      setConsentBusy(true);
+      const response = await withdrawWhatsAppConsent(selectedUser._id);
+      setSelectedUser(response.user);
+    } catch (err: any) {
+      alert('Failed to withdraw consent: ' + (err.message || 'Unknown error'));
+    } finally {
+      setConsentBusy(false);
     }
   }
 
@@ -1992,6 +2031,70 @@ alert((response as any).message || 'User invited successfully');
                           {selectedUser.locationTrackingEnabled ? 'DISABLE' : 'ENABLE'}
                         </button>
                       </div>
+                    </div>
+                    <div className="rounded-lg border border-gray-200 p-3 space-y-2">
+                      <label className="block text-sm font-semibold text-ars-body">WhatsApp appointment consent</label>
+                      <p className={`px-3 py-1.5 rounded-lg inline-block font-medium ${
+                        selectedUser.whatsappConsent?.granted
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {selectedUser.whatsappConsent?.granted ? 'Granted' : 'Not granted'}
+                      </p>
+                      {selectedUser.cellPhone ? (
+                        <p className="text-xs text-ars-body">Number on file: {selectedUser.cellPhone}</p>
+                      ) : (
+                        <p className="text-xs text-amber-700">No cell phone on the user record. Messages cannot be sent until a number is stored.</p>
+                      )}
+                      {selectedUser.whatsappConsent?.agreedOn ? (
+                        <p className="text-xs text-ars-body">
+                          Agreed {new Date(selectedUser.whatsappConsent.agreedOn).toLocaleDateString('en-ZA')}
+                          {selectedUser.whatsappConsent.recordedAt
+                            ? ` · recorded ${new Date(selectedUser.whatsappConsent.recordedAt).toLocaleString('en-ZA')}`
+                            : ''}
+                        </p>
+                      ) : null}
+                      {selectedUser.whatsappConsent?.withdrawnAt ? (
+                        <p className="text-xs text-ars-body">
+                          Withdrawn {new Date(selectedUser.whatsappConsent.withdrawnAt).toLocaleString('en-ZA')}
+                        </p>
+                      ) : null}
+                      {(selectedUser.whatsappConsent?.withdrawals?.length || 0) > 0 ? (
+                        <p className="text-xs text-gray-500">
+                          {selectedUser.whatsappConsent?.withdrawals?.length} previous withdrawal(s) retained
+                        </p>
+                      ) : null}
+                      {hasPermission(USERS.MANAGE_CONSENT) ? (
+                        <div className="space-y-2 pt-1">
+                          <label className="block text-[11px] font-medium text-gray-600">Agreement date</label>
+                          <input
+                            type="date"
+                            value={consentAgreedOn}
+                            onChange={(e) => setConsentAgreedOn(e.target.value)}
+                            className="w-full pl-2 pr-2 py-2 border border-gray-300 rounded-[8px] text-[13px]"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void handleGrantWhatsAppConsent()}
+                              disabled={consentBusy}
+                              className="flex-1 px-3 py-1.5 bg-green-100 text-green-700 rounded-[8px] font-bold text-[13px] disabled:opacity-50"
+                            >
+                              Record consent
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleWithdrawWhatsAppConsent()}
+                              disabled={consentBusy || !selectedUser.whatsappConsent?.granted}
+                              className="flex-1 px-3 py-1.5 bg-red-100 text-red-700 rounded-[8px] font-bold text-[13px] disabled:opacity-50"
+                            >
+                              Withdraw
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-500">Requires the users.manage_consent permission.</p>
+                      )}
                     </div>
                     {selectedUser.passwordSet === false && (
                       <div>

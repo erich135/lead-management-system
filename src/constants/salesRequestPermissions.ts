@@ -7,6 +7,8 @@ export const SALES_REQUEST_PERMISSIONS = {
   UPDATE: 'sales_requests.update',
   SUBMIT: 'sales_requests.submit',
   REVIEW: 'sales_requests.review',
+  VIEW_ALL: 'sales_requests.view_all',
+  REASSIGN: 'sales_requests.reassign',
 } as const;
 
 export type SalesRequestPermissionName =

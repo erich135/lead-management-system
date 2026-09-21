@@ -67,7 +67,9 @@ export function MobileNavigation({
     user?.isSuperAdmin ||
     hasPermission('machines.verifyReadings');
   const canReviewSalesRequests =
-    user?.isSuperAdmin || hasPermission('sales_requests.review');
+    user?.isSuperAdmin ||
+    hasPermission('sales_requests.review') ||
+    hasPermission('sales_requests.view_all');
 
   const navItems = [
     { id: 'dashboard' as View, label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },

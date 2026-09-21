@@ -340,12 +340,6 @@ export function Reports({ statuses, branches }: ReportsProps) {
             setSelectedAdminCode(userAdminCode._id);
             setSelectedRole('admin');
           }
-        } else if (currentUser?.role?.name === 'rep') {
-          const userRepCode = repCodesResponse.repCodes?.find(rc => rc.user?._id === currentUser.id);
-          if (userRepCode) {
-            setSelectedRepCode(userRepCode._id);
-            setSelectedRole('rep');
-          }
         } else if (currentUser?.role?.name === 'technician') {
           const userTechnician = techniciansResponse.technicians?.find(t => t.user?._id === currentUser.id);
           if (userTechnician) {

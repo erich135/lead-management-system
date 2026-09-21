@@ -241,33 +241,6 @@ export function LeadsList({ onLeadClick, onCreateNew, statuses, branches, refres
 
   // Admin filter auto-selection removed - admins now see "All Admins" by default
 
-  // Auto-set rep code filter for rep users
-  useEffect(() => {
-    if (user?.role?.name === 'rep' && !user?.isSuperAdmin && repCodeFilter === 'all') {
-      // repCode can be either an ID string or populated object
-      if (typeof user.repCode === 'string' && user.repCode) {
-        const repCodeStr = user.repCode; // narrowed to string for use in callbacks
-        const userRepCode = repCodes.find(rc => rc._id === repCodeStr || rc.code === repCodeStr);
-        setRepCodeFilter(userRepCode?._id || repCodeStr);
-        return;
-      }
-
-      if (user.repCode && typeof user.repCode === 'object') {
-        if (user.repCode.id) {
-          setRepCodeFilter(user.repCode.id);
-          return;
-        }
-
-        if (user.repCode.code) {
-          const userRepCode = repCodes.find(rc => rc.code === user.repCode?.code);
-          if (userRepCode) {
-            setRepCodeFilter(userRepCode._id);
-          }
-        }
-      }
-    }
-  }, [user, repCodes]);
-
   // Auto-set technician filter for technician users
   useEffect(() => {
     if (user?.role?.name === 'technician' && !user?.isSuperAdmin && technicianFilter === 'all') {

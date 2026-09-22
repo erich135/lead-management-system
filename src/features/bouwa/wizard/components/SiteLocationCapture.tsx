@@ -20,7 +20,7 @@ import {
   type PlaceSuggestion,
 } from '../../../../lib/api';
 import {
-  GOOGLE_LOOKUP_UNAVAILABLE,
+  GOOGLE_LOOKUP_USER_MESSAGE,
   isGoogleLookupUnavailableError,
   pinFromPlaceDetails,
 } from '../../../../lib/googleAddressLookup';
@@ -508,7 +508,7 @@ export function SiteLocationCapture({
         </p>
         {lookupUnavailable ? (
           <p className="text-[11px] text-amber-700">
-            {GOOGLE_LOOKUP_UNAVAILABLE}. Coordinates can still be pinned. Type the address below.
+            {GOOGLE_LOOKUP_USER_MESSAGE}
           </p>
         ) : null}
         {geocodeFailed ? (

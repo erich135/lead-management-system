@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
-import { emptyProposedDraft } from './equipmentState';
+import { emptyProposedDraft, newCurrentEquipmentDraft } from './equipmentState';
 import {
   buildSalesProposalSavePayload,
   persistSalesProposalEditor,
@@ -10,7 +10,7 @@ import {
   saveThenPreviewCustomerProposal,
   type SalesProposalEditorState,
 } from './salesProposalPersistence';
-import { EMPTY_COMMERCIAL_OFFER, EMPTY_OPERATING_ASSUMPTIONS, EMPTY_SITE, type SalesProposal } from './types';
+import { EMPTY_COMMERCIAL_OFFER, EMPTY_ELECTRICITY_BASIS, EMPTY_OPERATING_ASSUMPTIONS, EMPTY_SITE, type SalesProposal } from './types';
 import { DEFAULT_AIR_AUDIT_SCOPE } from './airAuditScope';
 import { proposalRequiresRevision } from './customerProposalPresentation';
 
@@ -45,11 +45,18 @@ function editorState(
       changingSpec: false,
     },
     electricityBasis: {
+      ...EMPTY_ELECTRICITY_BASIS,
       type: 'flat_rate',
       flatRateRandPerKwh: 2.5,
-      tariffRecordId: null,
-      suppliedCurrentAmount: null,
-      suppliedCurrentPeriod: null,
+      touRates: {
+        ...EMPTY_ELECTRICITY_BASIS.touRates,
+        ldsStandard: 2.5,
+        ldsPeak: 2.5,
+        ldsOffPeak: 2.5,
+        hdsStandard: 2.5,
+        hdsPeak: 2.5,
+        hdsOffPeak: 2.5,
+      },
     },
     operatingAssumptions: EMPTY_OPERATING_ASSUMPTIONS,
     commercialOffer: {
@@ -87,13 +94,12 @@ describe('save-before-preview customer proposal freshness', () => {
     const payload = buildSalesProposalSavePayload(
       editorState({
         electricityBasis: {
+          ...EMPTY_ELECTRICITY_BASIS,
           type: 'flat_rate',
           flatRateRandPerKwh: 2.5,
-          tariffRecordId: null,
-          suppliedCurrentAmount: null,
-          suppliedCurrentPeriod: null,
         },
         operatingAssumptions: {
+          ...EMPTY_OPERATING_ASSUMPTIONS,
           annualOperatingHours: 4000,
           averageLoadPercent: 70,
         },
@@ -125,6 +131,85 @@ describe('save-before-preview customer proposal freshness', () => {
     expect(payload.commercialOffer.purchase.equipmentPrice).toBe(910000);
     expect(payload.customerId).toBe('cust-1');
     expect(payload.site.name).toBe('John Thompson');
+  });
+
+  it('keeps confirmed customer, efficiency, power type, VSD and airflow-reference edits in the save payload', () => {
+    const payload = buildSalesProposalSavePayload(
+      editorState({
+        customerId: 'cust-sunbake',
+        site: { ...EMPTY_SITE, name: 'Bushbuckridge bakery' },
+        currentEquipment: [
+          {
+            ...newCurrentEquipmentDraft(),
+            key: 'atlas-1',
+            make: 'Atlas Copco',
+            model: 'GA37+',
+            serialNumber: 'A1',
+            specLibraryRecordId: 'lib-ga37',
+            changingSpec: false,
+            efficiencyPercent: 94,
+            efficiencyOrigin: 'manual',
+            electricalPowerKind: 'motor_power',
+            variableSpeedDrive: false,
+            flowReferenceBasis: 'free_air_delivery',
+            referenceAbsolutePressurePa: 101325,
+            specificationReference: 'Atlas CAGI listing',
+            sourceBacked: {
+              manufacturer: 'Atlas Copco',
+              model: 'GA37+',
+              modelVariant: null,
+              ratedPressureBarG: 7.5,
+              ratedAirflowM3PerMin: 6.5,
+              packageInputPowerKw: 41,
+              motorShaftPowerKw: 37,
+              controlType: 'VSD',
+              sourceFileName: 'GA37.pdf',
+              sourceFileId: 'file-ga37',
+              sourceSha256: 'b'.repeat(64),
+            },
+          },
+        ],
+        proposed: {
+          ...emptyProposedDraft(),
+          specLibraryRecordId: 'lib-bouwa-55',
+          manufacturer: 'BOUWA',
+          model: 'SVC-RS55A-II',
+          changingSpec: false,
+          efficiencyPercent: 96,
+          efficiencyOrigin: 'manual',
+          electricalPowerKind: 'package_input',
+          variableSpeedDrive: true,
+          flowReferenceBasis: 'free_air_delivery',
+          referenceAbsolutePressurePa: 101325,
+          specificationReference: 'BOUWA datasheet FAD',
+          sourceBacked: {
+            manufacturer: 'BOUWA',
+            model: 'SVC-RS55A-II',
+            modelVariant: null,
+            ratedPressureBarG: 8,
+            ratedAirflowM3PerMin: 9.1,
+            packageInputPowerKw: 55,
+            motorShaftPowerKw: null,
+            controlType: 'VSD',
+            sourceFileName: 'BOUWA-55.pdf',
+            sourceFileId: 'file-bouwa',
+            sourceSha256: 'd'.repeat(64),
+          },
+        },
+      }),
+    );
+
+    expect(payload.customerId).toBe('cust-sunbake');
+    expect(payload.currentEquipment[0]?.efficiencyPercent).toBe(94);
+    expect(payload.currentEquipment[0]?.efficiencyOrigin).toBe('manual');
+    expect(payload.currentEquipment[0]?.electricalPowerKind).toBe('motor_power');
+    expect(payload.currentEquipment[0]?.variableSpeedDrive).toBe(false);
+    expect(payload.currentEquipment[0]?.sourceBacked?.controlType).toBe('VSD');
+    expect(payload.currentEquipment[0]?.flowReferenceBasis).toBe('free_air_delivery');
+    expect(payload.proposedEquipment[0]?.efficiencyPercent).toBe(96);
+    expect(payload.proposedEquipment[0]?.variableSpeedDrive).toBe(true);
+    expect(payload.proposedEquipment[0]?.sourceBacked?.controlType).toBe('VSD');
+    expect(payload.proposedEquipment[0]?.flowReferenceBasis).toBe('free_air_delivery');
   });
 
   it('invokes the canonical save before opening preview, and only after success', async () => {
@@ -236,6 +321,9 @@ describe('save-before-preview customer proposal freshness', () => {
     expect(editor).toMatch(/persistSalesProposalEditor/);
     expect(editor).toMatch(/saveThenPreviewCustomerProposal/);
     expect(editor).toMatch(/PREVIEW_SAVE_FAILED_MESSAGE/);
+    expect(editor).toMatch(/customerFromProposal/);
+    expect(editor).toMatch(/CUSTOMER_SELECTION_REQUIRED_MESSAGE/);
+    expect(editor).not.toMatch(/setCurrentEquipment\(\[\]\)/);
     expect(editor).not.toMatch(/to=\{salesProposalPreviewPath/);
     expect(editor).not.toMatch(/test\(doc\.recommendation\)/);
   });

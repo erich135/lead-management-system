@@ -10,6 +10,7 @@ interface ElectricityResultCardProps {
   comparison: AirAndElectricityComparison | null;
   onAddCurrentSpecSheet?: () => void;
   onAddProposedSpecSheet?: () => void;
+  hoursAreEstimated?: boolean | null;
 }
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -31,10 +32,99 @@ function days(value: number | null | undefined): string {
   return formatted ? `${formatted} days` : 'Not available';
 }
 
+function moneyPrecise(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return 'Not available';
+  return `R ${value.toLocaleString('en-ZA', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function CostBreakdownTable({
+  breakdown,
+}: {
+  breakdown: NonNullable<AirAndElectricityComparison['breakdown']['costBreakdown']>;
+}) {
+  const showRows = breakdown.rows.some((row) => row.productionDays != null);
+  return (
+    <div className="mt-4 overflow-x-auto">
+      {showRows && (
+        <>
+          <p className="text-xs font-medium text-[#383838]">
+            Electricity cost by season and day type
+          </p>
+          <table className="mt-2 w-full min-w-[36rem] border-collapse text-left text-xs">
+            <thead>
+              <tr className="border-b border-slate-200 text-slate-500">
+                <th className="py-1.5 pr-2 font-medium">Period</th>
+                <th className="py-1.5 px-2 font-medium text-right">Production days</th>
+                <th className="py-1.5 px-2 font-medium text-right">Daily current</th>
+                <th className="py-1.5 px-2 font-medium text-right">Daily proposed</th>
+                <th className="py-1.5 px-2 font-medium text-right">Annual current</th>
+                <th className="py-1.5 pl-2 font-medium text-right">Annual proposed</th>
+              </tr>
+            </thead>
+            <tbody>
+              {breakdown.rows.map((row) => (
+                <tr key={row.key} className="border-b border-slate-100">
+                  <td className="py-1.5 pr-2 text-[#383838]">{row.label}</td>
+                  <td className="py-1.5 px-2 text-right tabular-nums">
+                    {row.productionDays == null
+                      ? 'Not available'
+                      : formatMeasuredNumber(row.productionDays, 1) ?? 'Not available'}
+                  </td>
+                  <td className="py-1.5 px-2 text-right tabular-nums">
+                    {moneyPrecise(row.dailyCurrentCostRand)}
+                  </td>
+                  <td className="py-1.5 px-2 text-right tabular-nums">
+                    {moneyPrecise(row.dailyProposedCostRand)}
+                  </td>
+                  <td className="py-1.5 px-2 text-right tabular-nums">
+                    {displayOrUnavailable(formatEstimatedRand(row.annualCurrentCostRand))}
+                  </td>
+                  <td className="py-1.5 pl-2 text-right tabular-nums">
+                    {displayOrUnavailable(formatEstimatedRand(row.annualProposedCostRand))}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+      <dl className="mt-3">
+        <Row
+          label="Annual electricity totals before VSD allowance"
+          value={`${displayOrUnavailable(formatEstimatedRand(breakdown.currentAnnualBeforeVsdRand))} / ${displayOrUnavailable(formatEstimatedRand(breakdown.proposedAnnualBeforeVsdRand))}`}
+        />
+        <Row
+          label={breakdown.vsdAllowanceLabel ?? 'ARS VSD allowance — 14%'}
+          value={
+            breakdown.vsdApplicable
+              ? `${displayOrUnavailable(formatEstimatedRand(breakdown.currentVsdAllowanceRand ?? 0))} / ${displayOrUnavailable(formatEstimatedRand(breakdown.proposedVsdAllowanceRand ?? breakdown.vsdAllowanceRand))}`
+              : 'Not applicable'
+          }
+        />
+        <Row
+          label="Adjusted annual totals"
+          value={`${displayOrUnavailable(formatEstimatedRand(breakdown.currentAnnualAdjustedRand))} / ${displayOrUnavailable(formatEstimatedRand(breakdown.proposedAnnualAdjustedRand))}`}
+        />
+        <Row
+          label="Final annual electricity saving"
+          value={displayOrUnavailable(formatEstimatedRand(breakdown.annualSavingAfterVsdRand))}
+        />
+      </dl>
+      {breakdown.vsdNote && (
+        <p className="mt-2 text-xs text-slate-500">{breakdown.vsdNote}</p>
+      )}
+    </div>
+  );
+}
+
 export function ElectricityResultCard({
   comparison,
   onAddCurrentSpecSheet,
   onAddProposedSpecSheet,
+  hoursAreEstimated = null,
 }: ElectricityResultCardProps) {
   if (!comparison) {
     return (
@@ -67,7 +157,7 @@ export function ElectricityResultCard({
   const showProposedSpec =
     comparison.proposed.missingPackageInputNames.length > 0 && onAddProposedSpecSheet;
   const configurationInvalidNote = comparison.notes.find((note) =>
-    note.includes('does not meet the audited air requirement'),
+    note.includes('does not meet the air requirement'),
   );
   const otherNotes = comparison.notes.filter((note) => note !== configurationInvalidNote);
 
@@ -140,6 +230,12 @@ export function ElectricityResultCard({
       </div>
 
       <p className="mt-4 text-sm text-slate-600">{comparison.basisExplanation}</p>
+      {hoursAreEstimated && comparison.operating?.annualOperatingHours != null && (
+        <p className="mt-2 text-sm text-slate-600">
+          Annual operating hours used in this comparison are an estimate
+          ({formatMeasuredNumber(comparison.operating.annualOperatingHours, 0)} hours).
+        </p>
+      )}
       {comparison.electricity.suppliedAmountReferenceNote && (
         <p className="mt-2 text-sm text-slate-600">
           {comparison.electricity.suppliedCurrentAmount != null
@@ -192,7 +288,7 @@ export function ElectricityResultCard({
             value={comparison.breakdown.proposedPackageInputFad ?? 'Not available'}
           />
           <Row
-            label="Electricity rate"
+            label="Average electricity tariff"
             value={comparison.breakdown.electricityRate ?? 'Not available'}
           />
           <Row
@@ -204,6 +300,9 @@ export function ElectricityResultCard({
             value={displayOrUnavailable(formatEstimatedKwh(comparison.breakdown.estimatedProposedKwh))}
           />
         </dl>
+        {comparison.breakdown.costBreakdown && (
+          <CostBreakdownTable breakdown={comparison.breakdown.costBreakdown} />
+        )}
       </details>
     </section>
   );

@@ -1,12 +1,30 @@
 import type {
   CurrentEquipment,
+  MachineEfficiencyAudit,
+  MachineEfficiencyOrigin,
   ProposedEquipment,
   PublicMachineSpec,
   SourceBackedSpec,
+  ElectricalPowerKind,
 } from './types';
 import { DEFAULT_PROPOSED_QUANTITY } from './types.ts';
 import { hasDuplicateMachineIds } from './customerMachineSearch.ts';
-import { hasUsableSourceBacked, specDisplayName } from './specDisplay.ts';
+import {
+  emptySourceBackedSpec,
+  hasUsableSourceBacked,
+  specDisplayName,
+} from './specDisplay.ts';
+import { inferElectricalPowerKind } from './electricalPowerInput.ts';
+import {
+  hasConfirmedPublishedFlowReference,
+  publishedFlowReferenceFromSpec,
+  resolveDraftPublishedFlowReference,
+  type PublishedFlowReference,
+} from './publishedFlowReference.ts';
+import {
+  inferVariableSpeedDriveFromControlType,
+  resolveVariableSpeedDrive,
+} from './variableSpeedDrive.ts';
 
 export interface CurrentEquipmentDraft {
   key: string;
@@ -14,14 +32,27 @@ export interface CurrentEquipmentDraft {
   make: string;
   model: string;
   serialNumber: string;
+  quantity?: number;
   specLibraryRecordId: string | null;
   selectedSpec: PublicMachineSpec | null;
   changingSpec: boolean;
+  enteringManually?: boolean;
   sourceBacked: SourceBackedSpec | null;
   capturingSheet: boolean;
+  specsOpen?: boolean;
+  efficiencyPercent?: number | null;
+  efficiencyOrigin?: MachineEfficiencyOrigin | null;
+  efficiencyAudit?: MachineEfficiencyAudit | null;
+  electricalPowerKind?: ElectricalPowerKind | null;
+  variableSpeedDrive?: boolean | null;
+  advancedSpecificationsOpen?: boolean;
+  flowReferenceBasis?: string | null;
+  referenceAbsolutePressurePa?: number | null;
+  specificationReference?: string | null;
 }
 
 export interface ProposedEquipmentDraft {
+  key: string;
   specLibraryRecordId: string | null;
   selectedSpec: PublicMachineSpec | null;
   quantity: number;
@@ -29,7 +60,39 @@ export interface ProposedEquipmentDraft {
   model: string | null;
   sourceBacked: SourceBackedSpec | null;
   changingSpec: boolean;
+  enteringManually: boolean;
   capturingSheet: boolean;
+  specsOpen?: boolean;
+  efficiencyPercent?: number | null;
+  efficiencyOrigin?: MachineEfficiencyOrigin | null;
+  efficiencyAudit?: MachineEfficiencyAudit | null;
+  electricalPowerKind?: ElectricalPowerKind | null;
+  variableSpeedDrive?: boolean | null;
+  advancedSpecificationsOpen?: boolean;
+  flowReferenceBasis?: string | null;
+  referenceAbsolutePressurePa?: number | null;
+  specificationReference?: string | null;
+}
+
+function publishedFlowReferenceFields(
+  input: PublishedFlowReference,
+): PublishedFlowReference {
+  const source = input.specificationReference?.trim() || null;
+  return {
+    flowReferenceBasis: input.flowReferenceBasis ?? null,
+    referenceAbsolutePressurePa: input.referenceAbsolutePressurePa ?? null,
+    specificationReference: source,
+  };
+}
+
+function fromLibrarySpec(spec: PublicMachineSpec): PublishedFlowReference & {
+  specsOpen: boolean;
+} {
+  const fields = publishedFlowReferenceFromSpec(spec);
+  return {
+    ...fields,
+    specsOpen: !hasConfirmedPublishedFlowReference(fields),
+  };
 }
 
 export function newCurrentEquipmentDraft(): CurrentEquipmentDraft {
@@ -39,16 +102,29 @@ export function newCurrentEquipmentDraft(): CurrentEquipmentDraft {
     make: '',
     model: '',
     serialNumber: '',
+    quantity: DEFAULT_PROPOSED_QUANTITY,
     specLibraryRecordId: null,
     selectedSpec: null,
     changingSpec: true,
+    enteringManually: false,
     sourceBacked: null,
     capturingSheet: false,
+    specsOpen: false,
+    efficiencyPercent: null,
+    efficiencyOrigin: null,
+    efficiencyAudit: null,
+    electricalPowerKind: null,
+    variableSpeedDrive: null,
+    advancedSpecificationsOpen: false,
+    flowReferenceBasis: null,
+    referenceAbsolutePressurePa: null,
+    specificationReference: null,
   };
 }
 
 export function emptyProposedDraft(): ProposedEquipmentDraft {
   return {
+    key: `proposed-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     specLibraryRecordId: null,
     selectedSpec: null,
     quantity: DEFAULT_PROPOSED_QUANTITY,
@@ -56,7 +132,18 @@ export function emptyProposedDraft(): ProposedEquipmentDraft {
     model: null,
     sourceBacked: null,
     changingSpec: true,
+    enteringManually: false,
     capturingSheet: false,
+    specsOpen: false,
+    efficiencyPercent: null,
+    efficiencyOrigin: null,
+    efficiencyAudit: null,
+    electricalPowerKind: null,
+    variableSpeedDrive: null,
+    advancedSpecificationsOpen: false,
+    flowReferenceBasis: null,
+    referenceAbsolutePressurePa: null,
+    specificationReference: null,
   };
 }
 
@@ -71,20 +158,33 @@ export function draftsFromCurrentEquipment(
     make: row.make,
     model: row.model,
     serialNumber: row.serialNumber,
+    quantity: row.quantity && row.quantity >= 1 ? row.quantity : DEFAULT_PROPOSED_QUANTITY,
     specLibraryRecordId: row.specLibraryRecordId,
     selectedSpec: null,
     changingSpec: !row.specLibraryRecordId && !row.sourceBacked,
+    enteringManually: false,
     sourceBacked: row.sourceBacked,
     capturingSheet: false,
+    specsOpen: false,
+    efficiencyPercent: row.efficiencyPercent ?? null,
+    efficiencyOrigin: row.efficiencyOrigin ?? null,
+    efficiencyAudit: row.efficiencyAudit ?? null,
+    electricalPowerKind: row.electricalPowerKind ?? null,
+    variableSpeedDrive: row.variableSpeedDrive ?? null,
+    advancedSpecificationsOpen: false,
+    flowReferenceBasis: row.flowReferenceBasis ?? null,
+    referenceAbsolutePressurePa: row.referenceAbsolutePressurePa ?? null,
+    specificationReference: row.specificationReference ?? null,
   }));
 }
 
-export function proposedDraftFromProposal(
+export function proposedDraftsFromProposal(
   rows: ProposedEquipment[] | undefined,
-): ProposedEquipmentDraft {
-  const row = rows?.[0];
-  if (!row) return emptyProposedDraft();
-  return {
+): ProposedEquipmentDraft[] {
+  const list = rows ?? [];
+  if (list.length === 0) return [emptyProposedDraft()];
+  return list.map((row, index) => ({
+    key: `saved-proposed-${row.specLibraryRecordId ?? row.model ?? 'row'}-${index}`,
     specLibraryRecordId: row.specLibraryRecordId,
     selectedSpec: null,
     quantity: row.quantity >= 1 ? row.quantity : DEFAULT_PROPOSED_QUANTITY,
@@ -92,8 +192,25 @@ export function proposedDraftFromProposal(
     model: row.model,
     sourceBacked: row.sourceBacked,
     changingSpec: !row.specLibraryRecordId && !row.sourceBacked,
+    enteringManually: false,
     capturingSheet: false,
-  };
+    specsOpen: false,
+    efficiencyPercent: row.efficiencyPercent ?? null,
+    efficiencyOrigin: row.efficiencyOrigin ?? null,
+    efficiencyAudit: row.efficiencyAudit ?? null,
+    electricalPowerKind: row.electricalPowerKind ?? null,
+    variableSpeedDrive: row.variableSpeedDrive ?? null,
+    advancedSpecificationsOpen: false,
+    flowReferenceBasis: row.flowReferenceBasis ?? null,
+    referenceAbsolutePressurePa: row.referenceAbsolutePressurePa ?? null,
+    specificationReference: row.specificationReference ?? null,
+  }));
+}
+
+export function proposedDraftFromProposal(
+  rows: ProposedEquipment[] | undefined,
+): ProposedEquipmentDraft {
+  return proposedDraftsFromProposal(rows)[0] ?? emptyProposedDraft();
 }
 
 export function specIdToPreselect(machine: {
@@ -117,6 +234,38 @@ export function retainMachinesForCustomer(
   );
 }
 
+export function attachHydratedLibrarySpec<
+  T extends {
+    selectedSpec: PublicMachineSpec | null;
+    changingSpec: boolean;
+  },
+>(row: T, spec: PublicMachineSpec | null): T {
+  if (!spec) {
+    return { ...row, changingSpec: true };
+  }
+  return {
+    ...row,
+    selectedSpec: spec,
+    changingSpec: false,
+  };
+}
+
+export function libraryHydrationSignature(
+  rows: readonly {
+    key: string;
+    specLibraryRecordId: string | null;
+    selectedSpec: PublicMachineSpec | null;
+    changingSpec: boolean;
+  }[],
+): string {
+  return rows
+    .filter(
+      (row) => row.specLibraryRecordId && !row.selectedSpec && !row.changingSpec,
+    )
+    .map((row) => `${row.key}:${row.specLibraryRecordId}`)
+    .join('|');
+}
+
 export function canAddPhysicalMachine(
   selectedIds: readonly string[],
   nextId: string,
@@ -124,14 +273,68 @@ export function canAddPhysicalMachine(
   return !selectedIds.includes(nextId) && !hasDuplicateMachineIds([...selectedIds, nextId]);
 }
 
+export function applyProposedLibrarySpec(
+  draft: ProposedEquipmentDraft,
+  spec: PublicMachineSpec,
+): ProposedEquipmentDraft {
+  const flow = fromLibrarySpec(spec);
+  return {
+    ...draft,
+    specLibraryRecordId: spec.recordId,
+    selectedSpec: spec,
+    manufacturer: spec.manufacturer,
+    model: spec.model,
+    changingSpec: false,
+    enteringManually: false,
+    capturingSheet: false,
+    sourceBacked: null,
+    specsOpen: flow.specsOpen,
+    electricalPowerKind: inferElectricalPowerKind({
+      packageInputPowerKw: spec.packageInputPowerKw,
+      motorShaftPowerKw: spec.motorShaftPowerKw,
+    }),
+    variableSpeedDrive: inferVariableSpeedDriveFromControlType(spec.controlType),
+    ...publishedFlowReferenceFields(flow),
+  };
+}
+
+export function startManualCurrent(row: CurrentEquipmentDraft): CurrentEquipmentDraft {
+  return {
+    ...row,
+    enteringManually: true,
+    changingSpec: false,
+    capturingSheet: false,
+    specsOpen: true,
+    sourceBacked: row.sourceBacked ?? emptySourceBackedSpec(),
+  };
+}
+
+export function startManualProposed(draft: ProposedEquipmentDraft): ProposedEquipmentDraft {
+  return {
+    ...draft,
+    enteringManually: true,
+    changingSpec: false,
+    capturingSheet: false,
+    specsOpen: true,
+    sourceBacked: draft.sourceBacked ?? emptySourceBackedSpec(),
+  };
+}
+
 export function currentMachineHasIdentity(row: CurrentEquipmentDraft): boolean {
   return Boolean(
-    row.arsMachineId || row.specLibraryRecordId || hasUsableSourceBacked(row.sourceBacked),
+    row.arsMachineId ||
+      row.specLibraryRecordId ||
+      hasUsableSourceBacked(row.sourceBacked) ||
+      (row.enteringManually && (row.make.trim() !== '' || row.model.trim() !== '')),
   );
 }
 
 export function currentMachineIsComplete(row: CurrentEquipmentDraft): boolean {
-  return Boolean(row.specLibraryRecordId || hasUsableSourceBacked(row.sourceBacked));
+  return Boolean(
+    row.specLibraryRecordId ||
+      hasUsableSourceBacked(row.sourceBacked) ||
+      (row.enteringManually && (row.make.trim() !== '' || row.model.trim() !== '')),
+  );
 }
 
 export function currentMachineNeedsSpec(row: CurrentEquipmentDraft): boolean {
@@ -162,33 +365,71 @@ export function toCurrentEquipmentPayload(
         make: row.make,
         model: row.model,
         serialNumber: row.serialNumber,
+        quantity: row.quantity >= 1 ? row.quantity : DEFAULT_PROPOSED_QUANTITY,
         specLibraryRecordId: row.specLibraryRecordId,
-        sourceBacked: row.sourceBacked,
+        sourceBacked: hasUsableSourceBacked(row.sourceBacked)
+          ? row.sourceBacked
+          : row.enteringManually
+            ? {
+                ...emptySourceBackedSpec(),
+                ...row.sourceBacked,
+                manufacturer: row.sourceBacked?.manufacturer || row.make || null,
+                model: row.sourceBacked?.model || row.model || null,
+              }
+            : row.sourceBacked,
+        efficiencyPercent: row.efficiencyPercent ?? null,
+        efficiencyOrigin: row.efficiencyOrigin ?? null,
+        efficiencyAudit: row.efficiencyAudit ?? null,
+        electricalPowerKind: row.electricalPowerKind ?? null,
+        variableSpeedDrive: resolveVariableSpeedDrive(row),
+        ...publishedFlowReferenceFields(resolveDraftPublishedFlowReference(row)),
       },
     ];
   });
 }
 
 export function toProposedEquipmentPayload(
-  draft: ProposedEquipmentDraft,
+  drafts: ProposedEquipmentDraft | ProposedEquipmentDraft[],
 ): ProposedEquipment[] {
-  const specLibraryRecordId =
-    draft.specLibraryRecordId?.trim() ||
-    draft.selectedSpec?.recordId?.trim() ||
-    null;
-  const sourceBacked = hasUsableSourceBacked(draft.sourceBacked)
-    ? draft.sourceBacked
-    : null;
-  if (!specLibraryRecordId && !sourceBacked) return [];
-  return [
-    {
-      specLibraryRecordId,
-      quantity: draft.quantity >= 1 ? draft.quantity : DEFAULT_PROPOSED_QUANTITY,
-      manufacturer: draft.manufacturer ?? draft.selectedSpec?.manufacturer ?? null,
-      model: draft.model ?? draft.selectedSpec?.model ?? null,
-      sourceBacked,
-    },
-  ];
+  const rows = Array.isArray(drafts) ? drafts : [drafts];
+  return rows.flatMap((draft) => {
+    const specLibraryRecordId =
+      draft.specLibraryRecordId?.trim() ||
+      draft.selectedSpec?.recordId?.trim() ||
+      null;
+    const sourceBacked = hasUsableSourceBacked(draft.sourceBacked)
+      ? draft.sourceBacked
+      : draft.enteringManually && (draft.manufacturer || draft.model)
+        ? draft.sourceBacked
+        : null;
+    const manufacturer = draft.manufacturer ?? draft.selectedSpec?.manufacturer ?? null;
+    const model = draft.model ?? draft.selectedSpec?.model ?? null;
+    if (!specLibraryRecordId && !sourceBacked && !manufacturer && !model) return [];
+    return [
+      {
+        specLibraryRecordId,
+        quantity: draft.quantity >= 1 ? draft.quantity : DEFAULT_PROPOSED_QUANTITY,
+        manufacturer,
+        model,
+        sourceBacked: hasUsableSourceBacked(draft.sourceBacked)
+          ? draft.sourceBacked
+          : draft.enteringManually
+            ? {
+                ...emptySourceBackedSpec(),
+                ...draft.sourceBacked,
+                manufacturer,
+                model,
+              }
+            : null,
+        efficiencyPercent: draft.efficiencyPercent ?? null,
+        efficiencyOrigin: draft.efficiencyOrigin ?? null,
+        efficiencyAudit: draft.efficiencyAudit ?? null,
+        electricalPowerKind: draft.electricalPowerKind ?? null,
+        variableSpeedDrive: resolveVariableSpeedDrive(draft),
+        ...publishedFlowReferenceFields(resolveDraftPublishedFlowReference(draft)),
+      },
+    ];
+  });
 }
 
 export function applyPhysicalMachine(
@@ -208,6 +449,7 @@ export function applyPhysicalMachine(
     make: machine.make,
     model: machine.model,
     serialNumber: machine.serialNumber,
+    quantity: DEFAULT_PROPOSED_QUANTITY,
     specLibraryRecordId: remembered,
     selectedSpec: remembered ? row.selectedSpec : null,
     changingSpec: remembered === null,
@@ -220,6 +462,7 @@ export function applyLibrarySpec(
   spec: PublicMachineSpec,
 ): CurrentEquipmentDraft {
   const fromPhysical = Boolean(row.arsMachineId);
+  const flow = fromLibrarySpec(spec);
   return {
     ...row,
     make: fromPhysical ? row.make : spec.manufacturer,
@@ -227,8 +470,16 @@ export function applyLibrarySpec(
     specLibraryRecordId: spec.recordId,
     selectedSpec: spec,
     changingSpec: false,
+    enteringManually: false,
     capturingSheet: false,
     sourceBacked: null,
+    specsOpen: flow.specsOpen,
+    electricalPowerKind: inferElectricalPowerKind({
+      packageInputPowerKw: spec.packageInputPowerKw,
+      motorShaftPowerKw: spec.motorShaftPowerKw,
+    }),
+    variableSpeedDrive: inferVariableSpeedDriveFromControlType(spec.controlType),
+    ...publishedFlowReferenceFields(flow),
   };
 }
 
@@ -240,6 +491,14 @@ export function applyConfirmedLibrarySpec(
   return {
     ...applyLibrarySpec(row, spec),
     sourceBacked,
+    electricalPowerKind: inferElectricalPowerKind({
+      packageInputPowerKw: sourceBacked.packageInputPowerKw ?? spec.packageInputPowerKw,
+      motorShaftPowerKw: sourceBacked.motorShaftPowerKw ?? spec.motorShaftPowerKw,
+    }),
+    variableSpeedDrive: resolveVariableSpeedDrive({
+      sourceBacked,
+      selectedSpec: spec,
+    }),
   };
 }
 

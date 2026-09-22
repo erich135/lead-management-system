@@ -71,7 +71,7 @@ test('editor still sends the same proposed draft to comparison/electricity previ
   );
   assert.match(editor, /previewElectricityComparison/);
   assert.match(editor, /proposedEquipment: toProposedEquipmentPayload\(proposed\)/);
-  assert.match(editor, /setProposed\(proposedDraftFromProposal/);
+  assert.match(editor, /setProposed\(proposedDraftsFromProposal/);
   assert.match(comparison, /comparison\.proposed\.totalRatedFadM3PerMin/);
   assert.match(comparison, /comparison\.proposed\.ratedPressureBarG/);
   assert.match(electricity, /comparison\.proposed\.unavailableReason/);

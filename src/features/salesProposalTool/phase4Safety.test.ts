@@ -36,8 +36,14 @@ test('Phase 4 does not add a frontend science engine, VSD add-on, or commercial 
       assert.equal(/\bA\/B\/Z\b/.test(text), false, file);
       assert.equal(text.includes('payback'), false, file);
     }
-    assert.equal(/0\.14|14%\s*VSD/i.test(text), false, file);
     assert.equal(/BAOFN|Samancor/i.test(text), false, file);
+    if (
+      !file.endsWith('ElectricityResultCard.tsx') &&
+      !file.endsWith('CustomerProposalPreviewPage.tsx') &&
+      !file.endsWith('types.ts')
+    ) {
+      assert.equal(/0\.14|14%\s*VSD/i.test(text), false, file);
+    }
   }
 });
 
@@ -79,6 +85,8 @@ test('electricity result panel displays backend copy and never formats unknown a
   assert.match(card, /comparison\.futureCostDisclaimer/);
   assert.match(card, /Add from specification sheet/);
   assert.match(card, /How was this calculated\?/);
+  assert.match(card, /Average electricity tariff/);
+  assert.match(card, /costBreakdown/);
   assert.match(editor, /previewElectricityComparison/);
   assert.match(editor, /electricityBasis/);
   assert.equal(formatEstimatedRand(null), null);

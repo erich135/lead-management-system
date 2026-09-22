@@ -61,12 +61,17 @@ test('editor asks a compact scope question after CSV upload without blocking the
     path.join(FEATURE_ROOT, 'pages/SalesProposalEditorPage.tsx'),
     'utf8',
   );
+  const airRequirement = fs.readFileSync(
+    path.join(FEATURE_ROOT, 'components/AirRequirementSection.tsx'),
+    'utf8',
+  );
   const fields = fs.readFileSync(
     path.join(FEATURE_ROOT, 'components/AirAuditScopeFields.tsx'),
     'utf8',
   );
-  assert.match(editor, /AirAuditScopeFields/);
-  assert.match(editor, /proposal\.airAudit &&/);
+  assert.match(editor, /AirRequirementSection/);
+  assert.match(airRequirement, /AirAuditScopeFields/);
+  assert.match(airRequirement, /sourceFileName &&/);
   assert.match(editor, /airAuditScope/);
   assert.doesNotMatch(editor, /disabled=\{.*currentEquipment/);
   assert.match(fields, /What does this Air Audit measure\?/);

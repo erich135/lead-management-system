@@ -7,6 +7,7 @@ import {
   PUBLISHED_PACKAGE_INPUT_LABEL,
   publishedPowerRatingRows,
 } from './specDisplay';
+import { ESTIMATED_PACKAGE_INPUT_LABEL } from './electricalPowerInput';
 import type { PublicMachineSpec, SourceBackedSpec } from './types';
 
 const currentSource: SourceBackedSpec = {
@@ -113,5 +114,17 @@ describe('published package input presentation', () => {
     expect(row(sourceRows, 'Published package input')?.value).not.toBe(
       row(sourceRows, 'Motor rating')?.value,
     );
+  });
+
+  it('shows estimated package input when only motor power is available', () => {
+    const motorOnly: PublicMachineSpec = {
+      ...proposedLibrary,
+      packageInputPowerKw: null,
+      motorShaftPowerKw: 55,
+    };
+    const rows = publishedPowerRatingRows(motorOnly, null, 'motor_power');
+    expect(row(rows, MOTOR_RATING_LABEL)?.value).toBe('55,00 kW');
+    expect(row(rows, ESTIMATED_PACKAGE_INPUT_LABEL)?.value).toBe('63,25 kW');
+    expect(row(rows, PUBLISHED_PACKAGE_INPUT_LABEL)).toBeUndefined();
   });
 });

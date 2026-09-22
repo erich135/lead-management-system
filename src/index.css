@@ -620,10 +620,29 @@
   vertical-align: top;
 }
 
+.spt-proposal-electricity-table {
+  font-size: 10px;
+}
+
+.spt-proposal-electricity-table th,
+.spt-proposal-electricity-table td {
+  padding: 4px 5px;
+}
+
 .spt-proposal-num {
   text-align: right;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+}
+
+.spt-proposal-table.spt-proposal-centered-nums th.spt-proposal-num,
+.spt-proposal-table.spt-proposal-centered-nums td.spt-proposal-num {
+  text-align: center;
+}
+
+.spt-proposal-electricity-table th.spt-proposal-num {
+  white-space: normal;
+  line-height: 1.3;
 }
 
 .spt-proposal-total-row td {
@@ -650,6 +669,11 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #727272;
+}
+
+.spt-proposal-figure-strip-center .spt-proposal-figure-label,
+.spt-proposal-figure-strip-center .spt-proposal-figure-value {
+  text-align: center;
 }
 
 .spt-proposal-figure-value {

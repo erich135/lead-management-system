@@ -28,6 +28,7 @@ export interface SalesProposalAirAudit {
   deliveredVolumeM3: number | null;
   flowingFraction: number | null;
   flowingDurationSeconds: number | null;
+  validMeasurementDurationSeconds?: number | null;
   recordedPressureBar: number | null;
   shortRecord: boolean;
   validRowCount: number;
@@ -64,6 +65,19 @@ export interface PublicMachineSpec {
   controlType: string | null;
   sourceTitle: string | null;
   sourceFileName: string | null;
+  flowReferenceBasis?: string | null;
+  referenceAbsolutePressurePa?: number | null;
+}
+
+export type MachineEfficiencyOrigin = 'manual' | 'audit';
+export type MachineEfficiencySource = 'audit' | 'manual' | 'assumed';
+export type ElectricalPowerKind = 'motor_power' | 'package_input';
+
+export interface MachineEfficiencyAudit {
+  sourceFileId: string | null;
+  sourceFileName: string | null;
+  sourceSha256: string | null;
+  extractedPercent: number | null;
 }
 
 export interface CurrentEquipment {
@@ -72,8 +86,17 @@ export interface CurrentEquipment {
   make: string;
   model: string;
   serialNumber: string;
+  quantity: number;
   specLibraryRecordId: string | null;
   sourceBacked: SourceBackedSpec | null;
+  efficiencyPercent?: number | null;
+  efficiencyOrigin?: MachineEfficiencyOrigin | null;
+  efficiencyAudit?: MachineEfficiencyAudit | null;
+  electricalPowerKind?: ElectricalPowerKind | null;
+  variableSpeedDrive?: boolean | null;
+  flowReferenceBasis?: string | null;
+  referenceAbsolutePressurePa?: number | null;
+  specificationReference?: string | null;
 }
 
 export interface ProposedEquipment {
@@ -82,6 +105,14 @@ export interface ProposedEquipment {
   manufacturer: string | null;
   model: string | null;
   sourceBacked: SourceBackedSpec | null;
+  efficiencyPercent?: number | null;
+  efficiencyOrigin?: MachineEfficiencyOrigin | null;
+  efficiencyAudit?: MachineEfficiencyAudit | null;
+  electricalPowerKind?: ElectricalPowerKind | null;
+  variableSpeedDrive?: boolean | null;
+  flowReferenceBasis?: string | null;
+  referenceAbsolutePressurePa?: number | null;
+  specificationReference?: string | null;
 }
 
 export type ElectricityBasisType = 'none' | 'flat_rate' | 'supplied_compressor_amount';
@@ -92,11 +123,30 @@ export interface ElectricityBasis {
   tariffRecordId: string | null;
   suppliedCurrentAmount: number | null;
   suppliedCurrentPeriod: 'monthly' | 'annual' | null;
+  touRates: {
+    ldsStandard: number | null;
+    ldsPeak: number | null;
+    ldsOffPeak: number | null;
+    hdsStandard: number | null;
+    hdsPeak: number | null;
+    hdsOffPeak: number | null;
+  };
+  productionDays: {
+    ldsWorkdays: number | null;
+    ldsSaturdays: number | null;
+    ldsSundays: number | null;
+    hdsWorkdays: number | null;
+    hdsSaturdays: number | null;
+    hdsSundays: number | null;
+  };
+  touHoursPerDay: null;
 }
 
 export interface OperatingAssumptions {
   annualOperatingHours: number | null;
   averageLoadPercent: number | null;
+  hasAirAudit: boolean | null;
+  hoursAreEstimated: boolean | null;
 }
 
 export const EMPTY_ELECTRICITY_BASIS: ElectricityBasis = {
@@ -105,11 +155,30 @@ export const EMPTY_ELECTRICITY_BASIS: ElectricityBasis = {
   tariffRecordId: null,
   suppliedCurrentAmount: null,
   suppliedCurrentPeriod: null,
+  touRates: {
+    ldsStandard: null,
+    ldsPeak: null,
+    ldsOffPeak: null,
+    hdsStandard: null,
+    hdsPeak: null,
+    hdsOffPeak: null,
+  },
+  productionDays: {
+    ldsWorkdays: null,
+    ldsSaturdays: null,
+    ldsSundays: null,
+    hdsWorkdays: null,
+    hdsSaturdays: null,
+    hdsSundays: null,
+  },
+  touHoursPerDay: null,
 };
 
 export const EMPTY_OPERATING_ASSUMPTIONS: OperatingAssumptions = {
   annualOperatingHours: null,
   averageLoadPercent: null,
+  hasAirAudit: null,
+  hoursAreEstimated: null,
 };
 
 export interface AirAndElectricityComparison {
@@ -172,7 +241,16 @@ export interface AirAndElectricityComparison {
     annualDeliveredVolumeM3: number | null;
     unavailableReason: string | null;
     publishedCapacityFallbackNote: string | null;
+    hoursAreEstimated?: boolean | null;
   } | null;
+  airRequirement?: {
+    kind: 'measured' | 'assumed' | 'unavailable';
+    label: string;
+    airflowM3PerMin: number | null;
+    annualVolumeM3: number | null;
+    instruction: string | null;
+    assumedNote: string | null;
+  };
   basisExplanation: string;
   futureCostDisclaimer: string;
   copy: {
@@ -191,6 +269,30 @@ export interface AirAndElectricityComparison {
     electricityRate: string | null;
     estimatedCurrentKwh: number | null;
     estimatedProposedKwh: number | null;
+    costBreakdown?: {
+      rows: Array<{
+        key: string;
+        label: string;
+        productionDays: number | null;
+        dailyCurrentCostRand: number | null;
+        dailyProposedCostRand: number | null;
+        annualCurrentCostRand: number | null;
+        annualProposedCostRand: number | null;
+      }>;
+      currentAnnualBeforeVsdRand: number | null;
+      proposedAnnualBeforeVsdRand: number | null;
+      vsdAllowancePercent: number;
+      vsdAllowanceLabel?: string;
+      vsdAllowanceRand: number | null;
+      currentVsdAllowanceRand?: number | null;
+      proposedVsdAllowanceRand?: number | null;
+      vsdApplicable: boolean;
+      vsdNote: string;
+      currentAnnualAdjustedRand: number | null;
+      proposedAnnualAdjustedRand: number | null;
+      annualSavingAfterVsdRand: number | null;
+      derivedAverageTariffRandPerKwh: number | null;
+    };
   };
 }
 
@@ -346,6 +448,7 @@ export interface SitePerformanceView {
   altitudeLabel: string;
   altitudeDisplay: string | null;
   advisory: string | null;
+  missingInputs?: string[];
 }
 
 export interface CurrentMachineMeasuredPerformance {
@@ -412,6 +515,9 @@ export interface CustomerProposalDocument {
     publishedAirflow: string | null;
     publishedPressure: string | null;
     packageInput: string | null;
+    packageInputEstimated?: boolean;
+    auxiliaryAllowanceNote?: string | null;
+    efficiency?: string | null;
   }>;
   currentMachinePerformance: {
     title: string;
@@ -444,6 +550,9 @@ export interface CustomerProposalDocument {
     publishedAirflow: string | null;
     publishedPressure: string | null;
     packageInput: string | null;
+    packageInputEstimated?: boolean;
+    auxiliaryAllowanceNote?: string | null;
+    efficiency?: string | null;
     estimatedSectionTitle: string | null;
     estimatedLabel: string | null;
     estimatedAirflow: string | null;
@@ -472,6 +581,27 @@ export interface CustomerProposalDocument {
     saving: string | null;
     suppliedAmountReference?: string | null;
     suppliedAmountReferenceNote?: string | null;
+    costBreakdown?: {
+      rows: Array<{
+        label: string;
+        productionDays: string | null;
+        dailyCurrent: string | null;
+        dailyProposed: string | null;
+        annualCurrent: string | null;
+        annualProposed: string | null;
+      }>;
+      beforeVsdCurrent: string | null;
+      beforeVsdProposed: string | null;
+      vsdAllowanceLabel: string;
+      vsdAllowance: string | null;
+      vsdAllowanceCurrent?: string | null;
+      vsdAllowanceProposed?: string | null;
+      vsdNote: string | null;
+      adjustedCurrent: string | null;
+      adjustedProposed: string | null;
+      finalSaving: string | null;
+      averageTariff: string | null;
+    } | null;
   };
   commercial: {
     currentHeadline: string;

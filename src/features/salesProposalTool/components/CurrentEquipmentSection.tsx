@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useDismissibleSearchMenu } from '../useDismissibleSearchMenu';
 import { Loader2, Search, X } from 'lucide-react';
 import { getMachinesByCustomer, type Machine } from '../../../lib/api';
 import { readSpecLibraryRecord, searchSpecLibrary } from '../api';
@@ -10,24 +11,27 @@ import {
   applyLibrarySpec,
   applyConfirmedLibrarySpec,
   applyPhysicalMachine,
+  attachHydratedLibrarySpec,
   canAddPhysicalMachine,
   currentMachineCardTitle,
   currentMachineIsComplete,
   currentMachineNeedsSpec,
   installedSpecSearchHint,
+  libraryHydrationSignature,
   newCurrentEquipmentDraft,
   resetCurrentMachine,
+  startManualCurrent,
   type CurrentEquipmentDraft,
 } from '../equipmentState';
+import { resolveDraftPublishedFlowReference, hasKnownFlowReferenceBasis, AIRFLOW_REFERENCE_NEEDS_CONFIRMATION, OPEN_ADVANCED_SPECIFICATIONS_ACTION, type PublishedFlowReference } from '../publishedFlowReference';
 import {
-  displayedMotorRatingKw,
+  effectiveMotorShaft,
   effectivePackageInput,
   effectiveRatedAirflow,
   effectiveRatedPressure,
-  MOTOR_RATING_LABEL,
   specLibraryResultCopy,
 } from '../specDisplay';
-import { formatMeasuredNumber } from '../formatMeasured';
+import { inferElectricalPowerKind, resolvePackageInputKw } from '../electricalPowerInput';
 import { SEARCH_MENU_PANEL, searchMenuWrapClass } from '../searchOverlay';
 import {
   NO_PUBLISHED_SPEC_MATCH_MESSAGE,
@@ -35,13 +39,20 @@ import {
   physicalMachineLibrarySearchQuery,
   rankPublishedSpecsForPhysicalMachine,
 } from '../suggestPublishedSpecs';
-import type { PublicMachineSpec, SourceBackedSpec } from '../types';
+import type { ElectricalPowerKind, PublicMachineSpec, SourceBackedSpec } from '../types';
 import { PublishedRatingFields } from './PublishedRatingFields';
+import { SpecSheetCapture } from './SpecSheetCapture';
+import { MachineActionRow, QuantityField } from './MachineCardControls';
+import { MachineEfficiencyField } from './MachineEfficiencyField';
+import { VariableSpeedDriveCheckbox } from './VariableSpeedDriveCheckbox';
+import { MissingHint } from './EditorSection';
 import {
   LIBRARY_ADDED_STATUS,
   LIBRARY_USING_STATUS,
   PROPOSAL_ONLY_LIBRARY_STATUS,
 } from '../confirmSpecSheet';
+import { efficiencyFieldsFromRow } from '../machineEfficiency';
+import { inferVariableSpeedDriveFromControlType, resolveVariableSpeedDrive } from '../variableSpeedDrive';
 
 interface CurrentEquipmentSectionProps {
   proposalId: string;
@@ -59,7 +70,10 @@ export function CurrentEquipmentSection({
   const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const hydratedKeys = useRef(new Set<string>());
+  const inFlightKeys = useRef(new Set<string>());
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  const hydrateSignature = libraryHydrationSignature(rows);
 
   useEffect(() => {
     if (!customerId) {
@@ -93,15 +107,16 @@ export function CurrentEquipmentSection({
   }, [rows.length, onChange]);
 
   useEffect(() => {
-    const missing = rows.filter(
+    const missing = rowsRef.current.filter(
       (row) =>
         row.specLibraryRecordId &&
         !row.selectedSpec &&
         !row.changingSpec &&
-        !hydratedKeys.current.has(row.key),
+        !inFlightKeys.current.has(row.key),
     );
     if (missing.length === 0) return;
-    missing.forEach((row) => hydratedKeys.current.add(row.key));
+    const keys = missing.map((row) => row.key);
+    keys.forEach((key) => inFlightKeys.current.add(key));
     let cancelled = false;
     void Promise.all(
       missing.map(async (row) => {
@@ -113,31 +128,27 @@ export function CurrentEquipmentSection({
         }
       }),
     ).then((loaded) => {
+      keys.forEach((key) => inFlightKeys.current.delete(key));
       if (cancelled) return;
       onChange(
-        rows.map((row) => {
+        rowsRef.current.map((row) => {
           const hit = loaded.find((item) => item.key === row.key);
           if (!hit) return row;
-          return hit.spec
-            ? { ...row, selectedSpec: hit.spec, changingSpec: false }
-            : { ...row, changingSpec: true };
+          return attachHydratedLibrarySpec(row, hit.spec);
         }),
       );
     });
     return () => {
       cancelled = true;
     };
-  }, [rows, onChange]);
+  }, [hydrateSignature, onChange]);
 
   function updateRow(key: string, next: CurrentEquipmentDraft) {
     onChange(rows.map((row) => (row.key === key ? next : row)));
   }
 
   return (
-    <section className="space-y-4 overflow-visible">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-[#383838]/70">
-        Current equipment
-      </h2>
+    <div className="space-y-4 overflow-visible">
       {error && <p className="text-xs text-red-600">{error}</p>}
       {rows.map((row) => (
         <CurrentMachineCard
@@ -157,9 +168,9 @@ export function CurrentEquipmentSection({
         onClick={() => onChange([...rows, newCurrentEquipmentDraft()])}
         className="rounded-[8px] bg-slate-100 px-3 py-1.5 text-xs font-medium text-[#383838] hover:bg-slate-200"
       >
-        Add machine
+        Add another machine
       </button>
-    </section>
+    </div>
   );
 }
 
@@ -185,40 +196,13 @@ function CurrentMachineCard({
   const [query, setQuery] = useState('');
   const [librarySpecs, setLibrarySpecs] = useState<PublicMachineSpec[]>([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const { menuOpen, menuRef: searchMenuRef, openMenu, closeMenu } =
+    useDismissibleSearchMenu();
   const [suggestedSpecs, setSuggestedSpecs] = useState<PublicMachineSpec[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [suggestionsOpen, setSuggestionsOpen] = useState(true);
-  const searchMenuRef = useRef<HTMLDivElement>(null);
   const complete = currentMachineIsComplete(row) && !row.changingSpec;
   const needsSpec = currentMachineNeedsSpec(row);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-
-    function closeOnPointerAway(event: PointerEvent) {
-      const target = event.target;
-      if (target instanceof Node && !searchMenuRef.current?.contains(target)) {
-        setMenuOpen(false);
-      }
-    }
-
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key !== 'Escape') return;
-      setMenuOpen(false);
-      const active = document.activeElement;
-      if (active instanceof HTMLElement && searchMenuRef.current?.contains(active)) {
-        active.blur();
-      }
-    }
-
-    document.addEventListener('pointerdown', closeOnPointerAway);
-    document.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnPointerAway);
-      document.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [menuOpen]);
 
   useEffect(() => {
     if (complete || row.capturingSheet || !menuOpen) {
@@ -301,12 +285,24 @@ function CurrentMachineCard({
   async function handleSelectPhysical(machine: Machine) {
     const id = machineRecordId(machine);
     if (id !== row.arsMachineId && !canAddPhysicalMachine(selectedIds, id)) return;
-    setMenuOpen(false);
+    closeMenu();
     const next = applyPhysicalMachine(row, machine);
     if (next.specLibraryRecordId) {
       try {
         const spec = await readSpecLibraryRecord(next.specLibraryRecordId);
-        onChange({ ...next, selectedSpec: spec, changingSpec: false });
+        onChange({
+          ...next,
+          selectedSpec: spec,
+          changingSpec: false,
+          electricalPowerKind: inferElectricalPowerKind({
+            packageInputPowerKw: spec.packageInputPowerKw,
+            motorShaftPowerKw: spec.motorShaftPowerKw,
+          }),
+          ...resolveDraftPublishedFlowReference({
+            ...next,
+            selectedSpec: spec,
+          }),
+        });
         setQuery('');
         return;
       } catch {
@@ -322,7 +318,7 @@ function CurrentMachineCard({
   function handleSelectSpec(spec: PublicMachineSpec) {
     onChange(applyLibrarySpec(row, spec));
     setQuery('');
-    setMenuOpen(false);
+    closeMenu();
   }
 
   if (row.capturingSheet) {
@@ -351,6 +347,14 @@ function CurrentMachineCard({
               model: row.arsMachineId ? row.model : values.model || row.model,
               capturingSheet: false,
               changingSpec: false,
+              electricalPowerKind: inferElectricalPowerKind({
+                packageInputPowerKw: values.packageInputPowerKw,
+                motorShaftPowerKw: values.motorShaftPowerKw,
+              }),
+              variableSpeedDrive:
+                typeof row.variableSpeedDrive === 'boolean'
+                  ? row.variableSpeedDrive
+                  : inferVariableSpeedDriveFromControlType(values.controlType),
             })
           }
           onConfirmed={({ spec, sourceBacked }) =>
@@ -366,26 +370,81 @@ function CurrentMachineCard({
       <div className="flex items-start justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
           Current machine
+          {complete ? ` · × ${row.quantity}` : ''}
         </p>
         <button type="button" onClick={onRemove} className="text-slate-400 hover:text-[#383838]" title="Remove machine">
           <X className="h-4 w-4" />
         </button>
       </div>
 
+      <VariableSpeedDriveCheckbox
+        checked={resolveVariableSpeedDrive(row)}
+        onChange={(variableSpeedDrive) => onChange({ ...row, variableSpeedDrive })}
+      />
+
       {complete ? (
         <SelectedCurrentMachine
+          proposalId={proposalId}
           row={row}
           onSerialChange={(serialNumber) => onChange({ ...row, serialNumber })}
           onSourceChange={(sourceBacked) => onChange({ ...row, sourceBacked })}
+          onElectricalPowerKindChange={(electricalPowerKind) =>
+            onChange({ ...row, electricalPowerKind })
+          }
+          onFlowReferenceChange={(flowReference) => onChange({ ...row, ...flowReference })}
+          onAdvancedOpenChange={(advancedSpecificationsOpen) =>
+            onChange({ ...row, specsOpen: true, advancedSpecificationsOpen })
+          }
           onChangeMachine={() => {
             onChange(resetCurrentMachine(row));
             setQuery('');
-            setMenuOpen(true);
+            openMenu();
           }}
           onCapture={() => onChange({ ...row, capturingSheet: true })}
+          onQuantityChange={(quantity) => onChange({ ...row, quantity })}
+          onEfficiencyChange={(efficiency) => onChange({ ...row, ...efficiency })}
+          onToggleSpecs={() => onChange({ ...row, specsOpen: !row.specsOpen })}
+          onEnterManually={() => onChange(startManualCurrent(row))}
         />
       ) : (
         <div className="overflow-visible">
+          <MachineActionRow
+            onLibrary={() => {
+              openMenu();
+              onChange({ ...row, changingSpec: true, enteringManually: false });
+            }}
+            onManual={() => onChange(startManualCurrent(row))}
+            onUpload={() => onChange({ ...row, capturingSheet: true })}
+          />
+          <div className="mt-3">
+            <MachineEfficiencyField
+              proposalId={proposalId}
+              value={efficiencyFieldsFromRow(row)}
+              onChange={(efficiency) => onChange({ ...row, ...efficiency })}
+            />
+          </div>
+          {row.enteringManually && (
+            <div className="mt-3 space-y-2">
+              <label className="block">
+                <span className="text-xs font-medium text-slate-500">Make</span>
+                <input
+                  type="text"
+                  value={row.make}
+                  onChange={(event) => onChange({ ...row, make: event.target.value })}
+                  className="mt-1 w-full rounded-[8px] border border-slate-300 px-3 py-2 text-sm focus:border-[#0969a9] focus:outline-none focus:ring-2 focus:ring-[#0969a9]/20"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-slate-500">Model</span>
+                <input
+                  type="text"
+                  value={row.model}
+                  onChange={(event) => onChange({ ...row, model: event.target.value })}
+                  className="mt-1 w-full rounded-[8px] border border-slate-300 px-3 py-2 text-sm focus:border-[#0969a9] focus:outline-none focus:ring-2 focus:ring-[#0969a9]/20"
+                />
+              </label>
+            </div>
+          )}
           {needsSpec && (
             <p className="mb-2 text-sm text-slate-600">
               {row.make} {row.model}
@@ -403,14 +462,14 @@ function CurrentMachineCard({
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);
-                setMenuOpen(true);
+                openMenu();
               }}
-              onFocus={() => setMenuOpen(true)}
+              onClick={openMenu}
+              onFocus={openMenu}
               onKeyDown={(event) => {
                 if (event.key !== 'Escape') return;
                 event.preventDefault();
-                setMenuOpen(false);
-                event.currentTarget.blur();
+                closeMenu();
               }}
               placeholder="Search make, model, serial or library..."
               autoComplete="off"
@@ -424,7 +483,7 @@ function CurrentMachineCard({
                 title="Clear search"
                 onClick={() => {
                   setQuery('');
-                  setMenuOpen(true);
+                  openMenu();
                 }}
               >
                 <X className="h-4 w-4" />
@@ -517,11 +576,22 @@ function CurrentMachineCard({
                   type="button"
                   className="font-medium text-[#0969a9] underline"
                   onClick={() => {
-                    setMenuOpen(false);
+                    closeMenu();
                     onChange({ ...row, capturingSheet: true });
                   }}
                 >
                   Add from specification sheet
+                </button>
+                {' · '}
+                <button
+                  type="button"
+                  className="font-medium text-[#0969a9] underline"
+                  onClick={() => {
+                    closeMenu();
+                    onChange(startManualCurrent(row));
+                  }}
+                >
+                  Enter manually
                 </button>
               </div>
               </div>
@@ -538,6 +608,7 @@ function CurrentMachineCard({
               }}
               onSelect={handleSelectSpec}
               onCapture={() => onChange({ ...row, capturingSheet: true })}
+              onManual={() => onChange(startManualCurrent(row))}
             />
           )}
         </div>
@@ -553,6 +624,7 @@ function PhysicalMachineSpecSuggestions({
   onToggle,
   onSelect,
   onCapture,
+  onManual,
 }: {
   specs: PublicMachineSpec[];
   loading: boolean;
@@ -560,6 +632,7 @@ function PhysicalMachineSpecSuggestions({
   onToggle: () => void;
   onSelect: (spec: PublicMachineSpec) => void;
   onCapture: () => void;
+  onManual: () => void;
 }) {
   return (
     <div className="mt-3 rounded-[8px] border border-slate-200 bg-slate-50 p-3">
@@ -619,25 +692,47 @@ function PhysicalMachineSpecSuggestions({
       >
         Add from specification sheet
       </button>
+      <button
+        type="button"
+        className="mt-2 ml-3 text-xs font-medium text-[#0969a9] underline"
+        onClick={onManual}
+      >
+        Enter manually
+      </button>
     </div>
   );
 }
 
 function SelectedCurrentMachine({
+  proposalId,
   row,
   onSerialChange,
   onSourceChange,
+  onElectricalPowerKindChange,
+  onFlowReferenceChange,
+  onAdvancedOpenChange,
   onChangeMachine,
   onCapture,
+  onQuantityChange,
+  onEfficiencyChange,
+  onToggleSpecs,
+  onEnterManually,
 }: {
+  proposalId: string;
   row: CurrentEquipmentDraft;
   onSerialChange: (serialNumber: string) => void;
   onSourceChange: (sourceBacked: SourceBackedSpec) => void;
+  onElectricalPowerKindChange: (kind: ElectricalPowerKind) => void;
+  onFlowReferenceChange: (flowReference: PublishedFlowReference) => void;
+  onAdvancedOpenChange: (open: boolean) => void;
   onChangeMachine: () => void;
   onCapture: () => void;
+  onQuantityChange: (quantity: number) => void;
+  onEfficiencyChange: (efficiency: ReturnType<typeof efficiencyFieldsFromRow>) => void;
+  onToggleSpecs: () => void;
+  onEnterManually: () => void;
 }) {
   const title = currentMachineCardTitle(row);
-  const motor = displayedMotorRatingKw(row.selectedSpec, row.sourceBacked);
   const source =
     row.selectedSpec?.sourceTitle ||
     row.selectedSpec?.sourceFileName ||
@@ -646,15 +741,40 @@ function SelectedCurrentMachine({
   const pressure = effectiveRatedPressure(row.selectedSpec, row.sourceBacked);
   const airflow = effectiveRatedAirflow(row.selectedSpec, row.sourceBacked);
   const packageInput = effectivePackageInput(row.selectedSpec, row.sourceBacked);
-  const missingPackage = packageInput.value === null;
+  const motor = effectiveMotorShaft(row.selectedSpec, row.sourceBacked);
+  const missingPower =
+    resolvePackageInputKw({
+      storedKind: row.electricalPowerKind ?? null,
+      packageInputPowerKw: packageInput.value,
+      motorShaftPowerKw: motor.value,
+    }).packageInputKw === null;
   const missingAirflow = airflow.value === null;
   const missingPressure = pressure.value === null;
+  const flowReference = resolveDraftPublishedFlowReference(row);
+  const unknownFlowReference = !hasKnownFlowReferenceBasis(flowReference.flowReferenceBasis);
   const libraryOnly = !row.arsMachineId;
   const addedFromSheet = Boolean(row.sourceBacked?.sourceFileId);
 
   return (
     <div>
       <p className="text-sm font-medium text-[#383838]">{title}</p>
+      <div className="mt-2 flex flex-wrap items-end gap-3">
+        <QuantityField value={row.quantity ?? 1} onChange={onQuantityChange} />
+        <button
+          type="button"
+          className="text-xs font-medium text-[#0969a9] underline"
+          onClick={onToggleSpecs}
+        >
+          {row.specsOpen ? 'Hide specifications' : 'Show specifications'}
+        </button>
+      </div>
+      <div className="mt-3">
+        <MachineEfficiencyField
+          proposalId={proposalId}
+          value={efficiencyFieldsFromRow(row)}
+          onChange={onEfficiencyChange}
+        />
+      </div>
       <p className="mt-1 text-xs text-slate-500">
         {row.specLibraryRecordId
           ? addedFromSheet
@@ -679,43 +799,56 @@ function SelectedCurrentMachine({
             )}
           </dd>
         </div>
-        <PublishedRatingFields
-          library={row.selectedSpec}
-          source={row.sourceBacked}
-          identity={{
-            manufacturer: row.selectedSpec?.manufacturer ?? row.make,
-            model: row.selectedSpec?.model ?? row.model,
-            modelVariant: row.selectedSpec?.modelVariant ?? null,
-          }}
-          onSourceChange={onSourceChange}
-        />
-        {motor !== null && (
-          <CardValue
-            label={MOTOR_RATING_LABEL}
-            value={
-              formatMeasuredNumber(motor, 2)
-                ? `${formatMeasuredNumber(motor, 2)} kW`
-                : 'Not available'
-            }
-          />
-        )}
-        {source && (
-          <div>
-            <dt className="text-xs font-medium text-slate-500">Source</dt>
-            <dd className="text-sm text-[#383838]">{source}</dd>
-          </div>
+        {row.specsOpen && (
+          <>
+            <PublishedRatingFields
+              library={row.selectedSpec}
+              source={row.sourceBacked}
+              identity={{
+                manufacturer: row.selectedSpec?.manufacturer ?? row.make,
+                model: row.selectedSpec?.model ?? row.model,
+                modelVariant: row.selectedSpec?.modelVariant ?? null,
+              }}
+              electricalPowerKind={row.electricalPowerKind ?? null}
+              onSourceChange={onSourceChange}
+              onElectricalPowerKindChange={onElectricalPowerKindChange}
+              flowReference={flowReference}
+              onFlowReferenceChange={onFlowReferenceChange}
+              advancedOpen={row.advancedSpecificationsOpen === true}
+              onAdvancedOpenChange={onAdvancedOpenChange}
+            />
+            {source && (
+              <div>
+                <dt className="text-xs font-medium text-slate-500">Source</dt>
+                <dd className="text-sm text-[#383838]">{source}</dd>
+              </div>
+            )}
+          </>
         )}
       </dl>
-      {(missingPackage || missingAirflow || missingPressure) && (
-        <p className="mt-2 text-xs text-slate-600">
+      {(missingPower || missingAirflow || missingPressure) && (
+        <MissingHint>
           Enter the missing published ratings, or{' '}
           <button type="button" className="font-medium text-[#0969a9] underline" onClick={onCapture}>
             add from a specification sheet
           </button>
           .
-        </p>
+        </MissingHint>
       )}
-      {!(missingPackage || missingAirflow || missingPressure) && (
+      {unknownFlowReference && !row.specsOpen && (
+        <MissingHint>
+          {AIRFLOW_REFERENCE_NEEDS_CONFIRMATION}
+          {' '}
+          <button
+            type="button"
+            className="font-medium text-[#0969a9] underline"
+            onClick={() => onAdvancedOpenChange(true)}
+          >
+            {OPEN_ADVANCED_SPECIFICATIONS_ACTION}
+          </button>
+        </MissingHint>
+      )}
+      {!(missingPower || missingAirflow || missingPressure) && (
         <button type="button" className="mt-2 text-xs font-medium text-[#0969a9] underline" onClick={onCapture}>
           Add from specification sheet
         </button>
@@ -727,15 +860,13 @@ function SelectedCurrentMachine({
       >
         Change machine
       </button>
-    </div>
-  );
-}
-
-function CardValue({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-xs font-medium text-slate-500">{label}</dt>
-      <dd className="text-sm text-[#383838]">{value}</dd>
+      <div className="mt-3">
+        <MachineActionRow
+          onLibrary={onChangeMachine}
+          onManual={onEnterManually}
+          onUpload={onCapture}
+        />
+      </div>
     </div>
   );
 }

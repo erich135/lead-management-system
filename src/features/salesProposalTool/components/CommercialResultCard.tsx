@@ -55,10 +55,10 @@ export function CommercialResultCard({ commercial }: CommercialResultCardProps) 
       ? null
       : `${formatMeasuredNumber(commercial.purchase.paybackYears, 1)} years`;
   const configurationInvalidNote =
-    commercial.unavailableReason?.includes('does not meet the audited air requirement')
+    commercial.unavailableReason?.includes('does not meet the air requirement')
       ? commercial.unavailableReason
       : commercial.notes.find((note) =>
-          note.includes('does not meet the audited air requirement'),
+          note.includes('does not meet the air requirement'),
         );
   const otherNotes = commercial.notes.filter((note) => note !== configurationInvalidNote);
 

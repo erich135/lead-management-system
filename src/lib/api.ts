@@ -54,10 +54,11 @@ function apiBase(): string {
 interface ApiResponse<T> {
   success: boolean;
   data?: T;
-  error?: {
-    message: string;
-    stack?: string;
-  };
+    error?: {
+      message: string;
+      stack?: string;
+      reason?: string;
+    };
   message?: string;
 }
 
@@ -65,12 +66,14 @@ interface ApiResponse<T> {
 export class ApiRequestError extends Error {
   readonly kind: ApiFailureKind;
   readonly status?: number;
+  readonly reason?: string;
 
-  constructor(message: string, options: { kind: ApiFailureKind; status?: number }) {
+  constructor(message: string, options: { kind: ApiFailureKind; status?: number; reason?: string }) {
     super(message);
     this.name = 'ApiRequestError';
     this.kind = options.kind;
     this.status = options.status;
+    this.reason = options.reason;
   }
 }
 
@@ -260,6 +263,7 @@ async function apiRequest<T>(
     throw new ApiRequestError(errorMessage, {
       kind: response.ok ? 'malformed' : classifyApiFailure({ status: response.status }),
       status: response.status,
+      reason: data.error?.reason,
     });
   }
 
@@ -5749,6 +5753,7 @@ export default {
   geocodeSearch,
   geocodeReverse,
   geocodeEnrich,
+  geocodeMapsBrowserConfig,
 };
 
 // ============================================================
@@ -5846,6 +5851,10 @@ export interface SiteLocationEnrichmentResponse {
     lookedUpAt: string;
   } | null;
   elevationFailed: boolean;
+}
+
+export async function geocodeMapsBrowserConfig(): Promise<{ apiKey: string }> {
+  return apiRequest<{ apiKey: string }>('/api/geocode/maps-browser-config', { method: 'GET' });
 }
 
 /**

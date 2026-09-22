@@ -1,5 +1,9 @@
 export const GOOGLE_LOOKUP_UNAVAILABLE = 'Google address lookup is unavailable';
+export const GOOGLE_LOOKUP_USER_MESSAGE =
+  'Location lookup is unavailable. You can still click the map or type the site details.';
 export const STREET_MAP_ZOOM = 17;
+
+export type GoogleLookupReason = 'no_key' | 'not_enabled' | 'provider_error';
 
 export type PinSearchHit = {
   latitude: number;
@@ -7,10 +11,29 @@ export type PinSearchHit = {
   address: string;
 };
 
+function errorMessage(error: unknown): string {
+  if (!error || typeof error !== 'object' || !('message' in error)) return '';
+  return String((error as { message?: unknown }).message || '');
+}
+
+function errorReason(error: unknown): string {
+  if (!error || typeof error !== 'object' || !('reason' in error)) return '';
+  return String((error as { reason?: unknown }).reason || '');
+}
+
 export function isGoogleLookupUnavailableError(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false;
-  const message = 'message' in error ? String((error as { message?: unknown }).message) : '';
-  return message === GOOGLE_LOOKUP_UNAVAILABLE;
+  if (errorReason(error) === 'no_key' || errorReason(error) === 'not_enabled' || errorReason(error) === 'provider_error') {
+    return true;
+  }
+  return errorMessage(error) === GOOGLE_LOOKUP_UNAVAILABLE;
+}
+
+export function googleLookupUserMessage(_error?: unknown): string {
+  return GOOGLE_LOOKUP_USER_MESSAGE;
+}
+
+export function googleMapsAuthFailureMessage(): string {
+  return GOOGLE_LOOKUP_USER_MESSAGE;
 }
 
 function parseCoordinate(value: string | number | undefined): number | null {

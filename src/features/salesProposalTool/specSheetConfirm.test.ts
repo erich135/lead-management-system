@@ -16,6 +16,7 @@ import { buildSalesProposalSavePayload } from './salesProposalPersistence';
 import { DEFAULT_AIR_AUDIT_SCOPE } from './airAuditScope';
 import {
   EMPTY_COMMERCIAL_OFFER,
+  EMPTY_ELECTRICITY_BASIS,
   EMPTY_OPERATING_ASSUMPTIONS,
   EMPTY_SITE,
   type PublicMachineSpec,
@@ -179,13 +180,12 @@ describe('Sales Proposal Tool Step 10C confirmation UX', () => {
       currentEquipment: [],
       proposed: emptyProposedDraft(),
       electricityBasis: {
+        ...EMPTY_ELECTRICITY_BASIS,
         type: 'flat_rate',
         flatRateRandPerKwh: 2.5,
-        tariffRecordId: null,
-        suppliedCurrentAmount: null,
-        suppliedCurrentPeriod: null,
       },
       operatingAssumptions: {
+        ...EMPTY_OPERATING_ASSUMPTIONS,
         annualOperatingHours: 4000,
         averageLoadPercent: 70,
       },
@@ -193,6 +193,7 @@ describe('Sales Proposal Tool Step 10C confirmation UX', () => {
       airAuditScope: DEFAULT_AIR_AUDIT_SCOPE,
     });
     expect(payload.operatingAssumptions).toEqual({
+      ...EMPTY_OPERATING_ASSUMPTIONS,
       annualOperatingHours: 4000,
       averageLoadPercent: 70,
     });

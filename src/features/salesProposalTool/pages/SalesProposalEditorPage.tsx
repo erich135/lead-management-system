@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { getMachinesByCustomer, type Customer } from '../../../lib/api';
@@ -12,8 +12,6 @@ import {
 import { CustomerSelect } from '../components/CustomerSelect';
 import { SiteFields } from '../components/SiteFields';
 import { SiteMapCapture } from '../components/SiteMapCapture';
-import { AirAuditUpload } from '../components/AirAuditUpload';
-import { AirAuditScopeFields } from '../components/AirAuditScopeFields';
 import { MeasuredAuditCard } from '../components/MeasuredAuditCard';
 import { CurrentMachinePerformanceCard } from '../components/CurrentMachinePerformanceCard';
 import { CurrentEquipmentSection } from '../components/CurrentEquipmentSection';
@@ -22,6 +20,8 @@ import { MachineSummaryCard } from '../components/MachineSummaryCard';
 import { ElectricityBasisSection } from '../components/ElectricityBasisSection';
 import { OperatingAssumptionsSection } from '../components/OperatingAssumptionsSection';
 import { CommercialOfferSection } from '../components/CommercialOfferSection';
+import { AirRequirementSection } from '../components/AirRequirementSection';
+import { EditorSection } from '../components/EditorSection';
 import { AirMachineComparisonCard } from '../components/AirMachineComparisonCard';
 import { ElectricityResultCard } from '../components/ElectricityResultCard';
 import { CommercialResultCard } from '../components/CommercialResultCard';
@@ -29,7 +29,7 @@ import {
   currentMachineHasIdentity,
   draftsFromCurrentEquipment,
   emptyProposedDraft,
-  proposedDraftFromProposal,
+  proposedDraftsFromProposal,
   retainMachinesForCustomer,
   toCurrentEquipmentPayload,
   toProposedEquipmentPayload,
@@ -52,6 +52,10 @@ import {
   type SalesProposalEditorState,
 } from '../salesProposalPersistence';
 import {
+  CUSTOMER_SELECTION_REQUIRED_MESSAGE,
+  customerFromProposal,
+} from '../salesProposalEditorRestore';
+import {
   EMPTY_SITE,
   type AirAndElectricityComparison,
   type CommercialComparison,
@@ -72,7 +76,7 @@ export function SalesProposalEditorPage() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [site, setSite] = useState<SalesProposalSite>(EMPTY_SITE);
   const [currentEquipment, setCurrentEquipment] = useState<CurrentEquipmentDraft[]>([]);
-  const [proposed, setProposed] = useState<ProposedEquipmentDraft>(emptyProposedDraft());
+  const [proposed, setProposed] = useState<ProposedEquipmentDraft[]>([emptyProposedDraft()]);
   const [electricityBasis, setElectricityBasis] = useState<ElectricityBasis>(
     electricityBasisOrEmpty(null),
   );
@@ -96,7 +100,6 @@ export function SalesProposalEditorPage() {
   const [error, setError] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const previousCustomerId = useRef<string | null>(null);
 
   useEffect(() => {
     if (!proposalId) return;
@@ -115,19 +118,22 @@ export function SalesProposalEditorPage() {
             drafts.filter(currentMachineHasIdentity).map((row) => row.key),
           ),
         );
-        setProposed(proposedDraftFromProposal(loaded.proposedEquipment));
+        setProposed(proposedDraftsFromProposal(loaded.proposedEquipment));
         setElectricityBasis(electricityBasisOrEmpty(loaded.electricityBasis));
-        setOperatingAssumptions(operatingAssumptionsOrEmpty(loaded.operatingAssumptions));
+        setOperatingAssumptions(
+          operatingAssumptionsOrEmpty({
+            ...operatingAssumptionsOrEmpty(loaded.operatingAssumptions),
+            hasAirAudit:
+              loaded.operatingAssumptions?.hasAirAudit ??
+              (loaded.airAudit ? true : loaded.operatingAssumptions?.hasAirAudit ?? null),
+          }),
+        );
         setCommercialOffer(commercialOfferOrEmpty(loaded.commercialOffer));
         setComparison(loaded.comparison);
         setCommercial(loaded.commercial);
         setCurrentMachinePerformance(loaded.currentMachinePerformance ?? null);
         setProposedSitePerformance(loaded.proposedSitePerformance ?? null);
-        setCustomer(
-          loaded.customerId && loaded.customerName
-            ? { _id: loaded.customerId, name: loaded.customerName }
-            : null,
-        );
+        setCustomer(customerFromProposal(loaded));
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -144,10 +150,6 @@ export function SalesProposalEditorPage() {
 
   useEffect(() => {
     const nextId = customer?._id ?? null;
-    if (previousCustomerId.current && nextId === null) {
-      setCurrentEquipment([]);
-    }
-    previousCustomerId.current = nextId;
     if (!nextId) return;
     let cancelled = false;
     void getMachinesByCustomer(nextId)
@@ -226,6 +228,7 @@ export function SalesProposalEditorPage() {
 
   function applyPersistedProposal(saved: SalesProposal) {
     setProposal(saved);
+    setCustomer(customerFromProposal(saved));
     setSite(saved.site);
     const drafts = draftsFromCurrentEquipment(saved.currentEquipment);
     setCurrentEquipment(drafts);
@@ -235,7 +238,7 @@ export function SalesProposalEditorPage() {
         drafts.filter(currentMachineHasIdentity).map((row) => row.key),
       ),
     );
-    setProposed(proposedDraftFromProposal(saved.proposedEquipment));
+    setProposed(proposedDraftsFromProposal(saved.proposedEquipment));
     setElectricityBasis(electricityBasisOrEmpty(saved.electricityBasis));
     setOperatingAssumptions(operatingAssumptionsOrEmpty(saved.operatingAssumptions));
     setCommercialOffer(commercialOfferOrEmpty(saved.commercialOffer));
@@ -347,7 +350,19 @@ export function SalesProposalEditorPage() {
   }
 
   function openProposedSpecSheet() {
-    setProposed((draft) => ({ ...draft, capturingSheet: true, changingSpec: false }));
+    setProposed((rows) => {
+      const index = rows.findIndex(
+        (row) => effectivePackageInput(row.selectedSpec, row.sourceBacked).value === null,
+      );
+      if (index < 0) return rows;
+      return rows.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, capturingSheet: true, changingSpec: false, specsOpen: true } : row,
+      );
+    });
+  }
+
+  function setHasAirAudit(next: boolean) {
+    setOperatingAssumptions((current) => ({ ...current, hasAirAudit: next }));
   }
 
   if (loading) {
@@ -400,37 +415,65 @@ export function SalesProposalEditorPage() {
       {saveMessage && <p className="mt-0 text-sm text-emerald-700">{saveMessage}</p>}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-6 overflow-visible rounded-[8px] border border-slate-200 bg-white p-5 shadow-sm">
-          <section className="space-y-4">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-[#383838]/70">
-              Customer &amp; Site
-            </h2>
+        <div className="space-y-8 overflow-visible rounded-[8px] border border-slate-200 bg-white p-5 shadow-sm">
+          <EditorSection
+            number={1}
+            title="Customer"
+            instruction="Choose the customer. Known details are filled in for you."
+          >
             <CustomerSelect
               customerId={customer?._id ?? null}
               customerName={customer?.name ?? null}
               onSelect={(selected) => setCustomer(selected)}
               onClear={() => setCustomer(null)}
             />
+            {!customer && (
+              <p className="text-xs font-medium text-amber-800">
+                {CUSTOMER_SELECTION_REQUIRED_MESSAGE}
+              </p>
+            )}
+          </EditorSection>
+          <EditorSection
+            number={2}
+            title="Site"
+            instruction="Name the site and pin it on the map. Altitude is read from the pin."
+          >
             <SiteFields
               customer={customer}
               siteName={site.name ?? ''}
               onSiteNameChange={updateSiteName}
             />
             <SiteMapCapture site={site} onChange={setSite} />
-          </section>
-          <AirAuditUpload
-            uploading={uploading}
-            removing={removingAirAudit}
-            error={uploadError}
-            sourceFileName={proposal.airAudit?.sourceFileName ?? null}
-            onFile={(file) => void handleUpload(file)}
-            onRemove={() => void handleRemoveAirAudit()}
-          />
-          {proposal.airAudit && (
-            <AirAuditScopeFields
+          </EditorSection>
+          <EditorSection
+            number={3}
+            title="Current machines"
+            instruction="Add every machine being replaced. Choose from the library, enter details by hand, or upload a spec sheet. You can mix these. Edits stay on this proposal."
+          >
+            <CurrentEquipmentSection
+              proposalId={proposal.id}
+              customerId={customer?._id ?? null}
+              rows={currentEquipment}
+              onChange={setCurrentEquipment}
+            />
+          </EditorSection>
+          <EditorSection
+            number={4}
+            title="Air requirement"
+            instruction="If you have an air audit, upload it. If not, the proposed machines set the assumed air requirement for both sides of the comparison."
+          >
+            <AirRequirementSection
+              hasAirAudit={operatingAssumptions.hasAirAudit}
+              onHasAirAuditChange={setHasAirAudit}
+              uploading={uploading}
+              removing={removingAirAudit}
+              error={uploadError}
+              sourceFileName={proposal.airAudit?.sourceFileName ?? null}
+              onFile={(file) => void handleUpload(file)}
+              onRemove={() => void handleRemoveAirAudit()}
               scope={airAuditScope}
               machines={currentEquipment}
-              onChange={(next) =>
+              onScopeChange={(next) =>
                 setAirAuditScope(
                   normaliseAirAuditScope(
                     next,
@@ -438,29 +481,45 @@ export function SalesProposalEditorPage() {
                   ),
                 )
               }
+              proposedReady={toProposedEquipmentPayload(proposed).length > 0}
+              airRequirement={comparison?.airRequirement}
             />
-          )}
-          <OperatingAssumptionsSection
-            value={operatingAssumptions}
-            airAuditPresent={Boolean(proposal.airAudit)}
-            onChange={setOperatingAssumptions}
-          />
-          <CurrentEquipmentSection
-            proposalId={proposal.id}
-            customerId={customer?._id ?? null}
-            rows={currentEquipment}
-            onChange={setCurrentEquipment}
-          />
-          <ProposedReplacementSection
-            proposalId={proposal.id}
-            draft={proposed}
-            onChange={setProposed}
-          />
-          <ElectricityBasisSection value={electricityBasis} onChange={setElectricityBasis} />
-          <CommercialOfferSection value={commercialOffer} onChange={setCommercialOffer} />
+          </EditorSection>
+          <EditorSection
+            number={5}
+            title="Proposed machines"
+            instruction="Add the BOUWA machines you are offering. Different models and quantities are allowed. Specifications can always be edited."
+          >
+            <ProposedReplacementSection
+              proposalId={proposal.id}
+              rows={proposed}
+              onChange={setProposed}
+            />
+          </EditorSection>
+          <EditorSection
+            number={6}
+            title="Electricity"
+            instruction="Enter annual hours and the six R/kWh rates. The same hours, air requirement and tariff apply to current and proposed machines."
+          >
+            <OperatingAssumptionsSection
+              value={operatingAssumptions}
+              airAuditPresent={operatingAssumptions.hasAirAudit === true}
+              onChange={setOperatingAssumptions}
+            />
+            <ElectricityBasisSection value={electricityBasis} onChange={setElectricityBasis} />
+          </EditorSection>
+          <EditorSection
+            number={7}
+            title="Price"
+            instruction="Enter the commercial offer, including buy-back, installation and extras."
+          >
+            <CommercialOfferSection value={commercialOffer} onChange={setCommercialOffer} />
+          </EditorSection>
         </div>
         <div className="space-y-6">
-          <MeasuredAuditCard audit={proposal.airAudit} />
+          {operatingAssumptions.hasAirAudit !== false && (
+            <MeasuredAuditCard audit={proposal.airAudit} />
+          )}
           <MachineSummaryCard
             current={currentEquipment}
             proposed={proposed}
@@ -475,6 +534,7 @@ export function SalesProposalEditorPage() {
             comparison={comparison}
             onAddCurrentSpecSheet={openCurrentSpecSheet}
             onAddProposedSpecSheet={openProposedSpecSheet}
+            hoursAreEstimated={operatingAssumptions.hoursAreEstimated}
           />
           <CommercialResultCard commercial={commercial} />
         </div>

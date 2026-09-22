@@ -7,6 +7,8 @@ import {
   canConfirmMapPin,
   confirmedPinAddress,
   GOOGLE_LOOKUP_UNAVAILABLE,
+  googleLookupUserMessage,
+  GOOGLE_LOOKUP_USER_MESSAGE,
   isGoogleLookupUnavailableError,
   pinFromPlaceDetails,
   pinFromReverse,
@@ -56,6 +58,9 @@ test('reverse lookup of GPS coordinates rejects coordinate-only labels', () => {
 });
 
 test('Google provider failure keeps Confirm off until a typed address is available', () => {
+  const noKey = Object.assign(new Error(GOOGLE_LOOKUP_UNAVAILABLE), { reason: 'no_key' });
+  assert.equal(isGoogleLookupUnavailableError(noKey), true);
+  assert.equal(googleLookupUserMessage(noKey), GOOGLE_LOOKUP_USER_MESSAGE);
   assert.equal(
     isGoogleLookupUnavailableError(new Error(GOOGLE_LOOKUP_UNAVAILABLE)),
     true,

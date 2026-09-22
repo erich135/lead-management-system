@@ -3,12 +3,14 @@ import test from 'node:test';
 import {
   applyLibrarySpec,
   applyPhysicalMachine,
+  attachHydratedLibrarySpec,
   canAddPhysicalMachine,
   currentMachineCardTitle,
   currentMachineIsComplete,
   currentMachineNeedsSpec,
   draftsFromCurrentEquipment,
   emptyProposedDraft,
+  newCurrentEquipmentDraft,
   retainMachinesForCustomer,
   specIdToPreselect,
   toCurrentEquipmentPayload,
@@ -313,6 +315,58 @@ test('proposed payload uses the selected library spec id when the draft id was n
   });
   assert.equal(payload[0].specLibraryRecordId, 'lib-sc-rs37a');
   assert.equal(payload[0].model, 'SC-RS37A');
+});
+
+test('library hydration attaches the spec without replacing proposal-specific edits', () => {
+  const library = {
+    recordId: 'lib-ga37',
+    manufacturer: 'Atlas Copco',
+    model: 'GA37+',
+    modelVariant: null,
+    ratedPressureBarG: 7.5,
+    ratedAirflowM3PerMin: 6.5,
+    packageInputPowerKw: 41,
+    motorShaftPowerKw: 37,
+    controlType: 'VSD',
+    sourceTitle: 'CAGI',
+    sourceFileName: null,
+    flowReferenceBasis: 'free_air_delivery',
+    referenceAbsolutePressurePa: 101325,
+  };
+  const row = {
+    ...newCurrentEquipmentDraft(),
+    specLibraryRecordId: 'lib-ga37',
+    efficiencyPercent: 94,
+    efficiencyOrigin: 'manual' as const,
+    electricalPowerKind: 'motor_power' as const,
+    variableSpeedDrive: false,
+    flowReferenceBasis: 'actual_volumetric',
+    referenceAbsolutePressurePa: 95000,
+    specificationReference: 'Proposal note',
+    sourceBacked: {
+      manufacturer: 'Atlas Copco',
+      model: 'GA37+',
+      modelVariant: null,
+      ratedPressureBarG: 7.5,
+      ratedAirflowM3PerMin: 6.5,
+      packageInputPowerKw: 41,
+      motorShaftPowerKw: 37,
+      controlType: 'VSD',
+      sourceFileName: 'GA37.pdf',
+      sourceFileId: 'file-1',
+      sourceSha256: 'abc',
+    },
+  };
+  const hydrated = attachHydratedLibrarySpec(row, library);
+  assert.equal(hydrated.selectedSpec?.recordId, 'lib-ga37');
+  assert.equal(hydrated.efficiencyPercent, 94);
+  assert.equal(hydrated.efficiencyOrigin, 'manual');
+  assert.equal(hydrated.electricalPowerKind, 'motor_power');
+  assert.equal(hydrated.variableSpeedDrive, false);
+  assert.equal(hydrated.flowReferenceBasis, 'actual_volumetric');
+  assert.equal(hydrated.referenceAbsolutePressurePa, 95000);
+  assert.equal(hydrated.specificationReference, 'Proposal note');
+  assert.equal(hydrated.sourceBacked?.controlType, 'VSD');
 });
 
 test('proposed quantity defaults to 1 and persists on the payload', () => {

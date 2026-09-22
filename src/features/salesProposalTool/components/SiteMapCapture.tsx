@@ -1,8 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Loader2, Search } from 'lucide-react';
-import 'leaflet/dist/leaflet.css';
 import {
   geocodeAutocomplete,
   geocodeEnrich,
@@ -15,56 +12,12 @@ import type { SalesProposalSite } from '../types';
 import { formatAltitudeMetres, formatGps } from '../formatMeasured';
 import { SEARCH_MENU_PANEL, searchMenuWrapClass } from '../searchOverlay';
 import {
-  GOOGLE_LOOKUP_UNAVAILABLE,
+  googleLookupUserMessage,
   isGoogleLookupUnavailableError,
   pinFromPlaceDetails,
   pinFromSearchResult,
 } from '../../../lib/googleAddressLookup';
-
-const DEFAULT_CENTER: [number, number] = [-26.2041, 28.0473];
-
-const crosshairIcon = L.divIcon({
-  className: 'spt-selection-crosshair',
-  html: `<div style="width:28px;height:28px;position:relative;">
-    <div style="position:absolute;left:13px;top:0;width:2px;height:28px;background:#0969a9;"></div>
-    <div style="position:absolute;top:13px;left:0;height:2px;width:28px;background:#0969a9;"></div>
-    <div style="position:absolute;left:9px;top:9px;width:10px;height:10px;border:2px solid #f7c12b;border-radius:50%;background:rgba(255,255,255,0.35);"></div>
-  </div>`,
-  iconSize: [28, 28],
-  iconAnchor: [14, 14],
-});
-
-function MapClickHandler({
-  onMapClick,
-}: {
-  onMapClick: (lat: number, lng: number) => void;
-}) {
-  useMapEvents({
-    click(event) {
-      onMapClick(event.latlng.lat, event.latlng.lng);
-    },
-  });
-  return null;
-}
-
-function RecenterMap({ position }: { position: [number, number] }) {
-  const map = useMap();
-  useEffect(() => {
-    map.flyTo(position, Math.max(map.getZoom(), 12), { duration: 0.4 });
-  }, [position, map]);
-  return null;
-}
-
-function InvalidateSize() {
-  const map = useMap();
-  useEffect(() => {
-    const timers = [0, 150, 400].map((delay) =>
-      setTimeout(() => map.invalidateSize({ animate: false }), delay),
-    );
-    return () => timers.forEach(clearTimeout);
-  }, [map]);
-  return null;
-}
+import { GoogleSiteMap } from './GoogleSiteMap';
 
 function siteFromEnrichment(
   latitude: number,
@@ -97,17 +50,11 @@ export function SiteMapCapture({ site, onChange }: SiteMapCaptureProps) {
   const [results, setResults] = useState<PlaceSuggestion[]>([]);
   const [searching, setSearching] = useState(false);
   const [enriching, setEnriching] = useState(false);
-  const [lookupUnavailable, setLookupUnavailable] = useState(false);
+  const [lookupHint, setLookupHint] = useState<string | null>(null);
+  const [mapStatus, setMapStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const sessionTokenRef = useRef(crypto.randomUUID());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const selected = useMemo<[number, number] | null>(
-    () =>
-      site.latitude !== null && site.longitude !== null
-        ? [site.latitude, site.longitude]
-        : null,
-    [site.latitude, site.longitude],
-  );
-  const center = selected ?? DEFAULT_CENTER;
+  const selected = site.latitude !== null && site.longitude !== null;
 
   const applyCoordinates = useCallback(
     async (latitude: number, longitude: number) => {
@@ -133,17 +80,17 @@ export function SiteMapCapture({ site, onChange }: SiteMapCaptureProps) {
   const loadSuggestions = useCallback(async (value: string) => {
     if (value.trim().length < 3) {
       setResults([]);
-      setLookupUnavailable(false);
+      setLookupHint(null);
       return;
     }
     setSearching(true);
     try {
       const found = await geocodeAutocomplete(value.trim(), sessionTokenRef.current);
-      setLookupUnavailable(false);
+      setLookupHint(null);
       setResults(found);
     } catch (error) {
       setResults([]);
-      setLookupUnavailable(isGoogleLookupUnavailableError(error));
+      setLookupHint(isGoogleLookupUnavailableError(error) ? googleLookupUserMessage(error) : null);
     } finally {
       setSearching(false);
     }
@@ -165,10 +112,10 @@ export function SiteMapCapture({ site, onChange }: SiteMapCaptureProps) {
       if (!pin) return;
       setResults([]);
       setQuery(pin.address);
-      setLookupUnavailable(false);
+      setLookupHint(null);
       void applyCoordinates(pin.latitude, pin.longitude);
     } catch (error) {
-      setLookupUnavailable(isGoogleLookupUnavailableError(error));
+      setLookupHint(isGoogleLookupUnavailableError(error) ? googleLookupUserMessage(error) : null);
     }
   }
 
@@ -188,13 +135,13 @@ export function SiteMapCapture({ site, onChange }: SiteMapCaptureProps) {
       const pin = pinFromSearchResult(geocoded[0]);
       if (pin) {
         setQuery(pin.address);
-        setLookupUnavailable(false);
+        setLookupHint(null);
         void applyCoordinates(pin.latitude, pin.longitude);
       }
       setResults([]);
     } catch (error) {
       setResults([]);
-      setLookupUnavailable(isGoogleLookupUnavailableError(error));
+      setLookupHint(isGoogleLookupUnavailableError(error) ? googleLookupUserMessage(error) : null);
     } finally {
       setSearching(false);
     }
@@ -253,31 +200,15 @@ export function SiteMapCapture({ site, onChange }: SiteMapCaptureProps) {
           {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}
         </button>
       </div>
-      {lookupUnavailable ? (
-        <p className="text-xs text-amber-700">{GOOGLE_LOOKUP_UNAVAILABLE}. You can still click the map or type the site details.</p>
+      {lookupHint && mapStatus !== 'error' ? (
+        <p className="text-xs text-amber-700">{lookupHint}</p>
       ) : null}
-      <div className="h-64 overflow-hidden rounded-[8px] border border-slate-200">
-        <MapContainer
-          key="spt-site-map"
-          center={center}
-          zoom={selected ? 13 : 6}
-          className="h-full w-full"
-          scrollWheelZoom
-        >
-          <TileLayer
-            attribution='&copy; OpenStreetMap contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <InvalidateSize />
-          <MapClickHandler onMapClick={(lat, lng) => void applyCoordinates(lat, lng)} />
-          {selected && (
-            <>
-              <Marker position={selected} icon={crosshairIcon} />
-              <RecenterMap position={selected} />
-            </>
-          )}
-        </MapContainer>
-      </div>
+      <GoogleSiteMap
+        latitude={site.latitude}
+        longitude={site.longitude}
+        onPin={(lat, lng) => void applyCoordinates(lat, lng)}
+        onStatusChange={setMapStatus}
+      />
       <div className="rounded-[8px] bg-slate-50 p-3 text-sm text-[#383838]">
         {enriching && (
           <p className="mb-2 flex items-center gap-2 text-xs text-slate-500">
@@ -309,11 +240,21 @@ export function SiteMapCapture({ site, onChange }: SiteMapCaptureProps) {
             {site.province}
           </p>
         )}
-        {formatAltitudeMetres(site.altitudeMetres) && (
-          <p className="mt-2 text-xs text-slate-600">
-            <span className="font-semibold text-[#383838]">Altitude</span>
+        {formatAltitudeMetres(site.altitudeMetres) ? (
+          <p className="mt-2 text-sm text-[#383838]">
+            <span className="text-xs font-semibold uppercase tracking-wide text-[#383838]/70">
+              Site altitude
+            </span>
             <br />
-            {formatAltitudeMetres(site.altitudeMetres)}
+            <span className="text-base font-bold">{formatAltitudeMetres(site.altitudeMetres)}</span>
+          </p>
+        ) : selected ? (
+          <p className="mt-2 text-xs font-medium text-amber-800">
+            Site altitude is missing. Pin the site so altitude can be read automatically.
+          </p>
+        ) : (
+          <p className="mt-2 text-xs font-medium text-amber-800">
+            Pin the site to retrieve altitude.
           </p>
         )}
       </div>

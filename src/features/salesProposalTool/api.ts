@@ -258,6 +258,39 @@ export async function uploadSpecSheet(
   };
 }
 
+export async function uploadEfficiencyAudit(
+  proposalId: string,
+  file: File,
+): Promise<{
+  sourceFileId: string;
+  sourceFileName: string;
+  sourceSha256: string;
+  extractedPercent: number | null;
+  extractionStatus: 'extracted' | 'no_supported_values' | 'read_failed';
+}> {
+  const token = getAuthToken();
+  const form = new FormData();
+  form.append('file', file);
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const response = await fetch(
+    apiUrl(`/api/sales-proposal-tool/proposals/${proposalId}/efficiency-audit`),
+    {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: form,
+    },
+  );
+  return parseResponse<{
+    sourceFileId: string;
+    sourceFileName: string;
+    sourceSha256: string;
+    extractedPercent: number | null;
+    extractionStatus: 'extracted' | 'no_supported_values' | 'read_failed';
+  }>(response);
+}
+
 export async function confirmSpecSheet(
   proposalId: string,
   body: import('./confirmSpecSheet').SpecSheetConfirmPayload,

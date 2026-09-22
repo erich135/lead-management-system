@@ -38,16 +38,35 @@ export function AirMachineComparisonCard({
       </h2>
       {!comparison ? (
         <p className="mt-3 text-sm text-slate-600">
-          The comparison will appear here once the Air Audit and selected machines are available.
+          The comparison will appear here once machines, the air requirement, and the site are available.
         </p>
       ) : (
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
           <div>
-            <h3 className="text-sm font-bold text-[#383838]">Measured</h3>
+            <h3 className="text-sm font-bold text-[#383838]">
+              {comparison.airRequirement?.label ?? (air ? 'Measured air requirement' : 'Air requirement')}
+            </h3>
             <dl className="mt-2">
-              <Row label="Mean measured airflow" value={airflow(air?.meanAirflowM3PerMin)} />
-              <Row label="P90 measured airflow" value={airflow(air?.p90AirflowM3PerMin)} />
-              <Row label="Highest recorded airflow" value={airflow(air?.highestAirflowM3PerMin)} />
+              {comparison.airRequirement?.kind === 'measured' ? (
+                <>
+                  <Row label="Mean measured airflow" value={airflow(air?.meanAirflowM3PerMin)} />
+                  <Row label="P90 measured airflow" value={airflow(air?.p90AirflowM3PerMin)} />
+                  <Row label="Highest recorded airflow" value={airflow(air?.highestAirflowM3PerMin)} />
+                </>
+              ) : (
+                <>
+                  <Row
+                    label="Assumed airflow"
+                    value={airflow(comparison.airRequirement?.airflowM3PerMin)}
+                  />
+                  {comparison.airRequirement?.instruction && (
+                    <p className="mt-2 text-xs text-slate-600">{comparison.airRequirement.instruction}</p>
+                  )}
+                  {comparison.airRequirement?.assumedNote && (
+                    <p className="mt-2 text-xs text-slate-600">{comparison.airRequirement.assumedNote}</p>
+                  )}
+                </>
+              )}
             </dl>
           </div>
           <div>
@@ -66,13 +85,29 @@ export function AirMachineComparisonCard({
                 label="Published capacity"
                 value={airflow(comparison.proposed.totalRatedFadM3PerMin)}
               />
-              {proposedSitePerformance?.status === 'estimated' && (
+              <Row
+                label={proposedSitePerformance?.altitudeLabel ?? 'Site altitude'}
+                value={proposedSitePerformance?.altitudeDisplay ?? 'Not available'}
+              />
+              {proposedSitePerformance?.status === 'estimated' ? (
                 <Row
-                  label={proposedSitePerformance.estimatedLabel}
+                  label="Site-adjusted capacity"
                   value={airflow(proposedSitePerformance.estimatedSiteAirflowTotalM3PerMin)}
+                />
+              ) : (
+                <Row
+                  label="Site-adjusted capacity"
+                  value="Not available"
                 />
               )}
             </dl>
+            {proposedSitePerformance &&
+              proposedSitePerformance.status !== 'estimated' &&
+              proposedSitePerformance.unavailableReason && (
+                <p className="mt-2 text-xs text-slate-600">
+                  {proposedSitePerformance.unavailableReason}
+                </p>
+              )}
           </div>
         </div>
       )}

@@ -279,7 +279,7 @@ test('unlinked physical-machine selection searches the library and stays inline'
     current.indexOf('function handleSelectSpec'),
   );
   assert.doesNotMatch(selectPhysical, /applyLibrarySpec/);
-  assert.match(selectPhysical, /setMenuOpen\(false\)/);
+  assert.match(selectPhysical, /closeMenu\(\)/);
 
   const selectSpec = current.slice(
     current.indexOf('function handleSelectSpec'),

@@ -54,14 +54,16 @@ export function CustomerSelect({
     };
   }, [query]);
 
-  if (customerId && customerName) {
+  if (customerId) {
     return (
       <div>
         <label className="block text-xs font-semibold uppercase tracking-wide text-[#383838]/70 mb-1">
           Customer
         </label>
         <div className="flex items-center justify-between gap-2 rounded-[8px] border border-slate-200 bg-slate-50 px-3 py-2">
-          <p className="text-sm font-medium text-[#383838]">{customerName}</p>
+          <p className="text-sm font-medium text-[#383838]">
+            {customerName?.trim() || 'Selected customer'}
+          </p>
           <button
             type="button"
             onClick={onClear}
@@ -93,6 +95,11 @@ export function CustomerSelect({
           <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-slate-400" />
         )}
         {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+        {query.trim() !== '' && results.length === 0 && !loading && !error && (
+          <p className="mt-1 text-xs text-slate-600">
+            Choose a customer from the list. Typed text is not a saved selection.
+          </p>
+        )}
         {results.length > 0 && (
           <ul className={SEARCH_MENU_PANEL}>
             {results.map((customer) => (

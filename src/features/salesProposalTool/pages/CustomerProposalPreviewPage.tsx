@@ -50,12 +50,14 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 function FigureStrip({
   items,
+  centered = false,
 }: {
   items: Array<{ label: string; value: string }>;
+  centered?: boolean;
 }) {
   return (
     <div
-      className="spt-proposal-figure-strip spt-keep-together"
+      className={`spt-proposal-figure-strip spt-keep-together${centered ? ' spt-proposal-figure-strip-center' : ''}`}
       style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
     >
       {items.map((item) => (
@@ -207,9 +209,16 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
                 {machine.serial && <p className="spt-proposal-quiet">Serial {machine.serial}</p>}
                 <p className="spt-proposal-body">
                   Published airflow {machine.publishedAirflow ?? 'Not available'} · Published
-                  pressure {machine.publishedPressure ?? 'Not available'} · Published package
-                  input {machine.packageInput ?? 'Not available'}
+                  pressure {machine.publishedPressure ?? 'Not available'} ·{' '}
+                  {machine.packageInputEstimated ? 'Estimated package input' : 'Published package input'}{' '}
+                  {machine.packageInput ?? 'Not available'}
+                  {machine.efficiency
+                    ? ` · Efficiency ${machine.efficiency}`
+                    : ''}
                 </p>
+                {machine.auxiliaryAllowanceNote && (
+                  <p className="spt-proposal-quiet">{machine.auxiliaryAllowanceNote}</p>
+                )}
               </div>
             ))
           )}
@@ -305,9 +314,17 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
               <p className="spt-proposal-machine-name">{proposedName}</p>
               <p className="spt-proposal-body">
                 Published airflow {doc.proposed.publishedAirflow ?? 'Not available'} · Published
-                pressure {doc.proposed.publishedPressure ?? 'Not available'} · Published package
-                input {doc.proposed.packageInput ?? 'Not available'}
+                pressure {doc.proposed.publishedPressure ?? 'Not available'} ·{' '}
+                {doc.proposed.packageInputEstimated ? 'Estimated package input' : 'Published package input'}{' '}
+                {doc.proposed.packageInput ?? 'Not available'}
+                {doc.proposed.efficiency ? ` · Efficiency ${doc.proposed.efficiency}` : ''}
               </p>
+              <p className="spt-proposal-body">
+                Site altitude {doc.proposed.siteAltitude ?? 'Not available'}
+              </p>
+              {doc.proposed.auxiliaryAllowanceNote && (
+                <p className="spt-proposal-quiet">{doc.proposed.auxiliaryAllowanceNote}</p>
+              )}
               {doc.proposed.estimatedAirflow && (
                 <>
                   <p className="spt-proposal-kicker-inline">
@@ -317,7 +334,6 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
                   <p className="spt-proposal-body">
                     {doc.proposed.estimatedLabel ?? 'Estimated airflow at site conditions'}{' '}
                     {doc.proposed.estimatedAirflow}
-                    {doc.proposed.siteAltitude ? ` · Site altitude ${doc.proposed.siteAltitude}` : ''}
                   </p>
                   {doc.proposed.estimatedBasisNote && (
                     <p className="spt-proposal-quiet">{doc.proposed.estimatedBasisNote}</p>
@@ -352,7 +368,7 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
               )}
             </div>
           </div>
-          <table className="spt-proposal-table">
+          <table className="spt-proposal-table spt-proposal-centered-nums">
             <thead>
               <tr>
                 <th> </th>
@@ -409,12 +425,108 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
         <Letterhead doc={doc} />
 
         <Section title="Estimated electricity">
-          <FigureStrip items={electricityFigures} />
+          <FigureStrip items={electricityFigures} centered />
           {doc.electricity.suppliedAmountReference && (
             <p className="spt-proposal-quiet">{doc.electricity.suppliedAmountReference}</p>
           )}
           {doc.electricity.suppliedAmountReferenceNote && (
             <p className="spt-proposal-quiet">{doc.electricity.suppliedAmountReferenceNote}</p>
+          )}
+          {doc.electricity.costBreakdown && (
+            <div className="spt-keep-together">
+              <p className="spt-proposal-kicker-inline">Electricity cost by season and day type</p>
+              {doc.electricity.costBreakdown.averageTariff && (
+                <p className="spt-proposal-quiet">
+                  Average electricity tariff: {doc.electricity.costBreakdown.averageTariff}
+                </p>
+              )}
+              <table className="spt-proposal-table spt-proposal-electricity-table spt-proposal-centered-nums">
+                <thead>
+                  <tr>
+                    <th>Period</th>
+                    <th className="spt-proposal-num">Production days</th>
+                    <th className="spt-proposal-num">Daily current</th>
+                    <th className="spt-proposal-num">Daily proposed</th>
+                    <th className="spt-proposal-num">Annual current</th>
+                    <th className="spt-proposal-num">Annual proposed</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {doc.electricity.costBreakdown.rows.map((row) => (
+                    <tr key={row.label}>
+                      <td>{row.label}</td>
+                      <td className="spt-proposal-num">
+                        <Cell value={row.productionDays} />
+                      </td>
+                      <td className="spt-proposal-num">
+                        <Cell value={row.dailyCurrent} />
+                      </td>
+                      <td className="spt-proposal-num">
+                        <Cell value={row.dailyProposed} />
+                      </td>
+                      <td className="spt-proposal-num">
+                        <Cell value={row.annualCurrent} />
+                      </td>
+                      <td className="spt-proposal-num">
+                        <Cell value={row.annualProposed} />
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="spt-proposal-total-row">
+                    <td>Annual totals before VSD allowance</td>
+                    <td> </td>
+                    <td> </td>
+                    <td> </td>
+                    <td className="spt-proposal-num">
+                      {doc.electricity.costBreakdown.beforeVsdCurrent ?? 'Not available'}
+                    </td>
+                    <td className="spt-proposal-num">
+                      {doc.electricity.costBreakdown.beforeVsdProposed ?? 'Not available'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>{doc.electricity.costBreakdown.vsdAllowanceLabel}</td>
+                    <td> </td>
+                    <td> </td>
+                    <td> </td>
+                    <td className="spt-proposal-num">
+                      {doc.electricity.costBreakdown.vsdAllowanceCurrent ??
+                        (doc.electricity.costBreakdown.vsdAllowance ? 'R 0' : 'Not applicable')}
+                    </td>
+                    <td className="spt-proposal-num">
+                      {doc.electricity.costBreakdown.vsdAllowanceProposed ??
+                        doc.electricity.costBreakdown.vsdAllowance ??
+                        'Not applicable'}
+                    </td>
+                  </tr>
+                  <tr className="spt-proposal-total-row">
+                    <td>Adjusted annual totals</td>
+                    <td> </td>
+                    <td> </td>
+                    <td> </td>
+                    <td className="spt-proposal-num">
+                      {doc.electricity.costBreakdown.adjustedCurrent ?? 'Not available'}
+                    </td>
+                    <td className="spt-proposal-num">
+                      {doc.electricity.costBreakdown.adjustedProposed ?? 'Not available'}
+                    </td>
+                  </tr>
+                  <tr className="spt-proposal-total-row">
+                    <td>Final annual electricity saving</td>
+                    <td> </td>
+                    <td> </td>
+                    <td> </td>
+                    <td> </td>
+                    <td className="spt-proposal-num">
+                      {doc.electricity.costBreakdown.finalSaving ?? 'Not available'}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              {doc.electricity.costBreakdown.vsdNote && (
+                <p className="spt-proposal-quiet">{doc.electricity.costBreakdown.vsdNote}</p>
+              )}
+            </div>
           )}
         </Section>
 

@@ -13,7 +13,7 @@ import {
 import {
   canConfirmMapPin,
   confirmedPinAddress,
-  GOOGLE_LOOKUP_UNAVAILABLE,
+  GOOGLE_LOOKUP_USER_MESSAGE,
   isGoogleLookupUnavailableError,
   pinFromPlaceDetails,
   pinFromReverse,
@@ -377,7 +377,7 @@ export function MapPinSelector({ initialPosition, onConfirm, onClose }: MapPinSe
         <div className="px-5 py-4 border-t border-gray-200 bg-gray-50">
           {lookupUnavailable && (
             <p className="mb-3 text-sm text-amber-700">
-              {GOOGLE_LOOKUP_UNAVAILABLE}. You can still drop a pin and type the address.
+              {GOOGLE_LOOKUP_USER_MESSAGE}
             </p>
           )}
           {pinPosition ? (

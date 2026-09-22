@@ -1,6 +1,11 @@
 import { formatMeasuredNumber } from './formatMeasured.ts';
 import { parseNonNegativeNumber } from './electricityBasis.ts';
-import type { PublicMachineSpec, SourceBackedSpec } from './types';
+import type { ElectricalPowerKind, PublicMachineSpec, SourceBackedSpec } from './types';
+import {
+  ARS_AUXILIARY_POWER_ALLOWANCE_LABEL,
+  ESTIMATED_PACKAGE_INPUT_LABEL,
+  resolvePackageInputKw,
+} from './electricalPowerInput.ts';
 
 export type ValueOrigin = 'library' | 'source' | 'missing';
 
@@ -13,11 +18,11 @@ function pickNumber(
   libraryValue: number | null | undefined,
   sourceValue: number | null | undefined,
 ): EffectiveNumber {
-  if (typeof libraryValue === 'number' && Number.isFinite(libraryValue)) {
-    return { value: libraryValue, origin: 'library' };
-  }
   if (typeof sourceValue === 'number' && Number.isFinite(sourceValue)) {
     return { value: sourceValue, origin: 'source' };
+  }
+  if (typeof libraryValue === 'number' && Number.isFinite(libraryValue)) {
+    return { value: libraryValue, origin: 'library' };
   }
   return { value: null, origin: 'missing' };
 }
@@ -41,6 +46,13 @@ export function effectivePackageInput(
   source: SourceBackedSpec | null,
 ): EffectiveNumber {
   return pickNumber(library?.packageInputPowerKw, source?.packageInputPowerKw);
+}
+
+export function effectiveMotorShaft(
+  library: PublicMachineSpec | null,
+  source: SourceBackedSpec | null,
+): EffectiveNumber {
+  return pickNumber(library?.motorShaftPowerKw, source?.motorShaftPowerKw);
 }
 
 export function displayedMotorRatingKw(
@@ -171,9 +183,33 @@ function formatPublishedKw(value: number | null, digits: number): string | null 
 export function publishedPowerRatingRows(
   library: PublicMachineSpec | null,
   source: SourceBackedSpec | null,
+  electricalPowerKind?: ElectricalPowerKind | null,
 ): PublishedPowerRatingRow[] {
   const packageInput = effectivePackageInput(library, source);
   const motor = displayedMotorRatingKw(library, source);
+  const resolved = resolvePackageInputKw({
+    storedKind: electricalPowerKind ?? null,
+    packageInputPowerKw: packageInput.value,
+    motorShaftPowerKw: motor,
+  });
+  if (resolved.kind === 'motor_power' && resolved.auxiliaryAllowanceApplied) {
+    const rows: PublishedPowerRatingRow[] = [];
+    if (resolved.enteredPowerKw !== null) {
+      rows.push({
+        label: MOTOR_RATING_LABEL,
+        value: formatPublishedKw(resolved.enteredPowerKw, 2) ?? 'Not available',
+      });
+    }
+    rows.push({
+      label: ESTIMATED_PACKAGE_INPUT_LABEL,
+      value: formatPublishedKw(resolved.packageInputKw, 2) ?? 'Not available',
+    });
+    rows.push({
+      label: ARS_AUXILIARY_POWER_ALLOWANCE_LABEL,
+      value: 'Applied',
+    });
+    return rows;
+  }
   const rows: PublishedPowerRatingRow[] = [
     {
       label: PUBLISHED_PACKAGE_INPUT_LABEL,

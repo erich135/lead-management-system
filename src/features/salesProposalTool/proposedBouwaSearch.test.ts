@@ -204,6 +204,8 @@ test('proposed replacement still searches published BOUWA library records only',
   assert.match(proposed, /searchHint=""/);
   assert.match(proposed, /Search BOUWA machine/);
   assert.match(picker, /specPickerSearchIsOpen/);
+  assert.match(picker, /useDismissibleSearchMenu/);
+  assert.match(picker, /\{menuOpen && \(/);
   assert.match(picker, /searchSpecLibrary\(query, scope\)/);
   assert.match(api, /scope: 'all' \| 'bouwa'/);
   assert.doesNotMatch(proposed, /getMachinesByCustomer/);

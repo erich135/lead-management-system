@@ -25,7 +25,7 @@ export interface SalesProposalEditorState {
   customerId: string | null;
   site: SalesProposalSite;
   currentEquipment: CurrentEquipmentDraft[];
-  proposed: ProposedEquipmentDraft;
+  proposed: ProposedEquipmentDraft | ProposedEquipmentDraft[];
   electricityBasis: ElectricityBasis;
   operatingAssumptions: OperatingAssumptions;
   commercialOffer: CommercialOffer;

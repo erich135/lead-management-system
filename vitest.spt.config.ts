@@ -12,6 +12,10 @@ export default defineConfig({
       'src/features/salesProposalTool/sitePerformancePresentation.test.ts',
       'src/features/salesProposalTool/noAuditOperatingPresentation.test.ts',
       'src/features/salesProposalTool/specSheetConfirm.test.ts',
+      'src/features/salesProposalTool/electricalPowerInput.test.ts',
+      'src/features/salesProposalTool/publishedFlowReference.test.ts',
+      'src/features/salesProposalTool/salesProposalEditorRestore.test.ts',
+      'src/features/salesProposalTool/variableSpeedDrive.test.ts',
     ],
   },
 });

@@ -169,6 +169,11 @@ test('customer proposal page decides validity from the document flag, never from
   assert.match(PREVIEW_SOURCE, /showsPayback\(doc\)/);
   assert.match(PREVIEW_SOURCE, /customerProposalElectricityFigures\(doc\)/);
   assert.match(PREVIEW_SOURCE, /customerProposalCommercialFigures\(doc\)/);
+  assert.match(PREVIEW_SOURCE, /doc\.electricity\.costBreakdown/);
+  assert.match(PREVIEW_SOURCE, /Electricity cost by season and day type/);
+  assert.match(PREVIEW_SOURCE, /spt-proposal-electricity-table/);
+  assert.match(PREVIEW_SOURCE, /spt-proposal-centered-nums/);
+  assert.match(PREVIEW_SOURCE, /FigureStrip items=\{electricityFigures\} centered/);
   assert.match(PREVIEW_SOURCE, /\{savingVisible && \(/);
   assert.match(PREVIEW_SOURCE, /\{paybackVisible && \(/);
 });
@@ -199,6 +204,8 @@ test('customer proposal reuses the existing ARS logo and company header without 
   assert.match(css, /print-color-adjust:\s*exact/);
   assert.match(css, /#0969a9/);
   assert.match(css, /#f7c12b/);
+  assert.match(css, /spt-proposal-centered-nums th\.spt-proposal-num/);
+  assert.match(css, /spt-proposal-figure-strip-center/);
 });
 
 test('invalid proposal presentation still blocks saving and payback fields', () => {

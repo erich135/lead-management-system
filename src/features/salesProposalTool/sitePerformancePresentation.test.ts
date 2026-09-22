@@ -13,13 +13,15 @@ import {
 const FEATURE_ROOT = path.dirname(fileURLToPath(import.meta.url));
 
 const UNAVAILABLE_REASON =
-  'Site-adjusted airflow was not calculated because the published airflow reference basis is not confirmed.';
+  "Site-adjusted airflow was not calculated because Airflow reference basis is missing or is not Free Air Delivery (FAD). Open this machine's specifications and set Airflow reference basis to Free Air Delivery (FAD).";
 
 describe('site performance presentation', () => {
   it('renders an unavailable reason instead of zero when no reference conditions exist', () => {
     expect(UNAVAILABLE_REASON).not.toMatch(/^0/);
-    expect(UNAVAILABLE_REASON).toMatch(/not confirmed/);
-    expect(UNAVAILABLE_REASON).not.toMatch(/reference_basis_unconfirmed/);
+    expect(UNAVAILABLE_REASON).toMatch(/Airflow reference basis/);
+    expect(UNAVAILABLE_REASON).toMatch(/Free Air Delivery \(FAD\)/);
+    expect(UNAVAILABLE_REASON).toMatch(/this machine's specifications/);
+    expect(UNAVAILABLE_REASON).not.toMatch(/not confirmed/);
   });
 
   it('keeps published, estimated and measured as distinct customer-proposal rows', () => {
@@ -80,6 +82,30 @@ describe('site performance presentation', () => {
     expect(summary).toMatch(/sitePerformance\.sectionTitle/);
     expect(summary).toMatch(/unavailableReason/);
     expect(summary).not.toMatch(/2\.25577|isaAtmosphericPressurePa/);
+  });
+
+  it('places FAD basis, bar-absolute inlet pressure and specification source on the spec editor', () => {
+    const editor = readFileSync(
+      path.join(FEATURE_ROOT, 'components/PublishedRatingFields.tsx'),
+      'utf8',
+    );
+    const copy = readFileSync(
+      path.join(FEATURE_ROOT, 'publishedFlowReference.ts'),
+      'utf8',
+    );
+    expect(editor).toMatch(/AIRFLOW_REFERENCE_BASIS_LABEL/);
+    expect(editor).toMatch(/REFERENCE_INLET_PRESSURE_LABEL/);
+    expect(editor).toMatch(/REFERENCE_INLET_PRESSURE_UNIT/);
+    expect(editor).toMatch(/SPECIFICATION_REFERENCE_LABEL/);
+    expect(editor).toMatch(/FLOW_REFERENCE_BASIS_OPTIONS/);
+    expect(editor).toMatch(/ADVANCED_SPECIFICATIONS_LABEL/);
+    expect(editor).toMatch(/publishedAirflowBasisSummary/);
+    expect(editor).toMatch(/AIRFLOW_REFERENCE_NEEDS_CONFIRMATION/);
+    expect(copy).toMatch(/Free Air Delivery \(FAD\)/);
+    expect(copy).toMatch(/bar absolute/);
+    expect(copy).toMatch(/Airflow reference needs confirmation/);
+    expect(editor).not.toMatch(/type="checkbox"/);
+    expect(editor).not.toMatch(/bypass|skip validation|assume.*101325/i);
   });
 
   it('keeps Step 6 limitation wording and Step 1 boolean-driven suppression', () => {

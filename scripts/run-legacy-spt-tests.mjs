@@ -13,6 +13,10 @@ const converted = new Set([
   'sitePerformancePresentation.test.ts',
   'noAuditOperatingPresentation.test.ts',
   'specSheetConfirm.test.ts',
+  'electricalPowerInput.test.ts',
+  'publishedFlowReference.test.ts',
+  'salesProposalEditorRestore.test.ts',
+  'variableSpeedDrive.test.ts',
 ]);
 
 function listLegacyTests(dir) {

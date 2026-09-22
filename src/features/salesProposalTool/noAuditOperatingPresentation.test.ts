@@ -40,7 +40,7 @@ const PUBLISHED_CAPACITY_FALLBACK_NOTE =
   'Estimated based on published airflow because a site-adjusted airflow could not be established from the available reference data.';
 
 const SITE_UNAVAILABLE_REASON =
-  'Site-adjusted airflow was not calculated because the published airflow reference basis is not confirmed.';
+  "Site-adjusted airflow was not calculated because Airflow reference basis is missing or is not Free Air Delivery (FAD). Open this machine's specifications and set Airflow reference basis to Free Air Delivery (FAD).";
 
 const ESTIMATED_SITE: SitePerformanceView = {
   status: 'estimated',
@@ -164,7 +164,7 @@ describe('no-Air-Audit operating assumptions presentation', () => {
     expect(helpers).toContain(AVERAGE_LOAD_HELPER);
     expect(section).not.toMatch(/hours\/day|days\/week|shifts|duty cycle|schedule builder/i);
     expect(editor).toMatch(/OperatingAssumptionsSection/);
-    expect(editor).toMatch(/airAuditPresent=\{Boolean\(proposal\.airAudit\)\}/);
+    expect(editor).toMatch(/airAuditPresent=\{operatingAssumptions\.hasAirAudit === true\}/);
   });
 
   it('does not require operating assumptions when an Air Audit is present', () => {
@@ -194,16 +194,22 @@ describe('no-Air-Audit operating assumptions presentation', () => {
     expect(buildOperatingAssumptions({ hoursText: '', loadText: '' })).toEqual({
       annualOperatingHours: null,
       averageLoadPercent: null,
+      hasAirAudit: null,
+      hoursAreEstimated: null,
     });
     expect(buildOperatingAssumptions({ hoursText: '4000', loadText: '70' })).toEqual({
       annualOperatingHours: 4000,
       averageLoadPercent: 70,
+      hasAirAudit: null,
+      hoursAreEstimated: null,
     });
     const source = readFileSync(path.join(FEATURE_ROOT, 'operatingAssumptions.ts'), 'utf8');
     expect(source).not.toMatch(/8 hours|24 hours|365-day|averageLoadPercent:\s*50|averageLoadPercent:\s*100/);
     expect(EMPTY_OPERATING_ASSUMPTIONS).toEqual({
       annualOperatingHours: null,
       averageLoadPercent: null,
+      hasAirAudit: null,
+      hoursAreEstimated: null,
     });
   });
 
@@ -298,10 +304,29 @@ describe('no-Air-Audit operating assumptions presentation', () => {
         tariffRecordId: null,
         suppliedCurrentAmount: null,
         suppliedCurrentPeriod: null,
+        touRates: {
+          ldsStandard: 2.5,
+          ldsPeak: 2.5,
+          ldsOffPeak: 2.5,
+          hdsStandard: 2.5,
+          hdsPeak: 2.5,
+          hdsOffPeak: 2.5,
+        },
+        productionDays: {
+          ldsWorkdays: null,
+          ldsSaturdays: null,
+          ldsSundays: null,
+          hdsWorkdays: null,
+          hdsSaturdays: null,
+          hdsSundays: null,
+        },
+        touHoursPerDay: null,
       },
       operatingAssumptions: {
         annualOperatingHours: 4000,
         averageLoadPercent: 70,
+        hasAirAudit: null,
+        hoursAreEstimated: null,
       },
       commercialOffer: EMPTY_COMMERCIAL_OFFER,
       airAuditScope: DEFAULT_AIR_AUDIT_SCOPE,
@@ -309,6 +334,8 @@ describe('no-Air-Audit operating assumptions presentation', () => {
     expect(payload.operatingAssumptions).toEqual({
       annualOperatingHours: 4000,
       averageLoadPercent: 70,
+      hasAirAudit: null,
+      hoursAreEstimated: null,
     });
     const editor = readFileSync(
       path.join(FEATURE_ROOT, 'pages/SalesProposalEditorPage.tsx'),

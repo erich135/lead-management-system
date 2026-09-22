@@ -7,7 +7,7 @@ import {
 export const MAX_ANNUAL_OPERATING_HOURS = 8760;
 
 export const ANNUAL_OPERATING_HOURS_HELPER =
-  'Estimated total compressor operating hours per year.';
+  'Known or estimated total compressor operating hours per year. The same hours are used for current and proposed machines.';
 
 export const AUDIT_ANNUAL_HOURS_HELPER =
   'Estimated total compressor operating hours per year. Used to scale the measured Air Audit period to a year.';
@@ -33,15 +33,25 @@ export function parseAverageLoadPercent(text: string): number | null {
 export function buildOperatingAssumptions(input: {
   hoursText: string;
   loadText: string;
+  hasAirAudit?: boolean | null;
+  hoursAreEstimated?: boolean | null;
 }): OperatingAssumptions {
   return {
     annualOperatingHours: parseAnnualOperatingHours(input.hoursText),
     averageLoadPercent: parseAverageLoadPercent(input.loadText),
+    hasAirAudit: input.hasAirAudit ?? null,
+    hoursAreEstimated: input.hoursAreEstimated ?? null,
   };
 }
 
 export function operatingAssumptionsOrEmpty(
   value: OperatingAssumptions | null | undefined,
 ): OperatingAssumptions {
-  return value ?? EMPTY_OPERATING_ASSUMPTIONS;
+  if (!value) return EMPTY_OPERATING_ASSUMPTIONS;
+  return {
+    ...EMPTY_OPERATING_ASSUMPTIONS,
+    ...value,
+    hasAirAudit: value.hasAirAudit ?? null,
+    hoursAreEstimated: value.hoursAreEstimated ?? null,
+  };
 }

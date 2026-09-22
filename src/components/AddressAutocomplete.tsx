@@ -3,7 +3,7 @@ import { MapPin, Loader2, X, Search, Navigation } from 'lucide-react';
 import { MapPinSelector } from './MapPinSelector';
 import { geocodeAutocomplete, geocodePlaceDetails, type PlaceSuggestion } from '../lib/api';
 import {
-  GOOGLE_LOOKUP_UNAVAILABLE,
+  GOOGLE_LOOKUP_USER_MESSAGE,
   isGoogleLookupUnavailableError,
   pinFromPlaceDetails,
 } from '../lib/googleAddressLookup';
@@ -211,7 +211,7 @@ export function AddressAutocomplete({
 
       {lookupUnavailable && query.length >= 3 && (
         <p className="mt-1 text-xs text-amber-700">
-          {GOOGLE_LOOKUP_UNAVAILABLE}. Type the address or pin it on the map.
+          {GOOGLE_LOOKUP_USER_MESSAGE}
         </p>
       )}
 

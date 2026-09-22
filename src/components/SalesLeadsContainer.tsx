@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   ClipboardList,
   Calendar,
@@ -46,6 +47,15 @@ const SalesLeadsContainer: React.FC<SalesLeadsContainerProps> = ({ branches, rep
   const [selectedLead, setSelectedLead] = useState<SalesLead | null>(null);
   const [editingLead, setEditingLead] = useState<SalesLead | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [searchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+  const openRfqId = searchParams.get('rfq');
+
+  useEffect(() => {
+    if (requestedTab === 'requests' && canViewRequests) {
+      setActiveTab('requests');
+    }
+  }, [requestedTab, canViewRequests]);
 
   /**
    * Opens the create-lead form.
@@ -220,7 +230,7 @@ const SalesLeadsContainer: React.FC<SalesLeadsContainerProps> = ({ branches, rep
         )}
         {activeTab === 'requests' && canViewRequests && (
           <div className={isMobile ? 'mobile-rep-card overflow-hidden rounded-2xl' : ''}>
-            <SalesRequestsTab refreshKey={refreshKey} />
+            <SalesRequestsTab refreshKey={refreshKey} openRequestId={openRfqId} />
           </div>
         )}
       </div>

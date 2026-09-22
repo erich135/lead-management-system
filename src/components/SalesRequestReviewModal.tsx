@@ -12,12 +12,13 @@ import {
 import {
   acceptSalesRequestWithoutJob,
   approveSalesRequest,
-  declineSalesRequest,
   downloadSalesRequestPdf,
   getSalesRequest,
   getSalesRequestSubmissions,
   getSalesRequestVisibilityOptions,
   reassignSalesRequest,
+  retrySalesRequestCorrectionEmail,
+  returnSalesRequestForCorrection,
   reviewUpdateSalesRequest,
   type Job,
   type PlannerFormPublished,
@@ -42,7 +43,8 @@ import type { NewServiceLevelFormData } from './diary/newServiceLevelFormUtils';
 import { normalizeFormForRequestType, mergeStoredCustomerIntoForm, isDynamicPlannerFormData } from '../utils/salesRequestValidation';
 import SalesRequestAttachmentsPanel from './SalesRequestAttachmentsPanel';
 import SalesRequestHistoryPanel from './SalesRequestHistoryPanel';
-import RejectReasonDialog from './RejectReasonDialog';
+import ReturnForCorrectionDialog from './ReturnForCorrectionDialog';
+import { CorrectionRoundsPanel } from './CorrectionRoundsPanel';
 import { formatAppointmentStatusLabel } from './diary/diaryUtils';
 import { formatOutOfLocationDistance } from '../utils/salesRequestDistance';
 import { useAuth } from '../contexts/AuthContext';
@@ -163,7 +165,8 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
   );
   const [reassignAdministratorId, setReassignAdministratorId] = useState('');
   const [reassigning, setReassigning] = useState(false);
-  const [rejectOpen, setRejectOpen] = useState(false);
+  const [returnOpen, setReturnOpen] = useState(false);
+  const [retryingEmail, setRetryingEmail] = useState(false);
 
   /**
    * Applies a loaded sales request into local read-only / edit state.
@@ -229,6 +232,7 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
   }, [canReassign]);
 
   const isPending = detail?.status === 'pending';
+  const needsCorrection = detail?.status === 'needs_correction';
   /** Super Admin (and reviewers with decide rights) can enter edit mode on pending requests. */
   const canEnterEditMode = Boolean((isSuperAdmin || canDecide) && isPending && !acting);
   const fieldsEditable = Boolean(isEditing && !acting && !saving);
@@ -416,39 +420,73 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
   }
 
   /**
-   * Opens the required rejection-reason dialog for a pending request.
+   * Opens the required return-for-correction dialog for a pending request.
    */
-  function handleReject(): void {
+  function handleReturn(): void {
     if (!detail?._id || !isPending || !canDecide) return;
     if (isEditing) {
-      setError('Save or Cancel your edits before rejecting.');
+      setError('Save or Cancel your edits before returning this RFQ.');
       return;
     }
     setError(null);
-    setRejectOpen(true);
+    setReturnOpen(true);
   }
 
   /**
-   * Submits a validated rejection reason to the backend.
+   * Submits correction instructions to the backend. Does not create a job.
    */
-  async function confirmReject(reason: string): Promise<void> {
+  async function confirmReturn(instructions: string): Promise<void> {
     if (!detail?._id) return;
 
     setActing(true);
     setError(null);
     try {
-      const rejected = await declineSalesRequest(detail._id, {
-        formData: originalFormDataRef.current,
-        declineReason: reason,
+      const result = await returnSalesRequestForCorrection(detail._id, {
+        instructions,
         expectedVersion: detail.currentVersion,
       });
-      setRejectOpen(false);
-      onDecisionComplete({ request: rejected });
-    } catch (rejectError: unknown) {
-      console.error('Reject failed:', rejectError);
-      setError(getErrorMessage(rejectError, 'Failed to reject request'));
+      setReturnOpen(false);
+      applyLoadedRequest(result.request);
+      const email = result.correctionEmail || result.request.correctionEmail;
+      if (email && email.status !== 'sent') {
+        setSuccessHint(null);
+        setError(
+          email.error ||
+            'The RFQ was returned for correction, but the email to the assigned rep was not delivered. You can retry the email without creating another correction round.',
+        );
+        return;
+      }
+      onDecisionComplete({ request: result.request });
+    } catch (returnError: unknown) {
+      console.error('Return for correction failed:', returnError);
+      setError(getErrorMessage(returnError, 'Failed to return request for correction'));
     } finally {
       setActing(false);
+    }
+  }
+
+  async function handleRetryEmail(): Promise<void> {
+    if (!detail?._id) return;
+    setRetryingEmail(true);
+    setError(null);
+    try {
+      const result = await retrySalesRequestCorrectionEmail(detail._id);
+      applyLoadedRequest(result.request);
+      const email = result.correctionEmail || result.request.correctionEmail;
+      if (email?.status === 'sent') {
+        setSuccessHint('Correction email was sent to the assigned representative.');
+      } else if (email?.alreadySent) {
+        setSuccessHint('Correction email was already sent for this round.');
+      } else {
+        setError(
+          email?.error ||
+            'The correction email still could not be delivered. The RFQ remains in Needs correction.',
+        );
+      }
+    } catch (retryError: unknown) {
+      setError(getErrorMessage(retryError, 'Failed to retry the correction email'));
+    } finally {
+      setRetryingEmail(false);
     }
   }
 
@@ -606,10 +644,19 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
                 </div>
               )}
 
+              <CorrectionRoundsPanel
+                request={detail}
+                showRetry={Boolean(canDecide && needsCorrection)}
+                retrying={retryingEmail}
+                onRetry={() => {
+                  void handleRetryEmail();
+                }}
+              />
+
               {isEditing && (
                 <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                   Edit mode is on. Update fields or attachments, then Save. Cancel discards unsaved
-                  form changes. Approve and Reject are available after you leave edit mode.
+                  form changes. Approve and Return for correction are available after you leave edit mode.
                 </p>
               )}
 
@@ -1025,16 +1072,16 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
                 <>
                   <button
                     type="button"
-                    onClick={handleReject}
+                    onClick={handleReturn}
                     disabled={acting}
-                    className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                    className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-50"
                   >
                     {acting ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <XCircle className="h-4 w-4" />
                     )}
-                    Reject
+                    Return for correction
                   </button>
                   {canShowAcceptWithoutJob(detail) ? (
                     <button
@@ -1072,15 +1119,15 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
           </footer>
         )}
       </div>
-      <RejectReasonDialog
-        open={rejectOpen}
+      <ReturnForCorrectionDialog
+        open={returnOpen}
         requestNumber={detail?.requestNumber}
         submitting={acting}
         error={error}
         onCancel={() => {
-          if (!acting) setRejectOpen(false);
+          if (!acting) setReturnOpen(false);
         }}
-        onConfirm={confirmReject}
+        onConfirm={confirmReturn}
       />
     </div>
   );

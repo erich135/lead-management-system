@@ -54,7 +54,7 @@ test('6 unauthenticated users never reach the reading routes — the route is au
     appSource.indexOf('path="/pending-machine-readings"') + 120,
   );
   assert.match(routeBlock, /<ProtectedRoute>/);
-  assert.match(appSource, /return user \? <>\{children\}<\/> : <Navigate to="\/login" replace \/>;/);
+  assert.match(appSource, /\/login\?next=/);
 });
 
 test('7 existing management/super-admin users retain the same reading access (no narrowing)', () => {

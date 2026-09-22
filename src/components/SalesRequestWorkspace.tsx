@@ -40,6 +40,7 @@ import type { LoanRentalFormData } from './diary/loanRentalFormUtils';
 import type { NewServiceLevelFormData } from './diary/newServiceLevelFormUtils';
 import { DynamicPlannerFormRenderer, type DynamicFormValues } from './diary/DynamicPlannerFormRenderer';
 import type { PlannerFormPublished } from '../lib/api';
+import { CorrectionRoundsPanel } from './CorrectionRoundsPanel';
 
 interface SalesRequestWorkspaceProps {
   requestId?: string;
@@ -240,7 +241,9 @@ const SalesRequestWorkspace: React.FC<SalesRequestWorkspaceProps> = ({
   const isReadOnly =
     request?.status != null &&
     request.status !== 'draft' &&
-    request.status !== 'declined';
+    request.status !== 'declined' &&
+    request.status !== 'needs_correction';
+  const needsCorrection = request?.status === 'needs_correction';
   const activeStepForForm = isNarrow && requestType ? wizardStep : null;
 
   /**
@@ -447,7 +450,7 @@ const SalesRequestWorkspace: React.FC<SalesRequestWorkspaceProps> = ({
 
           {!isReadOnly && (
             <div className="hidden shrink-0 items-center gap-2 sm:flex">
-              {request?._id && (
+              {request?._id && request.status === 'draft' && (
                 <button
                   type="button"
                   onClick={() => {
@@ -488,7 +491,7 @@ const SalesRequestWorkspace: React.FC<SalesRequestWorkspaceProps> = ({
                 ) : (
                   <Send className="h-4 w-4" />
                 )}
-                {submitting ? 'Submitting…' : 'Submit for Approval'}
+                {submitting ? 'Submitting…' : needsCorrection ? 'Resubmit for approval' : 'Submit for Approval'}
               </button>
             </div>
           )}
@@ -532,6 +535,7 @@ const SalesRequestWorkspace: React.FC<SalesRequestWorkspaceProps> = ({
 
       <main className="flex-1 overflow-y-auto px-4 py-4 pb-28 sm:pb-6">
         <div className="mx-auto max-w-4xl space-y-4">
+          {request ? <CorrectionRoundsPanel request={request} /> : null}
           {!requestId && !initialType && !requestType && (
             <section className="crm-glass rounded-crm-lg p-5">
               <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-ink-muted">
@@ -660,7 +664,7 @@ const SalesRequestWorkspace: React.FC<SalesRequestWorkspaceProps> = ({
                   className="crm-btn-primary inline-flex flex-[1.4] items-center justify-center gap-1 py-3 disabled:opacity-50"
                 >
                   {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  Submit for Approval
+                  {needsCorrection ? 'Resubmit for approval' : 'Submit for Approval'}
                 </button>
               </>
             )}

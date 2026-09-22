@@ -20,11 +20,12 @@ import { BouwaModuleShell } from './features/bouwa/pages/BouwaModuleShell';
 import { BouwaRouteGuard } from './features/bouwa/components/BouwaRouteGuard';
 import { BouwaLoggerLocalApp } from './features/bouwa/pages/BouwaLoggerLocalApp';
 import { BouwaPilotAccessProvider } from './features/bouwa/BouwaPilotAccessContext';
+import { safeInternalPath } from './utils/loginRedirect';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  
-  
+  const location = useLocation();
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -36,11 +37,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return user ? <>{children}</> : <Navigate to="/login" replace />;
+  if (user) return <>{children}</>;
+  const next = encodeURIComponent(`${location.pathname}${location.search}`);
+  return <Navigate to={`/login?next=${next}`} replace />;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -53,7 +57,9 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return user ? <Navigate to="/dashboard" replace /> : <>{children}</>;
+  if (!user) return <>{children}</>;
+  const next = safeInternalPath(new URLSearchParams(location.search).get('next'));
+  return <Navigate to={next || '/dashboard'} replace />;
 }
 
 function SetPasswordRoute({ children }: { children: React.ReactNode }) {

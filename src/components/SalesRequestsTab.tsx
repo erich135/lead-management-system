@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import {
   listSalesRequests,
+  getSalesRequest,
   getSalesRequestVisibilityOptions,
   type SalesRequest,
   type SalesRequestStatus,
@@ -37,6 +38,7 @@ type StatusFilter = 'all' | SalesRequestStatus;
 
 interface SalesRequestsTabProps {
   refreshKey?: number;
+  openRequestId?: string | null;
 }
 
 const STATUS_SIDEBAR_ITEMS: Array<{
@@ -64,6 +66,12 @@ const STATUS_SIDEBAR_ITEMS: Array<{
     tone: 'pending',
   },
   {
+    id: 'needs_correction',
+    label: SALES_REQUEST_STATUS_LABELS.needs_correction,
+    description: 'Returned by a manager',
+    tone: 'warning',
+  },
+  {
     id: 'approved',
     label: SALES_REQUEST_STATUS_LABELS.approved,
     description: 'Approved — job created',
@@ -80,7 +88,10 @@ const STATUS_SIDEBAR_ITEMS: Array<{
 /**
  * Sales Requests list with a clear left-side status filter for Pending and related states.
  */
-const SalesRequestsTab: React.FC<SalesRequestsTabProps> = ({ refreshKey = 0 }) => {
+const SalesRequestsTab: React.FC<SalesRequestsTabProps> = ({
+  refreshKey = 0,
+  openRequestId,
+}) => {
   const { hasPermission, isSuperAdmin } = useAuth();
   const canCreate = hasPermission(SALES_REQUEST_PERMISSIONS.CREATE);
   const canRead =
@@ -101,6 +112,7 @@ const SalesRequestsTab: React.FC<SalesRequestsTabProps> = ({ refreshKey = 0 }) =
     all: 0,
     draft: 0,
     pending: 0,
+    needs_correction: 0,
     approved: 0,
     declined: 0,
   });
@@ -137,6 +149,7 @@ const SalesRequestsTab: React.FC<SalesRequestsTabProps> = ({ refreshKey = 0 }) =
       const statuses: SalesRequestStatus[] = [
         'draft',
         'pending',
+        'needs_correction',
         'approved',
         'declined',
       ];
@@ -153,13 +166,14 @@ const SalesRequestsTab: React.FC<SalesRequestsTabProps> = ({ refreshKey = 0 }) =
         all: 0,
         draft: 0,
         pending: 0,
+        needs_correction: 0,
         approved: 0,
         declined: 0,
       };
       for (const item of results) {
         next[item.status] = item.total;
       }
-      next.all = next.draft + next.pending + next.declined;
+      next.all = next.draft + next.pending + next.needs_correction + next.declined;
       setStatusCounts(next);
     } catch {
       // Counts are non-critical — keep previous values.
@@ -204,6 +218,26 @@ const SalesRequestsTab: React.FC<SalesRequestsTabProps> = ({ refreshKey = 0 }) =
       .catch(() => undefined);
   }, [canViewAll]);
 
+  useEffect(() => {
+    if (!openRequestId) return;
+    void getSalesRequest(openRequestId)
+      .then((item) => {
+        if (
+          item.status === 'draft' ||
+          item.status === 'declined' ||
+          item.status === 'needs_correction'
+        ) {
+          setStatusFilter(item.status);
+          setWorkspaceRequestId(item._id);
+          return;
+        }
+        setReviewRequestId(item._id);
+      })
+      .catch(() => {
+        setReviewRequestId(openRequestId);
+      });
+  }, [openRequestId]);
+
   /**
    * Handles a successful rep submit: shows confirmation and reloads the list.
    */
@@ -245,7 +279,7 @@ const SalesRequestsTab: React.FC<SalesRequestsTabProps> = ({ refreshKey = 0 }) =
   function handleRowClick(item: SalesRequest): void {
     setSuccessMessage(null);
 
-    if (item.status === 'draft' || item.status === 'declined') {
+    if (item.status === 'draft' || item.status === 'declined' || item.status === 'needs_correction') {
       setWorkspaceRequestId(item._id);
       return;
     }
@@ -264,7 +298,7 @@ const SalesRequestsTab: React.FC<SalesRequestsTabProps> = ({ refreshKey = 0 }) =
    * Returns whether a list row should look clickable.
    */
   function isRowClickable(item: SalesRequest): boolean {
-    if (item.status === 'draft' || item.status === 'declined') return true;
+    if (item.status === 'draft' || item.status === 'declined' || item.status === 'needs_correction') return true;
     return item.status === 'pending' || item.status === 'approved';
   }
 
@@ -293,6 +327,8 @@ const SalesRequestsTab: React.FC<SalesRequestsTabProps> = ({ refreshKey = 0 }) =
         return 'pending';
       case 'approved':
         return 'approved';
+      case 'needs_correction':
+        return 'warning';
       case 'declined':
         return 'declined';
       default:
@@ -350,7 +386,7 @@ const SalesRequestsTab: React.FC<SalesRequestsTabProps> = ({ refreshKey = 0 }) =
           subtitle={
             canReviewPending
               ? 'Use the status list on the left. Pending Approval needs review.'
-              : 'Use the status list on the left to find Draft, Pending Approval, Approved, or Rejected.'
+              : 'Use the status list on the left to find Draft, Pending Approval, Needs correction, Approved, or Rejected.'
           }
           className="!mb-3"
           actions={
@@ -610,7 +646,7 @@ const SalesRequestsTab: React.FC<SalesRequestsTabProps> = ({ refreshKey = 0 }) =
                     </div>
                     {item.status === 'pending' && canReviewPending && (
                       <p className="mt-2 text-xs font-medium text-amber-800">
-                        Tap to open, edit, Approve or Reject
+                        Tap to open, edit, Approve or return for correction
                       </p>
                     )}
                     {item.status === 'pending' && !canReviewPending && (
@@ -621,6 +657,11 @@ const SalesRequestsTab: React.FC<SalesRequestsTabProps> = ({ refreshKey = 0 }) =
                     {item.status === 'approved' && !canReviewPending && (
                       <p className="mt-2 text-xs text-ink-subtle">
                         Tap to view approved submission and download attachments.
+                      </p>
+                    )}
+                    {item.status === 'needs_correction' && (
+                      <p className="mt-2 text-xs font-medium text-amber-800">
+                        Needs correction — tap to edit and resubmit
                       </p>
                     )}
                     {item.status === 'declined' && (

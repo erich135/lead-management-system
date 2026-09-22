@@ -8,6 +8,7 @@ import {
   type JobSalesRequestData,
 } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { SalesRequestFormPresentation } from './SalesRequestFormPresentation';
 
 interface OriginatingRfqPanelProps {
   job: Job;
@@ -86,6 +87,15 @@ export function OriginatingRfqPanel({ job, onJobUpdated }: OriginatingRfqPanelPr
             {typeof copy.approvedVersion === 'number' ? ` · approved version ${copy.approvedVersion}` : ''}
           </p>
           <p className="text-xs text-slate-500">{lastCorrected}</p>
+          {job.salesRequestDataEditedAt ? (
+            <p className="mt-1 inline-block rounded bg-sky-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800">
+              Corrected copy
+            </p>
+          ) : (
+            <p className="mt-1 inline-block rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+              Original approved copy
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -196,9 +206,10 @@ export function OriginatingRfqPanel({ job, onJobUpdated }: OriginatingRfqPanelPr
             }}
           />
         ) : (
-          <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-white p-3 text-xs">
-            {JSON.stringify(copy.formData || {}, null, 2)}
-          </pre>
+          <SalesRequestFormPresentation
+            requestType={String(copy.requestType || '')}
+            formData={copy.formData}
+          />
         )}
       </div>
 

@@ -4717,7 +4717,32 @@ export async function restoreAdminPlannerForm(
 }
 
 /** Sales request lifecycle status. */
-export type SalesRequestStatus = 'draft' | 'pending' | 'approved' | 'declined';
+export type SalesRequestStatus =
+  | 'draft'
+  | 'pending'
+  | 'approved'
+  | 'declined'
+  | 'needs_correction';
+
+export type SalesRequestCorrectionEmailStatus =
+  | 'pending'
+  | 'sent'
+  | 'failed'
+  | 'missing'
+  | 'ambiguous';
+
+export interface SalesRequestCorrectionRound {
+  returnedBy?: string | { _id: string; firstName?: string; lastName?: string; email?: string };
+  returnedAt?: string;
+  instructions: string;
+  resubmittedBy?: string | { _id: string; firstName?: string; lastName?: string; email?: string } | null;
+  resubmittedAt?: string | null;
+  emailStatus?: SalesRequestCorrectionEmailStatus;
+  emailError?: string | null;
+  emailLogId?: string | null;
+  recipientUserId?: string | null;
+  recipientEmail?: string | null;
+}
 
 /**
  * Stored sales request attachment metadata returned by the API.
@@ -4792,6 +4817,13 @@ export interface SalesRequest {
   declinedBy?: string | { _id: string; firstName?: string; lastName?: string; email?: string };
   declinedAt?: string;
   declineReason?: string;
+  correctionRounds?: SalesRequestCorrectionRound[];
+  correctionEmail?: {
+    status: SalesRequestCorrectionEmailStatus;
+    error?: string | null;
+    alreadySent?: boolean;
+    previewPath?: string | null;
+  };
   reviewedBy?: string | { _id: string; firstName?: string; lastName?: string; email?: string };
   reviewedAt?: string;
   createdBy: string | { _id: string; firstName?: string; lastName?: string; email?: string };
@@ -5010,6 +5042,48 @@ export async function approveSalesRequest(
     method: 'POST',
     body: JSON.stringify(data ?? {}),
   });
+}
+
+/**
+ * Returns a pending sales request to the assigned representative for correction.
+ */
+export async function returnSalesRequestForCorrection(
+  id: string,
+  data: {
+    instructions: string;
+    expectedVersion?: number;
+  },
+): Promise<{
+  request: SalesRequest;
+  correctionEmail?: SalesRequest['correctionEmail'];
+}> {
+  const request = await apiRequest<SalesRequest & { correctionEmail?: SalesRequest['correctionEmail'] }>(
+    `/api/sales-requests/${id}/return-for-correction`,
+    {
+      method: 'POST',
+      body: JSON.stringify(data),
+    },
+  );
+  return { request, correctionEmail: request.correctionEmail };
+}
+
+/**
+ * Retries the current correction-round email without starting another round.
+ */
+export async function retrySalesRequestCorrectionEmail(
+  id: string,
+): Promise<{
+  request: SalesRequest;
+  correctionEmail?: SalesRequest['correctionEmail'];
+}> {
+  const request = await apiRequest<SalesRequest & { correctionEmail?: SalesRequest['correctionEmail'] }>(
+    `/api/sales-requests/${id}/correction-email/retry`,
+    {
+      method: 'POST',
+      body: JSON.stringify({}),
+    },
+  );
+  return { request, correctionEmail: request.correctionEmail };
 }
 
 /**
@@ -5719,6 +5793,8 @@ export default {
   submitSalesRequest,
   deleteSalesRequest,
   approveSalesRequest,
+  returnSalesRequestForCorrection,
+  retrySalesRequestCorrectionEmail,
   declineSalesRequest,
   reviewUpdateSalesRequest,
   deleteSalesRequestAttachment,

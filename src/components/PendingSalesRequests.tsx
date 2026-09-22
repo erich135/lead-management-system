@@ -53,6 +53,7 @@ const REP_APPROVAL_STATUS_LABELS: Record<string, string> = {
   pending: 'Waiting Review',
   approved: 'Approved',
   declined: 'Rejected',
+  needs_correction: 'Needs correction',
   draft: 'Draft',
 };
 
@@ -143,6 +144,9 @@ function requestTitle(item: SalesRequest): string {
 function statusPillClasses(item: SalesRequest): string {
   if (item.status === 'pending') {
     return 'rep-approval-waiting-badge bg-amber-500 text-white ring-2 ring-amber-300/70 shadow-sm shadow-amber-500/25';
+  }
+  if (item.status === 'needs_correction') {
+    return 'bg-amber-100 text-amber-950 ring-1 ring-amber-400/80';
   }
   if (item.status === 'declined') {
     return 'bg-rose-600 text-white ring-1 ring-rose-800/25';
@@ -315,19 +319,31 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
       setHistoryHasMore(false);
       historyPageRef.current = 1;
 
-      const { requests: items } = await listSalesRequests({
-        status: 'pending',
-        sortBy: 'submittedAt',
-        sortOrder: 'asc',
-        limit: 100,
+      const filter = {
         createdBy: representativeFilter || undefined,
         assignedAdministrator:
           administratorFilter && administratorFilter !== 'unassigned'
             ? administratorFilter
             : undefined,
         unassigned: administratorFilter === 'unassigned',
-      });
-      setRequests(items);
+      };
+      const [pending, returned] = await Promise.all([
+        listSalesRequests({
+          status: 'pending',
+          sortBy: 'submittedAt',
+          sortOrder: 'asc',
+          limit: 100,
+          ...filter,
+        }),
+        listSalesRequests({
+          status: 'needs_correction',
+          sortBy: 'updatedAt',
+          sortOrder: 'desc',
+          limit: 100,
+          ...filter,
+        }),
+      ]);
+      setRequests([...returned.requests, ...pending.requests]);
     } catch (loadError: unknown) {
       setError(getErrorMessage(loadError, 'Failed to load requests'));
     } finally {
@@ -693,7 +709,10 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
               >
                 <option value="all">All</option>
                 {tab === 'pending' ? (
-                  <option value="pending">Pending</option>
+                  <>
+                    <option value="pending">Pending</option>
+                    <option value="needs_correction">Needs correction</option>
+                  </>
                 ) : (
                   <>
                     <option value="approved">Approved</option>
@@ -903,7 +922,7 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
                                 className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-700 active:scale-[0.98]"
                               >
                                 <XCircle className="h-4 w-4" />
-                                Reject
+                                Return for correction
                               </button>
                             </>
                           )}

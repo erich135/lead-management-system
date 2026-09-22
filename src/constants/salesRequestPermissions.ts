@@ -34,6 +34,7 @@ export const SALES_REQUEST_STATUS_LABELS: Record<string, string> = {
   pending: 'Pending Approval',
   approved: 'Approved',
   declined: 'Rejected',
+  needs_correction: 'Needs correction',
 };
 
 /**
@@ -66,6 +67,7 @@ export function getSalesRequestOutcomeLabel(request: {
   approvalOutcome?: string;
   approvedJob?: unknown;
 }): string {
+  if (request.status === 'needs_correction') return 'Needs correction';
   if (request.status === 'declined') return 'Rejected';
   if (request.status === 'pending') return 'Pending Approval';
   if (request.status === 'draft') return 'Draft';

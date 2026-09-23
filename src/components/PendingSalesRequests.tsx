@@ -196,6 +196,7 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [reviewRequestId, setReviewRequestId] = useState<string | null>(null);
+  const [reviewOpenReturn, setReviewOpenReturn] = useState(false);
   const [attachmentsRequest, setAttachmentsRequest] = useState<SalesRequest | null>(null);
   const [attachmentNotice, setAttachmentNotice] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -398,8 +399,9 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
   /**
    * Opens the existing full review modal for a request.
    */
-  function openReview(requestId: string): void {
+  function openReview(requestId: string, openReturn = false): void {
     setSuccessMessage(null);
+    setReviewOpenReturn(openReturn);
     setReviewRequestId(requestId);
   }
 
@@ -918,7 +920,7 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
                               </button>
                               <button
                                 type="button"
-                                onClick={() => openReview(item._id)}
+                                onClick={() => openReview(item._id, true)}
                                 className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-700 active:scale-[0.98]"
                               >
                                 <XCircle className="h-4 w-4" />
@@ -958,7 +960,11 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
         <SalesRequestReviewModal
           requestId={reviewRequestId}
           canDecide={canDecide && tab === 'pending'}
-          onClose={() => setReviewRequestId(null)}
+          openReturn={reviewOpenReturn}
+          onClose={() => {
+            setReviewRequestId(null);
+            setReviewOpenReturn(false);
+          }}
           onDecisionComplete={handleDecisionComplete}
         />
       )}

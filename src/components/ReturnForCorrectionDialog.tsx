@@ -6,6 +6,7 @@ export const CORRECTION_INSTRUCTIONS_MAX = 10000;
 interface ReturnForCorrectionDialogProps {
   open: boolean;
   requestNumber?: string;
+  customerName?: string;
   submitting?: boolean;
   error?: string | null;
   onCancel: () => void;
@@ -18,6 +19,7 @@ interface ReturnForCorrectionDialogProps {
 const ReturnForCorrectionDialog: React.FC<ReturnForCorrectionDialogProps> = ({
   open,
   requestNumber,
+  customerName,
   submitting = false,
   error,
   onCancel,
@@ -76,10 +78,11 @@ const ReturnForCorrectionDialog: React.FC<ReturnForCorrectionDialogProps> = ({
             <h2 id="return-correction-title" className="text-lg font-bold text-ink">
               Return for correction
             </h2>
+            <p className="mt-1 text-sm font-semibold text-ink">
+              {[requestNumber, customerName].filter(Boolean).join(' · ') || 'Sales request'}
+            </p>
             <p className="mt-1 text-sm text-ink-muted">
-              {requestNumber
-                ? `Tell the representative what to correct on ${requestNumber}. The same RFQ number is kept.`
-                : 'Tell the representative what to correct. The same RFQ number is kept.'}
+              Tell the representative what to correct. The same RFQ number is kept.
             </p>
           </div>
           <button

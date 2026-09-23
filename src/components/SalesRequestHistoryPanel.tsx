@@ -2,10 +2,14 @@ import React from 'react';
 import { History } from 'lucide-react';
 import type { SalesRequestSubmission, SalesRequestSubmissionHistory } from '../lib/api';
 import { getSalesRequestAttachmentDownloadUrl } from '../utils/repApprovalsDownload';
+import { SalesRequestFormPresentation } from './SalesRequestFormPresentation';
+import { VisitLocationCard } from './VisitLocationCard';
 import {
   EXISTING_RECORD_CAPTURE_NOTE,
   formatHistoryValue,
   historyEmptyState,
+  readableFieldPath,
+  readRecordedGps,
   selectSalesRequestSubmission,
   submissionOutcomeLabel,
 } from '../utils/salesRequestHistoryView';
@@ -100,6 +104,7 @@ function SelectedSubmissionDetail({
 }) {
   const fromExisting =
     submission.captureSource === 'existing_record' || submission.capturedFromExistingRecord;
+  const recordedGps = submission.gps ? readRecordedGps(submission.gps) : null;
 
   return (
     <div className="space-y-3 text-sm">
@@ -152,19 +157,19 @@ function SelectedSubmissionDetail({
       ) : null}
 
       {submission.gps ? (
-        <div>
-          <h4 className="text-xs font-semibold uppercase text-slate-500">Recorded GPS</h4>
-          <pre className="overflow-x-auto rounded-lg bg-white p-2 text-xs text-slate-800">
-            {formatHistoryValue(submission.gps)}
-          </pre>
-        </div>
+        recordedGps ? (
+          <VisitLocationCard gps={recordedGps} />
+        ) : (
+          <p className="text-sm text-rose-700">Visit location could not be displayed.</p>
+        )
       ) : null}
 
       <div>
-        <h4 className="text-xs font-semibold uppercase text-slate-500">Submitted form</h4>
-        <pre className="max-h-64 overflow-auto rounded-lg bg-white p-2 text-xs text-slate-800">
-          {formatHistoryValue(submission.submittedFormData)}
-        </pre>
+        <h4 className="mb-2 text-xs font-semibold uppercase text-slate-500">Submitted form</h4>
+        <SalesRequestFormPresentation
+          requestType={submission.requestType}
+          formData={submission.submittedFormData}
+        />
       </div>
 
       <div>
@@ -205,7 +210,7 @@ function SelectedSubmissionDetail({
                 key={`${edit.path}-${index}`}
                 className="rounded-lg border border-slate-200 bg-white px-3 py-2"
               >
-                <p className="font-medium text-slate-900">{edit.path}</p>
+                <p className="font-medium text-slate-900">{readableFieldPath(edit.path)}</p>
                 <p className="text-xs text-slate-500">
                   {userName(edit.editedBy)} · {formatDate(edit.editedAt)}
                 </p>

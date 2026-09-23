@@ -15,6 +15,23 @@ test('originating RFQ presentation uses labels instead of raw JSON keys', () => 
   assert.equal(notes?.value, 'Keep\n\nparagraphs');
 });
 
+test('dynamic RFQ presentation hides schema dumps and field ids', () => {
+  const sections = presentSalesRequestForm('rfc', {
+    formTemplateName: 'Internal Request For Costing',
+    formTemplateId: '507f1f77bcf86cd799439011',
+    formSchemaSnapshot: {
+      fields: [{ id: 'fld_otherRequirements', label: 'Other Requirements / Notes', type: 'textarea' }],
+    },
+    values: { fld_otherRequirements: 'Keep this note' },
+  });
+  const rendered = JSON.stringify(sections);
+  assert.match(rendered, /Other Requirements \/ Notes/);
+  assert.match(rendered, /Keep this note/);
+  assert.equal(rendered.includes('fld_otherRequirements'), false);
+  assert.equal(rendered.includes('507f1f77bcf86cd799439011'), false);
+  assert.equal(rendered.includes('formSchemaSnapshot'), false);
+});
+
 test('login next only accepts in-app paths', () => {
   assert.equal(safeInternalPath('/sales-leads?tab=requests&rfq=abc'), '/sales-leads?tab=requests&rfq=abc');
   assert.equal(safeInternalPath('https://evil.example'), null);

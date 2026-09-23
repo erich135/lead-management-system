@@ -6,6 +6,8 @@ import {
   NO_RECORDED_HISTORY_MESSAGE,
   formatHistoryValue,
   historyEmptyState,
+  readRecordedGps,
+  readableFieldPath,
   selectSalesRequestSubmission,
   submissionOutcomeLabel,
 } from './salesRequestHistoryView.ts';
@@ -63,5 +65,33 @@ test('legacy captures are labelled as existing-record, not original submission',
   assert.equal(submissionOutcomeLabel('approved'), 'Approved');
   assert.equal(submissionOutcomeLabel('accepted_no_job'), 'Accepted — no job created');
   assert.equal(submissionOutcomeLabel('declined'), 'Rejected');
-  assert.equal(formatHistoryValue({ plant: 'P-12' }).includes('P-12'), true);
+  const formatted = formatHistoryValue({
+    plant: 'P-12',
+    formSchemaSnapshot: { fields: [{ id: 'fld_secret' }] },
+    _id: '507f1f77bcf86cd799439011',
+  });
+  assert.equal(formatted.includes('P-12'), true);
+  assert.equal(formatted.includes('{'), false);
+  assert.equal(formatted.includes('fld_secret'), false);
+  assert.equal(formatted.includes('507f1f77bcf86cd799439011'), false);
+  assert.equal(readableFieldPath('formData.values.fld_otherRequirements'), 'Other Requirements');
+});
+
+test('recorded GPS uses the visit card fields and drops stored attendance payloads', () => {
+  const gps = readRecordedGps({
+    visitGpsVerification: {
+      verified: true,
+      latitude: -26.183329,
+      longitude: 28.228386,
+      accuracyMeters: 10,
+      address: '2 Romeo St',
+      capturedBy: '507f1f77bcf86cd799439011',
+      appointmentId: '507f1f77bcf86cd799439012',
+    },
+    attendanceLocation: { type: 'Point', coordinates: [28.228386, -26.183329] },
+  });
+  assert.equal(gps?.latitude, -26.183329);
+  assert.equal(gps?.address, '2 Romeo St');
+  assert.equal(Object.prototype.hasOwnProperty.call(gps, 'capturedBy'), false);
+  assert.equal(readRecordedGps({ attendanceLocation: { type: 'Point', coordinates: [1, 2] } }), null);
 });

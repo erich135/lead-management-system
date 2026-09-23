@@ -15,8 +15,14 @@ export function SalesRequestFormPresentation({
   requestType = '',
   formData,
 }: SalesRequestFormPresentationProps) {
-  const sections = presentSalesRequestForm(requestType, formData);
-  const signature = extractSignatureDataUrl(formData);
+  let sections: ReturnType<typeof presentSalesRequestForm> = [];
+  let signature: string | null = null;
+  try {
+    sections = presentSalesRequestForm(requestType, formData);
+    signature = extractSignatureDataUrl(formData);
+  } catch {
+    return <p className="text-sm text-rose-700">This form could not be displayed.</p>;
+  }
 
   if (sections.length === 0 && !signature) {
     return <p className="text-sm text-slate-500">No form values were captured.</p>;

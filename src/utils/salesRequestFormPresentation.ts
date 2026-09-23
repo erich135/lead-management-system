@@ -312,7 +312,13 @@ function presentDynamicSnapshot(formData: Record<string, unknown>): FormPresenta
 function presentGeneric(formData: Record<string, unknown>): FormPresentationSection[] {
   const rows: FormPresentationRow[] = [];
   for (const [key, value] of Object.entries(formData)) {
-    if (key === "signatureDataUrl" || key === "formSchemaSnapshot") continue;
+    if (
+      key === "signatureDataUrl" ||
+      key === "formSchemaSnapshot" ||
+      /schema|checksum|dataurl|templateid|templateversion|templatetype|^_?id$|attachmentid/i.test(key)
+    ) {
+      continue;
+    }
     if (value && typeof value === "object" && !Array.isArray(value)) {
       const nested = presentGeneric(asRecord(value));
       for (const sectionRow of nested) {
@@ -333,6 +339,7 @@ function presentGeneric(formData: Record<string, unknown>): FormPresentationSect
 
 function humanize(key: string): string {
   return key
+    .replace(/^fld_/, "")
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/[_-]+/g, " ")
     .replace(/^\w/, (letter) => letter.toUpperCase());

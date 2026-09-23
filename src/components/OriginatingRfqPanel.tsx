@@ -192,25 +192,10 @@ export function OriginatingRfqPanel({ job, onJobUpdated }: OriginatingRfqPanelPr
 
       <div className="mt-3">
         <p className="mb-1 text-xs font-semibold uppercase text-slate-500">Form content</p>
-        {editing ? (
-          <textarea
-            className="min-h-[140px] w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-xs"
-            value={JSON.stringify(draft.formData || {}, null, 2)}
-            onChange={(event) => {
-              try {
-                setDraft({ ...draft, formData: JSON.parse(event.target.value) });
-                setError(null);
-              } catch {
-                setError('Form content must be valid JSON.');
-              }
-            }}
-          />
-        ) : (
-          <SalesRequestFormPresentation
-            requestType={String(copy.requestType || '')}
-            formData={copy.formData}
-          />
-        )}
+        <SalesRequestFormPresentation
+          requestType={String((editing ? draft.requestType : copy.requestType) || '')}
+          formData={editing ? draft.formData : copy.formData}
+        />
       </div>
 
       <div className="mt-3">

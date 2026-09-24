@@ -53,6 +53,17 @@ interface PublishedRatingFieldsProps {
   onElectricalPowerKindChange?: (kind: ElectricalPowerKind) => void;
   flowReference?: PublishedFlowReference | null;
   onFlowReferenceChange?: (next: PublishedFlowReference) => void;
+  referencePressureSource?: string | null;
+  referenceAbsolutePressurePa?: number | null;
+  onReferencePressureCommit?: (pressurePa: number | null) => void;
+  onConfirmReferencePressure?: () => void;
+  onClearReferencePressure?: () => void;
+  intakeTemperatureOverrideC?: number | null;
+  intakeTemperatureKind?: 'measured' | 'estimated' | null;
+  onIntakeOverrideChange?: (next: {
+    intakeTemperatureOverrideC: number | null;
+    intakeTemperatureKind: 'measured' | 'estimated' | null;
+  }) => void;
   advancedOpen?: boolean;
   onAdvancedOpenChange?: (open: boolean) => void;
 }
@@ -66,6 +77,14 @@ export function PublishedRatingFields({
   onElectricalPowerKindChange,
   flowReference = null,
   onFlowReferenceChange,
+  referencePressureSource = null,
+  referenceAbsolutePressurePa = null,
+  onReferencePressureCommit,
+  onConfirmReferencePressure,
+  onClearReferencePressure,
+  intakeTemperatureOverrideC = null,
+  intakeTemperatureKind = null,
+  onIntakeOverrideChange,
   advancedOpen = false,
   onAdvancedOpenChange,
 }: PublishedRatingFieldsProps) {
@@ -150,6 +169,14 @@ export function PublishedRatingFields({
         library={library}
         value={flowReference}
         onChange={onFlowReferenceChange}
+        onReferencePressureCommit={onReferencePressureCommit}
+        referencePressureSource={referencePressureSource}
+        storedReferencePressurePa={referenceAbsolutePressurePa}
+        onConfirmReferencePressure={onConfirmReferencePressure}
+        onClearReferencePressure={onClearReferencePressure}
+        intakeTemperatureOverrideC={intakeTemperatureOverrideC}
+        intakeTemperatureKind={intakeTemperatureKind}
+        onIntakeOverrideChange={onIntakeOverrideChange}
         advancedOpen={advancedOpen}
         onAdvancedOpenChange={onAdvancedOpenChange}
       />
@@ -161,12 +188,31 @@ function PublishedFlowReferenceFields({
   library,
   value,
   onChange,
+  onReferencePressureCommit,
+  referencePressureSource = null,
+  storedReferencePressurePa = null,
+  onConfirmReferencePressure,
+  onClearReferencePressure,
+  intakeTemperatureOverrideC = null,
+  intakeTemperatureKind = null,
+  onIntakeOverrideChange,
   advancedOpen = false,
   onAdvancedOpenChange,
 }: {
   library: PublicMachineSpec | null;
   value: PublishedFlowReference | null;
   onChange?: (next: PublishedFlowReference) => void;
+  onReferencePressureCommit?: (pressurePa: number | null) => void;
+  referencePressureSource?: string | null;
+  storedReferencePressurePa?: number | null;
+  onConfirmReferencePressure?: () => void;
+  onClearReferencePressure?: () => void;
+  intakeTemperatureOverrideC?: number | null;
+  intakeTemperatureKind?: 'measured' | 'estimated' | null;
+  onIntakeOverrideChange?: (next: {
+    intakeTemperatureOverrideC: number | null;
+    intakeTemperatureKind: 'measured' | 'estimated' | null;
+  }) => void;
   advancedOpen?: boolean;
   onAdvancedOpenChange?: (open: boolean) => void;
 }) {
@@ -248,9 +294,88 @@ function PublishedFlowReferenceFields({
             unit={REFERENCE_INLET_PRESSURE_UNIT}
             value={barAbs}
             placeholder="e.g. 1.013"
-            onChange={(text) => patch({ referenceAbsolutePressurePa: parseBarAbsoluteText(text) })}
+            onChange={(text) => onReferencePressureCommit?.(parseBarAbsoluteText(text))}
           />
+          <p className="text-xs text-slate-500">
+            Reps do not need to enter this. A documented manufacturer value is kept. Otherwise ARS uses 101.325 kPa absolute and 20°C. The 101.325 kPa figure in the altitude formula is the sea-level constant, not this machine’s reference.
+          </p>
+          {storedReferencePressurePa != null && referencePressureSource == null && (
+            <div className="rounded-[8px] border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+              <p>
+                This saved reference pressure has no recorded source. It is not used until you confirm it or clear it.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="rounded-[8px] bg-white px-2 py-1 font-medium text-[#0969a9] ring-1 ring-[#0969a9]"
+                  onClick={onConfirmReferencePressure}
+                >
+                  Keep as explicit override
+                </button>
+                <button
+                  type="button"
+                  className="rounded-[8px] bg-white px-2 py-1 font-medium text-slate-700 ring-1 ring-slate-300"
+                  onClick={onClearReferencePressure}
+                >
+                  Clear and use ARS default
+                </button>
+              </div>
+            </div>
+          )}
+          {referencePressureSource && (
+            <p className="text-xs text-slate-500">
+              Reference pressure source:{' '}
+              {referencePressureSource === 'manufacturer_documented'
+                ? 'Manufacturer documented'
+                : referencePressureSource === 'manual_override'
+                  ? 'Explicit manual override'
+                  : referencePressureSource === 'ars_assumed'
+                    ? 'ARS assumed'
+                    : referencePressureSource}
+            </p>
+          )}
           <p className="text-xs text-slate-500">{REFERENCE_INLET_PRESSURE_HELP}</p>
+          <label className="block">
+            <span className="text-xs font-medium text-slate-500">
+              Machine intake temperature override (°C)
+            </span>
+            <input
+              type="number"
+              value={intakeTemperatureOverrideC ?? ''}
+              placeholder="Uses the shared site temperature"
+              onChange={(event) => {
+                const text = event.target.value.trim();
+                onIntakeOverrideChange?.({
+                  intakeTemperatureOverrideC: text === '' ? null : Number(text),
+                  intakeTemperatureKind,
+                });
+              }}
+              className="mt-1 w-full rounded-[8px] border border-slate-300 bg-white px-3 py-1.5 text-sm focus:border-[#0969a9] focus:outline-none focus:ring-2 focus:ring-[#0969a9]/20"
+            />
+            <span className="mt-1 block text-xs text-slate-500">
+              Optional. Leave blank to use the shared air temperature at the compressor intake.
+            </span>
+          </label>
+          <label className="block">
+            <span className="text-xs font-medium text-slate-500">Override temperature choice</span>
+            <select
+              value={intakeTemperatureKind ?? ''}
+              onChange={(event) =>
+                onIntakeOverrideChange?.({
+                  intakeTemperatureOverrideC,
+                  intakeTemperatureKind:
+                    event.target.value === 'measured' || event.target.value === 'estimated'
+                      ? event.target.value
+                      : null,
+                })
+              }
+              className="mt-1 w-full rounded-[8px] border border-slate-300 bg-white px-3 py-1.5 text-sm focus:border-[#0969a9] focus:outline-none focus:ring-2 focus:ring-[#0969a9]/20"
+            >
+              <option value="">Use the shared choice</option>
+              <option value="measured">Measured</option>
+              <option value="estimated">Estimated</option>
+            </select>
+          </label>
           {looksLikeDischargePressureBarAbs(barAbs) && (
             <p className="text-xs text-amber-700">{DISCHARGE_PRESSURE_HINT}</p>
           )}

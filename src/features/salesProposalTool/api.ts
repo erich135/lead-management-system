@@ -85,7 +85,14 @@ export async function getSalesProposal(id: string): Promise<SalesProposal> {
 export async function saveSalesProposal(
   id: string,
   body: {
+    customerEntry?: 'existing' | 'manual';
     customerId: string | null;
+    manualCustomer?: {
+      companyName: string | null;
+      contactName: string | null;
+      email: string | null;
+      phone: string | null;
+    };
     site: SalesProposalSite;
     currentEquipment: CurrentEquipment[];
     proposedEquipment: ProposedEquipment[];
@@ -111,7 +118,14 @@ export async function saveSalesProposal(
 export async function previewElectricityComparison(
   id: string,
   body: {
+    customerEntry?: 'existing' | 'manual';
     customerId?: string | null;
+    manualCustomer?: {
+      companyName: string | null;
+      contactName: string | null;
+      email: string | null;
+      phone: string | null;
+    };
     site?: SalesProposalSite;
     currentEquipment: CurrentEquipment[];
     proposedEquipment: ProposedEquipment[];
@@ -128,12 +142,14 @@ export async function previewElectricityComparison(
   commercial: CommercialComparison;
   currentMachinePerformance: CurrentMachineMeasuredPerformance | null;
   proposedSitePerformance: SitePerformanceView | null;
+  proposedSitePerformances: SitePerformanceView[] | null;
 }> {
   return jsonRequest<{
     comparison: AirAndElectricityComparison;
     commercial: CommercialComparison;
     currentMachinePerformance: CurrentMachineMeasuredPerformance | null;
     proposedSitePerformance: SitePerformanceView | null;
+    proposedSitePerformances: SitePerformanceView[] | null;
   }>(
     `/api/sales-proposal-tool/proposals/${id}/electricity-comparison`,
     {

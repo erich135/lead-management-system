@@ -54,6 +54,7 @@ import {
 import {
   CUSTOMER_SELECTION_REQUIRED_MESSAGE,
   customerFromProposal,
+  restoreProposalCustomer,
 } from '../salesProposalEditorRestore';
 import {
   EMPTY_SITE,
@@ -74,6 +75,13 @@ export function SalesProposalEditorPage() {
   const navigate = useNavigate();
   const [proposal, setProposal] = useState<SalesProposal | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
+  const [customerEntry, setCustomerEntry] = useState<'existing' | 'manual'>('existing');
+  const [manualCustomer, setManualCustomer] = useState({
+    companyName: '',
+    contactName: '',
+    email: '',
+    phone: '',
+  });
   const [site, setSite] = useState<SalesProposalSite>(EMPTY_SITE);
   const [currentEquipment, setCurrentEquipment] = useState<CurrentEquipmentDraft[]>([]);
   const [proposed, setProposed] = useState<ProposedEquipmentDraft[]>([emptyProposedDraft()]);
@@ -93,6 +101,9 @@ export function SalesProposalEditorPage() {
     useState<CurrentMachineMeasuredPerformance | null>(null);
   const [proposedSitePerformance, setProposedSitePerformance] =
     useState<SitePerformanceView | null>(null);
+  const [proposedSitePerformances, setProposedSitePerformances] = useState<
+    SitePerformanceView[] | null
+  >(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -133,7 +144,16 @@ export function SalesProposalEditorPage() {
         setCommercial(loaded.commercial);
         setCurrentMachinePerformance(loaded.currentMachinePerformance ?? null);
         setProposedSitePerformance(loaded.proposedSitePerformance ?? null);
-        setCustomer(customerFromProposal(loaded));
+        setProposedSitePerformances(loaded.proposedSitePerformances ?? null);
+        const restored = restoreProposalCustomer(loaded);
+        setCustomerEntry(restored.entry);
+        setManualCustomer({
+          companyName: restored.companyName,
+          contactName: restored.contactName,
+          email: restored.email,
+          phone: restored.phone,
+        });
+        setCustomer(restored.entry === 'manual' ? null : customerFromProposal(loaded));
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -179,7 +199,14 @@ export function SalesProposalEditorPage() {
     if (!proposalId || loading) return;
     const timer = window.setTimeout(() => {
       void previewElectricityComparison(proposalId, {
-        customerId: customer?._id ?? null,
+        customerEntry,
+        customerId: customerEntry === 'manual' ? null : customer?._id ?? null,
+        manualCustomer: {
+          companyName: manualCustomer.companyName.trim() || null,
+          contactName: manualCustomer.contactName.trim() || null,
+          email: manualCustomer.email.trim() || null,
+          phone: manualCustomer.phone.trim() || null,
+        },
         site,
         currentEquipment: toCurrentEquipmentPayload(currentEquipment),
         proposedEquipment: toProposedEquipmentPayload(proposed),
@@ -193,6 +220,7 @@ export function SalesProposalEditorPage() {
           setCommercial(preview.commercial);
           setCurrentMachinePerformance(preview.currentMachinePerformance ?? null);
           setProposedSitePerformance(preview.proposedSitePerformance ?? null);
+          setProposedSitePerformances(preview.proposedSitePerformances ?? null);
         })
         .catch(() => {
           /* keep the last comparison if preview cannot run yet */
@@ -209,13 +237,24 @@ export function SalesProposalEditorPage() {
     commercialOffer,
     airAuditScope,
     site.altitudeMetres,
+    site.intakeAirTemperatureC,
+    site.intakeAirTemperatureKind,
     proposal?.airAudit?.sourceSha256,
     customer?._id,
+    customerEntry,
+    manualCustomer,
   ]);
 
   function editorPersistenceState(): SalesProposalEditorState {
     return {
+      customerEntry,
       customerId: customer?._id ?? null,
+      manualCustomer: {
+        companyName: manualCustomer.companyName,
+        contactName: manualCustomer.contactName,
+        email: manualCustomer.email,
+        phone: manualCustomer.phone,
+      },
       site,
       currentEquipment,
       proposed,
@@ -228,7 +267,15 @@ export function SalesProposalEditorPage() {
 
   function applyPersistedProposal(saved: SalesProposal) {
     setProposal(saved);
-    setCustomer(customerFromProposal(saved));
+    const restored = restoreProposalCustomer(saved);
+    setCustomerEntry(restored.entry);
+    setManualCustomer({
+      companyName: restored.companyName,
+      contactName: restored.contactName,
+      email: restored.email,
+      phone: restored.phone,
+    });
+    setCustomer(restored.entry === 'manual' ? null : customerFromProposal(saved));
     setSite(saved.site);
     const drafts = draftsFromCurrentEquipment(saved.currentEquipment);
     setCurrentEquipment(drafts);
@@ -246,6 +293,7 @@ export function SalesProposalEditorPage() {
     setCommercial(saved.commercial);
     setCurrentMachinePerformance(saved.currentMachinePerformance ?? null);
     setProposedSitePerformance(saved.proposedSitePerformance ?? null);
+    setProposedSitePerformances(saved.proposedSitePerformances ?? null);
   }
 
   async function handleSave() {
@@ -382,8 +430,10 @@ export function SalesProposalEditorPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-[#383838]">{SALES_PROPOSAL_TOOL_LABEL}</h1>
-          {customer?.name && (
-            <p className="mt-1 text-sm font-medium text-[#383838]">{customer.name}</p>
+          {(customerEntry === 'manual' ? manualCustomer.companyName.trim() : customer?.name) && (
+            <p className="mt-1 text-sm font-medium text-[#383838]">
+              {customerEntry === 'manual' ? manualCustomer.companyName.trim() : customer?.name}
+            </p>
           )}
         </div>
         <div className="flex gap-2">
@@ -419,18 +469,113 @@ export function SalesProposalEditorPage() {
           <EditorSection
             number={1}
             title="Customer"
-            instruction="Choose the customer. Known details are filled in for you."
+            instruction="Choose an existing customer, or enter the customer on this proposal only."
           >
-            <CustomerSelect
-              customerId={customer?._id ?? null}
-              customerName={customer?.name ?? null}
-              onSelect={(selected) => setCustomer(selected)}
-              onClear={() => setCustomer(null)}
-            />
-            {!customer && (
-              <p className="text-xs font-medium text-amber-800">
-                {CUSTOMER_SELECTION_REQUIRED_MESSAGE}
-              </p>
+            <div className="mb-3 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setCustomerEntry('existing')}
+                className={`rounded-[8px] px-3 py-2 text-sm font-bold ${
+                  customerEntry === 'existing'
+                    ? 'bg-[#f7c12b] text-[#383838]'
+                    : 'bg-slate-100 text-[#383838] hover:bg-slate-200'
+                }`}
+              >
+                Choose existing customer
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCustomerEntry('manual');
+                  setCustomer(null);
+                }}
+                className={`rounded-[8px] px-3 py-2 text-sm font-bold ${
+                  customerEntry === 'manual'
+                    ? 'bg-[#f7c12b] text-[#383838]'
+                    : 'bg-slate-100 text-[#383838] hover:bg-slate-200'
+                }`}
+              >
+                Enter customer manually
+              </button>
+            </div>
+            {customerEntry === 'existing' ? (
+              <>
+                <CustomerSelect
+                  customerId={customer?._id ?? null}
+                  customerName={customer?.name ?? null}
+                  onSelect={(selected) => setCustomer(selected)}
+                  onClear={() => setCustomer(null)}
+                />
+                {!customer && (
+                  <p className="text-xs font-medium text-amber-800">
+                    {CUSTOMER_SELECTION_REQUIRED_MESSAGE}
+                  </p>
+                )}
+              </>
+            ) : (
+              <div className="space-y-3">
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-500">Company / customer name</span>
+                  <input
+                    type="text"
+                    value={manualCustomer.companyName}
+                    onChange={(event) =>
+                      setManualCustomer((current) => ({
+                        ...current,
+                        companyName: event.target.value,
+                      }))
+                    }
+                    className="mt-1 w-full rounded-[8px] border border-slate-300 px-3 py-2 text-sm focus:border-[#0969a9] focus:outline-none focus:ring-2 focus:ring-[#0969a9]/20"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-500">Contact name</span>
+                  <input
+                    type="text"
+                    value={manualCustomer.contactName}
+                    onChange={(event) =>
+                      setManualCustomer((current) => ({
+                        ...current,
+                        contactName: event.target.value,
+                      }))
+                    }
+                    placeholder="Optional"
+                    className="mt-1 w-full rounded-[8px] border border-slate-300 px-3 py-2 text-sm focus:border-[#0969a9] focus:outline-none focus:ring-2 focus:ring-[#0969a9]/20"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-500">Email</span>
+                  <input
+                    type="email"
+                    value={manualCustomer.email}
+                    onChange={(event) =>
+                      setManualCustomer((current) => ({ ...current, email: event.target.value }))
+                    }
+                    placeholder="Optional"
+                    className="mt-1 w-full rounded-[8px] border border-slate-300 px-3 py-2 text-sm focus:border-[#0969a9] focus:outline-none focus:ring-2 focus:ring-[#0969a9]/20"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-500">Phone</span>
+                  <input
+                    type="tel"
+                    value={manualCustomer.phone}
+                    onChange={(event) =>
+                      setManualCustomer((current) => ({ ...current, phone: event.target.value }))
+                    }
+                    placeholder="Optional"
+                    className="mt-1 w-full rounded-[8px] border border-slate-300 px-3 py-2 text-sm focus:border-[#0969a9] focus:outline-none focus:ring-2 focus:ring-[#0969a9]/20"
+                  />
+                </label>
+                {!manualCustomer.companyName.trim() && (
+                  <p className="text-xs font-medium text-amber-800">
+                    Enter the customer name to complete this proposal. A draft can still be saved.
+                  </p>
+                )}
+                <p className="text-xs text-slate-600">
+                  This name is stored on the proposal only. It does not create a customer record.
+                </p>
+              </div>
             )}
           </EditorSection>
           <EditorSection
@@ -493,6 +638,9 @@ export function SalesProposalEditorPage() {
             <ProposedReplacementSection
               proposalId={proposal.id}
               rows={proposed}
+              intakeAirTemperatureC={site.intakeAirTemperatureC ?? null}
+              intakeAirTemperatureKind={site.intakeAirTemperatureKind ?? null}
+              onIntakeTemperatureChange={(next) => setSite({ ...site, ...next })}
               onChange={setProposed}
             />
           </EditorSection>
@@ -524,6 +672,7 @@ export function SalesProposalEditorPage() {
             current={currentEquipment}
             proposed={proposed}
             proposedSitePerformance={proposedSitePerformance}
+            proposedSitePerformances={proposedSitePerformances}
           />
           <CurrentMachinePerformanceCard result={currentMachinePerformance} />
           <AirMachineComparisonCard

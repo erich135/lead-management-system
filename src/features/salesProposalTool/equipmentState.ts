@@ -48,6 +48,11 @@ export interface CurrentEquipmentDraft {
   advancedSpecificationsOpen?: boolean;
   flowReferenceBasis?: string | null;
   referenceAbsolutePressurePa?: number | null;
+  referencePressureSource?: string | null;
+  referenceTemperatureC?: number | null;
+  referenceTemperatureSource?: string | null;
+  intakeTemperatureOverrideC?: number | null;
+  intakeTemperatureKind?: 'measured' | 'estimated' | null;
   specificationReference?: string | null;
 }
 
@@ -71,7 +76,28 @@ export interface ProposedEquipmentDraft {
   advancedSpecificationsOpen?: boolean;
   flowReferenceBasis?: string | null;
   referenceAbsolutePressurePa?: number | null;
+  referencePressureSource?: string | null;
+  referenceTemperatureC?: number | null;
+  referenceTemperatureSource?: string | null;
+  intakeTemperatureOverrideC?: number | null;
+  intakeTemperatureKind?: 'measured' | 'estimated' | null;
   specificationReference?: string | null;
+}
+
+function referenceConditionPayload(input: {
+  referencePressureSource?: string | null;
+  referenceTemperatureC?: number | null;
+  referenceTemperatureSource?: string | null;
+  intakeTemperatureOverrideC?: number | null;
+  intakeTemperatureKind?: 'measured' | 'estimated' | null;
+}) {
+  return {
+    referencePressureSource: input.referencePressureSource ?? null,
+    referenceTemperatureC: input.referenceTemperatureC ?? null,
+    referenceTemperatureSource: input.referenceTemperatureSource ?? null,
+    intakeTemperatureOverrideC: input.intakeTemperatureOverrideC ?? null,
+    intakeTemperatureKind: input.intakeTemperatureKind ?? null,
+  };
 }
 
 function publishedFlowReferenceFields(
@@ -174,6 +200,11 @@ export function draftsFromCurrentEquipment(
     advancedSpecificationsOpen: false,
     flowReferenceBasis: row.flowReferenceBasis ?? null,
     referenceAbsolutePressurePa: row.referenceAbsolutePressurePa ?? null,
+    referencePressureSource: row.referencePressureSource ?? null,
+    referenceTemperatureC: row.referenceTemperatureC ?? null,
+    referenceTemperatureSource: row.referenceTemperatureSource ?? null,
+    intakeTemperatureOverrideC: row.intakeTemperatureOverrideC ?? null,
+    intakeTemperatureKind: row.intakeTemperatureKind ?? null,
     specificationReference: row.specificationReference ?? null,
   }));
 }
@@ -203,6 +234,11 @@ export function proposedDraftsFromProposal(
     advancedSpecificationsOpen: false,
     flowReferenceBasis: row.flowReferenceBasis ?? null,
     referenceAbsolutePressurePa: row.referenceAbsolutePressurePa ?? null,
+    referencePressureSource: row.referencePressureSource ?? null,
+    referenceTemperatureC: row.referenceTemperatureC ?? null,
+    referenceTemperatureSource: row.referenceTemperatureSource ?? null,
+    intakeTemperatureOverrideC: row.intakeTemperatureOverrideC ?? null,
+    intakeTemperatureKind: row.intakeTemperatureKind ?? null,
     specificationReference: row.specificationReference ?? null,
   }));
 }
@@ -383,6 +419,7 @@ export function toCurrentEquipmentPayload(
         electricalPowerKind: row.electricalPowerKind ?? null,
         variableSpeedDrive: resolveVariableSpeedDrive(row),
         ...publishedFlowReferenceFields(resolveDraftPublishedFlowReference(row)),
+        ...referenceConditionPayload(row),
       },
     ];
   });
@@ -427,6 +464,7 @@ export function toProposedEquipmentPayload(
         electricalPowerKind: draft.electricalPowerKind ?? null,
         variableSpeedDrive: resolveVariableSpeedDrive(draft),
         ...publishedFlowReferenceFields(resolveDraftPublishedFlowReference(draft)),
+        ...referenceConditionPayload(draft),
       },
     ];
   });

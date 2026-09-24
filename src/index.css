@@ -252,6 +252,21 @@
     margin: 12mm;
   }
 
+  @page spt-proposal {
+    size: A4;
+    margin: 14mm 12mm 18mm 12mm;
+    @bottom-left {
+      content: "AIR ROTARY SERVICES (PTY) LTD";
+      font-size: 8pt;
+      color: #727272;
+    }
+    @bottom-right {
+      content: counter(page) " of " counter(pages);
+      font-size: 8pt;
+      color: #727272;
+    }
+  }
+
   body:has(.spt-customer-proposal-print-root) * {
     visibility: hidden;
   }
@@ -282,6 +297,7 @@
 .spt-customer-proposal-print-root {
   min-height: 100vh;
   background: #dbe3ea;
+  page: spt-proposal;
 }
 
 .spt-customer-proposal-toolbar {
@@ -361,27 +377,60 @@
 }
 
 .spt-customer-proposal-sheet {
+  position: relative;
   width: 210mm;
-  min-height: 297mm;
+  min-height: 0;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  padding: 16mm;
+  padding: 6mm 12.7mm 18mm;
   background: #ffffff;
   color: #383838;
   box-shadow: 0 8px 28px rgba(15, 23, 42, 0.12);
 }
 
+.spt-proposal-watermark {
+  position: absolute;
+  left: 8%;
+  top: 24%;
+  width: 84%;
+  height: auto;
+  opacity: 0.08;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.spt-customer-proposal-document > :not(.spt-proposal-watermark):not(.spt-proposal-letterhead):not(.spt-proposal-page-footer) {
+  position: relative;
+  z-index: 1;
+}
+
+.spt-proposal-return {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 2px solid #0969a9;
+  background: #f5f8fb;
+}
+
+.spt-proposal-letterhead-contact,
+.spt-proposal-letterhead-contact .spt-proposal-company-name {
+  color: #7f7f7f;
+  font-family: Arial, "Arial Narrow", sans-serif;
+  font-size: 10px;
+  line-height: 1.25;
+  text-align: right;
+}
+
 .spt-proposal-letterhead-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .spt-proposal-logo {
-  height: 52px;
-  width: auto;
+  width: 78mm;
+  height: auto;
   flex-shrink: 0;
   object-fit: contain;
 }
@@ -531,6 +580,12 @@
   gap: 8px 12px;
 }
 
+.spt-proposal-metric,
+.spt-proposal-performance > div {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
 .spt-proposal-performance {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -658,15 +713,33 @@
 
 .spt-proposal-figure-strip {
   display: grid;
+  align-items: stretch;
   gap: 10px;
-  padding: 10px 12px;
+  margin-top: 10px;
+  padding: 12px;
   background: #f5f8fb;
 }
 
+.spt-proposal-figure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+  padding: 2px 6px;
+  text-align: center;
+}
+
 .spt-proposal-figure-label {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  min-height: 3.4em;
   font-size: 8.5px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
+  line-height: 1.25;
   text-transform: uppercase;
   color: #727272;
 }
@@ -677,10 +750,20 @@
 }
 
 .spt-proposal-figure-value {
-  margin-top: 3px;
+  margin-top: 8px;
+  width: 100%;
   font-size: 15px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
   color: #111827;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .spt-proposal-figure-strip {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 .spt-proposal-callout {
@@ -710,7 +793,7 @@
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  margin-top: auto;
+  margin-top: 16px;
   padding-top: 10px;
   border-top: 1px solid #d7e6f2;
   font-size: 8.5px;
@@ -718,11 +801,74 @@
   color: #727272;
 }
 
+.spt-proposal-wrap {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.spt-proposal-recommend {
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: #f5f8fb;
+  border-top: 3px solid #0969a9;
+}
+
+.spt-proposal-chart {
+  margin: 12px 0 0;
+}
+
+.spt-proposal-chart-plot {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: end;
+  min-height: 160px;
+  padding: 8px 12px 0;
+}
+
+.spt-proposal-chart-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.spt-proposal-chart-value,
+.spt-proposal-chart-name {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.spt-proposal-chart-bar {
+  width: 72px;
+  max-width: 40%;
+}
+
+.spt-proposal-chart-bar-current {
+  background: #94a3b8;
+}
+
+.spt-proposal-chart-bar-proposed {
+  background: #0969a9;
+}
+
+.spt-proposal-table thead {
+  display: table-header-group;
+}
+
+.spt-proposal-table {
+  table-layout: fixed;
+}
+
 .spt-proposal-letterhead,
 .spt-proposal-callout,
 .spt-proposal-figure-strip,
 .spt-proposal-compare-col,
 .spt-proposal-rule,
+.spt-proposal-chart-bar,
+.spt-proposal-recommend,
 .spt-proposal-table th {
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
@@ -742,12 +888,41 @@
     padding: 5mm;
   }
 
-  /* One break only: start page 2 at the commercial story. Do not force a
-     break after page 1 — that stranded a short leftover page. */
-  .spt-customer-proposal-page-2 {
-    margin-top: 0 !important;
-    break-before: page;
-    page-break-before: always;
+  .spt-proposal-watermark {
+    position: fixed;
+    left: 12%;
+    top: 28%;
+    width: 76%;
+    opacity: 0.08;
+    z-index: 0;
+  }
+
+  .spt-proposal-letterhead {
+    position: fixed;
+    top: 4mm;
+    left: 12.7mm;
+    right: 12.7mm;
+    z-index: 2;
+    background: #fff;
+  }
+
+  .spt-customer-proposal-sheet {
+    padding-top: 58mm;
+    padding-bottom: 24mm;
+  }
+
+  .spt-proposal-page-footer {
+    display: flex;
+    position: fixed;
+    bottom: 2mm;
+    left: 12.7mm;
+    right: 12.7mm;
+    background: #fff;
+  }
+
+  .spt-proposal-page-footer img {
+    width: 150mm;
+    height: auto;
   }
 
   .spt-keep-together {

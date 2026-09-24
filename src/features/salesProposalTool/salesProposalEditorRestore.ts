@@ -20,3 +20,41 @@ export function customerSelectionIsConfirmed(
 ): boolean {
   return Boolean(customerId?.trim());
 }
+
+export interface RestoredProposalCustomer {
+  entry: 'existing' | 'manual';
+  companyName: string;
+  contactName: string;
+  email: string;
+  phone: string;
+}
+
+export function restoreProposalCustomer(proposal: {
+  customerEntry?: 'existing' | 'manual' | null;
+  customerId?: string | null;
+  customerName?: string | null;
+  manualCustomer?: {
+    companyName?: string | null;
+    contactName?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  } | null;
+}): RestoredProposalCustomer {
+  const manual = proposal.manualCustomer;
+  const linked = Boolean(proposal.customerId?.trim());
+  const storedManualName = manual?.companyName?.trim() || '';
+  const storedName = proposal.customerName?.trim() || '';
+  const entry: 'existing' | 'manual' =
+    proposal.customerEntry === 'manual' || (!linked && Boolean(storedManualName))
+      ? 'manual'
+      : 'existing';
+  const companyName =
+    entry === 'manual' ? storedManualName || storedName : storedManualName;
+  return {
+    entry,
+    companyName,
+    contactName: manual?.contactName?.trim() || '',
+    email: manual?.email?.trim() || '',
+    phone: manual?.phone?.trim() || '',
+  };
+}

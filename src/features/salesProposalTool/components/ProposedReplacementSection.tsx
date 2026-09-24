@@ -33,12 +33,21 @@ import { inferVariableSpeedDriveFromControlType, resolveVariableSpeedDrive } fro
 interface ProposedReplacementSectionProps {
   proposalId: string;
   rows: ProposedEquipmentDraft[];
+  intakeAirTemperatureC: number | null;
+  intakeAirTemperatureKind: 'measured' | 'estimated' | null;
+  onIntakeTemperatureChange: (next: {
+    intakeAirTemperatureC: number | null;
+    intakeAirTemperatureKind: 'measured' | 'estimated' | null;
+  }) => void;
   onChange: (rows: ProposedEquipmentDraft[]) => void;
 }
 
 export function ProposedReplacementSection({
   proposalId,
   rows,
+  intakeAirTemperatureC,
+  intakeAirTemperatureKind,
+  onIntakeTemperatureChange,
   onChange,
 }: ProposedReplacementSectionProps) {
   const inFlightKeys = useRef(new Set<string>());
@@ -94,6 +103,52 @@ export function ProposedReplacementSection({
 
   return (
     <div className="space-y-4 overflow-visible">
+      <div className="rounded-[8px] border border-slate-200 bg-slate-50 p-3">
+        <label className="block">
+          <span className="text-sm font-medium text-[#383838]">
+            Air temperature at compressor intake (°C)
+          </span>
+          <input
+            type="number"
+            value={intakeAirTemperatureC ?? ''}
+            onChange={(event) => {
+              const text = event.target.value.trim();
+              onIntakeTemperatureChange({
+                intakeAirTemperatureC: text === '' ? null : Number(text),
+                intakeAirTemperatureKind,
+              });
+            }}
+            className="mt-1 w-full rounded-[8px] border border-slate-300 bg-white px-3 py-1.5 text-sm focus:border-[#0969a9] focus:outline-none focus:ring-2 focus:ring-[#0969a9]/20"
+          />
+          <span className="mt-1 block text-xs text-slate-500">
+            Temperature of the air entering the compressor, not the compressed-air outlet temperature.
+          </span>
+        </label>
+        <label className="mt-2 block">
+          <span className="text-xs font-medium text-slate-500">This temperature is</span>
+          <select
+            value={intakeAirTemperatureKind ?? ''}
+            onChange={(event) =>
+              onIntakeTemperatureChange({
+                intakeAirTemperatureC,
+                intakeAirTemperatureKind:
+                  event.target.value === 'measured' || event.target.value === 'estimated'
+                    ? event.target.value
+                    : null,
+              })
+            }
+            className="mt-1 w-full rounded-[8px] border border-slate-300 bg-white px-3 py-1.5 text-sm focus:border-[#0969a9] focus:outline-none focus:ring-2 focus:ring-[#0969a9]/20"
+          >
+            <option value="">Select measured or estimated</option>
+            <option value="measured">Measured</option>
+            <option value="estimated">Estimated</option>
+          </select>
+        </label>
+        <p className="mt-2 text-xs text-slate-500">
+          Shared by the proposed machines unless a machine sets its own value under Advanced specifications.
+          A blank temperature is not treated as 0°C or 45°C. The pressure-only result, if shown, excludes temperature.
+        </p>
+      </div>
       {rows.map((row) => (
         <ProposedMachineCard
           key={row.key}
@@ -268,6 +323,28 @@ function ProposedMachineCard({
               }
               flowReference={flowReference}
               onFlowReferenceChange={(next) => onChange({ ...draft, ...next })}
+              referencePressureSource={draft.referencePressureSource ?? null}
+              referenceAbsolutePressurePa={draft.referenceAbsolutePressurePa ?? null}
+              onReferencePressureCommit={(pressurePa) =>
+                onChange({
+                  ...draft,
+                  referenceAbsolutePressurePa: pressurePa,
+                  referencePressureSource: 'manual_override',
+                })
+              }
+              onConfirmReferencePressure={() =>
+                onChange({ ...draft, referencePressureSource: 'manual_override' })
+              }
+              onClearReferencePressure={() =>
+                onChange({
+                  ...draft,
+                  referenceAbsolutePressurePa: null,
+                  referencePressureSource: null,
+                })
+              }
+              intakeTemperatureOverrideC={draft.intakeTemperatureOverrideC ?? null}
+              intakeTemperatureKind={draft.intakeTemperatureKind ?? null}
+              onIntakeOverrideChange={(next) => onChange({ ...draft, ...next })}
               advancedOpen={draft.advancedSpecificationsOpen === true}
               onAdvancedOpenChange={(advancedSpecificationsOpen) =>
                 onChange({ ...draft, specsOpen: true, advancedSpecificationsOpen })
@@ -357,6 +434,28 @@ function ProposedMachineCard({
             }
             flowReference={flowReference}
             onFlowReferenceChange={(next) => onChange({ ...draft, ...next })}
+            referencePressureSource={draft.referencePressureSource ?? null}
+            referenceAbsolutePressurePa={draft.referenceAbsolutePressurePa ?? null}
+            onReferencePressureCommit={(pressurePa) =>
+              onChange({
+                ...draft,
+                referenceAbsolutePressurePa: pressurePa,
+                referencePressureSource: 'manual_override',
+              })
+            }
+            onConfirmReferencePressure={() =>
+              onChange({ ...draft, referencePressureSource: 'manual_override' })
+            }
+            onClearReferencePressure={() =>
+              onChange({
+                ...draft,
+                referenceAbsolutePressurePa: null,
+                referencePressureSource: null,
+              })
+            }
+            intakeTemperatureOverrideC={draft.intakeTemperatureOverrideC ?? null}
+            intakeTemperatureKind={draft.intakeTemperatureKind ?? null}
+            onIntakeOverrideChange={(next) => onChange({ ...draft, ...next })}
             advancedOpen={draft.advancedSpecificationsOpen === true}
             onAdvancedOpenChange={(advancedSpecificationsOpen) =>
               onChange({ ...draft, advancedSpecificationsOpen })

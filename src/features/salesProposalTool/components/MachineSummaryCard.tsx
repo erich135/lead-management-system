@@ -26,6 +26,7 @@ interface MachineSummaryCardProps {
   current: CurrentEquipmentDraft[];
   proposed: ProposedEquipmentDraft | ProposedEquipmentDraft[];
   proposedSitePerformance?: SitePerformanceView | null;
+  proposedSitePerformances?: SitePerformanceView[] | null;
 }
 
 function formatAirflow(value: number | null): string | null {
@@ -57,6 +58,7 @@ export function MachineSummaryCard({
   current,
   proposed,
   proposedSitePerformance = null,
+  proposedSitePerformances = null,
 }: MachineSummaryCardProps) {
   const currentRows = current.filter(
     (row) => row.arsMachineId || row.specLibraryRecordId || row.sourceBacked || row.enteringManually,
@@ -121,7 +123,10 @@ export function MachineSummaryCard({
               subtitle={`× ${row.quantity}`}
               library={row.selectedSpec}
               source={row.sourceBacked}
-              sitePerformance={index === 0 ? proposedSitePerformance : null}
+              sitePerformance={
+                proposedSitePerformances?.[index] ??
+                (index === 0 ? proposedSitePerformance : null)
+              }
               electricalPowerKind={row.electricalPowerKind ?? null}
               flowReference={resolveDraftPublishedFlowReference(row)}
             />
@@ -205,6 +210,18 @@ function MachineBlock({
               label={sitePerformance.altitudeLabel}
               value={sitePerformance.altitudeDisplay ?? 'Not available'}
             />
+            <Row
+              label="Site intake temperature"
+              value={
+                sitePerformance.siteIntakeTemperatureDisplay
+                  ? `${sitePerformance.siteIntakeTemperatureDisplay}${
+                      sitePerformance.siteIntakeTemperatureKindLabel
+                        ? ` (${sitePerformance.siteIntakeTemperatureKindLabel})`
+                        : ''
+                    }`
+                  : 'Not entered — pressure-only estimate excludes temperature'
+              }
+            />
             {sitePerformance.status === 'estimated' ? (
               <Row
                 label={sitePerformance.estimatedLabel}
@@ -216,8 +233,22 @@ function MachineBlock({
             ) : (
               <Row label={sitePerformance.estimatedLabel} value="Not available" />
             )}
+            {sitePerformance.reductionDisplay && (
+              <Row label="Reduction from published capacity" value={sitePerformance.reductionDisplay} />
+            )}
           </dl>
-          {sitePerformance.status === 'estimated' && sitePerformance.basisNote && (
+          {sitePerformance.calculationExplanation && (
+            <p className="mt-1 text-xs text-slate-500">{sitePerformance.calculationExplanation}</p>
+          )}
+          {sitePerformance.electricityNote && (
+            <p className="mt-1 text-xs text-slate-500">{sitePerformance.electricityNote}</p>
+          )}
+          {sitePerformance.demandComparisonNote && (
+            <p className="mt-1 text-xs text-slate-500">{sitePerformance.demandComparisonNote}</p>
+          )}
+          {sitePerformance.status === 'estimated' &&
+            sitePerformance.basisNote &&
+            !sitePerformance.calculationExplanation && (
             <p className="mt-1 text-xs text-slate-500">{sitePerformance.basisNote}</p>
           )}
           {sitePerformance.status !== 'estimated' && sitePerformance.unavailableReason && (

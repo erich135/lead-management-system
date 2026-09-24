@@ -37,6 +37,17 @@ interface SpecPickerProps {
   onElectricalPowerKindChange?: (kind: ElectricalPowerKind) => void;
   flowReference?: PublishedFlowReference | null;
   onFlowReferenceChange?: (next: PublishedFlowReference) => void;
+  referencePressureSource?: string | null;
+  referenceAbsolutePressurePa?: number | null;
+  onReferencePressureCommit?: (pressurePa: number | null) => void;
+  onConfirmReferencePressure?: () => void;
+  onClearReferencePressure?: () => void;
+  intakeTemperatureOverrideC?: number | null;
+  intakeTemperatureKind?: 'measured' | 'estimated' | null;
+  onIntakeOverrideChange?: (next: {
+    intakeTemperatureOverrideC: number | null;
+    intakeTemperatureKind: 'measured' | 'estimated' | null;
+  }) => void;
   advancedOpen?: boolean;
   onAdvancedOpenChange?: (open: boolean) => void;
 }
@@ -67,6 +78,14 @@ export function SpecPicker({
   onElectricalPowerKindChange,
   flowReference = null,
   onFlowReferenceChange,
+  referencePressureSource = null,
+  referenceAbsolutePressurePa = null,
+  onReferencePressureCommit,
+  onConfirmReferencePressure,
+  onClearReferencePressure,
+  intakeTemperatureOverrideC = null,
+  intakeTemperatureKind = null,
+  onIntakeOverrideChange,
   advancedOpen = false,
   onAdvancedOpenChange,
 }: SpecPickerProps) {
@@ -170,6 +189,14 @@ export function SpecPicker({
             onElectricalPowerKindChange={onElectricalPowerKindChange}
             flowReference={flowReference}
             onFlowReferenceChange={onFlowReferenceChange}
+            referencePressureSource={referencePressureSource}
+            referenceAbsolutePressurePa={referenceAbsolutePressurePa}
+            onReferencePressureCommit={onReferencePressureCommit}
+            onConfirmReferencePressure={onConfirmReferencePressure}
+            onClearReferencePressure={onClearReferencePressure}
+            intakeTemperatureOverrideC={intakeTemperatureOverrideC}
+            intakeTemperatureKind={intakeTemperatureKind}
+            onIntakeOverrideChange={onIntakeOverrideChange}
             advancedOpen={advancedOpen}
             onAdvancedOpenChange={onAdvancedOpenChange}
           />

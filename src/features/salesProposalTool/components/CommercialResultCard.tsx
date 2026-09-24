@@ -53,7 +53,15 @@ export function CommercialResultCard({ commercial }: CommercialResultCardProps) 
   const payback =
     commercial.purchase?.paybackYears == null
       ? null
-      : `${formatMeasuredNumber(commercial.purchase.paybackYears, 1)} years`;
+      : `${formatMeasuredNumber(commercial.purchase.paybackYears, 2)} years (${formatMeasuredNumber(
+          commercial.purchase.paybackMonths ?? commercial.purchase.paybackYears * 12,
+          2,
+        )} months)`;
+  const simpleRoi =
+    commercial.purchase?.simpleAnnualRoiPercent == null
+      ? null
+      : `${formatMeasuredNumber(commercial.purchase.simpleAnnualRoiPercent, 2)}%`;
+  const rental = commercial.rentalProjection;
   const configurationInvalidNote =
     commercial.unavailableReason?.includes('does not meet the air requirement')
       ? commercial.unavailableReason
@@ -145,6 +153,15 @@ export function CommercialResultCard({ commercial }: CommercialResultCardProps) 
             ].filter((line): line is CommercialLine => line !== null)}
           />
           <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Simple annual ROI
+          </p>
+          <p className="mt-1 text-lg font-bold text-[#383838]">
+            {simpleRoi ?? commercial.purchase.paybackUnavailableReason ?? 'Not available'}
+          </p>
+          <p className="mt-1 text-xs text-slate-600">
+            Simple annual ROI is not a discounted investment return.
+          </p>
+          <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
             {commercial.copy.paybackHeadline}
           </p>
           <p className="mt-1 text-lg font-bold text-[#383838]">
@@ -153,6 +170,108 @@ export function CommercialResultCard({ commercial }: CommercialResultCardProps) 
         </div>
       )}
 
+      {commercial.offerType === 'rental' && rental && (
+        <div className="mt-5 border-t border-slate-100 pt-4">
+          <h3 className="text-sm font-bold text-[#383838]">
+            {rental.outcome === 'additional_cost' ? 'Additional cost after rental' : 'Net benefit after rental'}
+          </h3>
+          <Row
+            label={rental.outcome === 'additional_cost' ? 'Additional monthly cost' : 'First-year average monthly net benefit'}
+            value={displayOrUnavailable(
+              formatEstimatedRand(
+                rental.firstYearAverageMonthlyNetRand == null
+                  ? null
+                  : Math.abs(rental.firstYearAverageMonthlyNetRand),
+              ),
+            )}
+          />
+          <Row
+            label={rental.outcome === 'additional_cost' ? 'Additional annual cost' : 'First-year annual net benefit'}
+            value={displayOrUnavailable(
+              formatEstimatedRand(
+                rental.firstYearAnnualNetRand == null ? null : Math.abs(rental.firstYearAnnualNetRand),
+              ),
+            )}
+          />
+          <Row
+            label="Rental term"
+            value={rental.termMonths ? `${rental.termMonths} months` : 'Not entered'}
+          />
+          {rental.termMonths != null && (
+            <Row
+              label={
+                rental.termNetRand != null && rental.termNetRand < 0
+                  ? 'Additional cost over the term'
+                  : 'Total net benefit over the term'
+              }
+              value={displayOrUnavailable(
+                formatEstimatedRand(rental.termNetRand == null ? null : Math.abs(rental.termNetRand)),
+              )}
+            />
+          )}
+          {rental.unavailableReason && (
+            <p className="mt-2 text-sm text-slate-600">{rental.unavailableReason}</p>
+          )}
+        </div>
+      )}
+
+      {commercial.offerType === 'rent_to_own' && commercial.rentToOwnProjection && (
+        <div className="mt-5 border-t border-slate-100 pt-4">
+          <h3 className="text-sm font-bold text-[#383838]">Your financial return</h3>
+          <Row
+            label="Projection period"
+            value={`${commercial.rentToOwnProjection.projectionYears} years`}
+          />
+          <Row
+            label="Payment term"
+            value={
+              commercial.rentToOwnProjection.termMonths
+                ? `${commercial.rentToOwnProjection.termMonths} months, payments end after month ${commercial.rentToOwnProjection.paymentEndMonth ?? commercial.rentToOwnProjection.termMonths}`
+                : 'Not entered'
+            }
+          />
+          <Row
+            label={
+              (commercial.rentToOwnProjection.firstYearAnnualNetRand ?? 0) < 0
+                ? 'Additional annual cost during the payment period'
+                : 'Net annual benefit during the payment period'
+            }
+            value={displayOrUnavailable(
+              formatEstimatedRand(
+                commercial.rentToOwnProjection.firstYearAnnualNetRand == null
+                  ? null
+                  : Math.abs(commercial.rentToOwnProjection.firstYearAnnualNetRand),
+              ),
+            )}
+          />
+          <Row
+            label="Net annual benefit in the first full year after payments end"
+            value={displayOrUnavailable(
+              formatEstimatedRand(commercial.rentToOwnProjection.firstYearAfterPaymentsRand),
+            )}
+          />
+          <Row
+            label="Cumulative break-even"
+            value={
+              commercial.rentToOwnProjection.breakEvenYears == null
+                ? 'Not reached in this projection'
+                : `${formatMeasuredNumber(commercial.rentToOwnProjection.breakEvenYears, 2)} years`
+            }
+          />
+          <Row
+            label={`Total net benefit over ${commercial.rentToOwnProjection.projectionYears} years`}
+            value={displayOrUnavailable(
+              formatEstimatedRand(commercial.rentToOwnProjection.projectionNetRand),
+            )}
+          />
+          {commercial.rentToOwnProjection.unavailableReason && (
+            <p className="mt-2 text-sm text-amber-900">{commercial.rentToOwnProjection.unavailableReason}</p>
+          )}
+          {commercial.rentToOwnProjection.provisionalReasons.map((reason) => (
+            <p key={reason} className="mt-2 text-sm text-amber-900">{reason}</p>
+          ))}
+        </div>
+      )}
       {commercial.included.length > 0 && (
         <div className="mt-5 border-t border-slate-100 pt-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">

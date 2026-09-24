@@ -75,30 +75,24 @@ function Letterhead({
 }: {
   doc: CustomerProposalDocument;
 }) {
-  const header = ARS_DEFAULT_HEADER;
   return (
     <header className="spt-proposal-letterhead">
       <div className="spt-proposal-letterhead-row">
-        <img
-          src={ARS_LOGO_SRC}
-          alt={header.companyName}
-          className="spt-proposal-logo"
-        />
-        <div className="spt-proposal-company">
-          <div className="spt-proposal-company-name">{header.companyName}</div>
-          <div>Reg No: {header.registrationNumber}</div>
-          <div>VAT No: {header.vatNumber}</div>
-          <div>{header.city}</div>
-          <div>{header.phone}</div>
-        </div>
-        <div className="spt-proposal-letterhead-meta">
-          <div className="spt-proposal-kicker">Customer proposal</div>
-          <div className="spt-proposal-letterhead-date">{doc.date ?? '—'}</div>
-          {doc.preparedFor && <div>{doc.preparedFor}</div>}
-          {doc.siteName && <div>{doc.siteName}</div>}
+        <img src="/ars-letterhead/logo.png" alt="Air Rotary Services" className="spt-proposal-logo" />
+        <div className="spt-proposal-letterhead-contact">
+          <div className="spt-proposal-company-name">Air Rotory Services (Pty) Ltd</div>
+          <div>Centric Park, Block C,</div>
+          <div>Romeo Street, Hughes,</div>
+          <div>Boksburg, 1459</div>
+          <div>PO Box 9217, Cinda Park, 1463</div>
+          <div>Tel: 086 1279 765</div>
+          <div>Fax: 086 5500 474</div>
+          <div>Email: accounts@apxsolutions.co.za</div>
+          <div>Registration Number: 2015/221198/07</div>
+          <div>VAT Number: 4470274590</div>
         </div>
       </div>
-      <div className="spt-proposal-rule" />
+      <p className="spt-proposal-letterhead-date">{doc.date ?? ''}</p>
     </header>
   );
 }
@@ -112,10 +106,62 @@ function PageFooter({
 }) {
   return (
     <footer className="spt-proposal-page-footer">
-      <span>{ARS_DEFAULT_HEADER.companyName}</span>
-      <span>{[doc.preparedFor, doc.siteName].filter(Boolean).join(' · ')}</span>
+      <img src="/ars-letterhead/footer.png" alt="Thank you for your trust within Air Rotory as your preferred air compressor and dryer service specialists. Excellence in every m³/min!" />
       <span>{pageLabel}</span>
     </footer>
+  );
+}
+
+function proposalReference(reference: string | null | undefined): string {
+  if (!reference) return '—';
+  if (/^[a-f0-9]{24}$/i.test(reference)) return `SPT-${reference.slice(-8).toUpperCase()}`;
+  return reference;
+}
+
+function machineTitle(name: string, quantity: number | null | undefined): string {
+  const label = name.trim();
+  if (quantity && quantity > 1) return `${quantity} × ${label}`;
+  return label;
+}
+
+function ElectricityChart({
+  current,
+  proposed,
+  currentText,
+  proposedText,
+}: {
+  current: number;
+  proposed: number;
+  currentText: string;
+  proposedText: string;
+}) {
+  const max = Math.max(current, proposed, 1);
+  const currentHeight = Math.max(8, (current / max) * 120);
+  const proposedHeight = Math.max(8, (proposed / max) * 120);
+  return (
+    <figure className="spt-proposal-chart spt-keep-together">
+      <figcaption className="spt-proposal-kicker-inline">
+        Annual electricity cost
+      </figcaption>
+      <div className="spt-proposal-chart-plot">
+        <div className="spt-proposal-chart-col">
+          <div className="spt-proposal-chart-value">{currentText}</div>
+          <div
+            className="spt-proposal-chart-bar spt-proposal-chart-bar-current"
+            style={{ height: `${currentHeight}px` }}
+          />
+          <div className="spt-proposal-chart-name">Current</div>
+        </div>
+        <div className="spt-proposal-chart-col">
+          <div className="spt-proposal-chart-value">{proposedText}</div>
+          <div
+            className="spt-proposal-chart-bar spt-proposal-chart-bar-proposed"
+            style={{ height: `${proposedHeight}px` }}
+          />
+          <div className="spt-proposal-chart-name">Proposed</div>
+        </div>
+      </div>
+    </figure>
   );
 }
 
@@ -130,10 +176,55 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
     : null;
   const electricityFigures = customerProposalElectricityFigures(doc);
   const commercialFigures = customerProposalCommercialFigures(doc);
+  const proposedMachines = doc.proposedMachines ?? [];
+  const rentalRow = doc.commercial.costRows.find((row) => row.label === 'Rental / finance');
+  const explanations = proposedMachines
+    .map((machine) => machine.calculationExplanation)
+    .filter((text): text is string => Boolean(text));
+  const sharedExplanation =
+    explanations.length > 0 && explanations.every((text) => text === explanations[0])
+      ? explanations[0]
+      : null;
+  const capacityResult = {
+    label: doc.proposed.estimatedAirflow
+      ? doc.proposed.estimatedLabel ?? 'Site-adjusted capacity'
+      : 'Published airflow',
+    value: doc.proposed.estimatedAirflow ?? doc.proposed.publishedAirflow ?? 'Not available',
+  };
+  const electricitySavingResult = savingVisible
+    ? [{ label: doc.electricity.savingLabel, value: doc.electricity.saving ?? 'Not available' }]
+    : [];
+  const financialLead = doc.financialBenefit?.figures ?? [];
+  const keyResults =
+    financialLead.length > 0
+      ? [...financialLead, ...electricitySavingResult, capacityResult]
+      : [
+          capacityResult,
+          ...electricitySavingResult,
+          ...(doc.commercial.offerType === 'purchase' && doc.commercial.investment
+            ? [{ label: doc.commercial.investmentHeadline ?? 'Net investment', value: doc.commercial.investment }]
+            : []),
+          ...(paybackVisible
+            ? [{ label: doc.commercial.paybackHeadline ?? 'Estimated payback', value: doc.commercial.payback ?? 'Not available' }]
+            : []),
+          ...(doc.commercial.offerType === 'rental' && rentalRow?.proposed
+            ? [{ label: 'Proposed rental / finance', value: rentalRow.proposed }]
+            : []),
+        ];
+  const chartReady =
+    typeof doc.electricity.chartCurrentRand === 'number' &&
+    typeof doc.electricity.chartProposedRand === 'number' &&
+    doc.electricity.current &&
+    doc.electricity.proposed;
 
   return (
     <div className="spt-customer-proposal-canvas">
       <article className="spt-customer-proposal-sheet spt-customer-proposal-page-1 spt-customer-proposal-document">
+        <img
+          src="/ars-letterhead/watermark.png"
+          alt=""
+          className="spt-proposal-watermark"
+        />
         <Letterhead doc={doc} />
         <h1 className="spt-proposal-title">{doc.documentTitle}</h1>
         <dl className="spt-proposal-meta">
@@ -142,227 +233,143 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
             <dd>{doc.preparedFor ?? '—'}</dd>
           </div>
           <div>
+            <dt>Site</dt>
+            <dd>{doc.siteName ?? '—'}</dd>
+          </div>
+          <div>
             <dt>Date</dt>
             <dd>{doc.date ?? '—'}</dd>
           </div>
           <div>
-            <dt>Site</dt>
-            <dd>{doc.siteName ?? '—'}</dd>
+            <dt>Reference</dt>
+            <dd className="spt-proposal-wrap">{proposalReference(doc.reference)}</dd>
           </div>
           {doc.siteLocation && (
             <div>
               <dt>Location</dt>
-              <dd>{doc.siteLocation}</dd>
+              <dd className="spt-proposal-wrap">{doc.siteLocation}</dd>
             </div>
           )}
         </dl>
 
-        <Section title={doc.purposeTitle}>
+        {doc.financialBenefit?.mode === 'rent_to_own' && financialLead.length > 0 && (
+          <section className="spt-proposal-return">
+            <h2 className="spt-proposal-h2">Your 10-year financial return</h2>
+            <FigureStrip items={financialLead} centered />
+            {doc.financialBenefit.note && (
+              <p className="spt-proposal-quiet">{doc.financialBenefit.note}</p>
+            )}
+          </section>
+        )}
+        {doc.financialBenefit?.mode === 'rent_to_own' && (doc.financialBenefit.chart?.length ?? 0) > 0 && (
+          <section className="spt-proposal-section">
+              <h2 className="spt-proposal-h2">Year-by-year cash flow</h2>
+              <table className="spt-proposal-table spt-proposal-centered-nums">
+                <thead>
+                  <tr>
+                    <th>Year</th>
+                    <th className="spt-proposal-num">Current total</th>
+                    <th className="spt-proposal-num">Proposed operating</th>
+                    <th className="spt-proposal-num">Rent-to-own payments</th>
+                    <th className="spt-proposal-num">Annual net benefit</th>
+                    <th className="spt-proposal-num">Cumulative</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {doc.financialBenefit.chart?.map((row, index) => {
+                    const year = doc.financialBenefit?.years[index];
+                    const current = row.currentElectricity + row.currentFinance + row.currentMaintenance;
+                    const operating = row.proposedElectricity + row.proposedMaintenance;
+                    const money = (amount: number) =>
+                      amount.toLocaleString('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 });
+                    return (
+                      <tr key={row.year}>
+                        <td>{year?.year ?? row.year}</td>
+                        <td className="spt-proposal-num">{money(current)}</td>
+                        <td className="spt-proposal-num">{money(operating)}</td>
+                        <td className="spt-proposal-num">{money(row.proposedFinance)}</td>
+                        <td className="spt-proposal-num">{money(row.netBenefit)}</td>
+                        <td className="spt-proposal-num">{money(row.cumulative)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <p className="spt-proposal-quiet">Proposed operating cost is electricity plus maintenance. Rent-to-own payments stop after the agreed term. A blank final transfer payment and blank post-term maintenance are excluded and noted above.</p>
+            </section>
+        )}
+
+        <section className="spt-proposal-recommend">
+          <h2 className="spt-proposal-h2">Recommendation</h2>
+          <p className="spt-proposal-closing">{doc.recommendation}</p>
           <p className="spt-proposal-body">{doc.purposeLead}</p>
-          <ul className="spt-proposal-bullets">
-            {doc.purposeBullets.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </Section>
+          {proposedName && (
+            <p className="spt-proposal-body spt-proposal-wrap">
+              Proposed equipment: {proposedName}
+            </p>
+          )}
+          {doc.financialBenefit?.mode === 'rent_to_own' && financialLead.length > 0 ? (
+            <FigureStrip items={[...electricitySavingResult, capacityResult]} centered />
+          ) : financialLead.length > 0 ? (
+            <>
+              <FigureStrip items={financialLead} centered />
+              <FigureStrip items={[...electricitySavingResult, capacityResult]} centered />
+            </>
+          ) : (
+            <FigureStrip items={keyResults} centered />
+          )}
+          {doc.financialBenefit?.note && (
+            <p className="spt-proposal-quiet">{doc.financialBenefit.note}</p>
+          )}
+          {savingVisible && (
+            <p className="spt-proposal-quiet">
+              {doc.electricity.savingLabel} is the electricity difference only. {doc.commercial.savingHeadline} includes rental, finance and maintenance where those costs were supplied.
+            </p>
+          )}
+        </section>
 
-        {doc.airAudit.sourceFile && (
-        <Section title="Air Audit summary">
-          <p className="spt-proposal-kicker-inline">
-            {doc.airAudit.measuredHeading || 'Measured site air demand'}
-          </p>
-          <p className="spt-proposal-quiet">Source file: {doc.airAudit.sourceFile}</p>
-          <div className="spt-proposal-metric-grid">
-            <Metric label="Audit period" value={doc.airAudit.period ?? 'Not available'} />
-            <Metric
-              label="Mean measured airflow"
-              value={doc.airAudit.meanAirflow ?? 'Not available'}
-            />
-            <Metric
-              label="P90 measured airflow"
-              value={doc.airAudit.p90Airflow ?? 'Not available'}
-            />
-            <Metric
-              label="Highest recorded airflow"
-              value={doc.airAudit.highestAirflow ?? 'Not available'}
-            />
-            <Metric
-              label="Recorded pressure"
-              value={doc.airAudit.recordedPressure ?? 'Not available'}
-            />
-            <Metric
-              label="Delivered air"
-              value={doc.airAudit.deliveredAir ?? 'Not available'}
-            />
+        {(revisionCallout || doc.warnings.length > 0) && (
+          <div className="spt-proposal-callout spt-keep-together">
+            {revisionCallout && (
+              <p className="spt-proposal-callout-title">
+                Proposed configuration requires revision
+              </p>
+            )}
+            {doc.warnings.length > 0 && (
+              <ul>
+                {doc.warnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            )}
           </div>
-        </Section>
         )}
 
-        <Section title="Current compressed-air system">
-          <p className="spt-proposal-kicker-inline">Published machine specification</p>
-          {doc.currentMachines.length === 0 ? (
-            <p className="spt-proposal-body">No current machine has been selected.</p>
-          ) : (
-            doc.currentMachines.map((machine) => (
-              <div key={`${machine.name}-${machine.serial ?? ''}`} className="spt-proposal-machine">
-                <p className="spt-proposal-machine-name">{machine.name}</p>
-                {machine.serial && <p className="spt-proposal-quiet">Serial {machine.serial}</p>}
-                <p className="spt-proposal-body">
-                  Published airflow {machine.publishedAirflow ?? 'Not available'} · Published
-                  pressure {machine.publishedPressure ?? 'Not available'} ·{' '}
-                  {machine.packageInputEstimated ? 'Estimated package input' : 'Published package input'}{' '}
-                  {machine.packageInput ?? 'Not available'}
-                  {machine.efficiency
-                    ? ` · Efficiency ${machine.efficiency}`
-                    : ''}
-                </p>
-                {machine.auxiliaryAllowanceNote && (
-                  <p className="spt-proposal-quiet">{machine.auxiliaryAllowanceNote}</p>
-                )}
-              </div>
-            ))
-          )}
-        </Section>
-
-        {doc.currentMachinePerformance && (
-          <Section title={doc.currentMachinePerformance.title}>
-            {doc.currentMachinePerformance.machineName && (
-              <p className="spt-proposal-machine-name">
-                {doc.currentMachinePerformance.machineName}
-              </p>
-            )}
-            <div className="spt-proposal-performance spt-keep-together">
-              <Metric
-                label={
-                  doc.currentMachinePerformance.publishedLabel ?? 'Published airflow'
-                }
-                value={doc.currentMachinePerformance.publishedAirflow ?? 'Not available'}
-              />
-              {doc.currentMachinePerformance.estimatedAirflow && (
-                <Metric
-                  label={
-                    doc.currentMachinePerformance.estimatedLabel ??
-                    'Estimated airflow at site conditions'
-                  }
-                  value={doc.currentMachinePerformance.estimatedAirflow}
-                />
-              )}
-              {doc.currentMachinePerformance.presentation !== 'estimated_operating' && (
-                <Metric
-                  label={
-                    doc.currentMachinePerformance.measuredLabel ??
-                    'Highest measured airflow during Air Audit'
-                  }
-                  value={doc.currentMachinePerformance.measuredAirflow ?? 'Not available'}
-                />
-              )}
-              {doc.currentMachinePerformance.annualOperatingHoursLabel && (
-                <Metric
-                  label={doc.currentMachinePerformance.annualOperatingHoursLabel}
-                  value={doc.currentMachinePerformance.annualOperatingHours ?? 'Not available'}
-                />
-              )}
-              {doc.currentMachinePerformance.averageLoadLabel && (
-                <Metric
-                  label={doc.currentMachinePerformance.averageLoadLabel}
-                  value={doc.currentMachinePerformance.averageLoad ?? 'Not available'}
-                />
-              )}
-              {doc.currentMachinePerformance.estimatedAverageOperatingAirflowLabel && (
-                <Metric
-                  label={doc.currentMachinePerformance.estimatedAverageOperatingAirflowLabel}
-                  value={
-                    doc.currentMachinePerformance.estimatedAverageOperatingAirflow ??
-                    'Not available'
-                  }
-                />
-              )}
-              {doc.currentMachinePerformance.differenceLabel && (
-                <Metric
-                  label={doc.currentMachinePerformance.differenceLabel}
-                  value={doc.currentMachinePerformance.differenceAirflow ?? 'Not available'}
-                />
-              )}
-              {doc.currentMachinePerformance.comparisonLabel && (
-                <div className="spt-proposal-reduction">
-                  <div className="spt-proposal-metric-label">
-                    {doc.currentMachinePerformance.comparisonLabel}
-                  </div>
-                  <div className="spt-proposal-reduction-value">
-                    {doc.currentMachinePerformance.comparisonValue ?? 'Not available'}
-                  </div>
-                </div>
-              )}
-            </div>
-            {doc.currentMachinePerformance.estimatedBasisNote && (
-              <p className="spt-proposal-quiet">
-                {doc.currentMachinePerformance.estimatedBasisNote}
-              </p>
-            )}
-            {doc.currentMachinePerformance.limitationNote && (
-              <p className="spt-proposal-quiet">{doc.currentMachinePerformance.limitationNote}</p>
-            )}
-            {doc.currentMachinePerformance.caveat && (
-              <p className="spt-proposal-quiet">{doc.currentMachinePerformance.caveat}</p>
-            )}
-          </Section>
-        )}
-
-        <Section title="ARS recommended solution">
-          {proposedName ? (
-            <div className="spt-proposal-machine">
-              <p className="spt-proposal-machine-name">{proposedName}</p>
-              <p className="spt-proposal-body">
-                Published airflow {doc.proposed.publishedAirflow ?? 'Not available'} · Published
-                pressure {doc.proposed.publishedPressure ?? 'Not available'} ·{' '}
-                {doc.proposed.packageInputEstimated ? 'Estimated package input' : 'Published package input'}{' '}
-                {doc.proposed.packageInput ?? 'Not available'}
-                {doc.proposed.efficiency ? ` · Efficiency ${doc.proposed.efficiency}` : ''}
-              </p>
-              <p className="spt-proposal-body">
-                Site altitude {doc.proposed.siteAltitude ?? 'Not available'}
-              </p>
-              {doc.proposed.auxiliaryAllowanceNote && (
-                <p className="spt-proposal-quiet">{doc.proposed.auxiliaryAllowanceNote}</p>
-              )}
-              {doc.proposed.estimatedAirflow && (
-                <>
-                  <p className="spt-proposal-kicker-inline">
-                    {doc.proposed.estimatedSectionTitle ??
-                      'Estimated performance at site conditions'}
-                  </p>
-                  <p className="spt-proposal-body">
-                    {doc.proposed.estimatedLabel ?? 'Estimated airflow at site conditions'}{' '}
-                    {doc.proposed.estimatedAirflow}
-                  </p>
-                  {doc.proposed.estimatedBasisNote && (
-                    <p className="spt-proposal-quiet">{doc.proposed.estimatedBasisNote}</p>
-                  )}
-                </>
-              )}
-              {!doc.proposed.estimatedAirflow && doc.proposed.siteUnavailableReason && (
-                <p className="spt-proposal-quiet">{doc.proposed.siteUnavailableReason}</p>
-              )}
-            </div>
-          ) : (
-            <p className="spt-proposal-body">No proposed BOUWA machine has been selected.</p>
-          )}
-        </Section>
-
-        <Section title="Machine technical comparison">
-          <div className="spt-proposal-compare spt-keep-together">
+        <Section title="Current and proposed equipment">
+          <div className="spt-proposal-compare">
             <div className="spt-proposal-compare-col">
               <h3>Current</h3>
-              {doc.currentMachines[0] ? (
-                <p className="spt-proposal-machine-name">{doc.currentMachines[0].name}</p>
-              ) : (
+              {doc.currentMachines.length === 0 ? (
                 <p>No current machine has been selected.</p>
+              ) : (
+                doc.currentMachines.map((machine) => (
+                  <p key={`${machine.name}-${machine.serial ?? ''}`} className="spt-proposal-machine-name spt-proposal-wrap">
+                    {machineTitle(machine.name, machine.quantity)}
+                    {machine.serial ? ` · Serial ${machine.serial}` : ''}
+                  </p>
+                ))
               )}
             </div>
             <div className="spt-proposal-compare-col">
               <h3>Proposed</h3>
-              {proposedName ? (
-                <p className="spt-proposal-machine-name">{proposedName}</p>
+              {proposedMachines.length > 0 ? (
+                proposedMachines.map((machine) => (
+                  <p key={`${machine.name}-${machine.quantity}`} className="spt-proposal-machine-name spt-proposal-wrap">
+                    {machineTitle(machine.name, machine.quantity)}
+                  </p>
+                ))
+              ) : proposedName ? (
+                <p className="spt-proposal-machine-name spt-proposal-wrap">{proposedName}</p>
               ) : (
                 <p>No proposed BOUWA machine has been selected.</p>
               )}
@@ -380,52 +387,81 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
               {doc.technicalRows.map((row) => (
                 <tr key={row.label}>
                   <td>{row.label}</td>
-                  <td className="spt-proposal-num">
-                    <Cell value={row.current} />
-                  </td>
-                  <td className="spt-proposal-num">
-                    <Cell value={row.proposed} />
-                  </td>
+                  <td className="spt-proposal-num"><Cell value={row.current} /></td>
+                  <td className="spt-proposal-num"><Cell value={row.proposed} /></td>
                 </tr>
               ))}
-              {doc.proposed.quantity != null && (
-                <tr>
-                  <td>Quantity</td>
-                  <td className="spt-proposal-num"> </td>
-                  <td className="spt-proposal-num">{doc.proposed.quantity}</td>
-                </tr>
-              )}
             </tbody>
           </table>
+          {doc.siteAirflowAdvisory && (
+            <p className="spt-proposal-quiet">{doc.siteAirflowAdvisory}</p>
+          )}
         </Section>
 
-        {doc.siteAirflowAdvisory && (
-          <p className="spt-proposal-quiet">{doc.siteAirflowAdvisory}</p>
-        )}
-        {(revisionCallout || doc.warnings.length > 0) && (
-          <div className="spt-proposal-callout spt-keep-together">
-            {revisionCallout && (
-              <p className="spt-proposal-callout-title">
-                Proposed configuration requires revision
-              </p>
-            )}
-            {doc.warnings.length > 0 && (
-              <ul>
-                {doc.warnings.map((warning) => (
-                  <li key={warning}>{warning}</li>
-                ))}
-              </ul>
-            )}
+        <Section title="Air audit and site conditions">
+          {doc.airAudit.sourceFile ? (
+            <>
+              <p className="spt-proposal-kicker-inline">Measured site air demand</p>
+              <div className="spt-proposal-metric-grid">
+                <Metric label="Audit period" value={doc.airAudit.period ?? 'Not available'} />
+                <Metric label="Mean measured airflow" value={doc.airAudit.meanAirflow ?? 'Not available'} />
+                <Metric label="P90 measured airflow" value={doc.airAudit.p90Airflow ?? 'Not available'} />
+                <Metric label="Highest recorded airflow" value={doc.airAudit.highestAirflow ?? 'Not available'} />
+                <Metric label="Recorded pressure" value={doc.airAudit.recordedPressure ?? 'Not available'} />
+                <Metric label="Delivered air" value={doc.airAudit.deliveredAir ?? 'Not available'} />
+              </div>
+            </>
+          ) : (
+            <p className="spt-proposal-body">No Air Audit was supplied. Demand uses the stated operating hours and load.</p>
+          )}
+          <div className="spt-proposal-metric-grid">
+            <Metric label="Site altitude" value={doc.proposed.siteAltitude ?? 'Not available'} />
+            <Metric
+              label="Intake temperature"
+              value={
+                doc.proposed.siteIntakeTemperature
+                  ? `${doc.proposed.siteIntakeTemperature}${doc.proposed.siteIntakeTemperatureKind ? ` (${doc.proposed.siteIntakeTemperatureKind})` : ''}`
+                  : 'Not entered'
+              }
+            />
+            <Metric label="Site pressure" value={doc.proposed.sitePressure ?? 'Not available'} />
           </div>
-        )}
-        <PageFooter doc={doc} pageLabel="Page 1 of 2" />
-      </article>
+          {doc.currentMachinePerformance && (
+            <div className="spt-proposal-performance">
+              {doc.currentMachinePerformance.machineName && (
+                <p className="spt-proposal-machine-name spt-proposal-wrap">{doc.currentMachinePerformance.machineName}</p>
+              )}
+              <Metric
+                label={doc.currentMachinePerformance.measuredLabel ?? doc.currentMachinePerformance.publishedLabel}
+                value={
+                  doc.currentMachinePerformance.measuredAirflow ??
+                  doc.currentMachinePerformance.publishedAirflow ??
+                  'Not available'
+                }
+              />
+              {doc.currentMachinePerformance.comparisonValue && (
+                <Metric
+                  label={doc.currentMachinePerformance.comparisonLabel ?? 'Comparison'}
+                  value={doc.currentMachinePerformance.comparisonValue}
+                />
+              )}
+            </div>
+          )}
+        </Section>
 
-      <article className="spt-customer-proposal-sheet spt-customer-proposal-page-2 spt-customer-proposal-document">
-        <Letterhead doc={doc} />
-
-        <Section title="Estimated electricity">
+        <Section title="Electricity">
           <FigureStrip items={electricityFigures} centered />
+          {chartReady && (
+            <ElectricityChart
+              current={doc.electricity.chartCurrentRand as number}
+              proposed={doc.electricity.chartProposedRand as number}
+              currentText={doc.electricity.current as string}
+              proposedText={doc.electricity.proposed as string}
+            />
+          )}
+          {doc.electricity.costBreakdown?.vsdNote && (
+            <p className="spt-proposal-quiet">{doc.electricity.costBreakdown.vsdNote}</p>
+          )}
           {doc.electricity.suppliedAmountReference && (
             <p className="spt-proposal-quiet">{doc.electricity.suppliedAmountReference}</p>
           )}
@@ -433,7 +469,7 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
             <p className="spt-proposal-quiet">{doc.electricity.suppliedAmountReferenceNote}</p>
           )}
           {doc.electricity.costBreakdown && (
-            <div className="spt-keep-together">
+            <div>
               <p className="spt-proposal-kicker-inline">Electricity cost by season and day type</p>
               {doc.electricity.costBreakdown.averageTariff && (
                 <p className="spt-proposal-quiet">
@@ -455,21 +491,11 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
                   {doc.electricity.costBreakdown.rows.map((row) => (
                     <tr key={row.label}>
                       <td>{row.label}</td>
-                      <td className="spt-proposal-num">
-                        <Cell value={row.productionDays} />
-                      </td>
-                      <td className="spt-proposal-num">
-                        <Cell value={row.dailyCurrent} />
-                      </td>
-                      <td className="spt-proposal-num">
-                        <Cell value={row.dailyProposed} />
-                      </td>
-                      <td className="spt-proposal-num">
-                        <Cell value={row.annualCurrent} />
-                      </td>
-                      <td className="spt-proposal-num">
-                        <Cell value={row.annualProposed} />
-                      </td>
+                      <td className="spt-proposal-num"><Cell value={row.productionDays} /></td>
+                      <td className="spt-proposal-num"><Cell value={row.dailyCurrent} /></td>
+                      <td className="spt-proposal-num"><Cell value={row.dailyProposed} /></td>
+                      <td className="spt-proposal-num"><Cell value={row.annualCurrent} /></td>
+                      <td className="spt-proposal-num"><Cell value={row.annualProposed} /></td>
                     </tr>
                   ))}
                   <tr className="spt-proposal-total-row">
@@ -477,12 +503,8 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
                     <td> </td>
                     <td> </td>
                     <td> </td>
-                    <td className="spt-proposal-num">
-                      {doc.electricity.costBreakdown.beforeVsdCurrent ?? 'Not available'}
-                    </td>
-                    <td className="spt-proposal-num">
-                      {doc.electricity.costBreakdown.beforeVsdProposed ?? 'Not available'}
-                    </td>
+                    <td className="spt-proposal-num">{doc.electricity.costBreakdown.beforeVsdCurrent ?? 'Not available'}</td>
+                    <td className="spt-proposal-num">{doc.electricity.costBreakdown.beforeVsdProposed ?? 'Not available'}</td>
                   </tr>
                   <tr>
                     <td>{doc.electricity.costBreakdown.vsdAllowanceLabel}</td>
@@ -504,12 +526,8 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
                     <td> </td>
                     <td> </td>
                     <td> </td>
-                    <td className="spt-proposal-num">
-                      {doc.electricity.costBreakdown.adjustedCurrent ?? 'Not available'}
-                    </td>
-                    <td className="spt-proposal-num">
-                      {doc.electricity.costBreakdown.adjustedProposed ?? 'Not available'}
-                    </td>
+                    <td className="spt-proposal-num">{doc.electricity.costBreakdown.adjustedCurrent ?? 'Not available'}</td>
+                    <td className="spt-proposal-num">{doc.electricity.costBreakdown.adjustedProposed ?? 'Not available'}</td>
                   </tr>
                   <tr className="spt-proposal-total-row">
                     <td>Final annual electricity saving</td>
@@ -517,28 +535,50 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
                     <td> </td>
                     <td> </td>
                     <td> </td>
-                    <td className="spt-proposal-num">
-                      {doc.electricity.costBreakdown.finalSaving ?? 'Not available'}
-                    </td>
+                    <td className="spt-proposal-num">{doc.electricity.costBreakdown.finalSaving ?? 'Not available'}</td>
                   </tr>
                 </tbody>
               </table>
-              {doc.electricity.costBreakdown.vsdNote && (
-                <p className="spt-proposal-quiet">{doc.electricity.costBreakdown.vsdNote}</p>
-              )}
             </div>
           )}
         </Section>
 
-        <Section title="Estimated annual compressed-air cost">
-          <FigureStrip items={commercialFigures} />
-        </Section>
+        {doc.financialBenefit?.mode !== 'rent_to_own' && (doc.financialBenefit?.years.length ?? 0) > 0 && (
+          <Section title="Financial projection">
+            <table className="spt-proposal-table spt-proposal-centered-nums">
+              <thead>
+                <tr>
+                  <th>Year</th>
+                  <th className="spt-proposal-num">Months</th>
+                  <th className="spt-proposal-num">Payments</th>
+                  <th className="spt-proposal-num">Net benefit</th>
+                  <th className="spt-proposal-num">Cumulative</th>
+                </tr>
+              </thead>
+              <tbody>
+                {doc.financialBenefit?.years.map((row) => (
+                  <tr key={row.year}>
+                    <td>{row.year}</td>
+                    <td className="spt-proposal-num">{row.months}</td>
+                    <td className="spt-proposal-num">{row.rentalPaid}</td>
+                    <td className="spt-proposal-num">{row.netBenefit}</td>
+                    <td className="spt-proposal-num">{row.cumulative}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Section>
+        )}
 
-        <Section title="Estimated annual cost comparison">
+        <Section title="Commercial costs">
+          <FigureStrip items={commercialFigures} centered />
+          <p className="spt-proposal-quiet">
+            Electricity is shown separately from rental, finance and maintenance. The total is the estimated annual compressed-air cost.
+          </p>
           {doc.commercial.costRows.length === 0 ? (
             <p className="spt-proposal-body">Estimated total annual cost is not yet available.</p>
           ) : (
-            <table className="spt-proposal-table">
+            <table className="spt-proposal-table spt-proposal-centered-nums">
               <thead>
                 <tr>
                   <th> </th>
@@ -550,12 +590,8 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
                 {doc.commercial.costRows.map((row) => (
                   <tr key={row.label}>
                     <td>{row.label}</td>
-                    <td className="spt-proposal-num">
-                      <Cell value={row.current} />
-                    </td>
-                    <td className="spt-proposal-num">
-                      <Cell value={row.proposed} />
-                    </td>
+                    <td className="spt-proposal-num"><Cell value={row.current} /></td>
+                    <td className="spt-proposal-num"><Cell value={row.proposed} /></td>
                   </tr>
                 ))}
                 <tr className="spt-proposal-total-row">
@@ -567,9 +603,7 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
                   <tr className="spt-proposal-total-row">
                     <td>{doc.commercial.savingHeadline}</td>
                     <td> </td>
-                    <td className="spt-proposal-num">
-                      {doc.commercial.saving ?? 'Not available'}
-                    </td>
+                    <td className="spt-proposal-num">{doc.commercial.saving ?? 'Not available'}</td>
                   </tr>
                 )}
               </tbody>
@@ -578,8 +612,8 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
         </Section>
 
         {doc.commercial.offerType === 'purchase' && (
-          <Section title="Commercial offer — Purchase">
-            <table className="spt-proposal-table">
+          <Section title="Purchase">
+            <table className="spt-proposal-table spt-proposal-centered-nums">
               <tbody>
                 {doc.commercial.purchaseLines.map((line) => (
                   <tr key={line.label}>
@@ -590,25 +624,21 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
                 {doc.commercial.investmentHeadline && (
                   <tr className="spt-proposal-total-row">
                     <td>{doc.commercial.investmentHeadline}</td>
-                    <td className="spt-proposal-num">
-                      {doc.commercial.investment ?? 'Not available'}
-                    </td>
+                    <td className="spt-proposal-num">{doc.commercial.investment ?? 'Not available'}</td>
                   </tr>
                 )}
-                {savingVisible && (
-                  <tr className="spt-proposal-total-row">
-                    <td>{doc.commercial.savingHeadline}</td>
-                    <td className="spt-proposal-num">
-                      {doc.commercial.saving ?? 'Not available'}
-                    </td>
-                  </tr>
-                )}
-                {paybackVisible && (
+                {doc.financialBenefit?.figures
+                  .filter((figure) => figure.label === 'Simple annual ROI' || figure.label === 'Simple payback')
+                  .map((figure) => (
+                    <tr key={figure.label} className="spt-proposal-payback-row">
+                      <td>{figure.label}</td>
+                      <td className="spt-proposal-num">{figure.value}</td>
+                    </tr>
+                  ))}
+                {paybackVisible && !doc.financialBenefit?.figures.some((figure) => figure.label === 'Simple payback') && (
                   <tr className="spt-proposal-payback-row">
                     <td>{doc.commercial.paybackHeadline}</td>
-                    <td className="spt-proposal-num">
-                      {doc.commercial.payback ?? 'Not available'}
-                    </td>
+                    <td className="spt-proposal-num">{doc.commercial.payback ?? 'Not available'}</td>
                   </tr>
                 )}
               </tbody>
@@ -617,48 +647,55 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
         )}
 
         {doc.commercial.offerType === 'rental' && (
-          <Section title="Commercial offer — Rental">
-            <table className="spt-proposal-table">
+          <Section title="Rental">
+            <table className="spt-proposal-table spt-proposal-centered-nums">
               <tbody>
-                {doc.commercial.costRows
-                  .filter(
-                    (row) =>
-                      row.label === 'Rental / finance' || row.label === 'SLA / maintenance',
-                  )
-                  .map((row) => (
-                    <tr key={row.label}>
-                      <td>{row.label}</td>
-                      <td className="spt-proposal-num">{row.proposed ?? 'Not available'}</td>
-                    </tr>
-                  ))}
                 <tr className="spt-proposal-total-row">
                   <td>{doc.commercial.proposedHeadline}</td>
-                  <td className="spt-proposal-num">
-                    {doc.commercial.proposed ?? 'Not available'}
-                  </td>
+                  <td className="spt-proposal-num">{doc.commercial.proposed ?? 'Not available'}</td>
                 </tr>
                 {savingVisible && (
                   <tr className="spt-proposal-total-row">
                     <td>{doc.commercial.savingHeadline}</td>
-                    <td className="spt-proposal-num">
-                      {doc.commercial.saving ?? 'Not available'}
-                    </td>
+                    <td className="spt-proposal-num">{doc.commercial.saving ?? 'Not available'}</td>
                   </tr>
                 )}
               </tbody>
             </table>
+            {(doc.financialBenefit?.years.length ?? 0) > 0 && (
+              <div className="spt-proposal-year-table">
+                <p className="spt-proposal-quiet">
+                  Year-by-year cash flow. A negative net benefit is an additional cost. Monthly amounts are the annual estimates divided by 12.
+                </p>
+                <table className="spt-proposal-table spt-proposal-centered-nums">
+                  <thead>
+                    <tr>
+                      <th>Year</th>
+                      <th className="spt-proposal-num">Months</th>
+                      <th className="spt-proposal-num">Rental paid</th>
+                      <th className="spt-proposal-num">Net benefit</th>
+                      <th className="spt-proposal-num">Cumulative</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {doc.financialBenefit?.years.map((row) => (
+                      <tr key={row.year}>
+                        <td>{row.year}</td>
+                        <td className="spt-proposal-num">{row.months}</td>
+                        <td className="spt-proposal-num">{row.rentalPaid}</td>
+                        <td className="spt-proposal-num">{row.netBenefit}</td>
+                        <td className="spt-proposal-num">{row.cumulative}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </Section>
         )}
 
-        <Section title="Recommendation">
-          <p className="spt-proposal-closing">{doc.recommendation}</p>
-        </Section>
-
         <Section title="Conclusion">
           <p className="spt-proposal-body">{doc.conclusion}</p>
-        </Section>
-
-        <Section title="Next steps">
           <ol className="spt-proposal-steps">
             {doc.nextSteps.map((step) => (
               <li key={step}>{step}</li>
@@ -666,12 +703,62 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
           </ol>
         </Section>
 
-        <Section title="Calculation basis" muted>
+        <Section title="Calculation basis and assumptions" muted>
           <p className="spt-proposal-basis">{doc.basis}</p>
           <p className="spt-proposal-basis">{doc.futureCostDisclaimer}</p>
           <p className="spt-proposal-quiet">{doc.estimatedNote}</p>
+          {doc.proposed.electricityNote && (
+            <p className="spt-proposal-quiet">{doc.proposed.electricityNote}</p>
+          )}
+          {sharedExplanation && <p className="spt-proposal-quiet">{sharedExplanation}</p>}
+          {proposedMachines.length > 0 && (
+            <table className="spt-proposal-table spt-proposal-centered-nums">
+              <thead>
+                <tr>
+                  <th>Machine</th>
+                  <th className="spt-proposal-num">Published airflow</th>
+                  <th className="spt-proposal-num">Site capacity</th>
+                  <th className="spt-proposal-num">Reduction</th>
+                  <th className="spt-proposal-num">Reference</th>
+                </tr>
+              </thead>
+              <tbody>
+                {proposedMachines.map((machine) => (
+                  <tr key={`${machine.name}-${machine.quantity}-${machine.publishedAirflow}`}>
+                    <td className="spt-proposal-wrap">{machineTitle(machine.name, machine.quantity)}</td>
+                    <td className="spt-proposal-num">{machine.publishedAirflow ?? '—'}</td>
+                    <td className="spt-proposal-num">{machine.estimatedAirflow ?? '—'}</td>
+                    <td className="spt-proposal-num">{machine.reduction ?? '—'}</td>
+                    <td className="spt-proposal-num spt-proposal-wrap">
+                      {[machine.referencePressure, machine.referencePressureSource].filter(Boolean).join(' · ') || '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {!sharedExplanation &&
+            proposedMachines.map((machine) =>
+              machine.calculationExplanation ? (
+                <p key={`${machine.name}-calc`} className="spt-proposal-quiet">
+                  <strong>{machineTitle(machine.name, machine.quantity)}. </strong>
+                  {machine.calculationExplanation}
+                </p>
+              ) : machine.siteUnavailableReason ? (
+                <p key={`${machine.name}-unavailable`} className="spt-proposal-quiet">
+                  <strong>{machineTitle(machine.name, machine.quantity)}. </strong>
+                  {machine.siteUnavailableReason}
+                </p>
+              ) : null,
+            )}
+          {doc.airAudit.measuredHeading && doc.airAudit.sourceFile && (
+            <p className="spt-proposal-quiet spt-proposal-wrap">{doc.airAudit.measuredHeading}</p>
+          )}
+          {doc.proposed.estimatedBasisNote && !doc.proposed.calculationExplanation && (
+            <p className="spt-proposal-quiet">{doc.proposed.estimatedBasisNote}</p>
+          )}
         </Section>
-        <PageFooter doc={doc} pageLabel="Page 2 of 2" />
+        <PageFooter doc={doc} pageLabel="" />
       </article>
     </div>
   );

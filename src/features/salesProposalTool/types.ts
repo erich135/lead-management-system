@@ -9,6 +9,8 @@ export interface SalesProposalSite {
   postcode: string | null;
   country: string | null;
   altitudeMetres: number | null;
+  intakeAirTemperatureC?: number | null;
+  intakeAirTemperatureKind?: 'measured' | 'estimated' | null;
 }
 export interface SalesProposalAirAudit {
   sourceFileName: string;
@@ -96,6 +98,11 @@ export interface CurrentEquipment {
   variableSpeedDrive?: boolean | null;
   flowReferenceBasis?: string | null;
   referenceAbsolutePressurePa?: number | null;
+  referencePressureSource?: string | null;
+  referenceTemperatureC?: number | null;
+  referenceTemperatureSource?: string | null;
+  intakeTemperatureOverrideC?: number | null;
+  intakeTemperatureKind?: 'measured' | 'estimated' | null;
   specificationReference?: string | null;
 }
 
@@ -112,6 +119,11 @@ export interface ProposedEquipment {
   variableSpeedDrive?: boolean | null;
   flowReferenceBasis?: string | null;
   referenceAbsolutePressurePa?: number | null;
+  referencePressureSource?: string | null;
+  referenceTemperatureC?: number | null;
+  referenceTemperatureSource?: string | null;
+  intakeTemperatureOverrideC?: number | null;
+  intakeTemperatureKind?: 'measured' | 'estimated' | null;
   specificationReference?: string | null;
 }
 
@@ -301,6 +313,8 @@ export interface SalesProposal {
   status: 'draft';
   customerId: string | null;
   customerName: string | null;
+  customerEntry?: 'existing' | 'manual';
+  manualCustomer?: ManualCustomerDetails | null;
   site: SalesProposalSite;
   airAudit: SalesProposalAirAudit | null;
   currentEquipment: CurrentEquipment[];
@@ -313,6 +327,7 @@ export interface SalesProposal {
   customerProposal?: CustomerProposalDocument | null;
   currentMachinePerformance?: CurrentMachineMeasuredPerformance | null;
   proposedSitePerformance?: SitePerformanceView | null;
+  proposedSitePerformances?: SitePerformanceView[] | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -339,13 +354,14 @@ export const EMPTY_SITE: SalesProposalSite = {
 
 export const DEFAULT_PROPOSED_QUANTITY = 1;
 
-export type CommercialOfferType = 'none' | 'purchase' | 'rental';
+export type CommercialOfferType = 'none' | 'purchase' | 'rental' | 'rent_to_own';
 
 export interface CommercialOffer {
   type: CommercialOfferType;
   current: {
     monthlyRental: number | null;
     annualSla: number | null;
+    financeEndMonth: number | null;
   };
   purchase: {
     equipmentPrice: number | null;
@@ -358,12 +374,32 @@ export interface CommercialOffer {
     monthlyRental: number | null;
     annualSla: number | null;
     installation: number | null;
+    termMonths: number | null;
+    annualEscalationPercent: number | null;
   };
+  rentToOwn: {
+    monthlyPayment: number | null;
+    termMonths: number | null;
+    annualEscalationPercent: number | null;
+    finalTransferPaymentRand: number | null;
+    upfrontRand: number | null;
+    buyBackRand: number | null;
+    postTermAnnualSlaRand: number | null;
+    projectionYears: number | null;
+    ownershipConfirmed: boolean;
+  };
+}
+
+export interface ManualCustomerDetails {
+  companyName: string | null;
+  contactName: string | null;
+  email: string | null;
+  phone: string | null;
 }
 
 export const EMPTY_COMMERCIAL_OFFER: CommercialOffer = {
   type: 'none',
-  current: { monthlyRental: null, annualSla: null },
+  current: { monthlyRental: null, annualSla: null, financeEndMonth: null },
   purchase: {
     equipmentPrice: null,
     installation: null,
@@ -371,7 +407,24 @@ export const EMPTY_COMMERCIAL_OFFER: CommercialOffer = {
     buyBack: null,
     annualSla: null,
   },
-  rental: { monthlyRental: null, annualSla: null, installation: null },
+  rental: {
+    monthlyRental: null,
+    annualSla: null,
+    installation: null,
+    termMonths: null,
+    annualEscalationPercent: null,
+  },
+  rentToOwn: {
+    monthlyPayment: null,
+    termMonths: null,
+    annualEscalationPercent: null,
+    finalTransferPaymentRand: null,
+    upfrontRand: null,
+    buyBackRand: null,
+    postTermAnnualSlaRand: null,
+    projectionYears: 10,
+    ownershipConfirmed: false,
+  },
 };
 
 export interface CommercialLine {
@@ -411,7 +464,41 @@ export interface CommercialComparison {
     grossInvestmentRand: number | null;
     netInvestmentRand: number | null;
     paybackYears: number | null;
+    paybackMonths?: number | null;
+    simpleAnnualRoiPercent?: number | null;
     paybackUnavailableReason: string | null;
+  } | null;
+  rentalProjection?: {
+    escalationPercent: number;
+    termMonths: number | null;
+    firstYearMonths: number;
+    firstYearAnnualNetRand: number | null;
+    firstYearAverageMonthlyNetRand: number | null;
+    termNetRand: number | null;
+    upfrontNetOutlayRand: number;
+    recoveryMonth: number | null;
+    recoveryReversed: boolean;
+    years: Array<{
+      year: number;
+      months: number;
+      rentalPaidRand: number;
+      netBenefitRand: number;
+      cumulativeNetBenefitRand: number;
+    }>;
+    outcome: 'benefit' | 'additional_cost' | 'unavailable';
+    unavailableReason: string | null;
+  } | null;
+  rentToOwnProjection?: {
+    projectionYears: number;
+    termMonths: number | null;
+    paymentEndMonth: number | null;
+    firstYearAnnualNetRand: number | null;
+    firstYearAfterPaymentsRand: number | null;
+    breakEvenYears: number | null;
+    projectionNetRand: number | null;
+    provisional: boolean;
+    provisionalReasons: string[];
+    unavailableReason: string | null;
   } | null;
   included: string[];
   notes: string[];
@@ -449,6 +536,20 @@ export interface SitePerformanceView {
   altitudeDisplay: string | null;
   advisory: string | null;
   missingInputs?: string[];
+  temperatureIncluded?: boolean;
+  reductionPercent?: number | null;
+  siteIntakeTemperatureC?: number | null;
+  siteIntakeTemperatureDisplay?: string | null;
+  siteIntakeTemperatureKindLabel?: string | null;
+  referenceTemperatureDisplay?: string | null;
+  referenceTemperatureSourceLabel?: string | null;
+  referencePressureDisplay?: string | null;
+  referencePressureSourceLabel?: string | null;
+  sitePressureDisplay?: string | null;
+  reductionDisplay?: string | null;
+  calculationExplanation?: string | null;
+  electricityNote?: string | null;
+  demandComparisonNote?: string | null;
 }
 
 export interface CurrentMachineMeasuredPerformance {
@@ -496,6 +597,7 @@ export interface CustomerProposalDocument {
   siteName: string | null;
   siteLocation: string | null;
   date: string | null;
+  reference?: string | null;
   purposeTitle: string;
   purposeLead: string;
   purposeBullets: string[];
@@ -511,6 +613,7 @@ export interface CustomerProposalDocument {
   };
   currentMachines: Array<{
     name: string;
+    quantity?: number;
     serial: string | null;
     publishedAirflow: string | null;
     publishedPressure: string | null;
@@ -557,9 +660,34 @@ export interface CustomerProposalDocument {
     estimatedLabel: string | null;
     estimatedAirflow: string | null;
     siteAltitude: string | null;
+    siteIntakeTemperature?: string | null;
+    siteIntakeTemperatureKind?: string | null;
+    reduction?: string | null;
+    referencePressure?: string | null;
+    referencePressureSource?: string | null;
+    referenceTemperature?: string | null;
+    referenceTemperatureSource?: string | null;
+    calculationExplanation?: string | null;
+    electricityNote?: string | null;
     estimatedBasisNote: string | null;
     siteUnavailableReason: string | null;
+    sitePressure?: string | null;
   };
+  proposedMachines?: Array<{
+    name: string;
+    quantity: number;
+    publishedAirflow: string | null;
+    publishedPressure: string | null;
+    packageInput: string | null;
+    estimatedAirflow: string | null;
+    reduction: string | null;
+    referencePressure: string | null;
+    referencePressureSource: string | null;
+    referenceTemperature: string | null;
+    referenceTemperatureSource: string | null;
+    calculationExplanation: string | null;
+    siteUnavailableReason: string | null;
+  }>;
   technicalRows: Array<{
     label: string;
     current: string | null;
@@ -579,6 +707,8 @@ export interface CustomerProposalDocument {
     current: string | null;
     proposed: string | null;
     saving: string | null;
+    chartCurrentRand?: number | null;
+    chartProposedRand?: number | null;
     suppliedAmountReference?: string | null;
     suppliedAmountReferenceNote?: string | null;
     costBreakdown?: {
@@ -621,6 +751,31 @@ export interface CustomerProposalDocument {
       proposed: string | null;
     }>;
     purchaseLines: Array<{ label: string; amount: string }>;
+  };
+  financialBenefit?: {
+    mode: 'purchase' | 'rental' | 'rent_to_own' | 'none';
+    figures: Array<{ label: string; value: string }>;
+    note: string | null;
+    years: Array<{
+      year: string;
+      months: string;
+      rentalPaid: string;
+      netBenefit: string;
+      cumulative: string;
+    }>;
+    chart?: Array<{
+      year: string;
+      currentElectricity: number;
+      currentFinance: number;
+      currentMaintenance: number;
+      proposedElectricity: number;
+      proposedFinance: number;
+      proposedMaintenance: number;
+      netBenefit: number;
+      cumulative: number;
+    }>;
+    paymentEndYear?: number | null;
+    breakEvenYears?: number | null;
   };
   recommendation: string;
   conclusion: string;

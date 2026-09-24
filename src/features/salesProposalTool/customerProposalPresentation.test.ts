@@ -195,12 +195,12 @@ test('customer proposal reuses the existing ARS logo and company header without 
   assert.match(preview, /doc\.commercial\.savingHeadline/);
   assert.match(preview, /doc\.recommendation/);
   assert.match(preview, /spt-customer-proposal-page-1/);
-  assert.match(preview, /spt-customer-proposal-page-2/);
-  assert.doesNotMatch(preview, /spt-customer-proposal-page-3/);
+  assert.doesNotMatch(preview, /Page 1 of 2/);
+  assert.doesNotMatch(preview, /spt-customer-proposal-page-2/);
   assert.match(css, /padding:\s*16mm/);
   assert.match(css, /width:\s*210mm/);
-  assert.match(css, /min-height:\s*297mm/);
-  assert.match(css, /page-break-before:\s*always/);
+  assert.match(css, /min-height:\s*0/);
+  assert.doesNotMatch(css, /spt-customer-proposal-page-2[\s\S]*page-break-before:\s*always/);
   assert.match(css, /print-color-adjust:\s*exact/);
   assert.match(css, /#0969a9/);
   assert.match(css, /#f7c12b/);

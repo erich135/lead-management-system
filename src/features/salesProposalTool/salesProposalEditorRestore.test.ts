@@ -4,6 +4,7 @@ import {
   SELECTED_CUSTOMER_FALLBACK_NAME,
   customerFromProposal,
   customerSelectionIsConfirmed,
+  restoreProposalCustomer,
 } from './salesProposalEditorRestore';
 
 describe('sales proposal editor customer restore', () => {
@@ -29,6 +30,17 @@ describe('sales proposal editor customer restore', () => {
     ).toBeNull();
     expect(customerSelectionIsConfirmed(null)).toBe(false);
     expect(CUSTOMER_SELECTION_REQUIRED_MESSAGE).toMatch(/typed text is not saved/i);
+  });
+
+  it('restores a manual company name when there is no linked customer', () => {
+    expect(
+      restoreProposalCustomer({
+        customerEntry: 'manual',
+        customerId: null,
+        customerName: 'Sunbake',
+        manualCustomer: { companyName: null, contactName: 'Sam', email: null, phone: null },
+      }),
+    ).toMatchObject({ entry: 'manual', companyName: 'Sunbake', contactName: 'Sam' });
   });
 
   it('keeps the stored display name when both identity and name are present', () => {

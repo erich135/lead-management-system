@@ -12,17 +12,27 @@ import type {
   CommercialOffer,
   CurrentEquipment,
   ElectricityBasis,
+  ManualCustomerDetails,
   OperatingAssumptions,
   ProposedEquipment,
   SalesProposal,
   SalesProposalSite,
 } from './types.ts';
 
+export const EMPTY_MANUAL_CUSTOMER: ManualCustomerDetails = {
+  companyName: null,
+  contactName: null,
+  email: null,
+  phone: null,
+};
+
 export const PREVIEW_SAVE_FAILED_MESSAGE =
   'Could not save the latest proposal changes. The customer proposal was not opened.';
 
 export interface SalesProposalEditorState {
+  customerEntry?: 'existing' | 'manual';
   customerId: string | null;
+  manualCustomer?: ManualCustomerDetails;
   site: SalesProposalSite;
   currentEquipment: CurrentEquipmentDraft[];
   proposed: ProposedEquipmentDraft | ProposedEquipmentDraft[];
@@ -33,7 +43,9 @@ export interface SalesProposalEditorState {
 }
 
 export interface SalesProposalSavePayload {
+  customerEntry: 'existing' | 'manual';
   customerId: string | null;
+  manualCustomer: ManualCustomerDetails;
   site: SalesProposalSite;
   currentEquipment: CurrentEquipment[];
   proposedEquipment: ProposedEquipment[];
@@ -55,8 +67,18 @@ export type SaveThenPreviewResult =
 export function buildSalesProposalSavePayload(
   state: SalesProposalEditorState,
 ): SalesProposalSavePayload {
+  const manual = state.customerEntry === 'manual';
   return {
-    customerId: state.customerId,
+    customerEntry: manual ? 'manual' : 'existing',
+    customerId: manual ? null : state.customerId,
+    manualCustomer: manual
+      ? {
+          companyName: state.manualCustomer?.companyName?.trim() || null,
+          contactName: state.manualCustomer?.contactName?.trim() || null,
+          email: state.manualCustomer?.email?.trim() || null,
+          phone: state.manualCustomer?.phone?.trim() || null,
+        }
+      : EMPTY_MANUAL_CUSTOMER,
     site: { ...state.site, name: state.site.name },
     currentEquipment: toCurrentEquipmentPayload(state.currentEquipment),
     proposedEquipment: toProposedEquipmentPayload(state.proposed),

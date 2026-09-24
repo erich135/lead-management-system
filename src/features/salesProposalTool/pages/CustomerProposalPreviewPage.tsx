@@ -703,61 +703,218 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
           </ol>
         </Section>
 
-        <Section title="Calculation basis and assumptions" muted>
-          <p className="spt-proposal-basis">{doc.basis}</p>
-          <p className="spt-proposal-basis">{doc.futureCostDisclaimer}</p>
-          <p className="spt-proposal-quiet">{doc.estimatedNote}</p>
-          {doc.proposed.electricityNote && (
-            <p className="spt-proposal-quiet">{doc.proposed.electricityNote}</p>
-          )}
-          {sharedExplanation && <p className="spt-proposal-quiet">{sharedExplanation}</p>}
-          {proposedMachines.length > 0 && (
-            <table className="spt-proposal-table spt-proposal-centered-nums">
+        <section className="spt-proposal-section spt-proposal-basis-page">
+          <h2 className="spt-proposal-h2">How these figures were worked out</h2>
+          <div className="spt-proposal-section-body spt-proposal-plain">
+            <p>
+              These pages explain the estimate in everyday language. The rand amounts earlier in this proposal come from the steps below. They are an estimate for this site, not a promise of future bills.
+            </p>
+
+            <h3 className="spt-proposal-h3">The air this site uses</h3>
+            {doc.airAudit.sourceFile ? (
+              <table className="spt-proposal-table">
+                <thead>
+                  <tr>
+                    <th>What we looked at</th>
+                    <th>Result</th>
+                    <th>What that means</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>When the air was measured</td>
+                    <td>{doc.airAudit.period ?? 'Not available'}</td>
+                    <td>The days the logger was recording on site.</td>
+                  </tr>
+                  <tr>
+                    <td>Typical airflow</td>
+                    <td>{doc.airAudit.meanAirflow ?? 'Not available'}</td>
+                    <td>The average air the site used during that recording.</td>
+                  </tr>
+                  <tr>
+                    <td>Busy airflow</td>
+                    <td>{doc.airAudit.p90Airflow ?? 'Not available'}</td>
+                    <td>Air use that was higher only about 10% of the time.</td>
+                  </tr>
+                  <tr>
+                    <td>Highest airflow</td>
+                    <td>{doc.airAudit.highestAirflow ?? 'Not available'}</td>
+                    <td>The largest airflow recorded. Gaps in the recording are left out. They are not treated as zero air use.</td>
+                  </tr>
+                  <tr>
+                    <td>Air used over a year</td>
+                    <td>{doc.airAudit.deliveredAir ?? 'Not available'}</td>
+                    <td>The measured air, stretched to a full year using 30-day months.</td>
+                  </tr>
+                </tbody>
+              </table>
+            ) : (
+              <p>No air measurement was supplied. The estimate uses the operating hours and load entered for this site.</p>
+            )}
+
+            <h3 className="spt-proposal-h3">What the proposed machine can supply here</h3>
+            <p>
+              Brochure airflow is the figure published for the machine. Site capacity is that figure adjusted for the height of this site and the temperature of the air going into the compressor. A thinner, hotter intake means the machine delivers less air. This adjustment is used to check whether the machine is big enough. It is not used again in the electricity cost.
+            </p>
+            <table className="spt-proposal-table">
               <thead>
                 <tr>
-                  <th>Machine</th>
-                  <th className="spt-proposal-num">Published airflow</th>
-                  <th className="spt-proposal-num">Site capacity</th>
-                  <th className="spt-proposal-num">Reduction</th>
-                  <th className="spt-proposal-num">Reference</th>
+                  <th>Site condition</th>
+                  <th>Value used</th>
                 </tr>
               </thead>
               <tbody>
-                {proposedMachines.map((machine) => (
-                  <tr key={`${machine.name}-${machine.quantity}-${machine.publishedAirflow}`}>
-                    <td className="spt-proposal-wrap">{machineTitle(machine.name, machine.quantity)}</td>
-                    <td className="spt-proposal-num">{machine.publishedAirflow ?? '—'}</td>
-                    <td className="spt-proposal-num">{machine.estimatedAirflow ?? '—'}</td>
-                    <td className="spt-proposal-num">{machine.reduction ?? '—'}</td>
-                    <td className="spt-proposal-num spt-proposal-wrap">
-                      {[machine.referencePressure, machine.referencePressureSource].filter(Boolean).join(' · ') || '—'}
-                    </td>
-                  </tr>
-                ))}
+                <tr>
+                  <td>Height of the site</td>
+                  <td>{doc.proposed.siteAltitude ?? 'Not available'}</td>
+                </tr>
+                <tr>
+                  <td>Temperature of air entering the compressor</td>
+                  <td>
+                    {doc.proposed.siteIntakeTemperature
+                      ? `${doc.proposed.siteIntakeTemperature}${doc.proposed.siteIntakeTemperatureKind ? ` (${doc.proposed.siteIntakeTemperatureKind})` : ''}`
+                      : 'Not entered'}
+                  </td>
+                </tr>
+                <tr>
+                  <td>Air pressure at this site</td>
+                  <td>{doc.proposed.sitePressure ?? 'Not available'}</td>
+                </tr>
+                <tr>
+                  <td>Brochure reference pressure</td>
+                  <td>{[doc.proposed.referencePressure, doc.proposed.referencePressureSource].filter(Boolean).join(' · ') || 'Not available'}</td>
+                </tr>
+                <tr>
+                  <td>Brochure reference temperature</td>
+                  <td>{[doc.proposed.referenceTemperature, doc.proposed.referenceTemperatureSource].filter(Boolean).join(' · ') || 'Not available'}</td>
+                </tr>
               </tbody>
             </table>
-          )}
-          {!sharedExplanation &&
-            proposedMachines.map((machine) =>
-              machine.calculationExplanation ? (
-                <p key={`${machine.name}-calc`} className="spt-proposal-quiet">
-                  <strong>{machineTitle(machine.name, machine.quantity)}. </strong>
-                  {machine.calculationExplanation}
-                </p>
-              ) : machine.siteUnavailableReason ? (
-                <p key={`${machine.name}-unavailable`} className="spt-proposal-quiet">
-                  <strong>{machineTitle(machine.name, machine.quantity)}. </strong>
-                  {machine.siteUnavailableReason}
-                </p>
-              ) : null,
+            {proposedMachines.length > 0 && (
+              <table className="spt-proposal-table">
+                <thead>
+                  <tr>
+                    <th>Machine</th>
+                    <th className="spt-proposal-num">Brochure airflow</th>
+                    <th className="spt-proposal-num">Air available at this site</th>
+                    <th className="spt-proposal-num">Reduction</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {proposedMachines.map((machine) => (
+                    <tr key={`${machine.name}-${machine.quantity}-${machine.publishedAirflow}`}>
+                      <td className="spt-proposal-wrap">{machineTitle(machine.name, machine.quantity)}</td>
+                      <td className="spt-proposal-num">{machine.publishedAirflow ?? '—'}</td>
+                      <td className="spt-proposal-num">{machine.estimatedAirflow ?? '—'}</td>
+                      <td className="spt-proposal-num">{machine.reduction ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
-          {doc.airAudit.measuredHeading && doc.airAudit.sourceFile && (
-            <p className="spt-proposal-quiet spt-proposal-wrap">{doc.airAudit.measuredHeading}</p>
-          )}
-          {doc.proposed.estimatedBasisNote && !doc.proposed.calculationExplanation && (
-            <p className="spt-proposal-quiet">{doc.proposed.estimatedBasisNote}</p>
-          )}
-        </Section>
+            {sharedExplanation && <p>{sharedExplanation}</p>}
+            {!sharedExplanation &&
+              proposedMachines.map((machine) =>
+                machine.calculationExplanation ? (
+                  <p key={`${machine.name}-calc`}>
+                    <strong>{machineTitle(machine.name, machine.quantity)}. </strong>
+                    {machine.calculationExplanation}
+                  </p>
+                ) : machine.siteUnavailableReason ? (
+                  <p key={`${machine.name}-unavailable`}>
+                    <strong>{machineTitle(machine.name, machine.quantity)}. </strong>
+                    {machine.siteUnavailableReason}
+                  </p>
+                ) : null,
+              )}
+
+            <h3 className="spt-proposal-h3">How the electricity cost is calculated</h3>
+            <p>
+              Both sides of the comparison use the same measured air and the same electricity tariff. The difference is the power each machine needs to supply that air.
+            </p>
+            <table className="spt-proposal-table">
+              <thead>
+                <tr>
+                  <th>Step</th>
+                  <th>What we do</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>1. Air for the year</td>
+                  <td>Start with the measured air and stretch it to 12 months of 30 days. The logger period is not treated as a full year by itself.</td>
+                </tr>
+                <tr>
+                  <td>2. Machine power</td>
+                  <td>Use the published power of each machine together with its published airflow. We do not measure how much electricity the current machines actually draw.</td>
+                </tr>
+                <tr>
+                  <td>3. Efficiency</td>
+                  <td>
+                    The published power is divided once by the efficiency entered for that machine. If efficiency is left blank, it is treated as 100%.
+                    {doc.currentMachines.some((machine) => machine.efficiency) && (
+                      <> Current: {doc.currentMachines.filter((machine) => machine.efficiency).map((machine) => `${machine.name} ${machine.efficiency}`).join('; ')}.</>
+                    )}
+                    {doc.proposed.efficiency ? <> Proposed: {doc.proposed.efficiency}.</> : null}
+                  </td>
+                </tr>
+                <tr>
+                  <td>4. Extra equipment</td>
+                  <td>Add 15% for dryers, filters and other equipment around the compressor.</td>
+                </tr>
+                <tr>
+                  <td>5. Variable-speed drive</td>
+                  <td>Where a machine has a variable-speed drive, add 14% once. It is not added again anywhere else.</td>
+                </tr>
+                <tr>
+                  <td>6. Electricity tariff</td>
+                  <td>
+                    Multiply the energy by the tariff used for this proposal
+                    {doc.electricity.costBreakdown?.averageTariff ? ` (average ${doc.electricity.costBreakdown.averageTariff})` : ''}.
+                    Height and intake temperature are not applied to this electricity figure.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            {doc.proposed.electricityNote && <p>{doc.proposed.electricityNote}</p>}
+
+            <h3 className="spt-proposal-h3">What this estimate leaves out</h3>
+            <table className="spt-proposal-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>How it is treated</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Future electricity price increases</td>
+                  <td>Not included. {doc.futureCostDisclaimer}</td>
+                </tr>
+                <tr>
+                  <td>Tax and the value of the machine at the end</td>
+                  <td>Not included.</td>
+                </tr>
+                <tr>
+                  <td>Costs that were not supplied</td>
+                  <td>{doc.estimatedNote} Only amounts entered on this proposal are included.</td>
+                </tr>
+                {doc.financialBenefit?.mode === 'rent_to_own' && (
+                  <tr>
+                    <td>After the payments stop</td>
+                    <td>A blank final transfer payment and blank maintenance after the term are left out and described as unconfirmed. They are not treated as zero.</td>
+                  </tr>
+                )}
+                {doc.financialBenefit?.mode === 'rental' && (
+                  <tr>
+                    <td>End of the rental</td>
+                    <td>This is an open rental. There is no fixed end date and no ownership transfer in these figures.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
         <PageFooter doc={doc} pageLabel="" />
       </article>
     </div>

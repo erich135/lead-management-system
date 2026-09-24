@@ -426,7 +426,7 @@ export function SalesProposalEditorPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-28">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-[#383838]">{SALES_PROPOSAL_TOOL_LABEL}</h1>

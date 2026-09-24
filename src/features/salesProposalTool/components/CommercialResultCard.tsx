@@ -193,21 +193,24 @@ export function CommercialResultCard({ commercial }: CommercialResultCardProps) 
               ),
             )}
           />
-          <Row
-            label="Rental term"
-            value={rental.termMonths ? `${rental.termMonths} months` : 'Not entered'}
-          />
-          {rental.termMonths != null && (
-            <Row
-              label={
-                rental.termNetRand != null && rental.termNetRand < 0
-                  ? 'Additional cost over the term'
-                  : 'Total net benefit over the term'
-              }
-              value={displayOrUnavailable(
-                formatEstimatedRand(rental.termNetRand == null ? null : Math.abs(rental.termNetRand)),
-              )}
-            />
+          {rental.termMonths == null ? (
+            <p className="mt-2 text-xs text-slate-600">
+              Open rental. No fixed period and no ownership.
+            </p>
+          ) : (
+            <>
+              <Row label="Rental term" value={`${rental.termMonths} months`} />
+              <Row
+                label={
+                  rental.termNetRand != null && rental.termNetRand < 0
+                    ? 'Additional cost over the term'
+                    : 'Total net benefit over the term'
+                }
+                value={displayOrUnavailable(
+                  formatEstimatedRand(rental.termNetRand == null ? null : Math.abs(rental.termNetRand)),
+                )}
+              />
+            </>
           )}
           {rental.unavailableReason && (
             <p className="mt-2 text-sm text-slate-600">{rental.unavailableReason}</p>

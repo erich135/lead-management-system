@@ -2223,7 +2223,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
       {/* Scroll to Top Button */}
       <button
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-        className="fixed bottom-8 left-8 w-14 h-14 bg-[#0969a9] text-white rounded-full shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-110 flex items-center justify-center z-40 group"
+        className="fixed bottom-8 right-28 w-14 h-14 bg-[#0969a9] text-white rounded-full shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-110 flex items-center justify-center z-40 group"
         title="Scroll to top"
       >
         <svg

@@ -56,7 +56,7 @@ export function CommercialOfferSection({
   const [rentalTerm, setRentalTerm] = useState(
     value.rental.termMonths == null ? '' : String(value.rental.termMonths),
   );
-  const [rentalEscalation, setRentalEscalation] = useState(
+  const [rentalEscalation] = useState(
     value.rental.annualEscalationPercent == null
       ? ''
       : String(value.rental.annualEscalationPercent),
@@ -138,7 +138,7 @@ export function CommercialOfferSection({
       </h2>
       <div>
         <p className="text-xs font-medium text-slate-500">How are we offering the proposed solution?</p>
-        <div className="mt-2 flex gap-2">
+        <div className="mt-2 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => emit('purchase')}
@@ -152,14 +152,18 @@ export function CommercialOfferSection({
           </button>
           <button
             type="button"
-            onClick={() => emit('rental')}
-            className={`rounded-[8px] px-4 py-2 text-sm font-bold ${
+            onClick={() => {
+              setRentalTerm('');
+              emit('rental', { rentalTerm: '' });
+            }}
+            className={`rounded-[8px] px-4 py-2 text-left text-sm font-bold ${
               value.type === 'rental'
                 ? 'bg-[#f7c12b] text-[#383838]'
                 : 'bg-slate-100 text-[#383838] hover:bg-slate-200'
             }`}
           >
-            Rental
+            <span className="block">Rental</span>
+            <span className="block text-[11px] font-medium">No fixed period. No ownership.</span>
           </button>
           <button
             type="button"
@@ -181,13 +185,14 @@ export function CommercialOfferSection({
                 rentToOwnOwnership: true,
               });
             }}
-            className={`rounded-[8px] px-4 py-2 text-sm font-bold ${
+            className={`rounded-[8px] px-4 py-2 text-left text-sm font-bold ${
               value.type === 'rent_to_own'
                 ? 'bg-[#f7c12b] text-[#383838]'
                 : 'bg-slate-100 text-[#383838] hover:bg-slate-200'
             }`}
           >
-            Rent-to-own
+            <span className="block">Rent-to-own</span>
+            <span className="block text-[11px] font-medium">Fixed term. Ownership at the end.</span>
           </button>
         </div>
       </div>
@@ -268,53 +273,25 @@ export function CommercialOfferSection({
 
       {value.type === 'rental' && (
         <div className="space-y-3">
+          <p className="text-xs text-slate-600">
+            Open rental. There is no fixed period and ownership does not transfer.
+          </p>
           <RandField
             label="Monthly rental"
             unit="/ month"
             text={rentalMonthly}
             onText={(next) => {
               setRentalMonthly(next);
-              emit('rental', { rentalMonthly: next });
+              emit('rental', { rentalMonthly: next, rentalTerm: '' });
             }}
           />
-          <label className="block">
-            <span className="text-xs font-medium text-slate-500">Rental term (months)</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={rentalTerm}
-              onChange={(event) => {
-                setRentalTerm(event.target.value);
-                emit('rental', { rentalTerm: event.target.value });
-              }}
-              placeholder="Required for the full-term benefit"
-              className="mt-1 w-full rounded-[8px] border border-slate-300 px-3 py-2 text-sm focus:border-[#0969a9] focus:outline-none focus:ring-2 focus:ring-[#0969a9]/20"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs font-medium text-slate-500">Annual rental escalation (%)</span>
-            <input
-              type="text"
-              inputMode="decimal"
-              value={rentalEscalation}
-              onChange={(event) => {
-                setRentalEscalation(event.target.value);
-                emit('rental', { rentalEscalation: event.target.value });
-              }}
-              placeholder="Blank means 0%"
-              className="mt-1 w-full rounded-[8px] border border-slate-300 px-3 py-2 text-sm focus:border-[#0969a9] focus:outline-none focus:ring-2 focus:ring-[#0969a9]/20"
-            />
-            <p className="mt-1 text-xs text-slate-600">
-              Rental increases every 12 months from the start of the agreement.
-            </p>
-          </label>
           <RandField
             label="SLA / maintenance"
             unit="/ year"
             text={rentalAnnualSla}
             onText={(next) => {
               setRentalAnnualSla(next);
-              emit('rental', { rentalAnnualSla: next });
+              emit('rental', { rentalAnnualSla: next, rentalTerm: '' });
             }}
           />
           <RandField
@@ -323,7 +300,7 @@ export function CommercialOfferSection({
             text={rentalInstallation}
             onText={(next) => {
               setRentalInstallation(next);
-              emit('rental', { rentalInstallation: next });
+              emit('rental', { rentalInstallation: next, rentalTerm: '' });
             }}
           />
         </div>

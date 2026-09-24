@@ -569,6 +569,44 @@
   color: #727272;
 }
 
+.spt-proposal-basis-page {
+  break-before: page;
+  page-break-before: always;
+}
+
+.spt-proposal-basis-page .spt-proposal-h2 {
+  font-size: 18px;
+}
+
+.spt-proposal-h3 {
+  margin: 18px 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0969a9;
+}
+
+.spt-proposal-plain,
+.spt-proposal-plain p {
+  font-size: 13px;
+  line-height: 1.55;
+  color: #1f2937;
+}
+
+.spt-proposal-plain p {
+  margin: 0 0 10px;
+}
+
+.spt-proposal-basis-page .spt-proposal-table {
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.spt-proposal-basis-page .spt-proposal-table th,
+.spt-proposal-basis-page .spt-proposal-table td {
+  padding: 8px 10px;
+}
+
 .spt-proposal-section-muted .spt-proposal-h2 {
   color: #64748b;
   border-bottom-color: #e2e8f0;

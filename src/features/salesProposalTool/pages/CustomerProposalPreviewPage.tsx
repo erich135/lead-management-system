@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { ARS_DEFAULT_HEADER } from '../../../utils/arsJobCardHeaderDefaults';
-import { getSalesProposal } from '../api';
+import { getSalesProposal, downloadCustomerProposalPdf } from '../api';
 import {
   customerProposalCommercialFigures,
   customerProposalElectricityFigures,
@@ -97,17 +97,11 @@ function Letterhead({
   );
 }
 
-function PageFooter({
-  doc,
-  pageLabel,
-}: {
-  doc: CustomerProposalDocument;
-  pageLabel: string;
-}) {
+function PageFooter() {
   return (
     <footer className="spt-proposal-page-footer">
       <img src="/ars-letterhead/footer.png" alt="Thank you for your trust within Air Rotory as your preferred air compressor and dryer service specialists. Excellence in every m³/min!" />
-      <span>{pageLabel}</span>
+      <span className="spt-proposal-page-count" />
     </footer>
   );
 }
@@ -220,12 +214,29 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
   return (
     <div className="spt-customer-proposal-canvas">
       <article className="spt-customer-proposal-sheet spt-customer-proposal-page-1 spt-customer-proposal-document">
+        <table className="spt-print-frame">
+          <thead>
+            <tr>
+              <td>
+                <Letterhead doc={doc} />
+              </td>
+            </tr>
+          </thead>
+          <tfoot>
+            <tr>
+              <td>
+                <PageFooter />
+              </td>
+            </tr>
+          </tfoot>
+          <tbody>
+            <tr>
+              <td>
         <img
           src="/ars-letterhead/watermark.png"
           alt=""
           className="spt-proposal-watermark"
         />
-        <Letterhead doc={doc} />
         <h1 className="spt-proposal-title">{doc.documentTitle}</h1>
         <dl className="spt-proposal-meta">
           <div>
@@ -915,20 +926,49 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
             </table>
           </div>
         </section>
-        <PageFooter doc={doc} pageLabel="" />
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </article>
     </div>
   );
 }
 
 const PRINT_HEADER_FOOTER_HINT =
-  'In the print dialog, open More settings and turn off Headers and footers. That removes the date, browser title, localhost URL and page numbers from the customer PDF.';
+  'Print uses the browser dialog. Turn off Headers and footers under More settings so the date, title and web address are not added. Download PDF already leaves those out.';
 
 export function CustomerProposalPreviewPage() {
   const { proposalId } = useParams();
   const [document, setDocument] = useState<CustomerProposalDocument | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleDownloadPdf() {
+    const sheet = window.document.querySelector('.spt-customer-proposal-document');
+    if (!proposalId || !sheet) return;
+    const styles = [
+      ...window.document.querySelectorAll('link[rel="stylesheet"]'),
+      ...window.document.querySelectorAll('style'),
+    ].map((node) => node.outerHTML).join('');
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><base href="${window.location.origin}/">${styles}</head><body><div class="spt-customer-proposal-print-root">${sheet.outerHTML}</div></body></html>`;
+    setDownloading(true);
+    setError(null);
+    try {
+      const blob = await downloadCustomerProposalPdf(proposalId, html);
+      const url = URL.createObjectURL(blob);
+      const link = window.document.createElement('a');
+      link.href = url;
+      link.download = 'Compressed Air Performance & Sales Proposal.pdf';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Could not create the proposal PDF.');
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   useEffect(() => {
     const previousTitle = window.document.title;
@@ -970,10 +1010,18 @@ export function CustomerProposalPreviewPage() {
           </Link>
           <button
             type="button"
+            onClick={() => void handleDownloadPdf()}
+            disabled={downloading || loading || !document}
+            className="spt-customer-proposal-print-button"
+          >
+            {downloading ? 'Preparing PDF…' : 'Download PDF'}
+          </button>
+          <button
+            type="button"
             onClick={() => window.print()}
             className="spt-customer-proposal-print-button"
           >
-            Download / Print Proposal
+            Print
           </button>
         </div>
         <p className="spt-customer-proposal-print-hint">{PRINT_HEADER_FOOTER_HINT}</p>

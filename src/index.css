@@ -142,7 +142,7 @@
 
 /* Job card filled report — print */
 @media print {
-  body * {
+  body:has(.job-card-print-root) * {
     visibility: hidden;
   }
 
@@ -254,17 +254,7 @@
 
   @page spt-proposal {
     size: A4;
-    margin: 14mm 12mm 18mm 12mm;
-    @bottom-left {
-      content: "AIR ROTARY SERVICES (PTY) LTD";
-      font-size: 8pt;
-      color: #727272;
-    }
-    @bottom-right {
-      content: counter(page) " of " counter(pages);
-      font-size: 8pt;
-      color: #727272;
-    }
+    margin: 12mm 12mm 14mm 12mm;
   }
 
   body:has(.spt-customer-proposal-print-root) * {
@@ -298,6 +288,17 @@
   min-height: 100vh;
   background: #dbe3ea;
   page: spt-proposal;
+}
+
+.spt-customer-proposal-document {
+  page: spt-proposal;
+}
+
+.spt-proposal-page-count {
+  display: none;
+  flex-shrink: 0;
+  font-size: 9px;
+  color: #727272;
 }
 
 .spt-customer-proposal-toolbar {
@@ -923,39 +924,49 @@
     width: auto;
     min-height: 0;
     box-shadow: none;
-    padding: 5mm;
+    padding: 0;
+  }
+
+  .spt-print-frame {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .spt-print-frame thead {
+    display: table-header-group;
+  }
+
+  .spt-print-frame tfoot {
+    display: table-footer-group;
+  }
+
+  .spt-print-frame td {
+    padding: 0;
+    border: 0;
   }
 
   .spt-proposal-watermark {
     position: fixed;
-    left: 12%;
+    left: 18%;
     top: 28%;
-    width: 76%;
-    opacity: 0.08;
+    width: 64%;
+    height: auto;
+    margin: 0;
+    opacity: 0.07;
     z-index: 0;
   }
 
-  .spt-proposal-letterhead {
-    position: fixed;
-    top: 4mm;
-    left: 12.7mm;
-    right: 12.7mm;
-    z-index: 2;
+  .spt-proposal-letterhead,
+  .spt-proposal-page-footer {
+    position: static;
+    height: auto;
+    max-height: none;
+    overflow: visible;
     background: #fff;
-  }
-
-  .spt-customer-proposal-sheet {
-    padding-top: 58mm;
-    padding-bottom: 24mm;
   }
 
   .spt-proposal-page-footer {
-    display: flex;
-    position: fixed;
-    bottom: 2mm;
-    left: 12.7mm;
-    right: 12.7mm;
-    background: #fff;
+    margin-top: 6mm;
   }
 
   .spt-proposal-page-footer img {
@@ -963,12 +974,21 @@
     height: auto;
   }
 
+  .spt-proposal-page-count {
+    display: inline;
+  }
+
+  .spt-proposal-page-count::after {
+    content: none;
+  }
+
   .spt-keep-together {
     break-inside: avoid;
     page-break-inside: avoid;
   }
 
-  .spt-customer-proposal-document h2 {
+  .spt-customer-proposal-document h2,
+  .spt-customer-proposal-document h3 {
     break-after: avoid;
     page-break-after: avoid;
   }
@@ -981,15 +1001,4 @@
     page-break-inside: avoid;
   }
 
-  .spt-proposal-title {
-    font-size: 14pt;
-  }
-
-  .spt-proposal-figure-value {
-    font-size: 12pt;
-  }
-
-  .spt-proposal-page-footer {
-    margin-top: 10mm;
-  }
 }

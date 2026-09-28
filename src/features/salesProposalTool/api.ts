@@ -307,6 +307,22 @@ export async function uploadEfficiencyAudit(
   }>(response);
 }
 
+export async function downloadCustomerProposalPdf(proposalId: string, html: string): Promise<Blob> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const response = await fetch(apiUrl(`/api/sales-proposal-tool/proposals/${proposalId}/customer-pdf`), {
+    method: 'POST',
+    headers,
+    credentials: 'include',
+    body: JSON.stringify({ html }),
+  });
+  if (!response.ok) {
+    throw new ApiRequestError('Could not create the proposal PDF.', { kind: 'malformed', status: response.status });
+  }
+  return response.blob();
+}
+
 export async function confirmSpecSheet(
   proposalId: string,
   body: import('./confirmSpecSheet').SpecSheetConfirmPayload,

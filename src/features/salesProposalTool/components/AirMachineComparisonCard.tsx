@@ -1,9 +1,18 @@
 import type { AirAndElectricityComparison, SitePerformanceView } from '../types';
 import { formatMeasuredNumber } from '../formatMeasured';
+import { ConfigurationAcceptancePanel } from './ConfigurationAcceptancePanel';
 
 interface AirMachineComparisonCardProps {
   comparison: AirAndElectricityComparison | null;
   proposedSitePerformance?: SitePerformanceView | null;
+  validationFailed?: boolean;
+  configurationAccepted?: boolean;
+  acceptedByName?: string | null;
+  acceptedAt?: string | null;
+  acceptanceNote?: string | null;
+  canAcceptConfiguration?: boolean;
+  onAcceptConfiguration?: (note: string) => void;
+  onRevokeConfiguration?: () => void;
 }
 
 function airflow(value: number | null | undefined): string {
@@ -28,6 +37,14 @@ function Row({ label, value }: { label: string; value: string }) {
 export function AirMachineComparisonCard({
   comparison,
   proposedSitePerformance = null,
+  validationFailed = false,
+  configurationAccepted = false,
+  acceptedByName = null,
+  acceptedAt = null,
+  acceptanceNote = null,
+  canAcceptConfiguration = false,
+  onAcceptConfiguration,
+  onRevokeConfiguration,
 }: AirMachineComparisonCardProps) {
   const air = comparison?.air ?? null;
 
@@ -133,11 +150,30 @@ export function AirMachineComparisonCard({
       {proposedSitePerformance?.advisory && (
         <p className="mt-3 text-sm text-slate-600">{proposedSitePerformance.advisory}</p>
       )}
-      {comparison?.warnings.map((warning) => (
-        <p key={warning} className="mt-3 text-sm text-amber-800">
-          {warning}
-        </p>
-      ))}
+      {!configurationAccepted &&
+        comparison?.warnings.map((warning) => (
+          <p key={warning} className="mt-3 text-sm text-amber-800">
+            {warning}
+          </p>
+        ))}
+      {onAcceptConfiguration && onRevokeConfiguration && (
+        <ConfigurationAcceptancePanel
+          validationFailed={validationFailed}
+          accepted={configurationAccepted}
+          acceptedByName={acceptedByName}
+          acceptedAt={acceptedAt}
+          note={acceptanceNote}
+          canAccept={canAcceptConfiguration}
+          onAccept={onAcceptConfiguration}
+          onRevoke={onRevokeConfiguration}
+        />
+      )}
+      {configurationAccepted &&
+        comparison?.warnings.map((warning) => (
+          <p key={warning} className="mt-3 text-sm text-amber-800">
+            {warning}
+          </p>
+        ))}
     </section>
   );
 }

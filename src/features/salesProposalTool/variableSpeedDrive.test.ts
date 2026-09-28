@@ -51,6 +51,26 @@ describe('variable-speed drive proposal flag', () => {
     expect(toProposedEquipmentPayload(hydrated)[0].variableSpeedDrive).toBe(false);
   });
 
+  it('selects the checkbox when the library control method is variable_speed_drive', () => {
+    const applied = applyProposedLibrarySpec(emptyProposedDraft(), {
+      recordId: 'lib-bouwa-svc',
+      manufacturer: 'BOUWA',
+      model: 'SVC-RS37A-II',
+      modelVariant: null,
+      ratedPressureBarG: 8.5,
+      ratedAirflowM3PerMin: 7.4,
+      minimumAirflowM3PerMin: 1.8,
+      packageInputPowerKw: 37,
+      motorShaftPowerKw: null,
+      controlType: 'variable_speed_drive',
+      sourceTitle: null,
+      sourceFileName: null,
+    });
+    expect(applied.variableSpeedDrive).toBe(true);
+    expect(inferVariableSpeedDriveFromControlType('variable_speed_drive')).toBe(true);
+    expect(inferVariableSpeedDriveFromControlType('fixed_speed_load_unload')).toBe(false);
+  });
+
   it('lets a proposal checkbox override a VSD control type string', () => {
     expect(
       resolveVariableSpeedDrive({

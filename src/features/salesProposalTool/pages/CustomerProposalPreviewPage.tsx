@@ -339,12 +339,29 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
           )}
         </section>
 
-        {(revisionCallout || doc.warnings.length > 0) && (
+        {(revisionCallout || doc.configurationAcceptance || doc.warnings.length > 0) && (
           <div className="spt-proposal-callout spt-keep-together">
             {revisionCallout && (
               <p className="spt-proposal-callout-title">
                 Proposed configuration requires revision
               </p>
+            )}
+            {doc.configurationAcceptance && (
+              <>
+                <p className="spt-proposal-callout-title">
+                  {doc.configurationAcceptance.title}
+                </p>
+                <p>{doc.configurationAcceptance.statement}</p>
+                {doc.configurationAcceptance.acceptedByName && (
+                  <p>Accepted by: {doc.configurationAcceptance.acceptedByName}</p>
+                )}
+                {doc.configurationAcceptance.acceptedAtLabel && (
+                  <p>Accepted: {doc.configurationAcceptance.acceptedAtLabel}</p>
+                )}
+                {doc.configurationAcceptance.note && (
+                  <p>Engineering note: {doc.configurationAcceptance.note}</p>
+                )}
+              </>
             )}
             {doc.warnings.length > 0 && (
               <ul>

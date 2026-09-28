@@ -4,6 +4,8 @@ import type {
   AirAndElectricityComparison,
   CommercialComparison,
   CommercialOffer,
+  ConfigurationAcceptanceRequest,
+  EngineeringValidation,
   CurrentEquipment,
   CurrentMachineMeasuredPerformance,
   ElectricityBasis,
@@ -103,6 +105,7 @@ export async function saveSalesProposal(
       type: 'single_machine' | 'site_header';
       currentEquipmentId: string | null;
     };
+    configurationAcceptance?: ConfigurationAcceptanceRequest;
   },
 ): Promise<SalesProposal> {
   const data = await jsonRequest<{ proposal: SalesProposal }>(
@@ -136,6 +139,7 @@ export async function previewElectricityComparison(
       type: 'single_machine' | 'site_header';
       currentEquipmentId: string | null;
     };
+    configurationAcceptance?: ConfigurationAcceptanceRequest;
   },
 ): Promise<{
   comparison: AirAndElectricityComparison;
@@ -143,6 +147,7 @@ export async function previewElectricityComparison(
   currentMachinePerformance: CurrentMachineMeasuredPerformance | null;
   proposedSitePerformance: SitePerformanceView | null;
   proposedSitePerformances: SitePerformanceView[] | null;
+  engineeringValidation: EngineeringValidation | null;
 }> {
   return jsonRequest<{
     comparison: AirAndElectricityComparison;
@@ -150,6 +155,7 @@ export async function previewElectricityComparison(
     currentMachinePerformance: CurrentMachineMeasuredPerformance | null;
     proposedSitePerformance: SitePerformanceView | null;
     proposedSitePerformances: SitePerformanceView[] | null;
+    engineeringValidation: EngineeringValidation | null;
   }>(
     `/api/sales-proposal-tool/proposals/${id}/electricity-comparison`,
     {

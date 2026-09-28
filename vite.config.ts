@@ -1,16 +1,51 @@
+import { execSync } from 'node:child_process';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
+function resolveAppBuildId(): string {
+  const fromEnv = process.env.ARS_BUILD_ID?.trim();
+  if (fromEnv) return fromEnv;
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const date = `${year}.${month}.${day}`;
+  try {
+    const since = `${year}-${month}-${day} 00:00`;
+    const count = Number(
+      execSync(`git rev-list --count --since="${since}" HEAD`, {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim(),
+    );
+    const dirty = execSync('git status --porcelain', {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+      ? 1
+      : 0;
+    const sequence = Math.max(1, (Number.isFinite(count) ? count : 0) + dirty);
+    return `${date}.${sequence}`;
+  } catch {
+    return `${date}.dev`;
+  }
+}
+
+const ARS_APP_BUILD = resolveAppBuildId();
+
 // https://vitejs.dev/config/
 export default defineConfig({
+  define: {
+    __ARS_APP_BUILD__: JSON.stringify(ARS_APP_BUILD),
+  },
   plugins: [
     react(),
     VitePWA({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.ts',
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       injectRegister: false,
       includeAssets: [
         'Favicon.png',

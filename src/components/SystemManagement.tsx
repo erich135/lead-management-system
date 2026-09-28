@@ -3,6 +3,7 @@
  * Provides user management, role/permission assignment, and import functionality.
  */
 import { useState, useEffect, useMemo } from 'react';
+import { ARS_APP_BUILD } from '../pwa/appBuild';
 import { BranchPermissionsSection } from './BranchPermissionsSection';
 import { 
   getUsers, 
@@ -1456,6 +1457,7 @@ alert((response as any).message || 'User invited successfully');
       <h3 className="text-2xl font-bold text-ars-heading flex items-center gap-2">
             System Management
           </h3>
+          <p className="text-sm text-slate-500">Version {ARS_APP_BUILD}</p>
         </div>
 
         {/* Tabs */}

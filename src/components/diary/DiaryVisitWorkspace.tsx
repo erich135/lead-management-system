@@ -87,6 +87,13 @@ import { SALES_REQUEST_PERMISSIONS } from '../../constants/salesRequestPermissio
 import { useGeolocation } from '../../hooks/useGeolocation';
 import type { VisitGpsVerification } from '../../types';
 import { enqueueOfflineVisitSync } from '../../mobile-rep/useOfflineVisitSync';
+import {
+  VisitPhotoError,
+  logVisitPhotoFailure,
+  openVisitPhotoPicker,
+  prepareVisitPhoto,
+  visitPhotoStorageMessage,
+} from './visitPhotoPicker';
 import VisitLocationPermissionModal from './VisitLocationPermissionModal';
 import {
   createEmptyRfcForm,
@@ -564,6 +571,39 @@ function getVisitWorkflowErrorMessage(error: unknown, fallback: string): string 
   return fallback;
 }
 
+class VisitPhotoSectionBoundary extends React.Component<
+  { children: React.ReactNode },
+  { message: string | null }
+> {
+  state = { message: null as string | null };
+
+  static getDerivedStateFromError(): { message: string } {
+    return {
+      message: 'A photo could not be shown. The rest of this visit is unchanged. Try again.',
+    };
+  }
+
+  componentDidCatch(error: unknown): void {
+    logVisitPhotoFailure(error, 'render');
+  }
+
+  render() {
+    if (!this.state.message) return this.props.children;
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-700">
+        <p>{this.state.message}</p>
+        <button
+          type="button"
+          onClick={() => this.setState({ message: null })}
+          className="mt-2 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-red-700"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+}
+
 /**
  * Minimal field visit workspace: timer, notes, photos, auto-save, and finish flow.
  * RFC, Loan Rental and New Service Level appointments open their sheets first.
@@ -970,7 +1010,13 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
       return;
     }
 
-    saveVisitSession(session);
+    try {
+      saveVisitSession(session);
+    } catch (saveError) {
+      logVisitPhotoFailure(saveError, 'store');
+      const storageMessage = visitPhotoStorageMessage(saveError);
+      if (storageMessage) setError(storageMessage);
+    }
   }, [appointment, session]);
 
   useEffect(() => {
@@ -1645,49 +1691,61 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
   }
 
   /**
-   * Reads a selected file as a data URL.
+   * Opens the system photo chooser without launching the camera intent.
    */
-  function readFileAsDataUrl(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsDataURL(file);
-    });
+  function handleOpenPhotoPicker(): void {
+    try {
+      openVisitPhotoPicker(photoInputRef.current);
+    } catch (pickerError) {
+      logVisitPhotoFailure(pickerError, 'open');
+      setError(
+        pickerError instanceof VisitPhotoError
+          ? pickerError.userMessage
+          : 'Unable to open the photo picker. Try again.',
+      );
+    }
   }
 
   /**
-   * Adds one or more captured photos to the visit session.
+   * Adds one or more selected photos. A failed file does not clear the visit.
    */
   async function handlePhotoSelected(event: React.ChangeEvent<HTMLInputElement>): Promise<void> {
     const files = Array.from(event.target.files || []);
-    if (files.length === 0) {
-      return;
-    }
+    event.target.value = '';
+    if (files.length === 0) return;
 
-    try {
-      const newPhotos: VisitPhoto[] = [];
-      for (const file of files) {
-        const dataUrl = await readFileAsDataUrl(file);
-        newPhotos.push({
+    const added: VisitPhoto[] = [];
+    const problems: string[] = [];
+    for (const file of files) {
+      try {
+        const dataUrl = await prepareVisitPhoto(file);
+        added.push({
           id: createVisitItemId('photo'),
           dataUrl,
           caption: '',
         });
+      } catch (photoError) {
+        logVisitPhotoFailure(photoError, 'read');
+        problems.push(
+          photoError instanceof VisitPhotoError
+            ? photoError.userMessage
+            : 'Unable to add photo. Try again.',
+        );
       }
+    }
 
+    if (added.length > 0) {
       setSession((current) =>
         current
           ? {
               ...current,
-              photos: [...current.photos, ...newPhotos],
+              photos: [...current.photos, ...added],
             }
           : current,
       );
-    } catch {
-      setError('Unable to add photo.');
-    } finally {
-      event.target.value = '';
+    }
+    if (problems.length > 0) {
+      setError(problems[0]);
     }
   }
 
@@ -2424,7 +2482,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
               {!showCompletionDialog && (
                 <button
                   type="button"
-                  onClick={() => photoInputRef.current?.click()}
+                  onClick={handleOpenPhotoPicker}
                   className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white"
                 >
                   Add
@@ -2436,15 +2494,15 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
               type="file"
               accept="image/*"
               multiple
-              capture="environment"
-              className="hidden"
-              onChange={handlePhotoSelected}
+              className="sr-only"
+              onChange={(event) => void handlePhotoSelected(event)}
             />
+            <VisitPhotoSectionBoundary>
             {session.photos.length === 0 ? (
               <button
                 type="button"
                 disabled={showCompletionDialog}
-                onClick={() => photoInputRef.current?.click()}
+                onClick={handleOpenPhotoPicker}
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 py-10 text-sm text-slate-500 disabled:opacity-50"
               >
                 <Camera className="h-5 w-5" />
@@ -2478,6 +2536,7 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
                 ))}
               </div>
             )}
+            </VisitPhotoSectionBoundary>
           </section>
         </div>
       </div>

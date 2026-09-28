@@ -385,13 +385,21 @@ export function GuidedProposalWizard({
   const unsaved = hasUnsavedWork(saveState);
 
   useEffect(() => {
-    if (!unsaved) return;
+    window.__ARS_UNSAVED_WORK__ = unsaved;
+    if (!unsaved) {
+      return () => {
+        window.__ARS_UNSAVED_WORK__ = false;
+      };
+    }
     function warn(event: BeforeUnloadEvent) {
       event.preventDefault();
       event.returnValue = '';
     }
     window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
+    return () => {
+      window.__ARS_UNSAVED_WORK__ = false;
+      window.removeEventListener('beforeunload', warn);
+    };
   }, [unsaved]);
 
   const goTo = useCallback(

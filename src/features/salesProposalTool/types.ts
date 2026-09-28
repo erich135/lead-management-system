@@ -62,6 +62,7 @@ export interface PublicMachineSpec {
   modelVariant: string | null;
   ratedPressureBarG: number | null;
   ratedAirflowM3PerMin: number | null;
+  minimumAirflowM3PerMin?: number | null;
   packageInputPowerKw: number | null;
   motorShaftPowerKw: number | null;
   controlType: string | null;
@@ -328,8 +329,26 @@ export interface SalesProposal {
   currentMachinePerformance?: CurrentMachineMeasuredPerformance | null;
   proposedSitePerformance?: SitePerformanceView | null;
   proposedSitePerformances?: SitePerformanceView[] | null;
+  engineeringValidation?: EngineeringValidation | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface EngineeringValidation {
+  passed: boolean;
+  fingerprint: string;
+  acceptance: {
+    acceptedByName: string | null;
+    acceptedAt: string | null;
+    note: string | null;
+    fingerprint: string;
+  } | null;
+}
+
+export interface ConfigurationAcceptanceRequest {
+  accepted: boolean;
+  note: string | null;
+  fingerprint: string | null;
 }
 
 export interface SalesProposalListItem {
@@ -696,6 +715,13 @@ export interface CustomerProposalDocument {
   warnings: string[];
   siteAirflowAdvisory: string | null;
   requiresRevision: boolean;
+  configurationAcceptance?: {
+    title: string;
+    statement: string;
+    acceptedByName: string | null;
+    acceptedAtLabel: string | null;
+    note: string | null;
+  } | null;
   electricity: {
     currentEnergyLabel?: string;
     proposedEnergyLabel?: string;

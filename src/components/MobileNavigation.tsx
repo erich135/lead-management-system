@@ -2,6 +2,7 @@ import { LayoutDashboard, FileText, BarChart3, Calendar, Users, Menu, X, Bell, L
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { ARS_APP_BUILD } from '../pwa/appBuild';
 import PwaInstallButton from './PwaInstallButton';
 import { canAccessMachineReadingWorkflow } from '../lib/readingAccess';
 import {
@@ -153,6 +154,7 @@ export function MobileNavigation({
                 <div className="flex-1">
                   <p className="font-semibold text-ars-heading">{user?.fullName || 'User'}</p>
                   <p className="text-sm text-ars-body capitalize">{user?.role?.name || 'user'}</p>
+                  <p className="text-xs text-ars-body/80">Version {ARS_APP_BUILD}</p>
                 </div>
               </div>
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useAuth } from '../../../contexts/AuthContext';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { getMachinesByCustomer, type Customer } from '../../../lib/api';
@@ -59,6 +60,8 @@ import {
 import {
   EMPTY_SITE,
   type AirAndElectricityComparison,
+  type ConfigurationAcceptanceRequest,
+  type EngineeringValidation,
   type CommercialComparison,
   type CommercialOffer,
   type CurrentMachineMeasuredPerformance,
@@ -69,10 +72,16 @@ import {
   type SitePerformanceView,
 } from '../types';
 import { effectivePackageInput } from '../specDisplay';
+import {
+  configurationWarningsFail,
+  engineeringAcceptanceKey,
+  type LocalConfigurationAcceptance,
+} from '../configurationAcceptance';
 
 export function SalesProposalEditorPage() {
   const { proposalId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [proposal, setProposal] = useState<SalesProposal | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customerEntry, setCustomerEntry] = useState<'existing' | 'manual'>('existing');
@@ -104,6 +113,11 @@ export function SalesProposalEditorPage() {
   const [proposedSitePerformances, setProposedSitePerformances] = useState<
     SitePerformanceView[] | null
   >(null);
+  const [engineeringValidation, setEngineeringValidation] =
+    useState<EngineeringValidation | null>(null);
+  const [localAcceptance, setLocalAcceptance] =
+    useState<LocalConfigurationAcceptance | null>(null);
+  const [previewAcceptanceKey, setPreviewAcceptanceKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -145,6 +159,7 @@ export function SalesProposalEditorPage() {
         setCurrentMachinePerformance(loaded.currentMachinePerformance ?? null);
         setProposedSitePerformance(loaded.proposedSitePerformance ?? null);
         setProposedSitePerformances(loaded.proposedSitePerformances ?? null);
+        restoreConfigurationAcceptance(loaded);
         const restored = restoreProposalCustomer(loaded);
         setCustomerEntry(restored.entry);
         setManualCustomer({
@@ -195,8 +210,27 @@ export function SalesProposalEditorPage() {
     );
   }, [currentEquipment]);
 
+  const acceptanceKey = engineeringAcceptanceKey({
+    airAuditSha256: proposal?.airAudit?.sourceSha256 ?? null,
+    airAuditScope,
+    hasAirAudit: operatingAssumptions.hasAirAudit !== false,
+    altitudeMetres: site.altitudeMetres ?? null,
+    intakeAirTemperatureC: site.intakeAirTemperatureC ?? null,
+    proposed: toProposedEquipmentPayload(proposed),
+  });
+  const activeAcceptance =
+    localAcceptance && localAcceptance.key === acceptanceKey ? localAcceptance : null;
+  const configurationAcceptanceRequest: ConfigurationAcceptanceRequest = activeAcceptance
+    ? {
+        accepted: true,
+        note: activeAcceptance.note,
+        fingerprint: activeAcceptance.fingerprint,
+      }
+    : { accepted: false, note: null, fingerprint: null };
+
   useEffect(() => {
     if (!proposalId || loading) return;
+    const requestedKey = acceptanceKey;
     const timer = window.setTimeout(() => {
       void previewElectricityComparison(proposalId, {
         customerEntry,
@@ -214,6 +248,7 @@ export function SalesProposalEditorPage() {
         operatingAssumptions,
         commercialOffer,
         airAuditScope,
+        configurationAcceptance: configurationAcceptanceRequest,
       })
         .then((preview) => {
           setComparison(preview.comparison);
@@ -221,6 +256,8 @@ export function SalesProposalEditorPage() {
           setCurrentMachinePerformance(preview.currentMachinePerformance ?? null);
           setProposedSitePerformance(preview.proposedSitePerformance ?? null);
           setProposedSitePerformances(preview.proposedSitePerformances ?? null);
+          setEngineeringValidation(preview.engineeringValidation ?? null);
+          setPreviewAcceptanceKey(requestedKey);
         })
         .catch(() => {
           /* keep the last comparison if preview cannot run yet */
@@ -243,6 +280,10 @@ export function SalesProposalEditorPage() {
     customer?._id,
     customerEntry,
     manualCustomer,
+    acceptanceKey,
+    activeAcceptance?.fingerprint,
+    activeAcceptance?.note,
+    activeAcceptance?.acceptedAt,
   ]);
 
   function editorPersistenceState(): SalesProposalEditorState {
@@ -262,7 +303,37 @@ export function SalesProposalEditorPage() {
       operatingAssumptions,
       commercialOffer,
       airAuditScope,
+      configurationAcceptance: configurationAcceptanceRequest,
     };
+  }
+
+  function restoreConfigurationAcceptance(saved: SalesProposal) {
+    setEngineeringValidation(saved.engineeringValidation ?? null);
+    const restoredAcceptance = saved.engineeringValidation?.acceptance;
+    const currentDrafts = draftsFromCurrentEquipment(saved.currentEquipment);
+    if (!restoredAcceptance?.fingerprint) {
+      setLocalAcceptance(null);
+      setPreviewAcceptanceKey(null);
+      return;
+    }
+    const restoredKey = engineeringAcceptanceKey({
+      airAuditSha256: saved.airAudit?.sourceSha256 ?? null,
+      airAuditScope: normaliseAirAuditScope(
+        saved.airAudit?.scope,
+        currentDrafts.filter(currentMachineHasIdentity).map((row) => row.key),
+      ),
+      hasAirAudit: saved.operatingAssumptions?.hasAirAudit !== false,
+      altitudeMetres: saved.site.altitudeMetres ?? null,
+      intakeAirTemperatureC: saved.site.intakeAirTemperatureC ?? null,
+      proposed: toProposedEquipmentPayload(proposedDraftsFromProposal(saved.proposedEquipment)),
+    });
+    setLocalAcceptance({
+      note: restoredAcceptance.note,
+      key: restoredKey,
+      fingerprint: restoredAcceptance.fingerprint,
+      acceptedAt: restoredAcceptance.acceptedAt ?? new Date().toISOString(),
+    });
+    setPreviewAcceptanceKey(restoredKey);
   }
 
   function applyPersistedProposal(saved: SalesProposal) {
@@ -294,6 +365,7 @@ export function SalesProposalEditorPage() {
     setCurrentMachinePerformance(saved.currentMachinePerformance ?? null);
     setProposedSitePerformance(saved.proposedSitePerformance ?? null);
     setProposedSitePerformances(saved.proposedSitePerformances ?? null);
+    restoreConfigurationAcceptance(saved);
   }
 
   async function handleSave() {
@@ -345,6 +417,9 @@ export function SalesProposalEditorPage() {
     try {
       const updated = await uploadAirAuditCsv(proposalId, file);
       setProposal(updated);
+      setEngineeringValidation(updated.engineeringValidation ?? null);
+      setLocalAcceptance(null);
+      setPreviewAcceptanceKey(null);
       setAirAuditScope(
         normaliseAirAuditScope(
           updated.airAudit?.scope,
@@ -367,6 +442,9 @@ export function SalesProposalEditorPage() {
     try {
       const updated = await removeAirAudit(proposalId);
       setProposal(updated);
+      setEngineeringValidation(updated.engineeringValidation ?? null);
+      setLocalAcceptance(null);
+      setPreviewAcceptanceKey(null);
       setAirAuditScope(DEFAULT_AIR_AUDIT_SCOPE);
       setComparison(updated.comparison);
       setCommercial(updated.commercial);
@@ -678,6 +756,33 @@ export function SalesProposalEditorPage() {
           <AirMachineComparisonCard
             comparison={comparison}
             proposedSitePerformance={proposedSitePerformance}
+            validationFailed={
+              engineeringValidation
+                ? engineeringValidation.passed === false
+                : configurationWarningsFail(comparison?.warnings ?? [])
+            }
+            configurationAccepted={Boolean(activeAcceptance)}
+            acceptedByName={
+              engineeringValidation?.acceptance?.acceptedByName || user?.fullName || null
+            }
+            acceptedAt={
+              engineeringValidation?.acceptance?.acceptedAt || activeAcceptance?.acceptedAt || null
+            }
+            acceptanceNote={activeAcceptance?.note ?? engineeringValidation?.acceptance?.note ?? null}
+            canAcceptConfiguration={
+              Boolean(engineeringValidation?.fingerprint) && previewAcceptanceKey === acceptanceKey
+            }
+            onAcceptConfiguration={(note) => {
+              const fingerprint = engineeringValidation?.fingerprint;
+              if (!fingerprint || previewAcceptanceKey !== acceptanceKey) return;
+              setLocalAcceptance({
+                note: note.trim() || null,
+                key: acceptanceKey,
+                fingerprint,
+                acceptedAt: new Date().toISOString(),
+              });
+            }}
+            onRevokeConfiguration={() => setLocalAcceptance(null)}
           />
           <ElectricityResultCard
             comparison={comparison}

@@ -1,6 +1,7 @@
 import { useState, useEffect, type ComponentProps } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { ARS_APP_BUILD } from '../pwa/appBuild';
 import { canAccessMachineReadingWorkflow } from '../lib/readingAccess';
 import {
   getJobStats,
@@ -968,6 +969,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                 >
                   <p className="text-sm font-semibold text-[#383838]">{user?.fullName || 'User'}</p>
                   <p className="text-xs text-[#383838]/70 capitalize">{user?.role?.name || 'user'} · Settings</p>
+                  <p className="text-[11px] text-[#383838]/60">Version {ARS_APP_BUILD}</p>
                 </button>
                 <button
                   onClick={signOut}

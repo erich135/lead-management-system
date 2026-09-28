@@ -3,10 +3,11 @@ export const VARIABLE_SPEED_DRIVE_LABEL = 'Variable-speed drive (VSD)';
 export function controlTypeIndicatesVsd(
   controlType: string | null | undefined,
 ): boolean {
-  const text = (controlType ?? '').trim().toLowerCase();
+  const text = (controlType ?? '').trim().toLowerCase().replace(/[_/]+/g, ' ');
   if (!text) return false;
   return (
     /\bvsd\b/.test(text) ||
+    /\bvfd\b/.test(text) ||
     text.includes('variable speed') ||
     text.includes('variable-speed')
   );

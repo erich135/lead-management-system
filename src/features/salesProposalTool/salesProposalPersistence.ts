@@ -17,6 +17,7 @@ import type {
   ProposedEquipment,
   SalesProposal,
   SalesProposalSite,
+  ConfigurationAcceptanceRequest,
 } from './types.ts';
 
 export const EMPTY_MANUAL_CUSTOMER: ManualCustomerDetails = {
@@ -40,6 +41,7 @@ export interface SalesProposalEditorState {
   operatingAssumptions: OperatingAssumptions;
   commercialOffer: CommercialOffer;
   airAuditScope: AirAuditScope;
+  configurationAcceptance?: ConfigurationAcceptanceRequest;
 }
 
 export interface SalesProposalSavePayload {
@@ -53,6 +55,7 @@ export interface SalesProposalSavePayload {
   operatingAssumptions: OperatingAssumptions;
   commercialOffer: CommercialOffer;
   airAuditScope: AirAuditScope;
+  configurationAcceptance?: ConfigurationAcceptanceRequest;
 }
 
 export type PersistSalesProposal = (
@@ -86,6 +89,9 @@ export function buildSalesProposalSavePayload(
     operatingAssumptions: state.operatingAssumptions,
     commercialOffer: state.commercialOffer,
     airAuditScope: state.airAuditScope,
+    ...(state.configurationAcceptance
+      ? { configurationAcceptance: state.configurationAcceptance }
+      : {}),
   };
 }
 

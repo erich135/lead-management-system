@@ -53,7 +53,7 @@ test('Air Audit measured card still does not invent electrical copy', () => {
     'utf8',
   );
   assert.equal(containsInventedElectricalCopy(card), false);
-  assert.match(card, /Mean measured airflow/);
+  assert.match(card, /Overall measured mean airflow/);
   assert.match(card, /Recorded pressure/);
 });
 

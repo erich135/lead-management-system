@@ -40,6 +40,7 @@ export interface SalesProposalEditorState {
   electricityBasis: ElectricityBasis;
   operatingAssumptions: OperatingAssumptions;
   commercialOffer: CommercialOffer;
+  electricityCalculationBasis?: 'air_audit' | 'published_capacity';
   airAuditScope: AirAuditScope;
   configurationAcceptance?: ConfigurationAcceptanceRequest;
 }
@@ -54,6 +55,7 @@ export interface SalesProposalSavePayload {
   electricityBasis: ElectricityBasis;
   operatingAssumptions: OperatingAssumptions;
   commercialOffer: CommercialOffer;
+  electricityCalculationBasis?: 'air_audit' | 'published_capacity';
   airAuditScope: AirAuditScope;
   configurationAcceptance?: ConfigurationAcceptanceRequest;
 }
@@ -88,6 +90,7 @@ export function buildSalesProposalSavePayload(
     electricityBasis: state.electricityBasis,
     operatingAssumptions: state.operatingAssumptions,
     commercialOffer: state.commercialOffer,
+    electricityCalculationBasis: state.electricityCalculationBasis,
     airAuditScope: state.airAuditScope,
     ...(state.configurationAcceptance
       ? { configurationAcceptance: state.configurationAcceptance }

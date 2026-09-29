@@ -38,6 +38,10 @@ import {
   type ProposedEquipmentDraft,
 } from '../equipmentState';
 import { electricityBasisOrEmpty } from '../electricityBasis';
+import {
+  defaultElectricityCalculationBasis,
+  type ElectricityCalculationBasis,
+} from '../electricityCalculationBasis';
 import { operatingAssumptionsOrEmpty } from '../operatingAssumptions';
 import { commercialOfferOrEmpty } from '../commercialOffer';
 import {
@@ -103,6 +107,8 @@ export function SalesProposalEditorPage() {
   const [commercialOffer, setCommercialOffer] = useState<CommercialOffer>(
     commercialOfferOrEmpty(null),
   );
+  const [electricityCalculationBasis, setElectricityCalculationBasis] =
+    useState<ElectricityCalculationBasis>('published_capacity');
   const [airAuditScope, setAirAuditScope] = useState<AirAuditScope>(DEFAULT_AIR_AUDIT_SCOPE);
   const [comparison, setComparison] = useState<AirAndElectricityComparison | null>(null);
   const [commercial, setCommercial] = useState<CommercialComparison | null>(null);
@@ -154,6 +160,10 @@ export function SalesProposalEditorPage() {
           }),
         );
         setCommercialOffer(commercialOfferOrEmpty(loaded.commercialOffer));
+        setElectricityCalculationBasis(
+          loaded.electricityCalculationBasis ??
+            defaultElectricityCalculationBasis(Boolean(loaded.airAudit)),
+        );
         setComparison(loaded.comparison);
         setCommercial(loaded.commercial);
         setCurrentMachinePerformance(loaded.currentMachinePerformance ?? null);
@@ -247,6 +257,7 @@ export function SalesProposalEditorPage() {
         electricityBasis,
         operatingAssumptions,
         commercialOffer,
+        electricityCalculationBasis,
         airAuditScope,
         configurationAcceptance: configurationAcceptanceRequest,
       })
@@ -272,6 +283,7 @@ export function SalesProposalEditorPage() {
     electricityBasis,
     operatingAssumptions,
     commercialOffer,
+    electricityCalculationBasis,
     airAuditScope,
     site.altitudeMetres,
     site.intakeAirTemperatureC,
@@ -302,6 +314,7 @@ export function SalesProposalEditorPage() {
       electricityBasis,
       operatingAssumptions,
       commercialOffer,
+      electricityCalculationBasis,
       airAuditScope,
       configurationAcceptance: configurationAcceptanceRequest,
     };
@@ -755,6 +768,8 @@ export function SalesProposalEditorPage() {
           <CurrentMachinePerformanceCard result={currentMachinePerformance} />
           <AirMachineComparisonCard
             comparison={comparison}
+            calculationBasis={electricityCalculationBasis}
+            onCalculationBasisChange={setElectricityCalculationBasis}
             proposedSitePerformance={proposedSitePerformance}
             validationFailed={
               engineeringValidation

@@ -41,5 +41,5 @@ test('measured result card does not invent electrical values', () => {
   assert.equal(containsInventedElectricalCopy(card), false);
   assert.doesNotMatch(card, /bar\(g\)/);
   assert.match(card, /Recorded pressure/);
-  assert.match(card, /Mean measured airflow/);
+  assert.match(card, /Overall measured mean airflow/);
 });

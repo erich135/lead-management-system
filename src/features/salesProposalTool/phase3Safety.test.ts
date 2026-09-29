@@ -37,7 +37,7 @@ test('Air Audit measured card is unchanged and still has no invented electrical 
     'utf8',
   );
   assert.equal(containsInventedElectricalCopy(card), false);
-  assert.match(card, /Mean measured airflow/);
+  assert.match(card, /Overall measured mean airflow/);
   assert.match(card, /Recorded pressure/);
 });
 

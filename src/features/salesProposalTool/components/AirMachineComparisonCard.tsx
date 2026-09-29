@@ -1,6 +1,11 @@
 import type { AirAndElectricityComparison, SitePerformanceView } from '../types';
 import { formatMeasuredNumber } from '../formatMeasured';
 import { ConfigurationAcceptancePanel } from './ConfigurationAcceptancePanel';
+import {
+  AIR_AUDIT_DEMAND_HELP,
+  PUBLISHED_CAPACITY_HELP,
+  type ElectricityCalculationBasis,
+} from '../electricityCalculationBasis';
 
 interface AirMachineComparisonCardProps {
   comparison: AirAndElectricityComparison | null;
@@ -13,6 +18,8 @@ interface AirMachineComparisonCardProps {
   canAcceptConfiguration?: boolean;
   onAcceptConfiguration?: (note: string) => void;
   onRevokeConfiguration?: () => void;
+  calculationBasis?: ElectricityCalculationBasis;
+  onCalculationBasisChange?: (basis: ElectricityCalculationBasis) => void;
 }
 
 function airflow(value: number | null | undefined): string {
@@ -45,14 +52,48 @@ export function AirMachineComparisonCard({
   canAcceptConfiguration = false,
   onAcceptConfiguration,
   onRevokeConfiguration,
+  calculationBasis = 'air_audit',
+  onCalculationBasisChange,
 }: AirMachineComparisonCardProps) {
   const air = comparison?.air ?? null;
+  const help =
+    calculationBasis === 'published_capacity' ? PUBLISHED_CAPACITY_HELP : AIR_AUDIT_DEMAND_HELP;
 
   return (
     <section className="rounded-[8px] border border-slate-200 bg-white p-5 shadow-sm">
       <h2 className="text-xs font-semibold uppercase tracking-wide text-[#383838]/70">
         Air &amp; machine comparison
       </h2>
+      {onCalculationBasisChange && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold text-[#383838]">Electricity calculation basis</p>
+          <div className="mt-2 inline-flex rounded-lg border border-slate-300 bg-slate-50 p-0.5">
+            <button
+              type="button"
+              onClick={() => onCalculationBasisChange('air_audit')}
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+                calculationBasis === 'air_audit'
+                  ? 'bg-[#0969a9] text-white'
+                  : 'text-slate-700'
+              }`}
+            >
+              Air Audit demand
+            </button>
+            <button
+              type="button"
+              onClick={() => onCalculationBasisChange('published_capacity')}
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+                calculationBasis === 'published_capacity'
+                  ? 'bg-[#0969a9] text-white'
+                  : 'text-slate-700'
+              }`}
+            >
+              Published capacity / Legacy method
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-slate-600">{help}</p>
+        </div>
+      )}
       {!comparison ? (
         <p className="mt-3 text-sm text-slate-600">
           The comparison will appear here once machines, the air requirement, and the site are available.
@@ -66,7 +107,13 @@ export function AirMachineComparisonCard({
             <dl className="mt-2">
               {comparison.airRequirement?.kind === 'measured' ? (
                 <>
-                  <Row label="Mean measured airflow" value={airflow(air?.meanAirflowM3PerMin)} />
+                  <Row label="Overall measured mean airflow" value={airflow(air?.meanAirflowM3PerMin)} />
+                  {calculationBasis === 'air_audit' && (
+                    <Row
+                      label="24-hour profile average used for electricity calculation"
+                      value={airflow(air?.profileAverageM3PerMin)}
+                    />
+                  )}
                   <Row label="P90 measured airflow" value={airflow(air?.p90AirflowM3PerMin)} />
                   <Row label="Highest recorded airflow" value={airflow(air?.highestAirflowM3PerMin)} />
                 </>

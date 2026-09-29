@@ -40,6 +40,98 @@ function moneyPrecise(value: number | null | undefined): string {
   })}`;
 }
 
+function signedRand(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return 'Not available';
+  const rounded = Math.round(value);
+  const amount = `R ${Math.abs(rounded).toLocaleString('en-ZA')}`;
+  return rounded < 0 ? `−${amount}` : amount;
+}
+
+function difference(
+  left: number | null | undefined,
+  right: number | null | undefined,
+): number | null {
+  if (left == null || right == null || !Number.isFinite(left) || !Number.isFinite(right)) {
+    return null;
+  }
+  return left - right;
+}
+
+function SavingStages({
+  breakdown,
+  prominent = false,
+  showCosts = true,
+}: {
+  breakdown: NonNullable<AirAndElectricityComparison['breakdown']['costBreakdown']>;
+  prominent?: boolean;
+  showCosts?: boolean;
+}) {
+  const currentAllowance = breakdown.currentVsdAllowanceRand ?? 0;
+  const proposedAllowance = breakdown.proposedVsdAllowanceRand ?? breakdown.vsdAllowanceRand;
+  const baseSaving = difference(
+    breakdown.currentAnnualBeforeVsdRand,
+    breakdown.proposedAnnualBeforeVsdRand,
+  );
+  const netEffect = difference(proposedAllowance, currentAllowance);
+  return (
+    <div className={prominent ? 'mt-5 space-y-4 border-t border-slate-100 pt-4' : 'mt-3 space-y-3'}>
+      {showCosts && (
+        <div>
+          <h3 className="text-sm font-bold text-[#383838]">Before VSD allowance</h3>
+          <dl className="mt-1">
+            <Row
+              label="Current annual electricity cost before VSD"
+              value={displayOrUnavailable(formatEstimatedRand(breakdown.currentAnnualBeforeVsdRand))}
+            />
+            <Row
+              label="Proposed annual electricity cost before VSD"
+              value={displayOrUnavailable(formatEstimatedRand(breakdown.proposedAnnualBeforeVsdRand))}
+            />
+          </dl>
+        </div>
+      )}
+      <div>
+        <h3 className="text-sm font-bold text-[#383838]">1. Base annual electricity saving</h3>
+        <p className="mt-1 text-lg font-bold text-[#383838]">{signedRand(baseSaving)}</p>
+        <p className="text-xs text-slate-500">Before VSD allowances</p>
+      </div>
+      <div>
+        <h3 className="text-sm font-bold text-[#383838]">2. VSD allowance adjustment</h3>
+        <dl className="mt-1">
+          <Row label="Current machine VSD allowance" value={signedRand(currentAllowance)} />
+          <Row label="Proposed machine VSD allowance" value={signedRand(proposedAllowance)} />
+          <Row label="Net VSD effect on comparison" value={signedRand(netEffect)} />
+        </dl>
+        <p className="mt-1 text-xs text-slate-500">
+          Proposed allowance minus current allowance. A negative figure means the current machine’s allowance is larger, so the VSD treatment reduces the gap.
+        </p>
+      </div>
+      {showCosts && (
+        <div>
+          <h3 className="text-sm font-bold text-[#383838]">After VSD allowance</h3>
+          <dl className="mt-1">
+            <Row
+              label="Current annual electricity cost after VSD"
+              value={displayOrUnavailable(formatEstimatedRand(breakdown.currentAnnualAdjustedRand))}
+            />
+            <Row
+              label="Proposed annual electricity cost after VSD"
+              value={displayOrUnavailable(formatEstimatedRand(breakdown.proposedAnnualAdjustedRand))}
+            />
+          </dl>
+        </div>
+      )}
+      <div className={prominent ? 'rounded-[8px] border-2 border-[#0969a9] px-3 py-3' : ''}>
+        <h3 className="text-sm font-bold text-[#0969a9]">3. Final estimated annual electricity saving</h3>
+        <p className={`mt-1 font-bold text-[#0969a9] ${prominent ? 'text-2xl' : 'text-lg'}`}>
+          {signedRand(breakdown.annualSavingAfterVsdRand)}
+        </p>
+        <p className="text-xs text-slate-600">After the VSD allowances have been applied</p>
+      </div>
+    </div>
+  );
+}
+
 function CostBreakdownTable({
   breakdown,
 }: {
@@ -91,28 +183,6 @@ function CostBreakdownTable({
           </table>
         </>
       )}
-      <dl className="mt-3">
-        <Row
-          label="Annual electricity totals before VSD allowance"
-          value={`${displayOrUnavailable(formatEstimatedRand(breakdown.currentAnnualBeforeVsdRand))} / ${displayOrUnavailable(formatEstimatedRand(breakdown.proposedAnnualBeforeVsdRand))}`}
-        />
-        <Row
-          label={breakdown.vsdAllowanceLabel ?? 'ARS VSD allowance — 14%'}
-          value={
-            breakdown.vsdApplicable
-              ? `${displayOrUnavailable(formatEstimatedRand(breakdown.currentVsdAllowanceRand ?? 0))} / ${displayOrUnavailable(formatEstimatedRand(breakdown.proposedVsdAllowanceRand ?? breakdown.vsdAllowanceRand))}`
-              : 'Not applicable'
-          }
-        />
-        <Row
-          label="Adjusted annual totals"
-          value={`${displayOrUnavailable(formatEstimatedRand(breakdown.currentAnnualAdjustedRand))} / ${displayOrUnavailable(formatEstimatedRand(breakdown.proposedAnnualAdjustedRand))}`}
-        />
-        <Row
-          label="Final annual electricity saving"
-          value={displayOrUnavailable(formatEstimatedRand(breakdown.annualSavingAfterVsdRand))}
-        />
-      </dl>
       {breakdown.vsdNote && (
         <p className="mt-2 text-xs text-slate-500">{breakdown.vsdNote}</p>
       )}
@@ -178,9 +248,25 @@ export function ElectricityResultCard({
             value={displayOrUnavailable(currentKwh)}
           />
           <Row
-            label={comparison.copy.currentCost}
-            value={displayOrUnavailable(currentCost)}
+            label={
+              comparison.breakdown.costBreakdown
+                ? 'Current annual electricity cost before VSD'
+                : comparison.copy.currentCost
+            }
+            value={displayOrUnavailable(
+              comparison.breakdown.costBreakdown
+                ? formatEstimatedRand(comparison.breakdown.costBreakdown.currentAnnualBeforeVsdRand)
+                : currentCost,
+            )}
           />
+          {comparison.breakdown.costBreakdown && (
+            <Row
+              label="Current annual electricity cost after VSD"
+              value={displayOrUnavailable(
+                formatEstimatedRand(comparison.breakdown.costBreakdown.currentAnnualAdjustedRand),
+              )}
+            />
+          )}
         </dl>
         {showCurrentSpec && (
           <button
@@ -204,9 +290,25 @@ export function ElectricityResultCard({
             value={displayOrUnavailable(proposedKwh)}
           />
           <Row
-            label={comparison.copy.proposedCost}
-            value={displayOrUnavailable(proposedCost)}
+            label={
+              comparison.breakdown.costBreakdown
+                ? 'Proposed annual electricity cost before VSD'
+                : comparison.copy.proposedCost
+            }
+            value={displayOrUnavailable(
+              comparison.breakdown.costBreakdown
+                ? formatEstimatedRand(comparison.breakdown.costBreakdown.proposedAnnualBeforeVsdRand)
+                : proposedCost,
+            )}
           />
+          {comparison.breakdown.costBreakdown && (
+            <Row
+              label="Proposed annual electricity cost after VSD"
+              value={displayOrUnavailable(
+                formatEstimatedRand(comparison.breakdown.costBreakdown.proposedAnnualAdjustedRand),
+              )}
+            />
+          )}
         </dl>
         {showProposedSpec && (
           <button
@@ -219,15 +321,19 @@ export function ElectricityResultCard({
         )}
       </div>
 
-      <div className="mt-5 border-t border-slate-100 pt-4">
-        <h3 className="text-sm font-bold text-[#383838]">{comparison.copy.saving}</h3>
-        {configurationInvalidNote && (
-          <p className="mt-2 text-sm text-amber-800">{configurationInvalidNote}</p>
-        )}
-        <p className="mt-2 text-lg font-bold text-[#383838]">
-          {saving ?? 'Not available'}
-        </p>
-      </div>
+      {comparison.breakdown.costBreakdown ? (
+        <SavingStages breakdown={comparison.breakdown.costBreakdown} prominent showCosts={false} />
+      ) : (
+        <div className="mt-5 border-t border-slate-100 pt-4">
+          <h3 className="text-sm font-bold text-[#383838]">{comparison.copy.saving}</h3>
+          <p className="mt-2 text-lg font-bold text-[#383838]">
+            {saving ?? 'Not available'}
+          </p>
+        </div>
+      )}
+      {configurationInvalidNote && (
+        <p className="mt-2 text-sm text-amber-800">{configurationInvalidNote}</p>
+      )}
 
       <p className="mt-4 text-sm text-slate-600">{comparison.basisExplanation}</p>
       {hoursAreEstimated && comparison.operating?.annualOperatingHours != null && (
@@ -280,11 +386,19 @@ export function ElectricityResultCard({
             value={volume(comparison.breakdown.annualisedAirVolumeM3)}
           />
           <Row
-            label="Current published package-input/FAD basis"
+            label={
+              comparison.breakdown.currentPackageInputFad?.includes('site-adjusted')
+                ? 'Current package input / site-adjusted airflow'
+                : 'Current published package-input/FAD basis'
+            }
             value={comparison.breakdown.currentPackageInputFad ?? 'Not available'}
           />
           <Row
-            label="Proposed published package-input/FAD basis"
+            label={
+              comparison.breakdown.proposedPackageInputFad?.includes('site-adjusted')
+                ? 'Proposed package input / site-adjusted airflow'
+                : 'Proposed published package-input/FAD basis'
+            }
             value={comparison.breakdown.proposedPackageInputFad ?? 'Not available'}
           />
           <Row

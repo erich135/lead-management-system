@@ -170,6 +170,11 @@ test('customer proposal page decides validity from the document flag, never from
   assert.match(PREVIEW_SOURCE, /customerProposalElectricityFigures\(doc\)/);
   assert.match(PREVIEW_SOURCE, /customerProposalCommercialFigures\(doc\)/);
   assert.match(PREVIEW_SOURCE, /doc\.electricity\.costBreakdown/);
+  assert.match(PREVIEW_SOURCE, /Base annual electricity saving/);
+  assert.match(PREVIEW_SOURCE, /VSD allowance adjustment/);
+  assert.match(PREVIEW_SOURCE, /Net VSD effect on comparison/);
+  assert.match(PREVIEW_SOURCE, /Final estimated annual electricity saving/);
+  assert.doesNotMatch(PREVIEW_SOURCE, /VSD Saving/);
   assert.match(PREVIEW_SOURCE, /Electricity cost by season and day type/);
   assert.match(PREVIEW_SOURCE, /spt-proposal-electricity-table/);
   assert.match(PREVIEW_SOURCE, /spt-proposal-centered-nums/);

@@ -35,6 +35,7 @@ export interface SalesProposalAirAudit {
   shortRecord: boolean;
   validRowCount: number;
   rowCount: number;
+  hourlyDemandProfileM3PerMin?: Array<number | null> | null;
   scope?: {
     type: 'single_machine' | 'site_header';
     currentEquipmentId: string | null;
@@ -206,6 +207,8 @@ export interface AirAndElectricityComparison {
     annualisationFactor: number | null;
     annualisedDeliveredVolumeM3: number | null;
     annualisationFormula: string;
+    profileAverageM3PerMin?: number | null;
+    hourlyDemandProfileM3PerMin?: Array<number | null> | null;
   } | null;
   current: {
     name: string | null;
@@ -265,6 +268,7 @@ export interface AirAndElectricityComparison {
     assumedNote: string | null;
   };
   basisExplanation: string;
+  electricityCalculationBasis?: 'air_audit' | 'published_capacity';
   futureCostDisclaimer: string;
   copy: {
     currentEnergy: string;
@@ -322,6 +326,7 @@ export interface SalesProposal {
   proposedEquipment: ProposedEquipment[];
   electricityBasis: ElectricityBasis;
   operatingAssumptions: OperatingAssumptions;
+  electricityCalculationBasis?: 'air_audit' | 'published_capacity';
   commercialOffer: CommercialOffer;
   comparison: AirAndElectricityComparison | null;
   commercial: CommercialComparison | null;
@@ -629,6 +634,8 @@ export interface CustomerProposalDocument {
     highestAirflow: string | null;
     recordedPressure: string | null;
     deliveredAir: string | null;
+    profileAverageAirflow?: string | null;
+    hourlyProfile?: Array<{ hour: string; airflow: string }> | null;
   };
   currentMachines: Array<{
     name: string;
@@ -752,6 +759,8 @@ export interface CustomerProposalDocument {
       vsdAllowance: string | null;
       vsdAllowanceCurrent?: string | null;
       vsdAllowanceProposed?: string | null;
+      baseSavingBeforeVsd?: string | null;
+      netVsdEffect?: string | null;
       vsdNote: string | null;
       adjustedCurrent: string | null;
       adjustedProposed: string | null;
@@ -806,6 +815,7 @@ export interface CustomerProposalDocument {
   recommendation: string;
   conclusion: string;
   nextSteps: string[];
+  electricityCalculationBasis?: 'air_audit' | 'published_capacity';
   basis: string;
   futureCostDisclaimer: string;
   estimatedNote: string;

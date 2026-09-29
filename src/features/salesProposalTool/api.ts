@@ -101,6 +101,7 @@ export async function saveSalesProposal(
     electricityBasis: ElectricityBasis;
     operatingAssumptions?: OperatingAssumptions;
     commercialOffer: CommercialOffer;
+    electricityCalculationBasis?: 'air_audit' | 'published_capacity';
     airAuditScope?: {
       type: 'single_machine' | 'site_header';
       currentEquipmentId: string | null;
@@ -135,6 +136,7 @@ export async function previewElectricityComparison(
     electricityBasis: ElectricityBasis;
     operatingAssumptions?: OperatingAssumptions;
     commercialOffer: CommercialOffer;
+    electricityCalculationBasis?: 'air_audit' | 'published_capacity';
     airAuditScope?: {
       type: 'single_machine' | 'site_header';
       currentEquipmentId: string | null;

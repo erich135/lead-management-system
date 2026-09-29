@@ -744,6 +744,69 @@
   font-weight: 700;
 }
 
+.spt-proposal-saving-stages {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.spt-proposal-saving-stage {
+  padding: 10px 12px;
+  background: #f5f8fb;
+  border-left: 4px solid #0969a9;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.spt-proposal-saving-stage h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #0969a9;
+}
+
+.spt-proposal-stage-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 3px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #111827;
+}
+
+.spt-proposal-stage-amount {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.spt-proposal-stage-value {
+  margin: 2px 0 0;
+  font-size: 18px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #111827;
+}
+
+.spt-proposal-stage-note {
+  margin: 3px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #383838;
+}
+
+.spt-proposal-saving-stage-final {
+  background: #ffffff;
+  border: 2px solid #0969a9;
+  border-left-width: 4px;
+}
+
+.spt-proposal-saving-stage-final .spt-proposal-stage-value {
+  font-size: 22px;
+  color: #0969a9;
+}
+
 .spt-proposal-payback-row td {
   font-size: 13px;
   font-weight: 700;
@@ -852,6 +915,31 @@
   border-top: 3px solid #0969a9;
 }
 
+.spt-proposal-calculation-basis {
+  margin: 10px 0 12px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 2px solid #0969a9;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.spt-proposal-calculation-basis-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.3;
+  color: #0969a9;
+}
+
+.spt-proposal-calculation-basis-text {
+  margin: 4px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #111827;
+}
+
 .spt-proposal-chart {
   margin: 12px 0 0;
 }
@@ -908,6 +996,8 @@
 .spt-proposal-rule,
 .spt-proposal-chart-bar,
 .spt-proposal-recommend,
+.spt-proposal-calculation-basis,
+.spt-proposal-saving-stage,
 .spt-proposal-table th {
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;

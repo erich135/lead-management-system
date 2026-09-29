@@ -14,6 +14,7 @@ import {
   SALES_PROPOSAL_TOOL_PATH,
   salesProposalEditorPath,
 } from '../navigation';
+import { customerProposalCalculationBasisCopy } from '../electricityCalculationBasis';
 import type { CustomerProposalDocument } from '../types';
 
 const ARS_LOGO_SRC = '/Logo.png';
@@ -135,7 +136,7 @@ function ElectricityChart({
   return (
     <figure className="spt-proposal-chart spt-keep-together">
       <figcaption className="spt-proposal-kicker-inline">
-        Annual electricity cost
+        Annual electricity cost after VSD allowance
       </figcaption>
       <div className="spt-proposal-chart-plot">
         <div className="spt-proposal-chart-col">
@@ -159,6 +160,76 @@ function ElectricityChart({
   );
 }
 
+function CalculationBasisNotice({
+  basis,
+}: {
+  basis: CustomerProposalDocument['electricityCalculationBasis'];
+}) {
+  const copy = customerProposalCalculationBasisCopy(basis);
+  return (
+    <div className="spt-proposal-calculation-basis">
+      <p className="spt-proposal-calculation-basis-title">{copy.title}</p>
+      <p className="spt-proposal-calculation-basis-text">{copy.explanation}</p>
+    </div>
+  );
+}
+
+function StageLine({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <p className="spt-proposal-stage-line">
+      <span>{label}</span>
+      <span className="spt-proposal-stage-amount">{value ?? 'Not available'}</span>
+    </p>
+  );
+}
+
+function ElectricitySavingStages({
+  breakdown,
+}: {
+  breakdown: NonNullable<CustomerProposalDocument['electricity']['costBreakdown']>;
+}) {
+  return (
+    <div className="spt-proposal-saving-stages">
+      <section className="spt-proposal-saving-stage">
+        <h3>Before VSD allowance</h3>
+        <StageLine
+          label="Current annual electricity cost before VSD"
+          value={breakdown.beforeVsdCurrent}
+        />
+        <StageLine
+          label="Proposed annual electricity cost before VSD"
+          value={breakdown.beforeVsdProposed}
+        />
+      </section>
+      <section className="spt-proposal-saving-stage">
+        <h3>1. Base annual electricity saving</h3>
+        <p className="spt-proposal-stage-value">{breakdown.baseSavingBeforeVsd ?? 'Not available'}</p>
+        <p className="spt-proposal-stage-note">Before VSD allowances</p>
+      </section>
+      <section className="spt-proposal-saving-stage">
+        <h3>2. VSD allowance adjustment</h3>
+        <StageLine label="Current machine VSD allowance" value={breakdown.vsdAllowanceCurrent} />
+        <StageLine label="Proposed machine VSD allowance" value={breakdown.vsdAllowanceProposed} />
+        <StageLine label="Net VSD effect on comparison" value={breakdown.netVsdEffect} />
+        <p className="spt-proposal-stage-note">
+          Proposed allowance minus current allowance. A negative figure means the current machine’s VSD allowance is larger, so the allowance reduces the gap between the machines.
+        </p>
+        {breakdown.vsdNote && <p className="spt-proposal-stage-note">{breakdown.vsdNote}</p>}
+      </section>
+      <section className="spt-proposal-saving-stage">
+        <h3>After VSD allowance</h3>
+        <StageLine label="Current annual electricity cost after VSD" value={breakdown.adjustedCurrent} />
+        <StageLine label="Proposed annual electricity cost after VSD" value={breakdown.adjustedProposed} />
+      </section>
+      <section className="spt-proposal-saving-stage spt-proposal-saving-stage-final">
+        <h3>3. Final estimated annual electricity saving</h3>
+        <p className="spt-proposal-stage-value">{breakdown.finalSaving ?? 'Not available'}</p>
+        <p className="spt-proposal-stage-note">After the VSD allowances have been applied</p>
+      </section>
+    </div>
+  );
+}
+
 function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
   const revisionCallout = showsRevisionCallout(doc);
   const savingVisible = showsCommercialSaving(doc);
@@ -179,6 +250,7 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
     explanations.length > 0 && explanations.every((text) => text === explanations[0])
       ? explanations[0]
       : null;
+  const legacyBasis = doc.electricityCalculationBasis === 'published_capacity';
   const capacityResult = {
     label: doc.proposed.estimatedAirflow
       ? doc.proposed.estimatedLabel ?? 'Site-adjusted capacity'
@@ -189,6 +261,9 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
     ? [{ label: doc.electricity.savingLabel, value: doc.electricity.saving ?? 'Not available' }]
     : [];
   const financialLead = doc.financialBenefit?.figures ?? [];
+  const savingsBeforeRecommendation =
+    doc.financialBenefit?.mode === 'rent_to_own' &&
+    (financialLead.length > 0 || (doc.financialBenefit.chart?.length ?? 0) > 0);
   const keyResults =
     financialLead.length > 0
       ? [...financialLead, ...electricitySavingResult, capacityResult]
@@ -263,6 +338,9 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
           )}
         </dl>
 
+        {savingsBeforeRecommendation && (
+          <CalculationBasisNotice basis={doc.electricityCalculationBasis} />
+        )}
         {doc.financialBenefit?.mode === 'rent_to_own' && financialLead.length > 0 && (
           <section className="spt-proposal-return">
             <h2 className="spt-proposal-h2">Your 10-year financial return</h2>
@@ -318,6 +396,9 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
             <p className="spt-proposal-body spt-proposal-wrap">
               Proposed equipment: {proposedName}
             </p>
+          )}
+          {!savingsBeforeRecommendation && (
+            <CalculationBasisNotice basis={doc.electricityCalculationBasis} />
           )}
           {doc.financialBenefit?.mode === 'rent_to_own' && financialLead.length > 0 ? (
             <FigureStrip items={[...electricitySavingResult, capacityResult]} centered />
@@ -432,7 +513,13 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
               <p className="spt-proposal-kicker-inline">Measured site air demand</p>
               <div className="spt-proposal-metric-grid">
                 <Metric label="Audit period" value={doc.airAudit.period ?? 'Not available'} />
-                <Metric label="Mean measured airflow" value={doc.airAudit.meanAirflow ?? 'Not available'} />
+                <Metric label="Overall measured mean airflow" value={doc.airAudit.meanAirflow ?? 'Not available'} />
+                {doc.airAudit.profileAverageAirflow && (
+                  <Metric
+                    label="24-hour profile average used for electricity calculation"
+                    value={doc.airAudit.profileAverageAirflow}
+                  />
+                )}
                 <Metric label="P90 measured airflow" value={doc.airAudit.p90Airflow ?? 'Not available'} />
                 <Metric label="Highest recorded airflow" value={doc.airAudit.highestAirflow ?? 'Not available'} />
                 <Metric label="Recorded pressure" value={doc.airAudit.recordedPressure ?? 'Not available'} />
@@ -478,7 +565,17 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
         </Section>
 
         <Section title="Electricity">
-          <FigureStrip items={electricityFigures} centered />
+          {doc.electricity.costBreakdown ? (
+            <ElectricitySavingStages breakdown={doc.electricity.costBreakdown} />
+          ) : (
+            <FigureStrip items={electricityFigures} centered />
+          )}
+          {doc.electricity.costBreakdown && electricityFigures.some((item) => item.label.toLowerCase().includes('energy')) && (
+            <FigureStrip
+              items={electricityFigures.filter((item) => item.label.toLowerCase().includes('energy'))}
+              centered
+            />
+          )}
           {chartReady && (
             <ElectricityChart
               current={doc.electricity.chartCurrentRand as number}
@@ -486,9 +583,6 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
               currentText={doc.electricity.current as string}
               proposedText={doc.electricity.proposed as string}
             />
-          )}
-          {doc.electricity.costBreakdown?.vsdNote && (
-            <p className="spt-proposal-quiet">{doc.electricity.costBreakdown.vsdNote}</p>
           )}
           {doc.electricity.suppliedAmountReference && (
             <p className="spt-proposal-quiet">{doc.electricity.suppliedAmountReference}</p>
@@ -534,39 +628,11 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
                     <td className="spt-proposal-num">{doc.electricity.costBreakdown.beforeVsdCurrent ?? 'Not available'}</td>
                     <td className="spt-proposal-num">{doc.electricity.costBreakdown.beforeVsdProposed ?? 'Not available'}</td>
                   </tr>
-                  <tr>
-                    <td>{doc.electricity.costBreakdown.vsdAllowanceLabel}</td>
-                    <td> </td>
-                    <td> </td>
-                    <td> </td>
-                    <td className="spt-proposal-num">
-                      {doc.electricity.costBreakdown.vsdAllowanceCurrent ??
-                        (doc.electricity.costBreakdown.vsdAllowance ? 'R 0' : 'Not applicable')}
-                    </td>
-                    <td className="spt-proposal-num">
-                      {doc.electricity.costBreakdown.vsdAllowanceProposed ??
-                        doc.electricity.costBreakdown.vsdAllowance ??
-                        'Not applicable'}
-                    </td>
-                  </tr>
-                  <tr className="spt-proposal-total-row">
-                    <td>Adjusted annual totals</td>
-                    <td> </td>
-                    <td> </td>
-                    <td> </td>
-                    <td className="spt-proposal-num">{doc.electricity.costBreakdown.adjustedCurrent ?? 'Not available'}</td>
-                    <td className="spt-proposal-num">{doc.electricity.costBreakdown.adjustedProposed ?? 'Not available'}</td>
-                  </tr>
-                  <tr className="spt-proposal-total-row">
-                    <td>Final annual electricity saving</td>
-                    <td> </td>
-                    <td> </td>
-                    <td> </td>
-                    <td> </td>
-                    <td className="spt-proposal-num">{doc.electricity.costBreakdown.finalSaving ?? 'Not available'}</td>
-                  </tr>
                 </tbody>
               </table>
+              <p className="spt-proposal-quiet">
+                These seasonal totals are the annual electricity cost before the VSD allowance.
+              </p>
             </div>
           )}
         </Section>
@@ -737,9 +803,14 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
             <p>
               These pages explain the estimate in everyday language. The rand amounts earlier in this proposal come from the steps below. They are an estimate for this site, not a promise of future bills.
             </p>
+            <CalculationBasisNotice basis={doc.electricityCalculationBasis} />
 
             <h3 className="spt-proposal-h3">The air this site uses</h3>
-            {doc.airAudit.sourceFile ? (
+            {legacyBasis ? (
+              <p>
+                This estimate uses each machine&apos;s published airflow, adjusted for this site where that adjustment is available, and the stated annual operating hours. It does not use the measured Air Audit demand as the electricity volume. The annual air volume is the proposed machines&apos; combined site airflow multiplied by those hours. Both the current and proposed machines are then costed on that same volume, using their published power and published airflow.
+              </p>
+            ) : doc.airAudit.sourceFile ? (
               <table className="spt-proposal-table">
                 <thead>
                   <tr>
@@ -755,10 +826,17 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
                     <td>The days the logger was recording on site.</td>
                   </tr>
                   <tr>
-                    <td>Typical airflow</td>
+                    <td>Overall measured mean airflow</td>
                     <td>{doc.airAudit.meanAirflow ?? 'Not available'}</td>
-                    <td>The average air the site used during that recording.</td>
+                    <td>The mean of all valid logger samples. This is not the figure used for the electricity calculation.</td>
                   </tr>
+                  {doc.airAudit.profileAverageAirflow && (
+                    <tr>
+                      <td>24-hour profile average used for electricity calculation</td>
+                      <td>{doc.airAudit.profileAverageAirflow}</td>
+                      <td>Each clock hour is averaged on its own, then those 24 hourly averages are given equal weight.</td>
+                    </tr>
+                  )}
                   <tr>
                     <td>Busy airflow</td>
                     <td>{doc.airAudit.p90Airflow ?? 'Not available'}</td>
@@ -772,7 +850,7 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
                   <tr>
                     <td>Air used over a year</td>
                     <td>{doc.airAudit.deliveredAir ?? 'Not available'}</td>
-                    <td>The measured air, stretched to a full year using 30-day months.</td>
+                    <td>The air measured while the logger was recording. Gaps are left out. They are not treated as zero air use, and this period total is not the electricity volume.</td>
                   </tr>
                 </tbody>
               </table>
@@ -782,7 +860,9 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
 
             <h3 className="spt-proposal-h3">What the proposed machine can supply here</h3>
             <p>
-              Brochure airflow is the figure published for the machine. Site capacity is that figure adjusted for the height of this site and the temperature of the air going into the compressor. A thinner, hotter intake means the machine delivers less air. This adjustment is used to check whether the machine is big enough. It is not used again in the electricity cost.
+              Brochure airflow is the figure published for the machine. Site capacity is that figure adjusted for the height of this site and the temperature of the air going into the compressor. A thinner, hotter intake means the machine delivers less air. This adjustment checks whether the machine is big enough. {legacyBasis
+                ? 'The electricity calculation still divides package input by published airflow.'
+                : 'In the Air Audit electricity calculation, package input is divided by this site-adjusted airflow. The measured Air Audit demand itself is not adjusted again for altitude.'}
             </p>
             <table className="spt-proposal-table">
               <thead>
@@ -858,7 +938,9 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
 
             <h3 className="spt-proposal-h3">How the electricity cost is calculated</h3>
             <p>
-              Both sides of the comparison use the same measured air and the same electricity tariff. The difference is the power each machine needs to supply that air.
+              {legacyBasis
+                ? 'Both sides use the proposed machines’ combined site airflow, the stated annual operating hours, and the same electricity tariff. The difference is the published power each machine needs for that airflow. This is the ARS legacy full-load method.'
+                : 'Both sides of the comparison use the same measured air and the same electricity tariff. The difference is the power each machine needs to supply that air.'}
             </p>
             <table className="spt-proposal-table">
               <thead>
@@ -870,11 +952,19 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
               <tbody>
                 <tr>
                   <td>1. Air for the year</td>
-                  <td>Start with the measured air and stretch it to 12 months of 30 days. The logger period is not treated as a full year by itself.</td>
+                  <td>
+                    {legacyBasis
+                      ? 'Multiply the proposed machines’ combined site airflow by the stated annual operating hours. Measured Air Audit demand is not used for this volume.'
+                      : 'The Air Audit readings are grouped by hour of day. ARS calculates the average measured airflow for each of the 24 clock hours and applies that daily demand profile to the stated annual production-day schedule. Periods where the logger was not recording are excluded rather than treated as zero demand.'}
+                  </td>
                 </tr>
                 <tr>
                   <td>2. Machine power</td>
-                  <td>Use the published power of each machine together with its published airflow. We do not measure how much electricity the current machines actually draw.</td>
+                  <td>
+                    {legacyBasis
+                      ? 'Use the published power of each machine together with its published airflow. We do not measure how much electricity the current machines actually draw.'
+                      : 'Divide each machine’s package input by its site-adjusted airflow to get kWh per cubic metre. Published airflow stays on the machine specification. We do not measure how much electricity the current machines actually draw.'}
+                  </td>
                 </tr>
                 <tr>
                   <td>3. Efficiency</td>
@@ -904,6 +994,37 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
                 </tr>
               </tbody>
             </table>
+            {!legacyBasis && doc.airAudit.hourlyProfile && doc.airAudit.hourlyProfile.length === 24 && (
+              <>
+                <h3 className="spt-proposal-h3">24-hour demand profile</h3>
+                <p>
+                  Each figure is the average of the valid Air Audit readings in that clock hour. Hours are weighted equally. This is not the overall mean of every logger sample.
+                </p>
+                <table className="spt-proposal-table">
+                  <thead>
+                    <tr>
+                      <th>Hour</th>
+                      <th className="spt-proposal-num">m³/min</th>
+                      <th>Hour</th>
+                      <th className="spt-proposal-num">m³/min</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {doc.airAudit.hourlyProfile.slice(0, 12).map((row, index) => {
+                      const paired = doc.airAudit.hourlyProfile?.[index + 12];
+                      return (
+                        <tr key={row.hour}>
+                          <td>{row.hour}</td>
+                          <td className="spt-proposal-num">{row.airflow.replace(' m³/min', '')}</td>
+                          <td>{paired?.hour}</td>
+                          <td className="spt-proposal-num">{paired?.airflow.replace(' m³/min', '')}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </>
+            )}
             {doc.proposed.electricityNote && <p>{doc.proposed.electricityNote}</p>}
 
             <h3 className="spt-proposal-h3">What this estimate leaves out</h3>

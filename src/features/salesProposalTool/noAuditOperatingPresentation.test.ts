@@ -412,7 +412,7 @@ describe('no-Air-Audit operating assumptions presentation', () => {
     );
     expect(preview).toMatch(/Air Audit summary/);
     expect(preview).toMatch(/doc\.airAudit\.measuredHeading/);
-    expect(preview).toMatch(/Mean measured airflow/);
+    expect(preview).toMatch(/Overall measured mean airflow/);
     expect(preview).toMatch(/P90 measured airflow/);
     expect(preview).toMatch(/Highest measured airflow during Air Audit/);
     expect(preview).toMatch(/limitationNote/);

@@ -52,7 +52,7 @@ export function MeasuredAuditCard({ audit }: MeasuredAuditCardProps) {
         <Row label="Audit period" value={period} />
         <Row label="Coverage" value={formatCoverageDays(audit.coverageDays)} />
         <Row
-          label="Mean measured airflow"
+          label="Overall measured mean airflow"
           value={
             formatMeasuredNumber(audit.meanAirflowM3PerMin)
               ? `${formatMeasuredNumber(audit.meanAirflowM3PerMin)} m³/min`

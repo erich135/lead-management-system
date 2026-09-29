@@ -23,6 +23,7 @@ import {
   type Job,
   type PlannerFormPublished,
   type SalesRequest,
+  type SalesRequestCorrectionEmailCandidate,
   type SalesRequestSubmissionHistory,
   type SalesRequestVisibilityOption,
 } from '../lib/api';
@@ -171,6 +172,8 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
   const [reassigning, setReassigning] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
   const [retryingEmail, setRetryingEmail] = useState(false);
+  const [emailCandidates, setEmailCandidates] = useState<SalesRequestCorrectionEmailCandidate[]>([]);
+  const [emailRecipientId, setEmailRecipientId] = useState('');
   const returnStarted = useRef(false);
 
   /**
@@ -428,6 +431,23 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
   }
 
   /**
+   * Keeps the legacy recipient picker when a correction email still needs a choice.
+   */
+  function noteCorrectionEmail(email?: SalesRequest['correctionEmail']): void {
+    if (email?.candidates && email.candidates.length > 1) {
+      setEmailCandidates(email.candidates);
+      setEmailRecipientId((current) =>
+        email.candidates?.some((candidate) => candidate.userId === current) ? current : '',
+      );
+      return;
+    }
+    if (email?.status === 'sent' || email?.alreadySent) {
+      setEmailCandidates([]);
+      setEmailRecipientId('');
+    }
+  }
+
+  /**
    * Opens the required return-for-correction dialog for a pending request.
    */
   function handleReturn(): void {
@@ -456,11 +476,12 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
       setReturnOpen(false);
       applyLoadedRequest(result.request);
       const email = result.correctionEmail || result.request.correctionEmail;
+      noteCorrectionEmail(email);
       if (email && email.status !== 'sent') {
         setSuccessHint(null);
         setError(
           email.error ||
-            'The RFQ was returned for correction, but the email to the assigned rep was not delivered. You can retry the email without creating another correction round.',
+            'The RFQ was returned for correction, but the email was not delivered. You can retry the email without creating another correction round.',
         );
         return;
       }
@@ -475,14 +496,22 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
 
   async function handleRetryEmail(): Promise<void> {
     if (!detail?._id) return;
+    if (emailCandidates.length > 1 && !emailRecipientId) {
+      setError('Choose who should receive the correction email.');
+      return;
+    }
     setRetryingEmail(true);
     setError(null);
     try {
-      const result = await retrySalesRequestCorrectionEmail(detail._id);
+      const result = await retrySalesRequestCorrectionEmail(
+        detail._id,
+        emailRecipientId ? { recipientUserId: emailRecipientId } : undefined,
+      );
       applyLoadedRequest(result.request);
       const email = result.correctionEmail || result.request.correctionEmail;
+      noteCorrectionEmail(email);
       if (email?.status === 'sent') {
-        setSuccessHint('Correction email was sent to the assigned representative.');
+        setSuccessHint('Correction email was sent.');
       } else if (email?.alreadySent) {
         setSuccessHint('Correction email was already sent for this round.');
       } else {
@@ -656,6 +685,9 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
                 request={detail}
                 showRetry={Boolean(canDecide && needsCorrection)}
                 retrying={retryingEmail}
+                recipientChoices={emailCandidates}
+                recipientUserId={emailRecipientId}
+                onRecipientUserIdChange={setEmailRecipientId}
                 onRetry={() => {
                   void handleRetryEmail();
                 }}

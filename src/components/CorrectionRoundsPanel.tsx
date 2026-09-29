@@ -1,5 +1,9 @@
 import { RotateCcw } from 'lucide-react';
-import type { SalesRequest, SalesRequestCorrectionRound } from '../lib/api';
+import type {
+  SalesRequest,
+  SalesRequestCorrectionEmailCandidate,
+  SalesRequestCorrectionRound,
+} from '../lib/api';
 
 function personName(
   user?: string | { firstName?: string; lastName?: string; email?: string } | null,
@@ -29,6 +33,9 @@ interface CorrectionRoundsPanelProps {
   showRetry?: boolean;
   retrying?: boolean;
   onRetry?: () => void;
+  recipientChoices?: SalesRequestCorrectionEmailCandidate[];
+  recipientUserId?: string;
+  onRecipientUserIdChange?: (userId: string) => void;
 }
 
 /**
@@ -39,6 +46,9 @@ export function CorrectionRoundsPanel({
   showRetry = false,
   retrying = false,
   onRetry,
+  recipientChoices = [],
+  recipientUserId = '',
+  onRecipientUserIdChange,
 }: CorrectionRoundsPanelProps) {
   const rounds = request.correctionRounds || [];
   if (rounds.length === 0 && request.status !== 'needs_correction') return null;
@@ -67,12 +77,29 @@ export function CorrectionRoundsPanel({
               {current.emailError ? `: ${current.emailError}` : '.'}
             </p>
           ) : null}
+          {showRetry && recipientChoices.length > 1 ? (
+            <label className="mt-3 block text-sm text-amber-950">
+              Send the correction email to
+              <select
+                value={recipientUserId}
+                onChange={(event) => onRecipientUserIdChange?.(event.target.value)}
+                className="mt-1 block w-full rounded-lg border border-amber-300 bg-white px-2 py-1.5 text-sm text-slate-900"
+              >
+                <option value="">Choose a linked user</option>
+                {recipientChoices.map((candidate) => (
+                  <option key={candidate.userId} value={candidate.userId}>
+                    {candidate.name ? `${candidate.name} (${candidate.email})` : candidate.email}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           {showRetry && current.emailStatus !== 'sent' && onRetry ? (
             <button
               type="button"
               onClick={onRetry}
-              disabled={retrying}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900"
+              disabled={retrying || (recipientChoices.length > 1 && !recipientUserId)}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 disabled:opacity-50"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               {retrying ? 'Retrying email…' : 'Retry email'}

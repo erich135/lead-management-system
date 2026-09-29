@@ -4731,6 +4731,12 @@ export type SalesRequestCorrectionEmailStatus =
   | 'missing'
   | 'ambiguous';
 
+export interface SalesRequestCorrectionEmailCandidate {
+  userId: string;
+  name: string;
+  email: string;
+}
+
 export interface SalesRequestCorrectionRound {
   returnedBy?: string | { _id: string; firstName?: string; lastName?: string; email?: string };
   returnedAt?: string;
@@ -4823,6 +4829,7 @@ export interface SalesRequest {
     error?: string | null;
     alreadySent?: boolean;
     previewPath?: string | null;
+    candidates?: SalesRequestCorrectionEmailCandidate[];
   };
   reviewedBy?: string | { _id: string; firstName?: string; lastName?: string; email?: string };
   reviewedAt?: string;
@@ -5072,6 +5079,7 @@ export async function returnSalesRequestForCorrection(
  */
 export async function retrySalesRequestCorrectionEmail(
   id: string,
+  data?: { recipientUserId?: string },
 ): Promise<{
   request: SalesRequest;
   correctionEmail?: SalesRequest['correctionEmail'];
@@ -5080,7 +5088,7 @@ export async function retrySalesRequestCorrectionEmail(
     `/api/sales-requests/${id}/correction-email/retry`,
     {
       method: 'POST',
-      body: JSON.stringify({}),
+      body: JSON.stringify(data ?? {}),
     },
   );
   return { request, correctionEmail: request.correctionEmail };

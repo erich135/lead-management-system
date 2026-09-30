@@ -344,6 +344,7 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
     address?: string | null;
     coordinates?: [number, number] | null;
     assignedRep?: string;
+    replaceLocation?: boolean;
   }): void {
     const companyName = options.companyName.trim();
     const address = (options.address || '').trim();
@@ -354,7 +355,7 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
 
     setFormData((current) => ({
       ...current,
-      ...(address ? { location: address } : {}),
+      ...(options.replaceLocation || address ? { location: address } : {}),
       ...(options.assignedRep && allowRepAssignment
         ? { assignedRep: options.assignedRep }
         : {}),
@@ -384,6 +385,7 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
     applyBusinessSelectionToForm({
       companyName: customer.name,
       address: customerCrm.contactAddress || customer.address,
+      replaceLocation: true,
     });
 
     try {
@@ -412,6 +414,7 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
         applyBusinessSelectionToForm({
           companyName: merged.companyName || customer.name,
           address: merged.contactAddress || customer.address,
+          replaceLocation: true,
           coordinates: bestLead.geoLocation?.coordinates ?? null,
           assignedRep:
             typeof bestLead.assignedRep === 'object' && bestLead.assignedRep
@@ -445,6 +448,7 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
     applyBusinessSelectionToForm({
       companyName: lead.companyName,
       address: leadCrm.contactAddress || lead.contactAddress,
+      replaceLocation: true,
       coordinates: lead.geoLocation?.coordinates ?? null,
       assignedRep: assignedRepId,
     });
@@ -468,6 +472,7 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
         applyBusinessSelectionToForm({
           companyName: merged.companyName || lead.companyName,
           address: merged.contactAddress || lead.contactAddress || match.address,
+          replaceLocation: true,
           coordinates: lead.geoLocation?.coordinates ?? null,
           assignedRep: assignedRepId,
         });

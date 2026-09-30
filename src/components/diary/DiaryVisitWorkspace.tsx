@@ -20,7 +20,7 @@ import {
   listPublishedPlannerForms,
   getSalesLead,
   getCustomers,
-  getSalesLeads,
+  updateCustomer,
   geocodeReverse,
 } from '../../lib/api';
 import type { SalesRequest, SalesRequestType, PlannerFormPublished, PlannerFormField } from '../../lib/api';
@@ -77,9 +77,7 @@ import DiaryLoanRentalForm from './DiaryLoanRentalForm';
 import DiaryNewServiceLevelForm from './DiaryNewServiceLevelForm';
 import {
   DynamicPlannerFormRenderer,
-  createEmptyDynamicFormValues,
   getMissingRequiredDynamicFields,
-  prefillDynamicFormValuesFromCrm,
 } from './DynamicPlannerFormRenderer';
 import { stripHiddenRfcPlannerFields, deriveFieldsFromElements } from './formBuilderUtils';
 import { useAuth } from '../../contexts/AuthContext';
@@ -95,6 +93,16 @@ import {
   visitPhotoStorageMessage,
 } from './visitPhotoPicker';
 import VisitLocationPermissionModal from './VisitLocationPermissionModal';
+import CustomerMasterUpdatePrompt from './CustomerMasterUpdatePrompt';
+import {
+  changedCustomerMasterFields,
+  customerMasterFromRecord,
+  customerMasterUpdatePayload,
+  findExactCustomer,
+  type CapturedCustomerContact,
+  type CustomerMasterChoice,
+} from './customerMasterVisit';
+import { readCapturedVisitContact, resolveDynamicVisitValues } from './dynamicFormValues';
 import {
   createEmptyRfcForm,
   getRfcFormProgress,
@@ -390,7 +398,6 @@ function resolveSheetPayloadFromSession(session: VisitSession, appointment: Plan
 
 import {
   mergeCrmContactFields,
-  pickBestCrmContactRecord,
   resolveCrmContactFields,
 } from './crmPrefillUtils';
 
@@ -457,55 +464,21 @@ async function resolveFreshCrmPrefillSource(
 
   if (companyName) {
     try {
-      const { leads } = await getSalesLeads({
-        search: companyName,
-        limit: 30,
-        sortBy: 'updatedAt',
-        sortOrder: 'desc',
-      });
-      const normalized = companyName.toLowerCase();
-      const matchingLeads = (leads || []).filter((lead) => {
-        const name = (lead.companyName || '').trim().toLowerCase();
-        return (
-          name === normalized ||
-          name.includes(normalized) ||
-          normalized.includes(name)
-        );
-      });
-      const bestLead = pickBestCrmContactRecord(matchingLeads, companyName);
-      if (bestLead) {
-        sources.push(resolveCrmContactFields(bestLead, companyName));
-      }
-    } catch {
-      // Lead search is best-effort.
-    }
-
-    try {
       const { customers } = await getCustomers({
         search: companyName,
         limit: 30,
       });
-      const normalized = companyName.toLowerCase();
-      const matchingCustomers = (customers || []).filter((customer) => {
-        const name = (customer.name || '').trim().toLowerCase();
-        return (
-          name === normalized ||
-          name.includes(normalized) ||
-          normalized.includes(name)
+      const exactCustomer = findExactCustomer(customers || [], companyName);
+      if (exactCustomer) {
+        sources.unshift(
+          resolveCrmContactFields(
+            { ...exactCustomer, companyName: exactCustomer.name },
+            companyName,
+          ),
         );
-      });
-      const bestCustomer = pickBestCrmContactRecord(
-        matchingCustomers.map((customer) => ({
-          ...customer,
-          companyName: customer.name,
-        })),
-        companyName,
-      );
-      if (bestCustomer) {
-        sources.push(resolveCrmContactFields(bestCustomer, companyName));
       }
     } catch {
-      // Customer lookup is best-effort enrichment.
+      // Customer lookup is best-effort. The linked lead still prefills blank fields.
     }
   }
 
@@ -629,6 +602,8 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
   const [isProcessingAction, setIsProcessingAction] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
+  const [showMasterPrompt, setShowMasterPrompt] = useState(false);
+  const masterChoiceRef = useRef<((choice: CustomerMasterChoice) => void) | null>(null);
   const [savedDurationLabel, setSavedDurationLabel] = useState('');
   const [visitFrozenAt, setVisitFrozenAt] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<VisitWorkspaceTab>('notes');
@@ -769,10 +744,20 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
     let cancelled = false;
     void (async () => {
       try {
+        const canLookupSalesRequestDraft =
+          hasPermission(SALES_REQUEST_PERMISSIONS.READ) ||
+          hasPermission(SALES_REQUEST_PERMISSIONS.CREATE) ||
+          hasPermission(SALES_REQUEST_PERMISSIONS.UPDATE) ||
+          hasPermission(SALES_REQUEST_PERMISSIONS.SUBMIT) ||
+          Boolean(user?.isSuperAdmin);
+
         if (plannerFormType && !isCompletedVisit) {
-          const [published, crmSource] = await Promise.all([
+          const [published, crmSource, editable] = await Promise.all([
             getPublishedPlannerForm(plannerFormType),
             resolveFreshCrmPrefillSource(appointment),
+            canLookupSalesRequestDraft
+              ? findEditableSalesRequestForAppointment(appointment._id)
+              : Promise.resolve(null),
           ]);
           if (!cancelled) {
             setSession((current) => {
@@ -780,35 +765,32 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
               // Do not overwrite a sheet the rep already finished in this visit.
               if (current.dynamicForm?.completedAt) return current;
 
-              const previousValues = current.dynamicForm?.values || {};
-              const previousFields = current.dynamicForm?.formSchemaSnapshot?.fields || [];
+              const formData = editable?.formData || {};
+              const savedValues =
+                formData.values && typeof formData.values === 'object'
+                  ? (formData.values as VisitDynamicFormState['values'])
+                  : null;
+              const savedSchema = formData.formSchemaSnapshot as PlannerFormPublished | undefined;
+              const hasSavedSnapshot = Boolean(editable?._id && savedValues);
               const publishedForVisit = stripHiddenRfcPlannerFields({
                 ...published,
                 type: plannerFormType,
               });
               const valueFields = resolvePlannerValueFields(publishedForVisit);
-              let nextValues = createEmptyDynamicFormValues(valueFields);
-
-              for (const field of valueFields) {
-                if (previousValues[field.id] != null && previousValues[field.id] !== '') {
-                  nextValues[field.id] = previousValues[field.id];
-                  continue;
-                }
-                const byKey = previousFields.find((row) => row.key === field.key);
-                if (byKey && previousValues[byKey.id] != null && previousValues[byKey.id] !== '') {
-                  nextValues[field.id] = previousValues[byKey.id];
-                }
-              }
-
-              // Always pull saved business CRM into still-empty form fields on Start.
-              nextValues = prefillDynamicFormValuesFromCrm(
-                valueFields,
-                nextValues,
-                crmSource,
-              );
+              const nextValues = resolveDynamicVisitValues({
+                fields: valueFields,
+                savedValues,
+                savedFields: savedSchema?.fields || [],
+                localValues: current.dynamicForm?.values,
+                localFields: current.dynamicForm?.formSchemaSnapshot?.fields,
+                master: crmSource,
+                hasSavedSnapshot,
+              });
 
               const next: VisitSession = {
                 ...current,
+                salesRequestId: editable?._id || current.salesRequestId,
+                notes: current.notes || editable?.visitNotes || '',
                 selectedPlannerFormType: current.selectedPlannerFormType || plannerFormType,
                 dynamicForm: {
                   formTemplateType: plannerFormType,
@@ -830,49 +812,15 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
               return next;
             });
           }
-        }
-
-        // Optional: resume an existing draft. Never block Visit if this list call fails
-        // (e.g. missing sales_requests.read) — create/update/submit still handle submit flow.
-        const canLookupSalesRequestDraft =
-          hasPermission(SALES_REQUEST_PERMISSIONS.READ) ||
-          hasPermission(SALES_REQUEST_PERMISSIONS.CREATE) ||
-          hasPermission(SALES_REQUEST_PERMISSIONS.UPDATE) ||
-          hasPermission(SALES_REQUEST_PERMISSIONS.SUBMIT) ||
-          Boolean(user?.isSuperAdmin);
-
-        if (canLookupSalesRequestDraft) {
+        } else if (canLookupSalesRequestDraft) {
           const editable = await findEditableSalesRequestForAppointment(appointment._id);
-          if (cancelled) return;
-          if (!editable?._id) {
-            // No existing draft — Visit continues with local session only.
-          } else {
+          if (!cancelled && editable?._id) {
             setSession((current) => {
               if (!current) return current;
-              const formData = editable.formData || {};
-              const hasDynamic =
-                Boolean(formData.formSchemaSnapshot) &&
-                Boolean(formData.values) &&
-                typeof formData.values === 'object';
-
-              // Prefer latest published schema; keep draft answers when keys match.
               const next: VisitSession = {
                 ...current,
                 salesRequestId: editable._id,
                 notes: current.notes || editable.visitNotes || '',
-                dynamicForm:
-                  current.dynamicForm ||
-                  (hasDynamic
-                    ? {
-                        formTemplateType:
-                          (formData.formTemplateType as VisitDynamicFormState['formTemplateType']) ||
-                          plannerFormType,
-                        formTemplateVersion: Number(formData.formTemplateVersion) || 1,
-                        formSchemaSnapshot: formData.formSchemaSnapshot as PlannerFormPublished,
-                        values: formData.values as VisitDynamicFormState['values'],
-                        completedAt: undefined,
-                      }
-                    : current.dynamicForm),
               };
               saveVisitSession(next);
               return next;
@@ -1203,20 +1151,16 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
           type: plannerFormType,
         });
         const valueFields = resolvePlannerValueFields(publishedForVisit);
-        let nextValues = createEmptyDynamicFormValues(valueFields);
-
-        for (const field of valueFields) {
-          if (previousValues[field.id] != null && previousValues[field.id] !== '') {
-            nextValues[field.id] = previousValues[field.id];
-            continue;
-          }
-          const byKey = previousFields.find((row) => row.key === field.key);
-          if (byKey && previousValues[byKey.id] != null && previousValues[byKey.id] !== '') {
-            nextValues[field.id] = previousValues[byKey.id];
-          }
-        }
-
-        nextValues = prefillDynamicFormValuesFromCrm(valueFields, nextValues, crmSource);
+        const hasSavedSnapshot = Boolean(current.salesRequestId && current.dynamicForm?.values);
+        const nextValues = resolveDynamicVisitValues({
+          fields: valueFields,
+          savedValues: previousValues,
+          savedFields: previousFields,
+          localValues: previousValues,
+          localFields: previousFields,
+          master: crmSource,
+          hasSavedSnapshot,
+        });
 
         const next: VisitSession = {
           ...current,
@@ -1531,6 +1475,84 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
   }
 
   /**
+   * Reads the contact fields captured on the active sheet.
+   * Fields that are not on the sheet are omitted so they cannot clear the customer profile.
+   */
+  function capturedContactFromSession(current: VisitSession): CapturedCustomerContact {
+    if (current.dynamicForm) {
+      return readCapturedVisitContact(
+        current.dynamicForm.formSchemaSnapshot.fields || [],
+        current.dynamicForm.values,
+      );
+    }
+    if (current.rfcForm) {
+      return {
+        address: current.rfcForm.customer.physicalAddress,
+        contactPerson: current.rfcForm.customer.contactPerson,
+        contactNumber: current.rfcForm.customer.telephone,
+        email: current.rfcForm.customer.email,
+      };
+    }
+    if (current.loanRentalForm) {
+      return {
+        contactPerson: current.loanRentalForm.customer.customerName,
+        contactNumber: current.loanRentalForm.customer.contactNumber,
+        email: current.loanRentalForm.customer.emailAddress,
+      };
+    }
+    if (current.newServiceLevelForm) {
+      return {
+        contactNumber: current.newServiceLevelForm.customerContactNo,
+        email: current.newServiceLevelForm.customerEmail,
+      };
+    }
+    return {};
+  }
+
+  /**
+   * Asks once, on finish, when the visit contact details differ from the customer master.
+   * Autosave does not call this. Visit-only leaves the customer record unchanged.
+   */
+  async function maybeUpdateCustomerMaster(source: VisitSession): Promise<boolean> {
+    const companyName = (appointmentRef.current?.salesLead?.companyName || '').trim();
+    const captured = capturedContactFromSession(source);
+    if (!companyName || Object.keys(captured).length === 0) return true;
+
+    let customerId = '';
+    let payload: ReturnType<typeof customerMasterUpdatePayload> = {};
+    try {
+      const { customers } = await getCustomers({ search: companyName, limit: 20 });
+      const customer = findExactCustomer(customers || [], companyName);
+      if (!customer?._id) return true;
+      const changes = changedCustomerMasterFields(captured, customerMasterFromRecord(customer));
+      if (changes.length === 0) return true;
+      const choice = await new Promise<CustomerMasterChoice>((resolve) => {
+        masterChoiceRef.current = resolve;
+        setShowMasterPrompt(true);
+      });
+      setShowMasterPrompt(false);
+      masterChoiceRef.current = null;
+      if (choice !== 'update') return true;
+      customerId = customer._id;
+      payload = customerMasterUpdatePayload(captured);
+    } catch {
+      return true;
+    }
+
+    try {
+      await updateCustomer(customerId, payload);
+      return true;
+    } catch (updateError: unknown) {
+      const message = updateError instanceof Error ? updateError.message : 'Customer profile update failed';
+      setError(`${message} This visit was saved. The customer profile was not changed.`);
+      setSession(source);
+      sessionRef.current = source;
+      saveVisitSession(source);
+      return false;
+    }
+  }
+
+  /**
    * Completes the Super Admin dynamic form, then moves the rep to notes.
    */
   async function handleFinishDynamicForm(): Promise<void> {
@@ -1566,6 +1588,8 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
     try {
       await persistVisitProgress(false, completedSession);
       await upsertDraftSalesRequest(completedSession);
+      const masterSaved = await maybeUpdateCustomerMaster(session);
+      if (!masterSaved) return;
       setLastSavedAt(new Date());
       setActiveTab('notes');
     } catch (saveError: any) {
@@ -1604,6 +1628,8 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
       await persistVisitProgress(false, completedSession);
       // Persist an editable draft — do not lock until Submit for Approval.
       await upsertDraftSalesRequest(completedSession);
+      const masterSaved = await maybeUpdateCustomerMaster(session);
+      if (!masterSaved) return;
       setLastSavedAt(new Date());
       setActiveTab('notes');
     } catch (saveError: any) {
@@ -1642,6 +1668,8 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
     try {
       await persistVisitProgress(false, completedSession);
       await upsertDraftSalesRequest(completedSession);
+      const masterSaved = await maybeUpdateCustomerMaster(session);
+      if (!masterSaved) return;
       setLastSavedAt(new Date());
       setActiveTab('notes');
     } catch (saveError: any) {
@@ -1680,6 +1708,8 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
     try {
       await persistVisitProgress(false, completedSession);
       await upsertDraftSalesRequest(completedSession);
+      const masterSaved = await maybeUpdateCustomerMaster(session);
+      if (!masterSaved) return;
       setLastSavedAt(new Date());
       setActiveTab('notes');
     } catch (saveError: any) {
@@ -2605,6 +2635,12 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
         loading={locationPromptLoading}
         onEnable={() => void handleEnableVisitLocation()}
         onContinueWithout={handleContinueWithoutVisitLocation}
+      />
+
+      <CustomerMasterUpdatePrompt
+        visible={showMasterPrompt}
+        onUpdateCustomer={() => masterChoiceRef.current?.('update')}
+        onUseForThisVisit={() => masterChoiceRef.current?.('visit-only')}
       />
 
       {showCompletionDialog && (

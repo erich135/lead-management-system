@@ -1,15 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Loader2, Plus, Search, User, X } from 'lucide-react';
-import type { Branch, Customer, RepCode, SalesLead } from '../../lib/api';
+import type { Customer, RepCode, SalesLead } from '../../lib/api';
 import {
   createCustomer,
   createDiaryAppointment,
   createSalesLead,
-  getBranches,
   getCustomers,
   getSalesLeads,
 } from '../../lib/api';
+import { branchIdForSelectedRep } from '../../lib/repBranchSelection';
 import { AddressAutocomplete } from '../AddressAutocomplete';
 import { SmartDateInput } from '../SmartDateInput';
 import { useAuth } from '../../contexts/AuthContext';
@@ -98,15 +98,6 @@ function canAssignAppointmentsToOthers(
   }
 
   return user?.role.name === 'manager';
-}
-
-/**
- * Picks a usable branch ID for quick client creation (default branch first).
- */
-function resolveBranchId(branches: Branch[]): string | undefined {
-  const active = branches.filter((branch) => branch.isActive !== false);
-  const preferred = active.find((branch) => branch.isDefault) || active[0] || branches[0];
-  return preferred?._id;
 }
 
 const EMPTY_CLIENT_FORM: NewClientFormState = {
@@ -564,8 +555,8 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
 
       let createdLead: SalesLead | null = null;
       try {
-        const { branches } = await getBranches();
-        const branchId = resolveBranchId(branches || []);
+        const assignedRep = formData.assignedRep || loggedInRepId || undefined;
+        const branchId = branchIdForSelectedRep(repCodes, assignedRep);
         if (branchId) {
           createdLead = await createSalesLead({
             companyName,
@@ -574,7 +565,7 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
             contactEmail: email || undefined,
             contactAddress: physicalAddress || undefined,
             branch: branchId,
-            assignedRep: formData.assignedRep || loggedInRepId || undefined,
+            assignedRep,
             leadSource: 'Walk-in',
             notes: notes || 'Created from New Appointment',
           });

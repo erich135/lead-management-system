@@ -5,6 +5,7 @@ import { HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
 import { SmartDateInput } from './SmartDateInput';
 import { isCanonicalMachineSelectable } from '../lib/canonicalMachines';
+import { firstLinkedBranchId } from '../lib/repBranchSelection';
 
 interface LeadFormProps {
   statuses: Status[];
@@ -843,11 +844,8 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
                       updates.adm = selectedRepCode.adminCodes[0];
                     }
                     
-                    if (selectedRepCode.branches && selectedRepCode.branches.length > 0) {
-                      const firstBranch = selectedRepCode.branches[0];
-                      const branchId = typeof firstBranch === 'object' 
-                        ? firstBranch._id 
-                        : firstBranch;
+                    const branchId = firstLinkedBranchId(selectedRepCode.branches);
+                    if (branchId) {
                       updates.branch = branchId;
                     }
                     

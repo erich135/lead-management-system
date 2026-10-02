@@ -3,6 +3,7 @@ import { useDismissibleSearchMenu } from '../useDismissibleSearchMenu';
 import { Loader2, Search, X } from 'lucide-react';
 import { getMachinesByCustomer, type Machine } from '../../../lib/api';
 import { readSpecLibraryRecord, searchSpecLibrary } from '../api';
+import { machineDisplayName } from '../machineDisplayName';
 import {
   describeCurrentMachineDropdown,
 } from '../currentMachineSearch';
@@ -447,7 +448,7 @@ function CurrentMachineCard({
           )}
           {needsSpec && (
             <p className="mb-2 text-sm text-slate-600">
-              {row.make} {row.model}
+              {machineDisplayName(row.make, row.model)}
               {row.serialNumber ? ` · Serial ${row.serialNumber}` : ''}. Choose the
               specification for this machine.
             </p>

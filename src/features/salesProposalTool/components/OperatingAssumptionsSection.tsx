@@ -1,11 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { classifyNumericEntry } from '../electricityBasis';
 import {
   ANNUAL_OPERATING_HOURS_HELPER,
   AUDIT_ANNUAL_HOURS_HELPER,
   AUDIT_ELECTRICITY_BASIS_INFO,
   AVERAGE_LOAD_HELPER,
   buildOperatingAssumptions,
+  parseAnnualOperatingHours,
+  parseAverageLoadPercent,
 } from '../operatingAssumptions';
+import type { UncapturedEntry } from './ElectricityBasisSection';
 import type { OperatingAssumptions } from '../types';
 import { MissingHint } from './EditorSection';
 
@@ -13,12 +17,14 @@ interface OperatingAssumptionsSectionProps {
   value: OperatingAssumptions;
   airAuditPresent: boolean;
   onChange: (next: OperatingAssumptions) => void;
+  onUncaptured?: (entries: UncapturedEntry[]) => void;
 }
 
 export function OperatingAssumptionsSection({
   value,
   airAuditPresent,
   onChange,
+  onUncaptured,
 }: OperatingAssumptionsSectionProps) {
   const [hoursText, setHoursText] = useState(
     value.annualOperatingHours === null ? '' : String(value.annualOperatingHours),
@@ -27,6 +33,34 @@ export function OperatingAssumptionsSection({
     value.averageLoadPercent === null ? '' : String(value.averageLoadPercent),
   );
   const hoursAreEstimated = value.hoursAreEstimated !== false;
+
+  useEffect(() => {
+    if (!onUncaptured) return;
+    const entries: UncapturedEntry[] = [];
+    const hours = classifyNumericEntry(hoursText, parseAnnualOperatingHours, () =>
+      'Enter annual operating hours between 1 and 8 760, or clear this field.',
+    );
+    if (hours.kind === 'rejected') {
+      entries.push({
+        id: 'annualOperatingHours',
+        label: 'Annual operating hours',
+        raw: hoursText,
+        reason: hours.reason,
+      });
+    }
+    const load = classifyNumericEntry(loadText, parseAverageLoadPercent, () =>
+      'Enter an average load between 1 and 100, or clear this field.',
+    );
+    if (load.kind === 'rejected') {
+      entries.push({
+        id: 'averageLoadPercent',
+        label: 'Average load',
+        raw: loadText,
+        reason: load.reason,
+      });
+    }
+    onUncaptured(entries);
+  }, [hoursText, loadText, onUncaptured]);
 
   function emit(nextHours: string, nextLoad: string, estimated: boolean | null = value.hoursAreEstimated) {
     onChange(

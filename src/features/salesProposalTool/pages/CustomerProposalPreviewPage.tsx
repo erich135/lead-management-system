@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { ARS_DEFAULT_HEADER } from '../../../utils/arsJobCardHeaderDefaults';
 import { getSalesProposal, downloadCustomerProposalPdf } from '../api';
+import { readReportSnapshot, rememberReportSnapshot } from '../reportSnapshot';
 import {
   customerProposalCommercialFigures,
   customerProposalElectricityFigures,
@@ -450,6 +451,21 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
                   <li key={warning}>{warning}</li>
                 ))}
               </ul>
+            )}
+            {doc.qualifications && doc.qualifications.length > 0 && (
+              <div>
+                <p><strong>Qualifications</strong></p>
+                <ul>
+                  {doc.qualifications.map((item) => (
+                    <li key={item.code}>{item.text}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {doc.electricity.averageMonthlySaving && (
+              <p>
+                {doc.electricity.averageMonthlySavingLabel} {doc.electricity.averageMonthlySaving}
+              </p>
             )}
           </div>
         )}
@@ -1079,6 +1095,7 @@ const PRINT_HEADER_FOOTER_HINT =
 export function CustomerProposalPreviewPage() {
   const { proposalId } = useParams();
   const [document, setDocument] = useState<CustomerProposalDocument | null>(null);
+  const [revision, setRevision] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
@@ -1094,7 +1111,7 @@ export function CustomerProposalPreviewPage() {
     setDownloading(true);
     setError(null);
     try {
-      const blob = await downloadCustomerProposalPdf(proposalId, html);
+      const blob = await downloadCustomerProposalPdf(proposalId, html, revision, 'technical');
       const url = URL.createObjectURL(blob);
       const link = window.document.createElement('a');
       link.href = url;
@@ -1119,9 +1136,16 @@ export function CustomerProposalPreviewPage() {
   useEffect(() => {
     if (!proposalId) return;
     let cancelled = false;
-    void getSalesProposal(proposalId)
+    const cached = readReportSnapshot(proposalId, Number(new URLSearchParams(window.location.search).get('revision') || '0'));
+    const load = cached
+      ? Promise.resolve(cached)
+      : getSalesProposal(proposalId);
+    void load
       .then((proposal) => {
-        if (!cancelled) setDocument(proposal.customerProposal ?? null);
+        if (cancelled) return;
+        rememberReportSnapshot(proposal);
+        setRevision(proposal.revision ?? proposal.customerProposal?.revision ?? 1);
+        setDocument(proposal.customerProposal ?? null);
       })
       .catch((err: unknown) => {
         if (!cancelled) {

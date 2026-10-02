@@ -12,10 +12,34 @@ export function parseNonNegativeNumber(text: string): number | null {
   return value;
 }
 
-function parseDays(text: string): number | null {
+export function parseDays(text: string): number | null {
   const value = parseNonNegativeNumber(text);
   if (value === null || value > 366) return null;
   return value;
+}
+
+export type NumericEntry =
+  | { kind: 'empty' }
+  | { kind: 'valid'; value: number }
+  | { kind: 'rejected'; reason: string };
+
+/** Uses the existing parser. "2.50" and "2.5" are both valid because both parse to 2.5. */
+export function classifyNumericEntry(
+  raw: string,
+  parse: (text: string) => number | null,
+  reason: (raw: string) => string,
+): NumericEntry {
+  if (raw.trim() === '') return { kind: 'empty' };
+  const value = parse(raw);
+  if (value === null) return { kind: 'rejected', reason: reason(raw) };
+  return { kind: 'valid', value };
+}
+
+export function productionDayRejection(raw: string): string {
+  const parsed = parseNonNegativeNumber(raw);
+  if (parsed === null) return 'Enter a number of days, or clear this field.';
+  if (parsed > 366) return 'Production days cannot be more than 366. Change it, or clear the field.';
+  return 'This value was not accepted. Change it, or clear the field.';
 }
 
 export function buildElectricityBasis(input: {
@@ -81,5 +105,3 @@ export function electricityBasisOrEmpty(
     touHoursPerDay: null,
   };
 }
-
-export { parseDays };

@@ -7,6 +7,7 @@ import { ResetPasswordPage } from './components/ResetPasswordPage';
 import { Dashboard } from './components/Dashboard';
 import { ChatWidget } from './components/ChatWidget';
 import { CustomerProposalPreviewPage } from './features/salesProposalTool/pages/CustomerProposalPreviewPage';
+import { ManagementSummaryPage } from './features/salesProposalTool/pages/ManagementSummaryPage';
 import { isCustomerProposalPreviewPath } from './features/salesProposalTool/navigation';
 // import { AutoLocationTracker } from './components/AutoLocationTracker'; // disabled
 import { MachineScanPage } from './components/MachineScanPage';
@@ -200,9 +201,19 @@ function AppContent() {
             <Dashboard view="salesProposalTool" />
           </ProtectedRoute>
         } />
+        <Route path="/sales-proposal-tool/:proposalId/summary" element={
+          <ProtectedRoute>
+            <ManagementSummaryPage />
+          </ProtectedRoute>
+        } />
         <Route path="/sales-proposal-tool/:proposalId/proposal" element={
           <ProtectedRoute>
             <CustomerProposalPreviewPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/sales-proposal-tool/:proposalId/:tab" element={
+          <ProtectedRoute>
+            <Dashboard view="salesProposalTool" />
           </ProtectedRoute>
         } />
         <Route path="/sales-proposal-tool/:proposalId" element={

@@ -107,6 +107,14 @@ export async function saveSalesProposal(
       currentEquipmentId: string | null;
     };
     configurationAcceptance?: ConfigurationAcceptanceRequest;
+    ifRevision?: number;
+    airAuditScopeConfirmation?: {
+      confirmed: true;
+      sourceSha256: string | null;
+      scopeType: 'single_machine' | 'site_header' | null;
+      currentEquipmentId: string | null;
+      machineIds: string[];
+    } | null;
   },
 ): Promise<SalesProposal> {
   const data = await jsonRequest<{ proposal: SalesProposal }>(
@@ -315,7 +323,12 @@ export async function uploadEfficiencyAudit(
   }>(response);
 }
 
-export async function downloadCustomerProposalPdf(proposalId: string, html: string): Promise<Blob> {
+export async function downloadCustomerProposalPdf(
+  proposalId: string,
+  html: string,
+  revision: number,
+  documentType?: 'technical' | 'management-summary',
+): Promise<Blob> {
   const token = getAuthToken();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -323,7 +336,7 @@ export async function downloadCustomerProposalPdf(proposalId: string, html: stri
     method: 'POST',
     headers,
     credentials: 'include',
-    body: JSON.stringify({ html }),
+    body: JSON.stringify({ html, revision, documentType }),
   });
   if (!response.ok) {
     throw new ApiRequestError('Could not create the proposal PDF.', { kind: 'malformed', status: response.status });

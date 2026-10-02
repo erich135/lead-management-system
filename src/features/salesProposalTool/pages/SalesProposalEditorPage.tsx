@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
@@ -23,7 +23,11 @@ import { OperatingAssumptionsSection } from '../components/OperatingAssumptionsS
 import { CommercialOfferSection } from '../components/CommercialOfferSection';
 import { AirRequirementSection } from '../components/AirRequirementSection';
 import { EditorSection } from '../components/EditorSection';
+import { AirAuditImportReport } from '../components/AirAuditImportReport';
 import { AirMachineComparisonCard } from '../components/AirMachineComparisonCard';
+import { ProposalEditorTabs } from '../components/ProposalEditorTabs';
+import { ProposalResultsStrip } from '../components/ProposalResultsStrip';
+import type { UncapturedEntry } from '../components/ElectricityBasisSection';
 import { ElectricityResultCard } from '../components/ElectricityResultCard';
 import { CommercialResultCard } from '../components/CommercialResultCard';
 import {
@@ -51,11 +55,20 @@ import {
 } from '../airAuditScope';
 import { SALES_PROPOSAL_TOOL_LABEL, SALES_PROPOSAL_TOOL_PATH } from '../navigation';
 import {
+  buildSalesProposalSavePayload,
   persistSalesProposalEditor,
   PREVIEW_SAVE_FAILED_MESSAGE,
   saveThenPreviewCustomerProposal,
   type SalesProposalEditorState,
 } from '../salesProposalPersistence';
+import {
+  OPERATING_ASSUMPTIONS_ELECTRICITY_KEYS,
+  projectOwned,
+} from '../proposalFieldOwnership';
+import { isProposalTabId, type ProposalTabId } from '../proposalTabs';
+import { samePayload } from '../saveResponseMerge';
+import { rememberReportSnapshot } from '../reportSnapshot';
+import { formatEstimatedRand } from '../formatMeasured';
 import {
   CUSTOMER_SELECTION_REQUIRED_MESSAGE,
   customerFromProposal,
@@ -83,7 +96,7 @@ import {
 } from '../configurationAcceptance';
 
 export function SalesProposalEditorPage() {
-  const { proposalId } = useParams();
+  const { proposalId, tab: tabParam } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [proposal, setProposal] = useState<SalesProposal | null>(null);
@@ -131,6 +144,15 @@ export function SalesProposalEditorPage() {
   const [error, setError] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<ProposalTabId>(
+    isProposalTabId(tabParam) ? tabParam : 'customer-site',
+  );
+  const [uncaptured, setUncaptured] = useState<UncapturedEntry[]>([]);
+  const [scopeConfirmed, setScopeConfirmed] = useState(false);
+  const uncapturedBuckets = useRef<Record<string, UncapturedEntry[]>>({});
+  const saveSeq = useRef(0);
+  const currentEquipmentRef = useRef(currentEquipment);
+  currentEquipmentRef.current = currentEquipment;
 
   useEffect(() => {
     if (!proposalId) return;
@@ -316,8 +338,37 @@ export function SalesProposalEditorPage() {
       commercialOffer,
       electricityCalculationBasis,
       airAuditScope,
+      airAuditScopeConfirmation: scopeConfirmationPayload(),
       configurationAcceptance: configurationAcceptanceRequest,
     };
+  }
+
+  function scopeConfirmationPayload(): SalesProposalEditorState['airAuditScopeConfirmation'] {
+    if (!scopeConfirmed || !proposal?.airAudit?.sourceSha256) return null;
+    const machineIds = currentEquipment
+      .filter(currentMachineHasIdentity)
+      .map((row) => row.key)
+      .sort();
+    return {
+      confirmed: true,
+      sourceSha256: proposal.airAudit.sourceSha256,
+      scopeType: airAuditScope.type,
+      currentEquipmentId: airAuditScope.currentEquipmentId,
+      machineIds,
+    };
+  }
+
+  function reportUncaptured(bucket: string, entries: UncapturedEntry[]) {
+    uncapturedBuckets.current[bucket] = entries;
+    setUncaptured(Object.values(uncapturedBuckets.current).flat());
+  }
+
+  function uncapturedMessage(savedLabel: string): string {
+    if (uncaptured.length === 0) return savedLabel;
+    const lines = uncaptured
+      .map((entry) => `${entry.label}: you typed “${entry.raw}”. ${entry.reason}`)
+      .join(' ');
+    return `${savedLabel} — ${uncaptured.length} ${uncaptured.length === 1 ? 'entry was' : 'entries were'} not captured. ${lines}`;
   }
 
   function restoreConfigurationAcceptance(saved: SalesProposal) {
@@ -373,6 +424,7 @@ export function SalesProposalEditorPage() {
     setElectricityBasis(electricityBasisOrEmpty(saved.electricityBasis));
     setOperatingAssumptions(operatingAssumptionsOrEmpty(saved.operatingAssumptions));
     setCommercialOffer(commercialOfferOrEmpty(saved.commercialOffer));
+    setScopeConfirmed(Boolean(saved.airAuditScopeConfirmation?.sourceSha256));
     setComparison(saved.comparison);
     setCommercial(saved.commercial);
     setCurrentMachinePerformance(saved.currentMachinePerformance ?? null);
@@ -386,14 +438,33 @@ export function SalesProposalEditorPage() {
     setSaving(true);
     setSaveMessage(null);
     setError(null);
+    const seq = ++saveSeq.current;
+    const submitted = buildSalesProposalSavePayload(editorPersistenceState());
     try {
       const saved = await persistSalesProposalEditor({
         proposalId,
-        state: editorPersistenceState(),
+        state: { ...editorPersistenceState(), ifRevision: proposal?.revision ?? 1 },
         save: saveSalesProposal,
       });
-      applyPersistedProposal(saved);
-      setSaveMessage('Saved.');
+      if (seq !== saveSeq.current) return;
+      const currentPayload = buildSalesProposalSavePayload(editorPersistenceState());
+      const editedDuringSave = !samePayload(currentPayload, submitted);
+      if (!editedDuringSave) {
+        applyPersistedProposal(saved);
+        setSaveMessage(uncapturedMessage(`Saved ${new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}`));
+      } else {
+        setProposal((current) =>
+          current
+            ? {
+                ...current,
+                revision: saved.revision ?? current.revision,
+                updatedAt: saved.updatedAt,
+                airAudit: current.airAudit,
+              }
+            : saved,
+        );
+        setSaveMessage('Saved — you have since made changes.');
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Could not save.');
     } finally {
@@ -403,6 +474,14 @@ export function SalesProposalEditorPage() {
 
   async function handlePreviewCustomerProposal() {
     if (!proposalId || saving) return;
+    if (uncaptured.length > 0) {
+      setError(
+        `Correct or clear these entries before review. ${uncaptured
+          .map((entry) => `${entry.label} (“${entry.raw}”)`)
+          .join('; ')}. Missing values can stay blank; a value the proposal did not accept cannot.`,
+      );
+      return;
+    }
     setSaving(true);
     setSaveMessage(null);
     setError(null);
@@ -417,6 +496,7 @@ export function SalesProposalEditorPage() {
         return;
       }
       applyPersistedProposal(result.proposal);
+      rememberReportSnapshot(result.proposal);
       navigate(result.path);
     } finally {
       setSaving(false);
@@ -433,12 +513,14 @@ export function SalesProposalEditorPage() {
       setEngineeringValidation(updated.engineeringValidation ?? null);
       setLocalAcceptance(null);
       setPreviewAcceptanceKey(null);
+      const rows = currentEquipmentRef.current;
       setAirAuditScope(
         normaliseAirAuditScope(
           updated.airAudit?.scope,
-          currentEquipment.filter(currentMachineHasIdentity).map((row) => row.key),
+          rows.filter(currentMachineHasIdentity).map((row) => row.key),
         ),
       );
+      setScopeConfirmed(false);
     } catch (err: unknown) {
       setUploadError(err instanceof Error ? err.message : 'The Air Audit could not be read.');
     } finally {
@@ -540,7 +622,7 @@ export function SalesProposalEditorPage() {
             disabled={saving}
             className="rounded-[8px] bg-slate-100 px-4 py-2 text-sm font-medium text-[#383838] hover:bg-slate-200 disabled:opacity-50"
           >
-            Preview Customer Proposal
+            Review Proposal
           </button>
           <button
             type="button"
@@ -548,15 +630,44 @@ export function SalesProposalEditorPage() {
             disabled={saving}
             className="rounded-[8px] bg-[#f7c12b] px-4 py-2 text-sm font-bold text-[#383838] hover:brightness-95 disabled:opacity-50"
           >
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? 'SAVING…' : 'Save Draft'}
           </button>
         </div>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       {saveMessage && <p className="mt-0 text-sm text-emerald-700">{saveMessage}</p>}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-8 overflow-visible rounded-[8px] border border-slate-200 bg-white p-5 shadow-sm">
+      <ProposalResultsStrip
+        savingText={
+          comparison?.electricity.outcome === 'saving'
+            ? formatEstimatedRand(comparison.electricity.estimatedSavingRand)
+            : null
+        }
+        paybackText={
+          commercial?.purchase?.paybackMonths == null
+            ? null
+            : `${commercial.purchase.paybackMonths} months`
+        }
+        suppressedMessage={
+          (engineeringValidation
+            ? engineeringValidation.passed === false
+            : configurationWarningsFail(comparison?.warnings ?? []))
+            ? (comparison?.notes.find((note) => note.includes('does not meet the air requirement')) ??
+              'Savings and payback are not shown for this configuration.')
+            : null
+        }
+      />
+      <ProposalEditorTabs
+        active={activeTab}
+        onSelect={(id) => {
+          setActiveTab(id);
+          if (proposalId) {
+            navigate(`${SALES_PROPOSAL_TOOL_PATH}/${proposalId}/${id}`, { replace: true });
+          }
+        }}
+        panels={{
+          'customer-site': (
+            <>
           <EditorSection
             number={1}
             title="Customer"
@@ -679,8 +790,12 @@ export function SalesProposalEditorPage() {
               siteName={site.name ?? ''}
               onSiteNameChange={updateSiteName}
             />
-            <SiteMapCapture site={site} onChange={setSite} />
+            <SiteMapCapture site={site} isVisible={activeTab === 'customer-site'} onChange={setSite} />
           </EditorSection>
+            </>
+          ),
+          'current-equipment': (
+            <>
           <EditorSection
             number={3}
             title="Current machines"
@@ -693,6 +808,11 @@ export function SalesProposalEditorPage() {
               onChange={setCurrentEquipment}
             />
           </EditorSection>
+          <CurrentMachinePerformanceCard result={currentMachinePerformance} />
+            </>
+          ),
+          'air-audit': (
+            <>
           <EditorSection
             number={4}
             title="Air requirement"
@@ -720,7 +840,30 @@ export function SalesProposalEditorPage() {
               proposedReady={toProposedEquipmentPayload(proposed).length > 0}
               airRequirement={comparison?.airRequirement}
             />
+            {currentEquipment.filter(currentMachineHasIdentity).length > 1 && proposal.airAudit && (
+              <label className="mt-3 flex items-start gap-2 text-sm text-[#383838]">
+                <input
+                  type="checkbox"
+                  checked={scopeConfirmed}
+                  onChange={(event) => {
+                    setScopeConfirmed(event.target.checked);
+                  }}
+                />
+                <span>
+                  I confirm this air-audit file applies to the scope and machines selected here.
+                  The confirmation is saved with this file and is cleared if the file, scope or machines change.
+                </span>
+              </label>
+            )}
+            <AirAuditImportReport audit={proposal.airAudit} />
           </EditorSection>
+          {operatingAssumptions.hasAirAudit !== false && (
+            <MeasuredAuditCard audit={proposal.airAudit} />
+          )}
+            </>
+          ),
+          'proposed-equipment': (
+            <>
           <EditorSection
             number={5}
             title="Proposed machines"
@@ -731,41 +874,18 @@ export function SalesProposalEditorPage() {
               rows={proposed}
               intakeAirTemperatureC={site.intakeAirTemperatureC ?? null}
               intakeAirTemperatureKind={site.intakeAirTemperatureKind ?? null}
-              onIntakeTemperatureChange={(next) => setSite({ ...site, ...next })}
+              onIntakeTemperatureChange={(next) =>
+                setSite((current) => ({ ...current, ...next }))
+              }
               onChange={setProposed}
             />
           </EditorSection>
-          <EditorSection
-            number={6}
-            title="Electricity"
-            instruction="Enter annual hours and the six R/kWh rates. The same hours, air requirement and tariff apply to current and proposed machines."
-          >
-            <OperatingAssumptionsSection
-              value={operatingAssumptions}
-              airAuditPresent={operatingAssumptions.hasAirAudit === true}
-              onChange={setOperatingAssumptions}
-            />
-            <ElectricityBasisSection value={electricityBasis} onChange={setElectricityBasis} />
-          </EditorSection>
-          <EditorSection
-            number={7}
-            title="Price"
-            instruction="Enter the commercial offer, including buy-back, installation and extras."
-          >
-            <CommercialOfferSection value={commercialOffer} onChange={setCommercialOffer} />
-          </EditorSection>
-        </div>
-        <div className="space-y-6">
-          {operatingAssumptions.hasAirAudit !== false && (
-            <MeasuredAuditCard audit={proposal.airAudit} />
-          )}
           <MachineSummaryCard
             current={currentEquipment}
             proposed={proposed}
             proposedSitePerformance={proposedSitePerformance}
             proposedSitePerformances={proposedSitePerformances}
           />
-          <CurrentMachinePerformanceCard result={currentMachinePerformance} />
           <AirMachineComparisonCard
             comparison={comparison}
             calculationBasis={electricityCalculationBasis}
@@ -799,15 +919,62 @@ export function SalesProposalEditorPage() {
             }}
             onRevokeConfiguration={() => setLocalAcceptance(null)}
           />
+            </>
+          ),
+          electricity: (
+            <>
+          <EditorSection
+            number={6}
+            title="Electricity"
+            instruction="Enter annual hours and the six R/kWh rates. The same hours, air requirement and tariff apply to current and proposed machines."
+          >
+            <OperatingAssumptionsSection
+              value={operatingAssumptions}
+              airAuditPresent={operatingAssumptions.hasAirAudit === true}
+              onChange={(next) =>
+                setOperatingAssumptions((current) =>
+                  projectOwned(current, next, OPERATING_ASSUMPTIONS_ELECTRICITY_KEYS),
+                )
+              }
+              onUncaptured={(entries) => reportUncaptured('operating', entries)}
+            />
+            <ElectricityBasisSection
+              value={electricityBasis}
+              onChange={setElectricityBasis}
+              onUncaptured={(entries) => reportUncaptured('electricity', entries)}
+            />
+          </EditorSection>
           <ElectricityResultCard
             comparison={comparison}
             onAddCurrentSpecSheet={openCurrentSpecSheet}
             onAddProposedSpecSheet={openProposedSpecSheet}
             hoursAreEstimated={operatingAssumptions.hoursAreEstimated}
           />
+            </>
+          ),
+          'price-offer': (
+            <>
+          <EditorSection
+            number={7}
+            title="Price"
+            instruction="Enter the commercial offer, including buy-back, installation and extras."
+          >
+            <CommercialOfferSection value={commercialOffer} onChange={setCommercialOffer} />
+          </EditorSection>
           <CommercialResultCard commercial={commercial} />
-        </div>
-      </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="rounded-[8px] bg-slate-100 px-3 py-2 text-sm font-bold"
+              onClick={() => navigate(`${SALES_PROPOSAL_TOOL_PATH}/${proposal.id}/summary`)}
+            >
+              Management Summary
+            </button>
+          </div>
+            </>
+          ),
+        }}
+      />
     </div>
   );
 }

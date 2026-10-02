@@ -1,16 +1,26 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   buildElectricityBasis,
+  classifyNumericEntry,
   parseDays,
   parseNonNegativeNumber,
+  productionDayRejection,
 } from '../electricityBasis';
 import { formatEstimatedRand } from '../formatMeasured';
 import type { ElectricityBasis } from '../types';
 import { MissingHint } from './EditorSection';
 
+export interface UncapturedEntry {
+  id: string;
+  label: string;
+  raw: string;
+  reason: string;
+}
+
 interface ElectricityBasisSectionProps {
   value: ElectricityBasis;
   onChange: (next: ElectricityBasis) => void;
+  onUncaptured?: (entries: UncapturedEntry[]) => void;
 }
 
 const RATE_FIELDS: { key: keyof ElectricityBasis['touRates']; label: string }[] = [
@@ -38,6 +48,7 @@ function textFromNumber(value: number | null | undefined): string {
 export function ElectricityBasisSection({
   value,
   onChange,
+  onUncaptured,
 }: ElectricityBasisSectionProps) {
   const [rateTexts, setRateTexts] = useState(() => ({
     ldsStandard: textFromNumber(value.touRates.ldsStandard ?? value.flatRateRandPerKwh),
@@ -113,6 +124,51 @@ export function ElectricityBasisSection({
     setRateTexts(filled);
     emit({ rates: filled });
   }
+
+  useEffect(() => {
+    if (!onUncaptured) return;
+    const entries: UncapturedEntry[] = [];
+    for (const field of DAY_FIELDS) {
+      const raw = dayTexts[field.key];
+      const classified = classifyNumericEntry(raw, parseDays, productionDayRejection);
+      if (classified.kind === 'rejected') {
+        entries.push({
+          id: `productionDays.${field.key}`,
+          label: `Production days — ${field.label}`,
+          raw,
+          reason: classified.reason,
+        });
+      }
+    }
+    for (const field of RATE_FIELDS) {
+      const raw = rateTexts[field.key];
+      const classified = classifyNumericEntry(raw, parseNonNegativeNumber, (text) =>
+        text.trim().startsWith('-')
+          ? 'Enter a rate of zero or more, or clear this field.'
+          : 'Enter a rate, or clear this field.',
+      );
+      if (classified.kind === 'rejected') {
+        entries.push({
+          id: `touRates.${field.key}`,
+          label: `Electricity rate — ${field.label}`,
+          raw,
+          reason: classified.reason,
+        });
+      }
+    }
+    const amount = classifyNumericEntry(amountText, parseNonNegativeNumber, () =>
+      'Enter an amount of zero or more, or clear this field.',
+    );
+    if (amount.kind === 'rejected') {
+      entries.push({
+        id: 'suppliedCurrentAmount',
+        label: 'Known electricity amount',
+        raw: amountText,
+        reason: amount.reason,
+      });
+    }
+    onUncaptured(entries);
+  }, [amountText, dayTexts, onUncaptured, rateTexts]);
 
   const missingRates = RATE_FIELDS.some((field) => rateTexts[field.key].trim() === '');
   const ratesDiffer = new Set(

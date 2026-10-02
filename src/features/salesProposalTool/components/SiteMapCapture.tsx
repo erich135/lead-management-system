@@ -43,9 +43,10 @@ function siteFromEnrichment(
 interface SiteMapCaptureProps {
   site: SalesProposalSite;
   onChange: (site: SalesProposalSite | ((current: SalesProposalSite) => SalesProposalSite)) => void;
+  isVisible?: boolean;
 }
 
-export function SiteMapCapture({ site, onChange }: SiteMapCaptureProps) {
+export function SiteMapCapture({ site, onChange, isVisible = true }: SiteMapCaptureProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<PlaceSuggestion[]>([]);
   const [searching, setSearching] = useState(false);
@@ -61,9 +62,10 @@ export function SiteMapCapture({ site, onChange }: SiteMapCaptureProps) {
       setEnriching(true);
       try {
         const enrichment = await geocodeEnrich(latitude, longitude);
-        onChange((current) =>
-          siteFromEnrichment(latitude, longitude, enrichment, current.name),
-        );
+        onChange((current) => ({
+          ...current,
+          ...siteFromEnrichment(latitude, longitude, enrichment, current.name),
+        }));
       } catch {
         onChange((current) => ({
           ...current,
@@ -206,6 +208,7 @@ export function SiteMapCapture({ site, onChange }: SiteMapCaptureProps) {
       <GoogleSiteMap
         latitude={site.latitude}
         longitude={site.longitude}
+        isVisible={isVisible}
         onPin={(lat, lng) => void applyCoordinates(lat, lng)}
         onStatusChange={setMapStatus}
       />

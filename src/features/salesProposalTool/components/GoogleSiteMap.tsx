@@ -83,9 +83,16 @@ interface GoogleSiteMapProps {
   longitude: number | null;
   onPin: (latitude: number, longitude: number) => void;
   onStatusChange?: (status: 'loading' | 'ready' | 'error') => void;
+  isVisible?: boolean;
 }
 
-export function GoogleSiteMap({ latitude, longitude, onPin, onStatusChange }: GoogleSiteMapProps) {
+export function GoogleSiteMap({
+  latitude,
+  longitude,
+  onPin,
+  onStatusChange,
+  isVisible = true,
+}: GoogleSiteMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<GoogleMapsMap | null>(null);
   const markerRef = useRef<GoogleMapsMarker | null>(null);
@@ -212,6 +219,14 @@ export function GoogleSiteMap({ latitude, longitude, onPin, onStatusChange }: Go
     mapRef.current.panTo(position);
     mapRef.current.setZoom(STREET_MAP_ZOOM);
   }, [latitude, longitude, status]);
+
+  useEffect(() => {
+    if (!isVisible || !mapRef.current || !window.google?.maps?.event) return;
+    window.google.maps.event.trigger(mapRef.current, 'resize');
+    if (latitude !== null && longitude !== null) {
+      mapRef.current.setCenter({ lat: latitude, lng: longitude });
+    }
+  }, [isVisible, latitude, longitude]);
 
   return (
     <div className="relative h-64 overflow-hidden rounded-[8px] border border-slate-200">

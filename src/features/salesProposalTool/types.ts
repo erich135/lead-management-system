@@ -328,6 +328,14 @@ export interface SalesProposal {
   operatingAssumptions: OperatingAssumptions;
   electricityCalculationBasis?: 'air_audit' | 'published_capacity';
   commercialOffer: CommercialOffer;
+  revision?: number;
+  airAuditScopeConfirmation?: {
+    sourceSha256: string | null;
+    scopeType: 'single_machine' | 'site_header' | null;
+    currentEquipmentId: string | null;
+    machineIds: string[];
+    confirmedAt: string | null;
+  } | null;
   comparison: AirAndElectricityComparison | null;
   commercial: CommercialComparison | null;
   customerProposal?: CustomerProposalDocument | null;
@@ -622,6 +630,9 @@ export interface CustomerProposalDocument {
   siteLocation: string | null;
   date: string | null;
   reference?: string | null;
+  revision?: number;
+  revisionLabel?: string | null;
+  qualifications?: Array<{ code: string; text: string }>;
   purposeTitle: string;
   purposeLead: string;
   purposeBullets: string[];
@@ -740,6 +751,8 @@ export interface CustomerProposalDocument {
     current: string | null;
     proposed: string | null;
     saving: string | null;
+    averageMonthlySaving?: string | null;
+    averageMonthlySavingLabel?: string | null;
     chartCurrentRand?: number | null;
     chartProposedRand?: number | null;
     suppliedAmountReference?: string | null;

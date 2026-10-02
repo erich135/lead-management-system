@@ -42,7 +42,15 @@ export interface SalesProposalEditorState {
   commercialOffer: CommercialOffer;
   electricityCalculationBasis?: 'air_audit' | 'published_capacity';
   airAuditScope: AirAuditScope;
+  airAuditScopeConfirmation?: {
+    confirmed: true;
+    sourceSha256: string | null;
+    scopeType: 'single_machine' | 'site_header' | null;
+    currentEquipmentId: string | null;
+    machineIds: string[];
+  } | null;
   configurationAcceptance?: ConfigurationAcceptanceRequest;
+  ifRevision?: number;
 }
 
 export interface SalesProposalSavePayload {
@@ -57,7 +65,9 @@ export interface SalesProposalSavePayload {
   commercialOffer: CommercialOffer;
   electricityCalculationBasis?: 'air_audit' | 'published_capacity';
   airAuditScope: AirAuditScope;
+  airAuditScopeConfirmation?: SalesProposalEditorState['airAuditScopeConfirmation'];
   configurationAcceptance?: ConfigurationAcceptanceRequest;
+  ifRevision?: number;
 }
 
 export type PersistSalesProposal = (
@@ -92,9 +102,13 @@ export function buildSalesProposalSavePayload(
     commercialOffer: state.commercialOffer,
     electricityCalculationBasis: state.electricityCalculationBasis,
     airAuditScope: state.airAuditScope,
+    ...(state.airAuditScopeConfirmation
+      ? { airAuditScopeConfirmation: state.airAuditScopeConfirmation }
+      : {}),
     ...(state.configurationAcceptance
       ? { configurationAcceptance: state.configurationAcceptance }
       : {}),
+    ...(typeof state.ifRevision === 'number' ? { ifRevision: state.ifRevision } : {}),
   };
 }
 

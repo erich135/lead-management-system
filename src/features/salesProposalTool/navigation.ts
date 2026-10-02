@@ -21,5 +21,5 @@ export function isSalesProposalToolPath(pathname: string): boolean {
 }
 
 export function isCustomerProposalPreviewPath(pathname: string): boolean {
-  return /\/sales-proposal-tool\/[^/]+\/proposal\/?$/.test(pathname);
+  return /\/sales-proposal-tool\/[^/]+\/(?:proposal|summary)\/?$/.test(pathname);
 }

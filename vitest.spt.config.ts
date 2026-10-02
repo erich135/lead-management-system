@@ -18,6 +18,7 @@ export default defineConfig({
       'src/features/salesProposalTool/variableSpeedDrive.test.ts',
       'src/features/salesProposalTool/configurationAcceptance.test.ts',
       'src/features/salesProposalTool/proposalEditorBehaviour.test.ts',
+      'src/features/salesProposalTool/managementSummaryPresentation.test.ts',
     ],
   },
 });

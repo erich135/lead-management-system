@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
@@ -67,6 +67,7 @@ import {
 } from '../proposalFieldOwnership';
 import { isProposalTabId, type ProposalTabId } from '../proposalTabs';
 import { samePayload } from '../saveResponseMerge';
+import { commitUncapturedReport } from '../uncapturedReport';
 import { rememberReportSnapshot } from '../reportSnapshot';
 import { formatEstimatedRand } from '../formatMeasured';
 import {
@@ -358,10 +359,18 @@ export function SalesProposalEditorPage() {
     };
   }
 
-  function reportUncaptured(bucket: string, entries: UncapturedEntry[]) {
-    uncapturedBuckets.current[bucket] = entries;
-    setUncaptured(Object.values(uncapturedBuckets.current).flat());
-  }
+  const reportUncaptured = useCallback((bucket: string, entries: UncapturedEntry[]) => {
+    const next = commitUncapturedReport(uncapturedBuckets.current, bucket, entries);
+    if (next) setUncaptured(next);
+  }, []);
+  const reportOperatingUncaptured = useCallback(
+    (entries: UncapturedEntry[]) => reportUncaptured('operating', entries),
+    [reportUncaptured],
+  );
+  const reportElectricityUncaptured = useCallback(
+    (entries: UncapturedEntry[]) => reportUncaptured('electricity', entries),
+    [reportUncaptured],
+  );
 
   function uncapturedMessage(savedLabel: string): string {
     if (uncaptured.length === 0) return savedLabel;
@@ -936,12 +945,12 @@ export function SalesProposalEditorPage() {
                   projectOwned(current, next, OPERATING_ASSUMPTIONS_ELECTRICITY_KEYS),
                 )
               }
-              onUncaptured={(entries) => reportUncaptured('operating', entries)}
+              onUncaptured={reportOperatingUncaptured}
             />
             <ElectricityBasisSection
               value={electricityBasis}
               onChange={setElectricityBasis}
-              onUncaptured={(entries) => reportUncaptured('electricity', entries)}
+              onUncaptured={reportElectricityUncaptured}
             />
           </EditorSection>
           <ElectricityResultCard

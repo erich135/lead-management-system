@@ -253,7 +253,7 @@
   }
 
   @page spt-proposal {
-    size: A4;
+    size: A4 portrait;
     margin: 12mm 12mm 14mm 12mm;
   }
 
@@ -292,6 +292,155 @@
 
 .spt-customer-proposal-document {
   page: spt-proposal;
+}
+
+.spt-ms-page {
+  width: 210mm;
+  max-width: 210mm;
+  box-sizing: border-box;
+  font-family: Arial, "Arial Narrow", sans-serif;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #383838;
+}
+
+.spt-ms-page p,
+.spt-ms-page li,
+.spt-ms-page td,
+.spt-ms-page th {
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+.spt-ms-page .spt-proposal-body {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.spt-ms-page .spt-ms-kicker {
+  margin: 0 0 6px;
+}
+
+.spt-ms-page .spt-ms-title {
+  margin: 0 0 14px;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.spt-ms-page .spt-ms-lead {
+  margin: 0 0 16px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.spt-ms-page .spt-proposal-h2 {
+  margin: 20px 0 8px;
+  font-size: 11px;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+.spt-ms-page .spt-proposal-table {
+  margin: 0 0 16px;
+  font-size: 12px;
+}
+
+.spt-ms-page .spt-proposal-table th,
+.spt-ms-page .spt-proposal-table td {
+  padding: 7px 8px;
+  font-size: 12px;
+}
+
+.spt-ms-page .spt-ms-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.spt-ms-page .spt-ms-list {
+  margin: 0 0 14px;
+  padding-left: 1.25em;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.spt-ms-page .spt-ms-list li + li {
+  margin-top: 6px;
+}
+
+.spt-ms-page .spt-proposal-logo {
+  width: 58mm;
+}
+
+.spt-ms-page .spt-proposal-letterhead-contact {
+  max-width: 95mm;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.spt-ms-kicker {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0969a9;
+}
+
+.spt-ms-title {
+  margin: 0 0 8px;
+  font-size: 22px;
+  line-height: 1.2;
+  color: #383838;
+}
+
+.spt-ms-lead {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.spt-ms-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0 12px;
+}
+
+.spt-ms-metric {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #d4dce4;
+  border-top: 3px solid #f7c12b;
+  padding: 12px;
+}
+
+.spt-ms-metric span {
+  display: block;
+  min-height: 2.8em;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+  text-transform: uppercase;
+  color: #5c6770;
+}
+
+.spt-ms-metric strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 16px;
+  line-height: 1.2;
+  color: #383838;
+}
+
+.spt-ms-note {
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #5c6770;
 }
 
 .spt-proposal-page-count {
@@ -1089,6 +1238,26 @@
 
   .spt-customer-proposal-document tr {
     page-break-inside: avoid;
+  }
+
+  .spt-ms-page {
+    display: block;
+    width: auto;
+    max-width: none;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .spt-ms-page:last-child,
+  .spt-ms-last {
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  .spt-ms-page .spt-proposal-page-footer img {
+    width: 120mm;
+    max-height: 16mm;
+    object-fit: contain;
   }
 
 }

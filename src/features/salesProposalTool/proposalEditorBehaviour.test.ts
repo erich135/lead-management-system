@@ -10,6 +10,7 @@ import {
 } from './proposalFieldOwnership';
 import { classifyNumericEntry, parseDays, parseNonNegativeNumber, productionDayRejection } from './electricityBasis';
 import { mergeSavePayload, samePayload } from './saveResponseMerge';
+import { commitUncapturedReport } from './uncapturedReport';
 import type { OperatingAssumptions, SalesProposalSite } from './types';
 import { EMPTY_SITE } from './types';
 
@@ -94,6 +95,39 @@ describe('rejected numeric entry', () => {
 
   it('treats an empty field as unset rather than rejected', () => {
     expect(classifyNumericEntry('  ', parseDays, productionDayRejection)).toEqual({ kind: 'empty' });
+  });
+});
+
+describe('uncaptured registration loop', () => {
+  it('does not schedule another update when the same field state is reported again', () => {
+    const buckets: Record<string, { id: string; label: string; raw: string; reason: string }[]> = {};
+    let updates = 0;
+    let continueReporting = true;
+    let steps = 0;
+    while (continueReporting && steps < 30) {
+      const next = commitUncapturedReport(buckets, 'operating', []);
+      continueReporting = next !== null;
+      if (next) updates += 1;
+      steps += 1;
+    }
+    expect(steps).toBe(1);
+    expect(updates).toBe(0);
+  });
+
+  it('publishes one update when a field becomes rejected, then stops', () => {
+    const buckets: Record<string, { id: string; label: string; raw: string; reason: string }[]> = {};
+    const rejected = [{
+      id: 'annualOperatingHours',
+      label: 'Annual operating hours',
+      raw: '9000',
+      reason: 'Enter annual operating hours between 1 and 8 760, or clear this field.',
+    }];
+    const first = commitUncapturedReport(buckets, 'operating', rejected);
+    const second = commitUncapturedReport(buckets, 'operating', rejected);
+    const cleared = commitUncapturedReport(buckets, 'operating', []);
+    expect(first).toEqual(rejected);
+    expect(second).toBeNull();
+    expect(cleared).toEqual([]);
   });
 });
 

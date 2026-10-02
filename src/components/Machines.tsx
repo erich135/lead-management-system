@@ -746,7 +746,7 @@ export function Machines() {
     setJobRsrSearching(true);
     const handle = setTimeout(async () => {
       try {
-        const res = await getJobs({ search: term, limit: 10, allTime: 'true' });
+        const res = await getJobs({ search: term, limit: 100, allTime: 'true' });
         if (!cancelled) setJobRsrResults(res.jobs || []);
       } catch {
         if (!cancelled) setJobRsrResults([]);

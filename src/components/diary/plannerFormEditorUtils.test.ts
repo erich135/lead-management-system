@@ -43,12 +43,33 @@ test('Form Editor keeps RFC, Loan and Rental, and New Service Level as system fo
   ]);
   assert.deepEqual(
     systemForms.map((form) => form.type),
-    ['rfc', 'loan_rental', 'new_service_level'],
+    ['rfc', 'loan_rental', 'rental_rfc', 'new_service_level'],
   );
   assert.deepEqual(
     generalVisitForms.map((form) => form.type),
     ['general_visit_walk'],
   );
+});
+
+test('archived selectable forms leave the active list and can be restored later', () => {
+  const { systemForms, archivedForms } = splitAdminPlannerForms([
+    template({
+      type: 'rfc',
+      isSystem: true,
+      formCategory: 'system',
+      isActive: false,
+      published: {
+        name: 'RFC',
+        title: 'RFC',
+        fields: [],
+        version: 2,
+        publishedAt: '2026-01-01',
+      },
+    }),
+  ]);
+  assert.equal(systemForms.some((form) => form.type === 'rfc'), false);
+  assert.equal(archivedForms[0]?.type, 'rfc');
+  assert.equal(archivedForms[0]?.published?.version, 2);
 });
 
 test('draft and unpublished General Visit forms are hidden from representatives', () => {

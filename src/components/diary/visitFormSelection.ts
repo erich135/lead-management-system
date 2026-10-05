@@ -13,9 +13,15 @@ type SalesRequestType =
   | 'rental'
   | 'loan_rental'
   | 'rfc_new_service_level'
-  | 'general_visit';
+  | 'general_visit'
+  | 'rental_rfc';
 
-export const VISIT_SYSTEM_PLANNER_FORM_TYPES = ['rfc', 'loan_rental', 'new_service_level'] as const;
+export const VISIT_SYSTEM_PLANNER_FORM_TYPES = [
+  'rfc',
+  'loan_rental',
+  'rental_rfc',
+  'new_service_level',
+] as const;
 
 export type VisitSystemPlannerFormType = (typeof VISIT_SYSTEM_PLANNER_FORM_TYPES)[number];
 
@@ -42,6 +48,11 @@ export const VISIT_CHOOSER_FORM_OPTIONS: Array<{
     description: 'Loan and rental unit request captured during the visit.',
   },
   {
+    type: 'rental_rfc',
+    title: 'Rental RFC',
+    description: 'Rental request captured during the visit.',
+  },
+  {
     type: 'new_service_level',
     title: 'New Service Level',
     description: 'New service level agreement details captured on site.',
@@ -55,7 +66,10 @@ export function isVisitSystemPlannerFormType(
   value?: string | null,
 ): value is VisitSystemPlannerFormType {
   return (
-    value === 'rfc' || value === 'loan_rental' || value === 'new_service_level'
+    value === 'rfc' ||
+    value === 'loan_rental' ||
+    value === 'rental_rfc' ||
+    value === 'new_service_level'
   );
 }
 
@@ -82,6 +96,7 @@ export function plannerFormTypeToSalesRequestType(
   if (value === 'rfc') return 'rfc';
   if (value === 'loan_rental') return 'loan_rental';
   if (value === 'new_service_level') return 'rfc_new_service_level';
+  if (value === 'rental_rfc') return 'rental_rfc';
   if (isGeneralVisitPlannerFormType(value)) return 'general_visit';
   return null;
 }
@@ -194,8 +209,9 @@ export interface PublishedVisitFormMeta {
 }
 
 /**
- * Keeps the three system forms in RFC → Loan and Rental → New Service Level order,
- * then appends published custom General Visit forms. Draft/custom_* entries stay out.
+ * Keeps published system forms in a fixed order, then custom General Visit forms.
+ * A form that is not in the published list is omitted. Archived forms must not
+ * be filled in from a hardcoded stand-in.
  */
 export function filterVisitChooserPublishedForms(
   forms: PublishedVisitFormMeta[] | undefined | null,
@@ -205,18 +221,21 @@ export function filterVisitChooserPublishedForms(
       .filter((form) => isVisitSystemPlannerFormType(form.type))
       .map((form) => [form.type, form] as const),
   );
-  const systemForms = VISIT_CHOOSER_FORM_OPTIONS.map((option) => {
+  const systemForms = VISIT_CHOOSER_FORM_OPTIONS.flatMap((option) => {
     const published = byType.get(option.type);
-    return {
-      type: option.type,
-      name: published?.name || option.title,
-      title: published?.title || option.title,
-      description: published?.description || option.description,
-      version: published?.version,
-      formCategory: 'system',
-      displayOrder: published?.displayOrder,
-      id: published?.id,
-    };
+    if (!published) return [];
+    return [
+      {
+        type: option.type,
+        name: published.name || option.title,
+        title: published.title || option.title,
+        description: published.description || option.description,
+        version: published.version,
+        formCategory: 'system',
+        displayOrder: published.displayOrder,
+        id: published.id,
+      },
+    ];
   });
 
   const generalVisitForms = (forms || [])
@@ -312,8 +331,42 @@ export function resolveSalesRequestDraftWrite(
 export function plannerFormTypeToVisitTab(plannerFormType: string): VisitWorkspaceTab {
   if (plannerFormType === 'loan_rental') return 'loan_rental';
   if (plannerFormType === 'new_service_level') return 'new_service_level';
-  if (isGeneralVisitPlannerFormType(plannerFormType)) return 'general_visit';
+  if (plannerFormType === 'rental_rfc' || isGeneralVisitPlannerFormType(plannerFormType)) {
+    return 'general_visit';
+  }
   return 'rfc';
+}
+
+/**
+ * A visit that has already started keeps the form it began with.
+ * A new visit, with no saved schema, loads the latest published form.
+ */
+export function resolveStartedVisitFormSnapshot<T>(options: {
+  completedAt?: string | null;
+  localSchema?: T | null;
+  savedSchema?: T | null;
+  appointmentStatus?: string | null;
+  hasPersistedRequest?: boolean;
+}): { keep: boolean; schema: T | null } {
+  const started =
+    options.appointmentStatus === 'in_progress' ||
+    options.appointmentStatus === 'rejected' ||
+    Boolean(options.hasPersistedRequest) ||
+    Boolean(options.completedAt);
+
+  if (!started) {
+    return { keep: false, schema: null };
+  }
+  if (options.completedAt && options.localSchema) {
+    return { keep: true, schema: options.localSchema };
+  }
+  if (options.localSchema) {
+    return { keep: true, schema: options.localSchema };
+  }
+  if (options.savedSchema) {
+    return { keep: true, schema: options.savedSchema };
+  }
+  return { keep: false, schema: null };
 }
 
 /**

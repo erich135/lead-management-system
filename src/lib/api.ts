@@ -4451,7 +4451,8 @@ export type SalesRequestType =
   | 'rental'
   | 'loan_rental'
   | 'rfc_new_service_level'
-  | 'general_visit';
+  | 'general_visit'
+  | 'rental_rfc';
 
 /** Planner form template types controlled by Super Admin (system + custom_*). */
 export type PlannerFormType = string;

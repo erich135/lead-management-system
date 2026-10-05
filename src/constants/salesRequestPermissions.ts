@@ -24,6 +24,7 @@ export const SALES_REQUEST_TYPE_LABELS: Record<string, string> = {
   loan_rental: 'Loan & Rental Request',
   rfc_new_service_level: 'New Service Level Agreement',
   general_visit: 'General Visit',
+  rental_rfc: 'Rental RFC',
 };
 
 /**

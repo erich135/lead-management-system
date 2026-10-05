@@ -8,6 +8,7 @@ import {
   isVisitSystemPlannerFormType,
   plannerFormTypeToSalesRequestType,
   resolveSalesRequestDraftWrite,
+  resolveStartedVisitFormSnapshot,
   resolveVisitPlannerFormType,
   resolveVisitSalesRequestType,
   resolveVisitWorkspaceSurface,
@@ -26,7 +27,7 @@ test('generic Visit with no selection needs the three-form chooser', () => {
   );
   assert.deepEqual(
     VISIT_CHOOSER_FORM_OPTIONS.map((option) => option.type),
-    ['rfc', 'loan_rental', 'new_service_level'],
+    ['rfc', 'loan_rental', 'rental_rfc', 'new_service_level'],
   );
   assert.equal(
     visitAllowsNotesPhotosAndSubmit({
@@ -124,7 +125,7 @@ test('dashboard shows Resume Visit for in-progress appointments or restored sess
   );
 });
 
-test('chooser metadata drops custom forms and keeps the three system forms in order', () => {
+test('chooser metadata drops custom forms and omits system forms that are not published', () => {
   const filtered = filterVisitChooserPublishedForms([
     { type: 'custom_extra', title: 'Custom' },
     { type: 'new_service_level', title: 'NSL published', description: 'SLA body' },
@@ -132,11 +133,10 @@ test('chooser metadata drops custom forms and keeps the three system forms in or
   ]);
   assert.deepEqual(
     filtered.map((form) => form.type),
-    ['rfc', 'loan_rental', 'new_service_level'],
+    ['rfc', 'new_service_level'],
   );
   assert.equal(filtered[0].title, 'RFC published');
-  assert.equal(filtered[1].title, 'Loan and Rental');
-  assert.equal(filtered[2].description, 'SLA body');
+  assert.equal(filtered[1].description, 'SLA body');
 });
 
 test('closed visits do not reopen the chooser', () => {
@@ -240,22 +240,23 @@ test('workspace surfaces keep notes hidden until a published form is ready', () 
 });
 
 test('chooser cards are large enough for a mobile viewport', () => {
-  assert.equal(VISIT_CHOOSER_FORM_OPTIONS.length, 3);
+  assert.equal(VISIT_CHOOSER_FORM_OPTIONS.length, 4);
   for (const option of VISIT_CHOOSER_FORM_OPTIONS) {
     assert.ok(option.title.length > 0);
     assert.ok(option.description.length > 0);
   }
 });
 
-test('published General Visit forms appear in the chooser after the three system forms', () => {
+test('published General Visit forms appear after the published system forms', () => {
   const filtered = filterVisitChooserPublishedForms([
     { type: 'custom_extra', title: 'Custom' },
     { type: 'general_visit_site_check', title: 'Site Check', formCategory: 'general_visit' },
     { type: 'rfc', title: 'RFC published' },
+    { type: 'rental_rfc', title: 'Rental RFC' },
   ]);
   assert.deepEqual(
     filtered.map((form) => form.type),
-    ['rfc', 'loan_rental', 'new_service_level', 'general_visit_site_check'],
+    ['rfc', 'rental_rfc', 'general_visit_site_check'],
   );
 });
 
@@ -280,6 +281,29 @@ test('General Visit selection maps to general_visit sales request and survives r
     }),
     false,
   );
+});
+
+test('Rental RFC is a first-class visit form and creates a rental_rfc request', () => {
+  assert.equal(resolveVisitPlannerFormType('site_visit', 'rental_rfc'), 'rental_rfc');
+  assert.equal(plannerFormTypeToSalesRequestType('rental_rfc'), 'rental_rfc');
+  assert.equal(resolveVisitSalesRequestType('site_visit', 'rental_rfc'), 'rental_rfc');
+});
+
+test('a started visit keeps its saved form instead of the latest published copy', () => {
+  const started = resolveStartedVisitFormSnapshot({
+    appointmentStatus: 'in_progress',
+    localSchema: { version: 1 },
+    savedSchema: { version: 1 },
+  });
+  assert.equal(started.keep, true);
+  assert.deepEqual(started.schema, { version: 1 });
+
+  const fresh = resolveStartedVisitFormSnapshot({
+    appointmentStatus: 'appointment',
+    localSchema: null,
+    savedSchema: null,
+  });
+  assert.equal(fresh.keep, false);
 });
 
 test('draft custom forms are not treated as chooser selections', () => {

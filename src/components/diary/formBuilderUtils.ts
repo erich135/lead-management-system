@@ -209,14 +209,32 @@ export function walkElements(elements: PlannerFormElement[]): PlannerFormElement
 }
 
 /**
+ * Collects input fields. A question inside a switched-off section is not required.
+ */
+function collectFields(
+  elements: PlannerFormElement[],
+  ancestorsEnabled: boolean,
+  fields: PlannerFormField[],
+): void {
+  const sorted = [...elements].sort((a, b) => a.order - b.order);
+  for (const element of sorted) {
+    const enabledHere = ancestorsEnabled && element.enabled !== false;
+    if (element.type === 'section' && Array.isArray(element.children)) {
+      collectFields(element.children, enabledHere, fields);
+      continue;
+    }
+    const field = elementToField(element, fields.length + 1);
+    if (!field) continue;
+    fields.push({ ...field, enabled: enabledHere });
+  }
+}
+
+/**
  * Derives fields[] from the visual element tree.
  */
 export function deriveFieldsFromElements(elements: PlannerFormElement[]): PlannerFormField[] {
   const fields: PlannerFormField[] = [];
-  for (const element of walkElements(elements)) {
-    const field = elementToField(element, fields.length + 1);
-    if (field) fields.push(field);
-  }
+  collectFields(elements, true, fields);
   return fields.map((field, index) => ({ ...field, order: index + 1 }));
 }
 

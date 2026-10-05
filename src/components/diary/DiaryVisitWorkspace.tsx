@@ -63,6 +63,7 @@ import {
   isVisitChooserPlannerFormType,
   plannerFormTypeToVisitTab,
   resolveSalesRequestDraftWrite,
+  resolveStartedVisitFormSnapshot,
   resolveVisitPlannerFormType,
   resolveVisitSalesRequestType,
   resolveVisitWorkspaceSurface,
@@ -752,17 +753,30 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
           Boolean(user?.isSuperAdmin);
 
         if (plannerFormType && !isCompletedVisit) {
-          const [published, crmSource, editable] = await Promise.all([
-            getPublishedPlannerForm(plannerFormType),
+          const [crmSource, editable] = await Promise.all([
             resolveFreshCrmPrefillSource(appointment),
             canLookupSalesRequestDraft
               ? findEditableSalesRequestForAppointment(appointment._id)
               : Promise.resolve(null),
           ]);
+          const savedFormData = editable?.formData || {};
+          const savedSchema = savedFormData.formSchemaSnapshot as PlannerFormPublished | undefined;
+          const kept = resolveStartedVisitFormSnapshot({
+            completedAt: sessionRef.current?.dynamicForm?.completedAt,
+            localSchema: sessionRef.current?.dynamicForm?.formSchemaSnapshot,
+            savedSchema,
+            appointmentStatus: appointment.status,
+            hasPersistedRequest: Boolean(editable?._id),
+          });
+          const published = kept.keep
+            ? null
+            : await getPublishedPlannerForm(plannerFormType).catch((error: unknown) => {
+                if (kept.schema) return null;
+                throw error;
+              });
           if (!cancelled) {
             setSession((current) => {
               if (!current) return current;
-              // Do not overwrite a sheet the rep already finished in this visit.
               if (current.dynamicForm?.completedAt) return current;
 
               const formData = editable?.formData || {};
@@ -770,8 +784,36 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
                 formData.values && typeof formData.values === 'object'
                   ? (formData.values as VisitDynamicFormState['values'])
                   : null;
-              const savedSchema = formData.formSchemaSnapshot as PlannerFormPublished | undefined;
               const hasSavedSnapshot = Boolean(editable?._id && savedValues);
+              const retained = resolveStartedVisitFormSnapshot({
+                completedAt: current.dynamicForm?.completedAt,
+                localSchema: current.dynamicForm?.formSchemaSnapshot,
+                savedSchema,
+                appointmentStatus: appointment.status,
+                hasPersistedRequest: Boolean(editable?._id),
+              });
+              if (retained.keep && retained.schema) {
+                const next: VisitSession = {
+                  ...current,
+                  salesRequestId: editable?._id || current.salesRequestId,
+                  notes: current.notes || editable?.visitNotes || '',
+                  selectedPlannerFormType: current.selectedPlannerFormType || plannerFormType,
+                  dynamicForm: {
+                    ...(current.dynamicForm || {
+                      formTemplateType: plannerFormType,
+                      formTemplateName: retained.schema.name || retained.schema.title,
+                      formTemplateVersion: retained.schema.version,
+                      values: savedValues || {},
+                    }),
+                    formTemplateType: current.dynamicForm?.formTemplateType || plannerFormType,
+                    formSchemaSnapshot: retained.schema,
+                    values: current.dynamicForm?.values || savedValues || {},
+                  },
+                };
+                saveVisitSession(next);
+                return next;
+              }
+              if (!published) return current;
               const publishedForVisit = stripHiddenRfcPlannerFields({
                 ...published,
                 type: plannerFormType,
@@ -1128,6 +1170,31 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
       if (!currentAppointment) {
         throw new Error('Visit appointment is not ready.');
       }
+      const existing = sessionRef.current;
+      const alreadyStarted = resolveStartedVisitFormSnapshot({
+        localSchema:
+          existing?.dynamicForm?.formTemplateType === plannerFormType
+            ? existing.dynamicForm.formSchemaSnapshot
+            : null,
+        appointmentStatus: currentAppointment.status,
+        hasPersistedRequest: Boolean(existing?.salesRequestId),
+        completedAt: existing?.dynamicForm?.completedAt,
+      });
+      if (alreadyStarted.keep && alreadyStarted.schema && existing?.dynamicForm) {
+        setTemplateLoadError(null);
+        const kept: VisitSession = {
+          ...existing,
+          selectedPlannerFormType: plannerFormType,
+          dynamicForm: {
+            ...existing.dynamicForm,
+            formSchemaSnapshot: alreadyStarted.schema,
+          },
+        };
+        sessionRef.current = kept;
+        saveVisitSession(kept);
+        setSession(kept);
+        return;
+      }
       const [published, crmSource] = await Promise.all([
         getPublishedPlannerForm(plannerFormType),
         resolveFreshCrmPrefillSource(currentAppointment),
@@ -1139,6 +1206,27 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
           const kept: VisitSession = {
             ...current,
             selectedPlannerFormType: plannerFormType,
+          };
+          saveVisitSession(kept);
+          return kept;
+        }
+
+        const retained = resolveStartedVisitFormSnapshot({
+          localSchema:
+            current.dynamicForm?.formTemplateType === plannerFormType
+              ? current.dynamicForm.formSchemaSnapshot
+              : null,
+          appointmentStatus: appointmentRef.current?.status,
+          hasPersistedRequest: Boolean(current.salesRequestId),
+        });
+        if (retained.keep && retained.schema && current.dynamicForm) {
+          const kept: VisitSession = {
+            ...current,
+            selectedPlannerFormType: plannerFormType,
+            dynamicForm: {
+              ...current.dynamicForm,
+              formSchemaSnapshot: retained.schema,
+            },
           };
           saveVisitSession(kept);
           return kept;
@@ -1403,7 +1491,9 @@ const DiaryVisitWorkspace: React.FC<DiaryVisitWorkspaceProps> = ({
   const isNewServiceLevelVisit =
     effectivePlannerFormType === 'new_service_level' && hasLoadedSheetForm;
   const isGeneralVisitVisit =
-    isGeneralVisitPlannerFormType(effectivePlannerFormType) && hasLoadedSheetForm;
+    (isGeneralVisitPlannerFormType(effectivePlannerFormType) ||
+      effectivePlannerFormType === 'rental_rfc') &&
+    hasLoadedSheetForm;
   const hasSheetForm = Boolean(effectivePlannerFormType && hasLoadedSheetForm);
   const rfcProgress = session.rfcForm ? getRfcFormProgress(session.rfcForm) : null;
   const loanRentalProgress = session.loanRentalForm

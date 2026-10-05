@@ -26,16 +26,14 @@ import {
   type PlannerFormType,
 } from '../../lib/api';
 import {
-  appendElement,
-  createBlankElement,
   ensureDraftElements,
-  syncContentFromElements,
 } from './formBuilderUtils';
-import { VisualFormBuilder } from './VisualFormBuilder';
+import { RepFormQuestionEditor } from './RepFormQuestionEditor';
 import {
   generalVisitFormStatusLabel,
   isGeneralVisitAdminForm,
   splitAdminPlannerForms,
+  SYSTEM_FORM_TYPES,
 } from './plannerFormEditorUtils';
 
 interface PlannerFormEditorModalProps {
@@ -63,6 +61,9 @@ function fallbackMeta(type: string): { name: string; description: string } {
   if (type === 'new_service_level') {
     return { name: 'New Service Level', description: 'New service level agreement' };
   }
+  if (type === 'rental_rfc') {
+    return { name: 'Rental RFC', description: 'Rental request captured during the visit' };
+  }
   return { name: 'RFC', description: 'Internal Request For Costing' };
 }
 
@@ -75,6 +76,8 @@ export function PlannerFormEditorModal({
 }: PlannerFormEditorModalProps): React.ReactElement | null {
   const [forms, setForms] = useState<PlannerFormAdminTemplate[]>([]);
   const [generalVisitForms, setGeneralVisitForms] = useState<PlannerFormAdminTemplate[]>([]);
+  const [archivedForms, setArchivedForms] = useState<PlannerFormAdminTemplate[]>([]);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [listLoading, setListLoading] = useState(false);
   const [selectedType, setSelectedType] = useState<PlannerFormType | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<PlannerFormAdminTemplate | null>(null);
@@ -87,7 +90,6 @@ export function PlannerFormEditorModal({
   const [mutating, setMutating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [showDonePrompt, setShowDonePrompt] = useState(false);
   const [showCreateGeneralVisit, setShowCreateGeneralVisit] = useState(false);
   const [createName, setCreateName] = useState('');
   const [createDescription, setCreateDescription] = useState('');
@@ -104,6 +106,7 @@ export function PlannerFormEditorModal({
       const split = splitAdminPlannerForms(result.forms || []);
       setForms(split.systemForms);
       setGeneralVisitForms(split.generalVisitForms);
+      setArchivedForms(split.archivedForms);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load forms');
     } finally {
@@ -114,26 +117,20 @@ export function PlannerFormEditorModal({
   /**
    * Opens the builder using the persisted DRAFT configuration (not published).
    */
-  const loadType = useCallback(async (type: PlannerFormType, autoAddField = false) => {
+  const loadType = useCallback(async (type: PlannerFormType) => {
     setSelectedType(type);
     setLoading(true);
     setError(null);
     setMessage(null);
-    setShowDonePrompt(false);
     setDraft(null);
     try {
       const template = await getAdminPlannerForm(type);
-      let nextDraft = ensureDraftElements(template.draft || template.published || {
+      const nextDraft = ensureDraftElements(template.draft || template.published || {
         name: fallbackMeta(type).name,
         title: fallbackMeta(type).name,
         description: fallbackMeta(type).description,
         fields: [],
       });
-      if (autoAddField) {
-        const blank = createBlankElement('text', 1);
-        const elements = appendElement(nextDraft.elements || [], blank);
-        nextDraft = syncContentFromElements(nextDraft, elements);
-      }
       setDraft(nextDraft);
       setPublishedVersion(template.published?.version ?? null);
       setHasUnpublishedChanges(Boolean(template.hasUnpublishedChanges));
@@ -154,7 +151,6 @@ export function PlannerFormEditorModal({
       setDraft(null);
       setError(null);
       setMessage(null);
-      setShowDonePrompt(false);
       setShowCreateGeneralVisit(false);
       return;
     }
@@ -175,7 +171,6 @@ export function PlannerFormEditorModal({
     setDraft(null);
     setError(null);
     setMessage(null);
-    setShowDonePrompt(false);
     void loadFormList();
   }
 
@@ -188,8 +183,8 @@ export function PlannerFormEditorModal({
    */
   function handleSaveClick(): void {
     if (!selectedType || !draft) return;
-    setShowDonePrompt(true);
     setError(null);
+    void handleNotDoneYet();
   }
 
   /**
@@ -197,16 +192,15 @@ export function PlannerFormEditorModal({
    */
   async function handleNotDoneYet(): Promise<void> {
     if (!selectedType || !draft) return;
-    setShowDonePrompt(false);
     setSaving(true);
     setError(null);
     setMessage(null);
     try {
       const payload = ensureDraftElements(draft);
-      await saveAdminPlannerFormDraft(selectedType, payload);
-      setSelectedType(null);
-      setDraft(null);
-      setMessage('Draft saved. Use Continue editing to keep working.');
+      const updated = await saveAdminPlannerFormDraft(selectedType, payload);
+      setSelectedTemplate(updated);
+      setHasUnpublishedChanges(true);
+      setMessage('Draft saved. Representatives will not see it until you publish.');
       await loadFormList();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to save draft');
@@ -216,34 +210,10 @@ export function PlannerFormEditorModal({
   }
 
   /**
-   * Yes, done — publish and clear draft status so the form card stays clean.
-   */
-  async function handleYesDone(): Promise<void> {
-    if (!selectedType || !draft) return;
-    setShowDonePrompt(false);
-    setPublishing(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const payload = ensureDraftElements(draft);
-      await publishAdminPlannerForm(selectedType, payload);
-      setSelectedType(null);
-      setDraft(null);
-      setMessage('Done. Form is live for reps.');
-      await loadFormList();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to finish form');
-    } finally {
-      setPublishing(false);
-    }
-  }
-
-  /**
-   * Direct publish (footer button) — same as Yes, done.
+   * Publishes the current draft as the next version for future visits.
    */
   async function handlePublish(): Promise<void> {
     if (!selectedType || !draft) return;
-    setShowDonePrompt(false);
     setPublishing(true);
     setError(null);
     setMessage(null);
@@ -312,7 +282,7 @@ export function PlannerFormEditorModal({
 
   async function handleArchive(): Promise<void> {
     if (!selectedType) return;
-    if (!window.confirm('Archive this form? Representatives will not see it.')) return;
+    setShowArchiveConfirm(false);
     setMutating(true);
     setError(null);
     try {
@@ -334,7 +304,11 @@ export function PlannerFormEditorModal({
     try {
       const updated = await restoreAdminPlannerForm(selectedType);
       setSelectedTemplate(updated);
-      setMessage('Form restored. Publish it again if representatives should see it.');
+      setMessage(
+        updated.published
+          ? 'Form restored. Representatives see the last published version. Draft edits stay unpublished until you publish.'
+          : 'Form restored. It stays hidden from representatives until you publish.',
+      );
       await loadFormList();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to restore form');
@@ -349,6 +323,10 @@ export function PlannerFormEditorModal({
     selectedTemplate;
   const isSelectedGeneralVisit = Boolean(
     selectedListItem && isGeneralVisitAdminForm(selectedListItem),
+  );
+  const canArchiveSelected = Boolean(
+    selectedType &&
+      (isSelectedGeneralVisit || (SYSTEM_FORM_TYPES as readonly string[]).includes(selectedType)),
   );
   const headerTitle = selectedType
     ? selectedListItem?.published?.name ||
@@ -380,7 +358,7 @@ export function PlannerFormEditorModal({
               <h2 className="text-lg font-extrabold text-slate-900">{headerTitle}</h2>
               <p className="text-sm text-slate-500">
                 {selectedType
-                  ? 'Save asks if you are done. No = draft. Yes = live for reps.'
+                  ? `Save draft keeps this private. Publish sends it to representatives.${publishedVersion ? ` Published version ${publishedVersion}.` : ''}`
                   : 'Choose a form to open and edit'}
               </p>
             </div>
@@ -399,16 +377,8 @@ export function PlannerFormEditorModal({
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
           {!selectedType ? (
             <div className="relative rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-              <button
-                type="button"
-                onClick={() => void loadType('rfc', true)}
-                className="absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-xl border border-ars-primary/40 bg-white px-3 py-2 text-xs font-bold text-ars-primary shadow-sm hover:bg-ars-primary/5"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Add field
-              </button>
-              <p className="mb-3 pr-28 text-xs text-slate-600">
-                Open a form below. Unfinished work stays as Draft until you say you are done.
+              <p className="mb-3 text-xs text-slate-600">
+                Open a form, switch questions on or off, then save a draft or publish.
               </p>
 
               {listLoading ? (
@@ -529,6 +499,34 @@ export function PlannerFormEditorModal({
                   </div>
                 )}
               </div>
+
+              <div className="mt-6 border-t border-slate-200 pt-4">
+                <h3 className="text-sm font-extrabold text-slate-900">Archived forms</h3>
+                <p className="mb-3 text-xs text-slate-500">
+                  Archived forms are hidden from new visits. Existing visits, answers and documents stay as they are.
+                </p>
+                {archivedForms.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-6 text-center text-sm text-slate-500">
+                    No archived forms.
+                  </p>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {archivedForms.map((item) => (
+                      <button
+                        key={item.type}
+                        type="button"
+                        onClick={() => void loadType(item.type)}
+                        className="rounded-2xl border border-slate-200 bg-white p-4 text-left"
+                      >
+                        <span className="block text-base font-extrabold text-slate-900">
+                          {item.published?.name || item.draft?.name || item.type}
+                        </span>
+                        <span className="mt-1 block text-xs font-bold text-slate-600">Archived</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           ) : loading || !draft ? (
             <div className="flex items-center justify-center py-16 text-slate-500">
@@ -536,10 +534,8 @@ export function PlannerFormEditorModal({
               Loading form…
             </div>
           ) : (
-            <VisualFormBuilder
+            <RepFormQuestionEditor
               draft={draft}
-              publishedVersion={publishedVersion}
-              hasUnpublishedChanges={hasUnpublishedChanges}
               onChange={(next) => {
                 setDraft(next);
                 setHasUnpublishedChanges(true);
@@ -580,18 +576,18 @@ export function PlannerFormEditorModal({
                   Unpublish
                 </button>
               ) : null}
-              {isSelectedGeneralVisit && selectedListItem?.isActive !== false ? (
+              {canArchiveSelected && selectedListItem?.isActive !== false ? (
                 <button
                   type="button"
                   disabled={saving || publishing || mutating}
-                  onClick={() => void handleArchive()}
+                  onClick={() => setShowArchiveConfirm(true)}
                   className="inline-flex items-center gap-2 rounded-xl border border-amber-300 px-4 py-2.5 text-sm font-bold text-amber-800 hover:bg-amber-50 disabled:opacity-50"
                 >
                   <Archive className="h-4 w-4" />
                   Archive
                 </button>
               ) : null}
-              {isSelectedGeneralVisit && selectedListItem?.isActive === false ? (
+              {canArchiveSelected && selectedListItem?.isActive === false ? (
                 <button
                   type="button"
                   disabled={saving || publishing || mutating}
@@ -672,39 +668,31 @@ export function PlannerFormEditorModal({
           </div>
         ) : null}
 
-        {showDonePrompt ? (
-          <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
-            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-              <h3 className="text-lg font-extrabold text-slate-900">Are you done editing?</h3>
-              <p className="mt-2 text-sm text-slate-600">
-                <strong>No</strong> — save as draft and continue later.
-                <br />
-                <strong>Yes</strong> — you are done; make it live for reps (no draft on the card).
+        {showArchiveConfirm ? (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/70 p-4">
+            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+              <h3 className="text-lg font-bold text-gray-900">Archive form</h3>
+              <p className="mt-3 text-sm text-gray-700">
+                {headerTitle} will no longer be available for new selection. Existing visits, answers,
+                submissions and documents remain intact.
               </p>
-              <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <div className="mt-6 flex items-center justify-end gap-3">
                 <button
                   type="button"
-                  disabled={saving || publishing}
-                  onClick={() => setShowDonePrompt(false)}
-                  className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-bold text-slate-600"
+                  disabled={mutating}
+                  onClick={() => setShowArchiveConfirm(false)}
+                  className="px-4 py-2 text-sm font-bold uppercase text-gray-600"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
-                  disabled={saving || publishing}
-                  onClick={() => void handleNotDoneYet()}
-                  className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-50 disabled:opacity-50"
+                  disabled={mutating}
+                  onClick={() => void handleArchive()}
+                  className="inline-flex items-center gap-2 rounded-lg bg-amber-700 px-6 py-2 text-sm font-bold text-white disabled:opacity-50"
                 >
-                  {saving ? 'Saving…' : 'No — save draft'}
-                </button>
-                <button
-                  type="button"
-                  disabled={saving || publishing}
-                  onClick={() => void handleYesDone()}
-                  className="rounded-xl bg-ars-primary px-3 py-2 text-sm font-bold text-white hover:bg-ars-primary/90 disabled:opacity-50"
-                >
-                  {publishing ? 'Publishing…' : 'Yes — done'}
+                  <Archive className="h-4 w-4" />
+                  Archive form
                 </button>
               </div>
             </div>

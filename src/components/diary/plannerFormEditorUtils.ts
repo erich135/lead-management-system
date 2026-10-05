@@ -1,6 +1,6 @@
 import type { PlannerFormAdminTemplate } from '../../lib/api';
 
-export const SYSTEM_FORM_TYPES = ['rfc', 'loan_rental', 'new_service_level'] as const;
+export const SYSTEM_FORM_TYPES = ['rfc', 'loan_rental', 'rental_rfc', 'new_service_level'] as const;
 
 /**
  * Returns true when an admin template is a custom General Visit form.
@@ -21,25 +21,33 @@ export function isGeneralVisitAdminForm(form: {
 export function splitAdminPlannerForms(forms: PlannerFormAdminTemplate[]): {
   systemForms: PlannerFormAdminTemplate[];
   generalVisitForms: PlannerFormAdminTemplate[];
+  archivedForms: PlannerFormAdminTemplate[];
 } {
   const byType = new Map(forms.map((form) => [form.type, form]));
-  const systemForms = SYSTEM_FORM_TYPES.map(
-    (type) =>
-      byType.get(type) ||
-      ({
-        type,
-        draft: { name: type, title: type, fields: [] },
-        published: null,
-        hasUnpublishedChanges: false,
-        isSystem: true,
-        formCategory: 'system',
-        isActive: true,
-      } as PlannerFormAdminTemplate),
-  );
-  const generalVisitForms = forms
-    .filter((form) => isGeneralVisitAdminForm(form))
+  const archivedForms = forms
+    .filter((form) => form.isActive === false)
+    .filter((form) => isGeneralVisitAdminForm(form) || (SYSTEM_FORM_TYPES as readonly string[]).includes(form.type))
     .sort((left, right) => (left.displayOrder ?? 100) - (right.displayOrder ?? 100));
-  return { systemForms, generalVisitForms };
+  const systemForms = SYSTEM_FORM_TYPES.flatMap((type) => {
+    const existing = byType.get(type);
+    if (existing?.isActive === false) return [];
+    return [
+      existing ||
+        ({
+          type,
+          draft: { name: type, title: type, fields: [] },
+          published: null,
+          hasUnpublishedChanges: false,
+          isSystem: true,
+          formCategory: 'system',
+          isActive: true,
+        } as PlannerFormAdminTemplate),
+    ];
+  });
+  const generalVisitForms = forms
+    .filter((form) => isGeneralVisitAdminForm(form) && form.isActive !== false)
+    .sort((left, right) => (left.displayOrder ?? 100) - (right.displayOrder ?? 100));
+  return { systemForms, generalVisitForms, archivedForms };
 }
 
 /**

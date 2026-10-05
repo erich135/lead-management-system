@@ -16,7 +16,7 @@ import {
   salesProposalEditorPath,
 } from '../navigation';
 import { customerProposalCalculationBasisCopy } from '../electricityCalculationBasis';
-import type { CustomerProposalDocument } from '../types';
+import type { CustomerProposalDocument, ProposalOptionReport } from '../types';
 
 const ARS_LOGO_SRC = '/Logo.png';
 
@@ -231,7 +231,15 @@ function ElectricitySavingStages({
   );
 }
 
-function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
+function DocumentBody({
+  doc,
+  optionTitle = null,
+  suppressRecommendation = false,
+}: {
+  doc: CustomerProposalDocument;
+  optionTitle?: string | null;
+  suppressRecommendation?: boolean;
+}) {
   const revisionCallout = showsRevisionCallout(doc);
   const savingVisible = showsCommercialSaving(doc);
   const paybackVisible = showsPayback(doc);
@@ -313,7 +321,7 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
           alt=""
           className="spt-proposal-watermark"
         />
-        <h1 className="spt-proposal-title">{doc.documentTitle}</h1>
+        <h1 className="spt-proposal-title">{optionTitle ?? doc.documentTitle}</h1>
         <dl className="spt-proposal-meta">
           <div>
             <dt>Prepared for</dt>
@@ -391,7 +399,9 @@ function DocumentBody({ doc }: { doc: CustomerProposalDocument }) {
 
         <section className="spt-proposal-recommend">
           <h2 className="spt-proposal-h2">Recommendation</h2>
-          <p className="spt-proposal-closing">{doc.recommendation}</p>
+          {doc.operatingArrangement && <p className="spt-proposal-body">{doc.operatingArrangement}</p>}
+          {doc.refurbishmentNote && <p className="spt-proposal-body">{doc.refurbishmentNote}</p>}
+          {!suppressRecommendation && <p className="spt-proposal-closing">{doc.recommendation}</p>}
           <p className="spt-proposal-body">{doc.purposeLead}</p>
           {proposedName && (
             <p className="spt-proposal-body spt-proposal-wrap">
@@ -1095,6 +1105,7 @@ const PRINT_HEADER_FOOTER_HINT =
 export function CustomerProposalPreviewPage() {
   const { proposalId } = useParams();
   const [document, setDocument] = useState<CustomerProposalDocument | null>(null);
+  const [optionReports, setOptionReports] = useState<ProposalOptionReport[] | null>(null);
   const [revision, setRevision] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1146,6 +1157,7 @@ export function CustomerProposalPreviewPage() {
         rememberReportSnapshot(proposal);
         setRevision(proposal.revision ?? proposal.customerProposal?.revision ?? 1);
         setDocument(proposal.customerProposal ?? null);
+        setOptionReports(proposal.optionReports ?? null);
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -1194,7 +1206,33 @@ export function CustomerProposalPreviewPage() {
         </p>
       )}
       {error && <p className="spt-customer-proposal-status spt-customer-proposal-error">{error}</p>}
-      {!loading && !error && document && <DocumentBody doc={document} />}
+      {!loading && !error && document && (
+        <div className="spt-customer-proposal-document">
+          {(optionReports?.length ?? 0) > 1 && (
+            <section className="spt-proposal-block spt-customer-proposal-sheet">
+              <h1>Included alternatives</h1>
+              <p>
+                Prepared for {document.preparedFor ?? 'the customer'}
+                {document.siteName ? ` at ${document.siteName}` : ''}. The current installation and Air Audit are shared. Each section below uses that alternative’s saved equipment and commercial terms.
+              </p>
+              <ol>
+                {optionReports?.map((report, index) => (
+                  <li key={report.id}>OPTION {index + 1} — {report.name}</li>
+                ))}
+              </ol>
+            </section>
+          )}
+          {((optionReports?.length ?? 0) > 0 ? optionReports ?? [] : [{ id: 'current', name: '', document }]).map((report, index, reports) => (
+            <div key={report.id} className={index > 0 ? 'spt-option-report' : undefined}>
+              <DocumentBody
+                doc={report.document}
+                optionTitle={reports.length > 1 ? `OPTION ${index + 1} — ${report.name}` : null}
+                suppressRecommendation={reports.length > 1}
+              />
+            </div>
+          ))}
+        </div>
+      )}
       {!loading && !error && !document && (
         <p className="spt-customer-proposal-status">This proposal is not ready to preview yet.</p>
       )}

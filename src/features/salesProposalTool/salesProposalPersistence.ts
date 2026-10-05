@@ -50,6 +50,8 @@ export interface SalesProposalEditorState {
     machineIds: string[];
   } | null;
   configurationAcceptance?: ConfigurationAcceptanceRequest;
+  options?: unknown;
+  activeOptionId?: string;
   ifRevision?: number;
 }
 
@@ -67,6 +69,8 @@ export interface SalesProposalSavePayload {
   airAuditScope: AirAuditScope;
   airAuditScopeConfirmation?: SalesProposalEditorState['airAuditScopeConfirmation'];
   configurationAcceptance?: ConfigurationAcceptanceRequest;
+  options?: unknown;
+  activeOptionId?: string;
   ifRevision?: number;
 }
 
@@ -100,6 +104,7 @@ export function buildSalesProposalSavePayload(
     electricityBasis: state.electricityBasis,
     operatingAssumptions: state.operatingAssumptions,
     commercialOffer: state.commercialOffer,
+    ...(state.options !== undefined ? { options: state.options, activeOptionId: state.activeOptionId } : {}),
     electricityCalculationBasis: state.electricityCalculationBasis,
     airAuditScope: state.airAuditScope,
     ...(state.airAuditScopeConfirmation
@@ -124,6 +129,7 @@ export async function saveThenPreviewCustomerProposal(options: {
   proposalId: string | undefined;
   state: SalesProposalEditorState;
   save: PersistSalesProposal;
+  openPath?: (id: string) => string;
 }): Promise<SaveThenPreviewResult> {
   if (!options.proposalId) {
     return { kind: 'blocked', error: PREVIEW_SAVE_FAILED_MESSAGE };
@@ -136,7 +142,7 @@ export async function saveThenPreviewCustomerProposal(options: {
     });
     return {
       kind: 'open',
-      path: salesProposalPreviewPath(proposal.id),
+      path: (options.openPath ?? salesProposalPreviewPath)(proposal.id),
       proposal,
     };
   } catch {

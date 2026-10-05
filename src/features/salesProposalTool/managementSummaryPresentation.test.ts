@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  finalElectricitySavingPresentation,
   humanizeTimestamps,
   offerTermRows,
+  overallFinancialEffect,
   paybackPresentation,
   readableProposalReference,
 } from './managementSummaryPresentation';
@@ -55,5 +57,28 @@ describe('management summary presentation', () => {
     );
     expect(rows.map((row) => row.label)).toEqual(['Monthly payment', 'Agreement term']);
     expect(rows[0]?.value?.replace(/\u00a0/g, ' ')).toBe('R 24 737');
+  });
+
+  it('labels an annual rental increase as an additional cost, including payments', () => {
+    const effect = overallFinancialEffect({
+      commercial: { saving: 'R 180 924', savingHeadline: 'Estimated annual increase' },
+      financialBenefit: { mode: 'rental' },
+    } as CustomerProposalDocument);
+    expect(effect?.label).toBe('Additional annual cost, including rental payments');
+    expect(effect?.value).toBe('R 180 924');
+  });
+
+  it('uses the signed final electricity figure from the saved breakdown', () => {
+    const line = finalElectricitySavingPresentation({
+      requiresRevision: false,
+      electricity: {
+        saving: 'R 142 036',
+        costBreakdown: { finalSaving: 'R 239 076' },
+      },
+    } as CustomerProposalDocument);
+    expect(line).toEqual({
+      label: 'Final annual electricity saving',
+      value: 'R 239 076',
+    });
   });
 });

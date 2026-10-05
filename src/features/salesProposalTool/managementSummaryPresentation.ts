@@ -53,6 +53,61 @@ export function paybackPresentation(
   return null;
 }
 
+export function overallFinancialEffect(
+  doc: CustomerProposalDocument,
+): { label: string; value: string } | null {
+  const value = doc.commercial.saving;
+  if (!value) return null;
+  const increase = /increase/i.test(doc.commercial.savingHeadline ?? '');
+  const mode = doc.financialBenefit?.mode ?? 'none';
+  if (mode === 'purchase') {
+    return {
+      label: increase
+        ? 'Additional annual operating cost. The equipment investment is separate, and payments are not included'
+        : 'Net annual operating saving. The equipment investment is separate, and payments are not included',
+      value,
+    };
+  }
+  if (mode === 'rental') {
+    return {
+      label: increase
+        ? 'Additional annual cost, including rental payments'
+        : 'Net annual saving, including rental payments',
+      value,
+    };
+  }
+  if (mode === 'rent_to_own') {
+    return {
+      label: increase
+        ? 'Additional annual cost, including rent-to-own payments'
+        : 'Net annual saving, including rent-to-own payments',
+      value,
+    };
+  }
+  return {
+    label: increase ? 'Additional annual cost' : 'Net annual saving',
+    value,
+  };
+}
+
+export function finalElectricitySavingPresentation(doc: CustomerProposalDocument): {
+  label: string;
+  value: string;
+} {
+  const signed = doc.electricity.costBreakdown?.finalSaving;
+  if (signed) {
+    const increase = signed.startsWith('−') || signed.startsWith('-');
+    return {
+      label: increase ? 'Final annual electricity increase' : 'Final annual electricity saving',
+      value: signed,
+    };
+  }
+  return {
+    label: 'Final annual electricity saving',
+    value: doc.requiresRevision ? 'Withheld' : doc.electricity.saving ?? 'Not available',
+  };
+}
+
 export function commercialPositionNote(mode: OfferMode): string | null {
   if (mode === 'rent_to_own') {
     return 'The electricity saving is only the reduction in compressor electricity. It does not mean that saving covers the rent-to-own payments. The payments and the existing net position are shown separately.';

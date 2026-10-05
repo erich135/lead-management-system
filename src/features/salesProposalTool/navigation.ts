@@ -13,6 +13,10 @@ export function salesProposalPreviewPath(id: string): string {
   return `${SALES_PROPOSAL_TOOL_PATH}/${id}/proposal`;
 }
 
+export function salesProposalSummaryPath(id: string): string {
+  return `${SALES_PROPOSAL_TOOL_PATH}/${id}/summary`;
+}
+
 export function isSalesProposalToolPath(pathname: string): boolean {
   return (
     pathname === SALES_PROPOSAL_TOOL_PATH ||

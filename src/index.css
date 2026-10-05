@@ -1240,6 +1240,11 @@
     page-break-inside: avoid;
   }
 
+  .spt-option-report {
+    break-before: page;
+    page-break-before: always;
+  }
+
   .spt-ms-page {
     display: block;
     width: auto;

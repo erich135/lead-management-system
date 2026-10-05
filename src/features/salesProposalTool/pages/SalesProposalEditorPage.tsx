@@ -21,6 +21,7 @@ import { MachineSummaryCard } from '../components/MachineSummaryCard';
 import { ElectricityBasisSection } from '../components/ElectricityBasisSection';
 import { OperatingAssumptionsSection } from '../components/OperatingAssumptionsSection';
 import { CommercialOfferSection } from '../components/CommercialOfferSection';
+import { OperatingArrangementFields, ProposalOptionBar } from '../components/ProposalOptionControls';
 import { AirRequirementSection } from '../components/AirRequirementSection';
 import { EditorSection } from '../components/EditorSection';
 import { AirAuditImportReport } from '../components/AirAuditImportReport';
@@ -53,7 +54,10 @@ import {
   normaliseAirAuditScope,
   type AirAuditScope,
 } from '../airAuditScope';
-import { SALES_PROPOSAL_TOOL_LABEL, SALES_PROPOSAL_TOOL_PATH } from '../navigation';
+import { SALES_PROPOSAL_TOOL_LABEL, SALES_PROPOSAL_TOOL_PATH, salesProposalSummaryPath } from '../navigation';
+import { managementSummaryUnavailableReasons } from '../managementSummaryReadiness';
+import { appendProposalOption, editorOptionsFromProposal, refurbishmentSentence, type EditorOption } from '../proposalOptions';
+import type { OperatingArrangement } from '../types';
 import {
   buildSalesProposalSavePayload,
   persistSalesProposalEditor,
@@ -121,6 +125,11 @@ export function SalesProposalEditorPage() {
   const [commercialOffer, setCommercialOffer] = useState<CommercialOffer>(
     commercialOfferOrEmpty(null),
   );
+  const [options, setOptions] = useState<EditorOption[]>([]);
+  const [activeOptionId, setActiveOptionId] = useState('option_1');
+  const [arrangement, setArrangement] = useState<OperatingArrangement>('all_run_together');
+  const [optionNotice, setOptionNotice] = useState<string | null>(null);
+  const optionControlsRef = useRef<HTMLDivElement>(null);
   const [electricityCalculationBasis, setElectricityCalculationBasis] =
     useState<ElectricityCalculationBasis>('published_capacity');
   const [airAuditScope, setAirAuditScope] = useState<AirAuditScope>(DEFAULT_AIR_AUDIT_SCOPE);
@@ -172,7 +181,12 @@ export function SalesProposalEditorPage() {
             drafts.filter(currentMachineHasIdentity).map((row) => row.key),
           ),
         );
-        setProposed(proposedDraftsFromProposal(loaded.proposedEquipment));
+        const loadedOptions = editorOptionsFromProposal(loaded);
+        const active = loadedOptions.find((option) => !option.archived) ?? loadedOptions[0];
+        setOptions(loadedOptions);
+        setActiveOptionId(active.id);
+        setArrangement(active.arrangement);
+        setProposed(active.proposed);
         setElectricityBasis(electricityBasisOrEmpty(loaded.electricityBasis));
         setOperatingAssumptions(
           operatingAssumptionsOrEmpty({
@@ -182,7 +196,7 @@ export function SalesProposalEditorPage() {
               (loaded.airAudit ? true : loaded.operatingAssumptions?.hasAirAudit ?? null),
           }),
         );
-        setCommercialOffer(commercialOfferOrEmpty(loaded.commercialOffer));
+        setCommercialOffer(active.commercialOffer);
         setElectricityCalculationBasis(
           loaded.electricityCalculationBasis ??
             defaultElectricityCalculationBasis(Boolean(loaded.airAudit)),
@@ -341,7 +355,80 @@ export function SalesProposalEditorPage() {
       airAuditScope,
       airAuditScopeConfirmation: scopeConfirmationPayload(),
       configurationAcceptance: configurationAcceptanceRequest,
+      options: flushOptions().map((option) => ({
+        id: option.id,
+        name: option.name,
+        includedInReport: option.includedInReport,
+        archived: option.archived,
+        arrangement: option.arrangement,
+        proposedEquipment: toProposedEquipmentPayload(option.proposed).map((row) => ({
+          ...row,
+          runningQuantity: option.arrangement === 'some_rest' ? row.runningQuantity ?? row.quantity : null,
+        })),
+        commercialOffer: option.commercialOffer,
+      })),
+      activeOptionId,
     };
+  }
+
+  function flushOptions(): EditorOption[] {
+    const base = options.length > 0 ? options : [{
+      id: activeOptionId,
+      name: 'Option 1',
+      includedInReport: true,
+      archived: false,
+      arrangement,
+      proposed,
+      commercialOffer,
+    }];
+    return base.map((option) =>
+      option.id === activeOptionId ? { ...option, proposed, commercialOffer, arrangement } : option,
+    );
+  }
+
+  function selectOption(id: string) {
+    const flushed = flushOptions();
+    const next = flushed.find((option) => option.id === id && !option.archived);
+    if (!next) return;
+    setOptions(flushed);
+    setActiveOptionId(id);
+    setArrangement(next.arrangement);
+    setProposed(next.proposed);
+    setCommercialOffer(next.commercialOffer);
+  }
+
+  function addOption() {
+    const { options: nextOptions, created } = appendProposalOption(
+      flushOptions(),
+      { id: activeOptionId, proposed, commercialOffer, arrangement },
+      `option_${Date.now()}`,
+    );
+    setOptions(nextOptions);
+    setActiveOptionId(created.id);
+    setArrangement(created.arrangement);
+    setProposed(created.proposed);
+    setCommercialOffer(created.commercialOffer);
+    setOptionNotice(`${created.name} created. Edit its equipment or price below.`);
+  }
+
+  useEffect(() => {
+    if (!optionNotice) return;
+    optionControlsRef.current?.scrollIntoView({ block: 'center' });
+    const nameField = optionControlsRef.current?.querySelector('input');
+    if (nameField instanceof HTMLInputElement) nameField.focus();
+  }, [optionNotice, activeOptionId]);
+
+  function archiveOption(id: string) {
+    const flushed = flushOptions().map((option) =>
+      option.id === id ? { ...option, archived: true, includedInReport: false } : option,
+    );
+    const next = flushed.find((option) => !option.archived);
+    if (!next) return;
+    setOptions(flushed);
+    setActiveOptionId(next.id);
+    setArrangement(next.arrangement);
+    setProposed(next.proposed);
+    setCommercialOffer(next.commercialOffer);
   }
 
   function scopeConfirmationPayload(): SalesProposalEditorState['airAuditScopeConfirmation'] {
@@ -429,10 +516,17 @@ export function SalesProposalEditorPage() {
         drafts.filter(currentMachineHasIdentity).map((row) => row.key),
       ),
     );
-    setProposed(proposedDraftsFromProposal(saved.proposedEquipment));
+    const savedOptions = editorOptionsFromProposal(saved);
+    const savedActive = savedOptions.find((option) => option.id === activeOptionId && !option.archived)
+      ?? savedOptions.find((option) => !option.archived)
+      ?? savedOptions[0];
+    setOptions(savedOptions);
+    setActiveOptionId(savedActive.id);
+    setArrangement(savedActive.arrangement);
+    setProposed(savedActive.proposed);
+    setCommercialOffer(savedActive.commercialOffer);
     setElectricityBasis(electricityBasisOrEmpty(saved.electricityBasis));
     setOperatingAssumptions(operatingAssumptionsOrEmpty(saved.operatingAssumptions));
-    setCommercialOffer(commercialOfferOrEmpty(saved.commercialOffer));
     setScopeConfirmed(Boolean(saved.airAuditScopeConfirmation?.sourceSha256));
     setComparison(saved.comparison);
     setCommercial(saved.commercial);
@@ -499,6 +593,31 @@ export function SalesProposalEditorPage() {
         proposalId,
         state: editorPersistenceState(),
         save: saveSalesProposal,
+      });
+      if (result.kind === 'blocked') {
+        setError(PREVIEW_SAVE_FAILED_MESSAGE);
+        return;
+      }
+      applyPersistedProposal(result.proposal);
+      rememberReportSnapshot(result.proposal);
+      navigate(result.path);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleOpenManagementSummary() {
+    if (!proposalId || saving || uploading || removingAirAudit) return;
+    if (summaryUnavailableReasons.length > 0) return;
+    setSaving(true);
+    setSaveMessage(null);
+    setError(null);
+    try {
+      const result = await saveThenPreviewCustomerProposal({
+        proposalId,
+        state: { ...editorPersistenceState(), ifRevision: proposal?.revision ?? 1 },
+        save: saveSalesProposal,
+        openPath: salesProposalSummaryPath,
       });
       if (result.kind === 'blocked') {
         setError(PREVIEW_SAVE_FAILED_MESSAGE);
@@ -595,6 +714,29 @@ export function SalesProposalEditorPage() {
     setOperatingAssumptions((current) => ({ ...current, hasAirAudit: next }));
   }
 
+  const summaryUnavailableReasons = managementSummaryUnavailableReasons({
+    customerEntry,
+    customerId: customer?._id ?? null,
+    manualCompanyName: manualCustomer.companyName,
+    siteName: site.name,
+    hasCurrentMachine: currentEquipment.some(currentMachineHasIdentity),
+    hasProposedMachine: toProposedEquipmentPayload(proposed).length > 0,
+    activeOptionCount: flushOptions().filter((option) => !option.archived).length,
+    includedOptionCount: flushOptions().filter((option) => !option.archived && option.includedInReport).length,
+    includedOptionsMissingMachine: flushOptions().filter(
+      (option) => !option.archived && option.includedInReport && toProposedEquipmentPayload(option.proposed).length === 0,
+    ).length,
+    electricityRateRandPerKwh: comparison?.electricity.rateRandPerKwh ?? null,
+    uncapturedCount: uncaptured.length,
+  });
+  const summaryBusy = saving || uploading || removingAirAudit;
+  const summaryDisabled = summaryBusy || summaryUnavailableReasons.length > 0;
+  const summaryHelp = summaryBusy
+    ? 'Wait until the current save or upload finishes before opening the Management Summary.'
+    : summaryUnavailableReasons.length > 0
+      ? `Management Summary stays closed until this proposal is ready. ${summaryUnavailableReasons.join(' ')} The result line above the tabs shows when a result is available.`
+      : '';
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 py-12 text-sm text-slate-500">
@@ -618,7 +760,7 @@ export function SalesProposalEditorPage() {
             </p>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <Link
             to={SALES_PROPOSAL_TOOL_PATH}
             className="rounded-[8px] bg-slate-100 px-4 py-2 text-sm font-medium text-[#383838] hover:bg-slate-200"
@@ -635,6 +777,16 @@ export function SalesProposalEditorPage() {
           </button>
           <button
             type="button"
+            onClick={() => void handleOpenManagementSummary()}
+            disabled={summaryDisabled}
+            title={summaryHelp || undefined}
+            aria-describedby={summaryDisabled ? 'management-summary-availability' : undefined}
+            className="rounded-[8px] bg-slate-100 px-4 py-2 text-sm font-medium text-[#383838] hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Management Summary
+          </button>
+          <button
+            type="button"
             onClick={() => void handleSave()}
             disabled={saving}
             className="rounded-[8px] bg-[#f7c12b] px-4 py-2 text-sm font-bold text-[#383838] hover:brightness-95 disabled:opacity-50"
@@ -643,15 +795,43 @@ export function SalesProposalEditorPage() {
           </button>
         </div>
       </div>
+      {summaryHelp ? (
+        <p id="management-summary-availability" className="text-sm text-slate-600">
+          {summaryHelp}
+        </p>
+      ) : null}
       {error && <p className="text-sm text-red-600">{error}</p>}
       {saveMessage && <p className="mt-0 text-sm text-emerald-700">{saveMessage}</p>}
 
+      <ProposalOptionBar
+        options={flushOptions()}
+        activeOptionId={activeOptionId}
+        onSelect={selectOption}
+        onRename={(id, name) => setOptions((current) => current.map((option) => option.id === id ? { ...option, name } : option))}
+        onInclude={(id, included) => setOptions((current) => current.map((option) => option.id === id ? { ...option, includedInReport: included } : option))}
+        onArchive={archiveOption}
+        onAdd={addOption}
+        showAdd={false}
+      />
       <ProposalResultsStrip
-        savingText={
-          comparison?.electricity.outcome === 'saving'
-            ? formatEstimatedRand(comparison.electricity.estimatedSavingRand)
-            : null
+        savingLabel={
+          (comparison?.breakdown.costBreakdown?.annualSavingAfterVsdRand ?? 0) < 0
+            ? 'Final annual electricity increase'
+            : 'Final annual electricity saving'
         }
+        savingText={(() => {
+          const finalRand = comparison?.breakdown.costBreakdown?.annualSavingAfterVsdRand;
+          const amount = typeof finalRand === 'number'
+            ? finalRand
+            : comparison?.electricity.outcome === 'saving'
+              ? comparison.electricity.estimatedSavingRand
+              : comparison?.electricity.outcome === 'increase'
+                ? comparison.electricity.estimatedIncreaseRand == null
+                  ? null
+                  : -comparison.electricity.estimatedIncreaseRand
+                : null;
+          return amount == null ? null : formatEstimatedRand(Math.abs(amount));
+        })()}
         paybackText={
           commercial?.purchase?.paybackMonths == null
             ? null
@@ -879,6 +1059,7 @@ export function SalesProposalEditorPage() {
             instruction="Add the BOUWA machines you are offering. Different models and quantities are allowed. Specifications can always be edited."
           >
             <ProposedReplacementSection
+              key={activeOptionId}
               proposalId={proposal.id}
               rows={proposed}
               intakeAirTemperatureC={site.intakeAirTemperatureC ?? null}
@@ -888,6 +1069,22 @@ export function SalesProposalEditorPage() {
               }
               onChange={setProposed}
             />
+            <OperatingArrangementFields
+              rows={proposed}
+              arrangement={arrangement}
+              onArrangement={(next) => {
+                setArrangement(next);
+                if (next === 'some_rest') {
+                  setProposed((rows) => rows.map((row) => ({ ...row, runningQuantity: row.runningQuantity ?? 1 })));
+                }
+              }}
+              onRunningQuantity={(key, runningQuantity) =>
+                setProposed((rows) => rows.map((row) => (row.key === key ? { ...row, runningQuantity } : row)))
+              }
+            />
+            {refurbishmentSentence(proposed, arrangement) && (
+              <p className="text-sm text-[#383838]">{refurbishmentSentence(proposed, arrangement)}</p>
+            )}
           </EditorSection>
           <MachineSummaryCard
             current={currentEquipment}
@@ -968,17 +1165,23 @@ export function SalesProposalEditorPage() {
             title="Price"
             instruction="Enter the commercial offer, including buy-back, installation and extras."
           >
-            <CommercialOfferSection value={commercialOffer} onChange={setCommercialOffer} />
+            <CommercialOfferSection key={activeOptionId} value={commercialOffer} onChange={setCommercialOffer} />
           </EditorSection>
           <CommercialResultCard commercial={commercial} />
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className="rounded-[8px] bg-slate-100 px-3 py-2 text-sm font-bold"
-              onClick={() => navigate(`${SALES_PROPOSAL_TOOL_PATH}/${proposal.id}/summary`)}
-            >
-              Management Summary
-            </button>
+          <div ref={optionControlsRef}>
+            {optionNotice ? (
+              <p className="mb-2 text-sm font-medium text-emerald-700">{optionNotice}</p>
+            ) : null}
+            <ProposalOptionBar
+              options={flushOptions()}
+              activeOptionId={activeOptionId}
+              onSelect={selectOption}
+              onRename={(id, name) => setOptions((current) => current.map((option) => option.id === id ? { ...option, name } : option))}
+              onInclude={(id, included) => setOptions((current) => current.map((option) => option.id === id ? { ...option, includedInReport: included } : option))}
+              onArchive={archiveOption}
+              onAdd={addOption}
+              showAdd
+            />
           </div>
             </>
           ),

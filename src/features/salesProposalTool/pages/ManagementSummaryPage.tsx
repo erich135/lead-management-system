@@ -1,20 +1,22 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import React, { useEffect, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getSalesProposal, downloadCustomerProposalPdf } from '../api';
 import { customerProposalCalculationBasisCopy } from '../electricityCalculationBasis';
 import { machineDisplayName } from '../machineDisplayName';
 import {
   commercialPositionNote,
+  finalElectricitySavingPresentation,
   humanizeTimestamps,
   offerMode,
   offerTermRows,
+  overallFinancialEffect,
   paybackPresentation,
   readableProposalReference,
   type OfferMode,
 } from '../managementSummaryPresentation';
 import { readReportSnapshot, rememberReportSnapshot } from '../reportSnapshot';
 import { SALES_PROPOSAL_TOOL_PATH, salesProposalEditorPath, salesProposalPreviewPath } from '../navigation';
-import type { CommercialOffer, CustomerProposalDocument, SalesProposal } from '../types';
+import type { CommercialOffer, CustomerProposalDocument, ProposalOptionReport, SalesProposal } from '../types';
 
 export function ManagementSummaryPage() {
   const { proposalId } = useParams();
@@ -96,10 +98,13 @@ export function ManagementSummaryPage() {
       </div>
       {loading && <p className="spt-customer-proposal-status">Opening management summary…</p>}
       {error && <p className="spt-customer-proposal-status spt-customer-proposal-error">{error}</p>}
-      {doc && (
+      {proposal && (proposal.optionReports?.length ?? 0) > 1 && (
+        <MultiOptionManagementSummary reports={proposal.optionReports ?? []} revision={revision} />
+      )}
+      {doc && (proposal?.optionReports?.length ?? 0) <= 1 && (
         <ManagementSummaryDocument
-          doc={doc}
-          offer={proposal?.commercialOffer ?? null}
+          doc={proposal?.optionReports?.[0]?.document ?? doc}
+          offer={proposal?.optionReports?.[0]?.commercialOffer ?? proposal?.commercialOffer ?? null}
           revision={revision}
         />
       )}
@@ -134,6 +139,102 @@ export function ManagementSummaryDocument({
   );
 }
 
+export function MultiOptionManagementSummary({
+  reports,
+  revision,
+}: {
+  reports: ProposalOptionReport[];
+  revision: number;
+}) {
+  const shared = reports[0]?.document;
+  if (!shared) return null;
+  const reference = readableProposalReference(shared.reference);
+  const identity = `${shared.preparedFor ?? 'Customer'} · ${shared.siteName ?? 'Site'} · ${shared.date ?? ''} · ${reference} · revision ${revision}`;
+  const current = shared.currentMachines.map((machine) => machineDisplayName(machine.name, '')).filter(Boolean);
+  return (
+    <div className="spt-customer-proposal-canvas spt-customer-proposal-document">
+      <SummaryPage identity={identity}>
+        <p className="spt-ms-kicker">Management summary</p>
+        <h1 className="spt-ms-title">Compressed air proposal</h1>
+        <p className="spt-ms-lead">
+          Prepared for {shared.preparedFor ?? 'the customer'}
+          {shared.siteName ? ` at ${shared.siteName}` : ''}
+          {shared.siteLocation ? `, ${shared.siteLocation}` : ''}.
+        </p>
+        <p className="spt-proposal-body">
+          {current.length > 0
+            ? `The current installation is ${current.join('; ')}.`
+            : 'The current installation is recorded in the Technical Report.'}
+        </p>
+        <p className="spt-proposal-body">{shared.purposeLead}</p>
+        <h2 className="spt-proposal-h2">Included alternatives</h2>
+        <ol className="spt-ms-list">
+          {reports.map((report, index) => (
+            <li key={report.id}>
+              OPTION {index + 1} — {report.name}. {offerLabel(offerMode(report.document, report.commercialOffer))}.
+            </li>
+          ))}
+        </ol>
+        <p className="spt-proposal-body">
+          Each alternative follows on its own pages. Customer, site, current installation and the Air Audit are shared. Excluded and archived alternatives are omitted.
+        </p>
+      </SummaryPage>
+      {reports.flatMap((report, index) => {
+        const title = `OPTION ${index + 1} — ${report.name}`;
+        const optionIdentity = `${shared.preparedFor ?? 'Customer'} · ${shared.siteName ?? 'Site'} · ${title} · ${reference} · revision ${revision}`;
+        const mode = offerMode(report.document, report.commercialOffer);
+        return [
+          <SummaryPage key={`${report.id}-offer`} identity={optionIdentity}>
+            <ExecutivePage
+              doc={report.document}
+              offer={report.commercialOffer}
+              mode={mode}
+              reference={reference}
+              revision={revision}
+              optionTitle={title}
+            />
+          </SummaryPage>,
+          <SummaryPage key={`${report.id}-equipment`} identity={optionIdentity}>
+            <ComparisonPage doc={report.document} optionTitle={title} />
+          </SummaryPage>,
+          <SummaryPage key={`${report.id}-commercial`} identity={optionIdentity}>
+            <CommercialPage doc={report.document} offer={report.commercialOffer} mode={mode} optionTitle={title} />
+          </SummaryPage>,
+        ];
+      })}
+      <SummaryPage identity={identity} last>
+        <p className="spt-ms-kicker">Comparison</p>
+        <h1 className="spt-ms-title">Alternatives at a glance</h1>
+        <p className="spt-ms-lead">This recap does not replace the explanation of each alternative above.</p>
+        <table className="spt-proposal-table">
+          <thead>
+            <tr>
+              <th>Option</th>
+              <th>Offer</th>
+              <th>Final annual electricity effect</th>
+              <th>Overall annual effect</th>
+            </tr>
+          </thead>
+          <tbody>
+            {reports.map((report, index) => {
+              const electricity = finalElectricitySavingPresentation(report.document);
+              const effect = overallFinancialEffect(report.document);
+              return (
+                <tr key={report.id}>
+                  <td>OPTION {index + 1} — {report.name}</td>
+                  <td>{offerLabel(offerMode(report.document, report.commercialOffer))}</td>
+                  <td>{electricity.label}: {electricity.value}</td>
+                  <td>{effect ? `${effect.label}: ${effect.value}` : 'Not available'}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </SummaryPage>
+    </div>
+  );
+}
+
 function SummaryPage({
   identity,
   last = false,
@@ -145,18 +246,30 @@ function SummaryPage({
 }) {
   return (
     <article className={`spt-customer-proposal-sheet spt-ms-page${last ? ' spt-ms-last' : ''}`}>
-      <header className="spt-proposal-letterhead">
-        <div className="spt-proposal-letterhead-row">
-          <img src="/ars-letterhead/logo.png" alt="Air Rotary Services" className="spt-proposal-logo" />
-          <div className="spt-proposal-letterhead-contact">
-            <div className="spt-proposal-company-name">Air Rotory Services (Pty) Ltd</div>
-            <div>Tel: 086 1279 765</div>
-            <div>accounts@apxsolutions.co.za</div>
-          </div>
-        </div>
-        <p className="spt-ms-note">{identity}</p>
-      </header>
-      {children}
+      <table className="spt-print-frame">
+        <thead>
+          <tr>
+            <td>
+              <header className="spt-proposal-letterhead">
+                <div className="spt-proposal-letterhead-row">
+                  <img src="/ars-letterhead/logo.png" alt="Air Rotary Services" className="spt-proposal-logo" />
+                  <div className="spt-proposal-letterhead-contact">
+                    <div className="spt-proposal-company-name">Air Rotory Services (Pty) Ltd</div>
+                    <div>Tel: 086 1279 765</div>
+                    <div>accounts@apxsolutions.co.za</div>
+                  </div>
+                </div>
+                <p className="spt-ms-note">{identity}</p>
+              </header>
+            </td>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>{children}</td>
+          </tr>
+        </tbody>
+      </table>
     </article>
   );
 }
@@ -167,29 +280,48 @@ function ExecutivePage({
   mode,
   reference,
   revision,
+  optionTitle = null,
 }: {
   doc: CustomerProposalDocument;
   offer: CommercialOffer | null;
   mode: OfferMode;
   reference: string;
   revision: number;
+  optionTitle?: string | null;
 }) {
   const proposed = proposedNames(doc);
   const current = doc.currentMachines.map((machine) => machineDisplayName(machine.name, '')).filter(Boolean);
   const payback = paybackPresentation(doc, mode);
   const position = commercialPositionNote(mode);
   const commitment = offerTermRows(offer, mode)[0];
+  const electricity = finalElectricitySavingPresentation(doc);
+  const effect = overallFinancialEffect(doc);
   return (
     <>
-      <p className="spt-ms-kicker">Management summary</p>
-      <h1 className="spt-ms-title">Compressed air proposal</h1>
+      {optionTitle ? (
+        <h1 className="spt-ms-title">{optionTitle}</h1>
+      ) : (
+        <>
+          <p className="spt-ms-kicker">Management summary</p>
+          <h1 className="spt-ms-title">Compressed air proposal</h1>
+        </>
+      )}
       <p className="spt-ms-lead">
         Prepared for {doc.preparedFor ?? 'the customer'}
         {doc.siteName ? ` at ${doc.siteName}` : ''}
         {doc.siteLocation ? `, ${doc.siteLocation}` : ''}. {doc.date ?? ''} · {reference} · revision {revision}.
       </p>
-      <h2 className="spt-proposal-h2">Recommendation</h2>
-      <p className="spt-proposal-body">{doc.recommendation}</p>
+      {!optionTitle && <h2 className="spt-proposal-h2">Recommendation</h2>}
+      {doc.operatingArrangement && <p className="spt-proposal-body">{doc.operatingArrangement}</p>}
+      {doc.refurbishmentNote && <p className="spt-proposal-body">{doc.refurbishmentNote}</p>}
+      {optionTitle && !doc.operatingArrangement && (
+        <p className="spt-proposal-body">Operating arrangement: all supplied machines run together.</p>
+      )}
+      {optionTitle ? (
+        <p className="spt-proposal-body">Commercial basis: {offerLabel(mode)}.</p>
+      ) : (
+        <p className="spt-proposal-body">{doc.recommendation}</p>
+      )}
       {proposed.length > 0 && (
         <p className="spt-proposal-body">Proposed equipment: {proposed.join('; ')}.</p>
       )}
@@ -205,8 +337,8 @@ function ExecutivePage({
           <strong>{commitment?.value ?? doc.commercial.investment ?? 'See commercial page'}</strong>
         </div>
         <div className="spt-ms-metric">
-          <span>Final annual electricity saving</span>
-          <strong>{doc.requiresRevision ? 'Withheld' : doc.electricity.saving ?? 'Not available'}</strong>
+          <span>{optionTitle ? electricity.label : 'Final annual electricity saving'}</span>
+          <strong>{optionTitle ? electricity.value : doc.requiresRevision ? 'Withheld' : doc.electricity.saving ?? 'Not available'}</strong>
         </div>
         <div className="spt-ms-metric">
           <span>Average monthly electricity saving</span>
@@ -221,19 +353,26 @@ function ExecutivePage({
       )}
       {payback && 'explanation' in payback && <p className="spt-proposal-body">{payback.explanation}</p>}
       {position && <p className="spt-proposal-body">{position}</p>}
-      {doc.commercial.saving && (
+      {optionTitle && effect ? (
+        <p className="spt-proposal-body">
+          <strong>{effect.label.replace(/\.$/, '')}.</strong> {effect.value}
+          {doc.commercial.current && doc.commercial.proposed
+            ? ` Current estimated annual cost ${doc.commercial.current}. Proposed estimated annual cost ${doc.commercial.proposed}.`
+            : ''}
+        </p>
+      ) : doc.commercial.saving ? (
         <p className="spt-proposal-body">
           <strong>{doc.commercial.savingHeadline || 'Net position'}.</strong> {doc.commercial.saving}
           {doc.commercial.current && doc.commercial.proposed
             ? ` Current estimated annual cost ${doc.commercial.current}. Proposed estimated annual cost ${doc.commercial.proposed}.`
             : ''}
         </p>
-      )}
+      ) : null}
     </>
   );
 }
 
-function ComparisonPage({ doc }: { doc: CustomerProposalDocument }) {
+function ComparisonPage({ doc, optionTitle = null }: { doc: CustomerProposalDocument; optionTitle?: string | null }) {
   const basis = customerProposalCalculationBasisCopy(doc.electricityCalculationBasis);
   const proposedList = doc.proposedMachines?.length
     ? doc.proposedMachines
@@ -242,7 +381,7 @@ function ComparisonPage({ doc }: { doc: CustomerProposalDocument }) {
       : [];
   return (
     <>
-      <p className="spt-ms-kicker">Current system and proposed solution</p>
+      <p className="spt-ms-kicker">{optionTitle ? `${optionTitle} · Current system and proposed solution` : 'Current system and proposed solution'}</p>
       <h1 className="spt-ms-title">What changes</h1>
       <h2 className="spt-proposal-h2">Equipment</h2>
       <table className="spt-proposal-table">
@@ -328,16 +467,18 @@ function CommercialPage({
   doc,
   offer,
   mode,
+  optionTitle = null,
 }: {
   doc: CustomerProposalDocument;
   offer: CommercialOffer | null;
   mode: OfferMode;
+  optionTitle?: string | null;
 }) {
   const terms = offerTermRows(offer, mode);
   const years = decisionYears(doc.financialBenefit?.years ?? []);
   return (
     <>
-      <p className="spt-ms-kicker">Commercial offer and decision</p>
+      <p className="spt-ms-kicker">{optionTitle ? `${optionTitle} · Commercial offer and decision` : 'Commercial offer and decision'}</p>
       <h1 className="spt-ms-title">{offerTitle(mode)}</h1>
       {terms.length > 0 && (
         <table className="spt-proposal-table">
@@ -494,6 +635,13 @@ function decisionYears(years: NonNullable<CustomerProposalDocument['financialBen
     indexes.add(paymentsStop);
   }
   return [...indexes].sort((left, right) => left - right).map((index) => years[index]);
+}
+
+function offerLabel(mode: OfferMode): string {
+  if (mode === 'rent_to_own') return 'Rent-to-own';
+  if (mode === 'rental') return 'Rental';
+  if (mode === 'purchase') return 'Purchase';
+  return 'Commercial terms not selected';
 }
 
 function offerTitle(mode: OfferMode): string {

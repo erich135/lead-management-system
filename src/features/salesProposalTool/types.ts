@@ -108,9 +108,43 @@ export interface CurrentEquipment {
   specificationReference?: string | null;
 }
 
+export type OperatingArrangement = 'all_run_together' | 'some_rest';
+
+export interface ProposalOptionRecord {
+  id: string;
+  name: string;
+  includedInReport: boolean;
+  archived: boolean;
+  arrangement: OperatingArrangement;
+  proposedEquipment: ProposedEquipment[];
+  commercialOffer: CommercialOffer;
+}
+
+export interface ProposalOptionReport {
+  id: string;
+  name: string;
+  commercialOffer: CommercialOffer;
+  document: CustomerProposalDocument;
+}
+
+export interface ProposalOptionComparison {
+  id: string;
+  name: string;
+  offerType: string;
+  arrangement: string;
+  refurbishmentNote: string | null;
+  electricitySavingRand: number | null;
+  netPositionRand: number | null;
+  netOutcome: string;
+  investmentRand: number | null;
+  paybackMonths: number | null;
+  monthlyPaymentRand: number | null;
+}
+
 export interface ProposedEquipment {
   specLibraryRecordId: string | null;
   quantity: number;
+  runningQuantity?: number | null;
   manufacturer: string | null;
   model: string | null;
   sourceBacked: SourceBackedSpec | null;
@@ -328,6 +362,9 @@ export interface SalesProposal {
   operatingAssumptions: OperatingAssumptions;
   electricityCalculationBasis?: 'air_audit' | 'published_capacity';
   commercialOffer: CommercialOffer;
+  options?: ProposalOptionRecord[] | null;
+  optionComparisons?: ProposalOptionComparison[] | null;
+  optionReports?: ProposalOptionReport[] | null;
   revision?: number;
   airAuditScopeConfirmation?: {
     sourceSha256: string | null;
@@ -826,6 +863,8 @@ export interface CustomerProposalDocument {
     breakEvenYears?: number | null;
   };
   recommendation: string;
+  operatingArrangement?: string | null;
+  refurbishmentNote?: string | null;
   conclusion: string;
   nextSteps: string[];
   electricityCalculationBasis?: 'air_audit' | 'published_capacity';

@@ -19,6 +19,8 @@ export default defineConfig({
       'src/features/salesProposalTool/configurationAcceptance.test.ts',
       'src/features/salesProposalTool/proposalEditorBehaviour.test.ts',
       'src/features/salesProposalTool/managementSummaryPresentation.test.ts',
+      'src/features/salesProposalTool/managementSummaryReadiness.test.ts',
+      'src/features/salesProposalTool/proposalOptions.test.tsx',
     ],
   },
 });

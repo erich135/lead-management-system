@@ -61,6 +61,7 @@ export interface ProposedEquipmentDraft {
   specLibraryRecordId: string | null;
   selectedSpec: PublicMachineSpec | null;
   quantity: number;
+  runningQuantity?: number | null;
   manufacturer: string | null;
   model: string | null;
   sourceBacked: SourceBackedSpec | null;
@@ -219,6 +220,7 @@ export function proposedDraftsFromProposal(
     specLibraryRecordId: row.specLibraryRecordId,
     selectedSpec: null,
     quantity: row.quantity >= 1 ? row.quantity : DEFAULT_PROPOSED_QUANTITY,
+    runningQuantity: row.runningQuantity ?? null,
     manufacturer: row.manufacturer,
     model: row.model,
     sourceBacked: row.sourceBacked,
@@ -446,6 +448,10 @@ export function toProposedEquipmentPayload(
       {
         specLibraryRecordId,
         quantity: draft.quantity >= 1 ? draft.quantity : DEFAULT_PROPOSED_QUANTITY,
+        runningQuantity:
+          typeof draft.runningQuantity === 'number' && Number.isFinite(draft.runningQuantity)
+            ? Math.min(draft.quantity >= 1 ? draft.quantity : DEFAULT_PROPOSED_QUANTITY, Math.max(0, Math.floor(draft.runningQuantity)))
+            : null,
         manufacturer,
         model,
         sourceBacked: hasUsableSourceBacked(draft.sourceBacked)

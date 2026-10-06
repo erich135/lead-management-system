@@ -1,11 +1,19 @@
 import { useState, FormEvent, useEffect, useRef } from 'react';
-import { createJob, getJobs, getStatuses, getBranches, getCustomers, createCustomer, getTechnicians, getServiceDescriptions, getJobSources, getRepCodes, getAdminCodes, getMachinesByCustomer, getRentalMachines, createMachine, getMachineTypes, resolveCanonicalMachineSelections, type Status, type Branch, type Customer, type Technician, type ServiceDescription, type JobSource, type RepCode, type AdminCode, type Machine, type MachineType, type Job } from '../lib/api';
+import { createJob, getJobs, getStatuses, getBranches, getCustomers, createCustomer, getTechnicians, getServiceDescriptions, getJobSources, getRepCodes, getAdminCodes, getMachinesByCustomer, getRentalMachines, createMachine, getMachineTypes, resolveCanonicalMachineSelections, claimInspectionFollowUp, confirmInspectionFollowUp, releaseInspectionFollowUp, type Status, type Branch, type Customer, type Technician, type ServiceDescription, type JobSource, type RepCode, type AdminCode, type Machine, type MachineType, type Job } from '../lib/api';
 import { X, Plus, Wrench } from 'lucide-react';
 import { HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
 import { SmartDateInput } from './SmartDateInput';
 import { isCanonicalMachineSelectable } from '../lib/canonicalMachines';
 import { firstLinkedBranchId } from '../lib/repBranchSelection';
+
+export interface InspectionJobPrefill {
+  inspectionId: string;
+  referenceNumber?: string;
+  customerId?: string | null;
+  siteLabel: string;
+  notes: string;
+}
 
 interface LeadFormProps {
   statuses: Status[];
@@ -14,13 +22,14 @@ interface LeadFormProps {
   onClose: () => void;
   onSaved: () => void;
   onJobCreated?: (job: Job) => void; // Optional callback with the created job
+  inspectionFollowUp?: InspectionJobPrefill | null;
 }
 
 /**
  * Form component for creating a new job.
  * Uses the new API structure with proper types and error handling.
  */
-export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }: LeadFormProps) {
+export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated, inspectionFollowUp }: LeadFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [technicians, setTechnicians] = useState<Technician[]>([]);
@@ -151,6 +160,25 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
     }
     loadReferenceData();
   }, []);
+
+  useEffect(() => {
+    if (!inspectionFollowUp) return;
+    const customer = allCustomers.find((item) => item._id === inspectionFollowUp.customerId);
+    setFormData((current) => ({
+      ...current,
+      notes: inspectionFollowUp.notes,
+      customer: customer ? customer._id : '',
+      cashCustomer: customer ? '' : inspectionFollowUp.siteLabel,
+    }));
+    if (customer) {
+      setCustomerSelection('customer');
+      setSelectedCustomer(customer);
+      setSelectedCustomerName(customer.name);
+      setCustomerSearchTerm(customer.name);
+    } else if (inspectionFollowUp.siteLabel) {
+      setCustomerSelection('cash');
+    }
+  }, [inspectionFollowUp, allCustomers]);
 
   // Set default status when statuses are loaded (only once)
   useEffect(() => {
@@ -523,7 +551,35 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
         }
       }
 
-      const response = await createJob(payload);
+      let claimedInspection = false;
+      if (inspectionFollowUp) {
+        const claim = await claimInspectionFollowUp(inspectionFollowUp.inspectionId);
+        if (claim.state === 'already-linked') {
+          setError('This inspection is already linked to a job. Another job was not created.');
+          setLoading(false);
+          return;
+        }
+        claimedInspection = true;
+        payload.inspectionId = inspectionFollowUp.inspectionId;
+      }
+
+      let response;
+      try {
+        response = await createJob(payload);
+      } catch (createError) {
+        if (claimedInspection && inspectionFollowUp) {
+          await releaseInspectionFollowUp(inspectionFollowUp.inspectionId).catch(() => undefined);
+        }
+        throw createError;
+      }
+
+      if (inspectionFollowUp && response.job) {
+        try {
+          await confirmInspectionFollowUp(inspectionFollowUp.inspectionId, response.job._id);
+        } catch {
+          setError(`Job ${response.job.jobNumber} was created. The printable inspection file still needs to be attached from the inspection list.`);
+        }
+      }
       onSaved();
       
       // If onJobCreated callback is provided, call it with the created job
@@ -650,7 +706,14 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated }:
       <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 backdrop-blur-sm md:items-center md:p-4">
         <div className="max-h-[92dvh] w-full max-w-4xl overflow-y-auto rounded-t-2xl bg-white shadow-2xl md:max-h-[90vh] md:rounded-2xl">
           <div className="sticky top-0 flex items-center justify-between rounded-t-2xl bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] px-4 py-3 text-white md:px-6 md:py-4">
-            <h2 className="text-lg font-bold md:text-xl">Create New Job</h2>
+            <div>
+              <h2 className="text-lg font-bold md:text-xl">Create New Job</h2>
+              {inspectionFollowUp ? (
+                <p className="text-sm text-white/90">
+                  Local test. From inspection {inspectionFollowUp.referenceNumber || inspectionFollowUp.siteLabel}. Choose the branch as usual. Leave the job number empty so the normal prefix is used.
+                </p>
+              ) : null}
+            </div>
             <button
               onClick={onClose}
               className="rounded-lg p-2 transition-all hover:bg-white/20"

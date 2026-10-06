@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getJob, updateJob, getMachinesByCustomer, createMachine, updateMachine, getTechnicians, getRepCodes, getCustomers, getActivities, getServiceDescriptions, getJobSources, getMachineTypes, deleteJob, uploadRSRDocument, getRSRDocuments, getRSRDocumentUrl, createJobNote, getJobNotes, uploadJobNoteAttachment, getJobNoteAttachmentUrl, deleteJobNote, resolveCanonicalMachineSelections, type Job, type Status, type Branch, type Machine, type Technician, type RepCode, type Customer, type Activity, type ServiceDescription, type JobSource, type MachineType, type OverdueJob, type JobRSRDocument, type JobNote, type JobNoteAttachment } from '../lib/api';
+import { getJob, updateJob, getMachinesByCustomer, createMachine, updateMachine, getTechnicians, getRepCodes, getCustomers, getActivities, getServiceDescriptions, getJobSources, getMachineTypes, deleteJob, uploadRSRDocument, getRSRDocuments, getRSRDocumentUrl, createJobNote, getJobNotes, uploadJobNoteAttachment, getJobNoteAttachmentUrl, deleteJobNote, openInspectionPrint, resolveCanonicalMachineSelections, type Job, type Status, type Branch, type Machine, type Technician, type RepCode, type Customer, type Activity, type ServiceDescription, type JobSource, type MachineType, type OverdueJob, type JobRSRDocument, type JobNote, type JobNoteAttachment } from '../lib/api';
 import { X, Edit, Save, Clock, User, Trash2, FileText, Paperclip, Upload, Download, Plus, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 import { OriginatingRfqPanel } from './OriginatingRfqPanel';
 import { HelpIcon } from './ui';
@@ -1136,6 +1136,15 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-2xl font-bold mb-1">{job.jobNumber}</h3>
+              {job.inspectionId ? (
+                <button
+                  type="button"
+                  className="mt-2 rounded bg-white/20 px-3 py-1 text-sm font-semibold"
+                  onClick={() => void openInspectionPrint(job.inspectionId as string)}
+                >
+                  Open printable inspection report
+                </button>
+              ) : null}
               <p className="text-white/90 text-sm">Job Details</p>
             </div>
             <div className="flex items-center gap-2">
@@ -2779,11 +2788,15 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                                 <a
                                   key={att._id}
                                   href={getJobNoteAttachmentUrl(att._id)}
-                                  download={att.originalName}
+                                  target={att.mimeType === 'text/html' ? '_blank' : undefined}
+                                  rel="noreferrer"
+                                  download={att.mimeType === 'text/html' ? undefined : att.originalName}
                                   className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 p-2 bg-white rounded border border-gray-200 hover:bg-gray-50 transition-colors"
                                 >
                                   <Paperclip className="w-4 h-4" />
-                                  <span className="flex-1 truncate">{att.originalName}</span>
+                                  <span className="flex-1 truncate">
+                                    {att.mimeType === 'text/html' ? `Print inspection report (${att.originalName})` : att.originalName}
+                                  </span>
                                   <Download className="w-4 h-4" />
                                 </a>
                               ))}

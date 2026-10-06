@@ -6,6 +6,7 @@ import { useState, useEffect, FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { verifyInvitationToken, setPassword } from '../lib/api';
 import { Lock, CheckCircle, AlertCircle, Mail } from 'lucide-react';
+import { PasswordField } from './PasswordField';
 
 /**
  * Set Password page component.
@@ -154,32 +155,34 @@ export function SetPasswordPage() {
             <label htmlFor="password" className="block text-sm font-semibold text-slate-700 mb-2">
               New Password
             </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPasswordValue(e.target.value)}
-              required
-              minLength={8}
-              className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-[#0969a9] focus:border-transparent text-[15px]"
-              placeholder="Enter your password (min. 8 characters)"
-            />
+            <div className="relative">
+              <PasswordField
+                id="password"
+                value={password}
+                onChange={setPasswordValue}
+                required
+                autoComplete="new-password"
+                className="w-full px-4 pr-12 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-[#0969a9] focus:border-transparent text-[15px]"
+                placeholder="Enter your password (min. 8 characters)"
+              />
+            </div>
           </div>
 
           <div>
             <label htmlFor="confirmPassword" className="block text-sm font-semibold text-slate-700 mb-2">
               Confirm Password
             </label>
-            <input
-              id="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              minLength={8}
-              className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-[#0969a9] focus:border-transparent text-[15px]"
-              placeholder="Confirm your password"
-            />
+            <div className="relative">
+              <PasswordField
+                id="confirmPassword"
+                value={confirmPassword}
+                onChange={setConfirmPassword}
+                required
+                autoComplete="new-password"
+                className="w-full px-4 pr-12 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-[#0969a9] focus:border-transparent text-[15px]"
+                placeholder="Confirm your password"
+              />
+            </div>
           </div>
 
           <button

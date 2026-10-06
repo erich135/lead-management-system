@@ -13,6 +13,7 @@ import {
   updateUserPermissions,
   updateUserBranches,
   resendInvitation,
+  sendPasswordRecovery,
   getRoles,
   getPermissions,
   applyGroupPermissions,
@@ -167,6 +168,7 @@ export function SystemManagement() {
   // Technician app APK release state
   const [techAppRelease, setTechAppRelease] = useState<TechnicianAppReleaseInfo | null>(null);
   const [techAppVersion, setTechAppVersion] = useState('');
+  const [techAppVersionCode, setTechAppVersionCode] = useState('');
   const [techAppDownloadEnabled, setTechAppDownloadEnabled] = useState(false);
   const [techAppApkFile, setTechAppApkFile] = useState<File | null>(null);
   const [techAppUploading, setTechAppUploading] = useState(false);
@@ -272,6 +274,7 @@ export function SystemManagement() {
       const release = await getTechnicianAppRelease();
       setTechAppRelease(release);
       setTechAppVersion(release.version || '');
+      setTechAppVersionCode(release.versionCode ? String(release.versionCode) : '');
       setTechAppDownloadEnabled(release.downloadEnabled);
     } catch (err: unknown) {
       console.error('Error loading technician app release:', err);
@@ -302,6 +305,7 @@ export function SystemManagement() {
         techAppApkFile,
         techAppVersion.trim(),
         techAppDownloadEnabled,
+        techAppVersionCode.trim() ? Number(techAppVersionCode.trim()) : null,
       );
       setTechAppRelease(response.data);
       setTechAppApkFile(null);
@@ -332,6 +336,7 @@ export function SystemManagement() {
       const response = await updateTechnicianAppReleaseSettings(
         techAppVersion.trim(),
         techAppDownloadEnabled,
+        techAppVersionCode.trim() ? Number(techAppVersionCode.trim()) : null,
       );
       setTechAppRelease(response);
       setTechAppMessage('Technician app settings saved.');
@@ -621,6 +626,21 @@ export function SystemManagement() {
   /**
    * Handles resending invitation email to a user.
    */
+  async function handleSendPasswordRecovery(userId: string) {
+    if (!confirm('Send this person a one-hour password reset link? Their account and job history stay as they are.')) {
+      return;
+    }
+    try {
+      setLoading(true);
+      const response = await sendPasswordRecovery(userId);
+      alert(response.message || 'Password reset link sent.');
+    } catch (err: any) {
+      alert(err.message || 'Could not send the password reset.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleResendInvitation(userId: string) {
     if (!confirm('Are you sure you want to resend the invitation email to this user?')) {
       return;
@@ -2004,6 +2024,22 @@ alert((response as any).message || 'User invited successfully');
                         <p className="text-xs text-amber-700">No cell phone on the user record. Appointment WhatsApp cannot be sent until a number is stored.</p>
                       )}
                     </div>
+                    {selectedUser.passwordSet !== false && (
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => handleSendPasswordRecovery(selectedUser._id)}
+                          disabled={loading}
+                          className="px-3 py-1.5 bg-slate-100 text-slate-800 rounded-[8px] font-bold text-[14px] flex items-center gap-2 disabled:opacity-50"
+                        >
+                          <Mail className="w-4 h-4" />
+                          SEND PASSWORD RESET
+                        </button>
+                        <p className="mt-2 text-xs text-ars-body">
+                          Sends a one-hour, single-use link. The current password is not shown, and the account is not recreated.
+                        </p>
+                      </div>
+                    )}
                     {selectedUser.passwordSet === false && (
                       <div>
                         <label className="block text-sm font-semibold text-ars-body mb-1">Password Status</label>
@@ -2767,6 +2803,7 @@ alert((response as any).message || 'User invited successfully');
               {techAppRelease?.hasApk && (
                 <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
                   Current release: v{techAppRelease.version}
+                  {techAppRelease.versionCode ? ` (build ${techAppRelease.versionCode})` : ''}
                   {techAppRelease.uploadedAt
                     ? ` · uploaded ${new Date(techAppRelease.uploadedAt).toLocaleString()}`
                     : ''}
@@ -2784,6 +2821,20 @@ alert((response as any).message || 'User invited successfully');
                     placeholder="e.g. 1.0.0"
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[13px]"
                   />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-gray-600 mb-1">Android version code</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={techAppVersionCode}
+                    onChange={(e) => setTechAppVersionCode(e.target.value.replace(/[^\d]/g, ''))}
+                    placeholder="e.g. 12"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[13px]"
+                  />
+                  <p className="text-xs text-ars-body mt-2">
+                    The number inside the APK, not the 1.0.2 label. Installed apps compare this before offering an update.
+                  </p>
                 </div>
                 <div>
                   <label className="block text-[11px] font-medium text-gray-600 mb-1">Allow download</label>

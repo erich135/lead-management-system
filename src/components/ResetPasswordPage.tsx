@@ -6,6 +6,7 @@ import { useState, useEffect, FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { verifyResetToken, resetPassword } from '../lib/api';
 import { Lock, CheckCircle, AlertCircle, Mail, ArrowLeft } from 'lucide-react';
+import { PasswordField } from './PasswordField';
 
 /**
  * Reset Password page component.
@@ -191,14 +192,13 @@ export function ResetPasswordPage() {
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <Lock className="h-5 w-5 text-ars-body" />
               </div>
-              <input
+              <PasswordField
                 id="password"
-                type="password"
                 value={password}
-                onChange={(e) => setPasswordValue(e.target.value)}
+                onChange={setPasswordValue}
                 required
-                minLength={8}
-                className="w-full pl-12 pr-4 py-3.5 border-2 border-gray-200 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-ars-primary transition-all duration-200 bg-gray-50 focus:bg-white text-ars-heading"
+                autoComplete="new-password"
+                className="w-full pl-12 pr-12 py-3.5 border-2 border-gray-200 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-ars-primary transition-all duration-200 bg-gray-50 focus:bg-white text-ars-heading"
                 placeholder="Enter your password (min. 8 characters)"
               />
             </div>
@@ -212,14 +212,13 @@ export function ResetPasswordPage() {
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <Lock className="h-5 w-5 text-ars-body" />
               </div>
-              <input
+              <PasswordField
                 id="confirmPassword"
-                type="password"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={setConfirmPassword}
                 required
-                minLength={8}
-                className="w-full pl-12 pr-4 py-3.5 border-2 border-gray-200 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-ars-primary transition-all duration-200 bg-gray-50 focus:bg-white text-ars-heading"
+                autoComplete="new-password"
+                className="w-full pl-12 pr-12 py-3.5 border-2 border-gray-200 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-ars-primary transition-all duration-200 bg-gray-50 focus:bg-white text-ars-heading"
                 placeholder="Confirm your password"
               />
             </div>

@@ -41,7 +41,7 @@ export function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordModalProp
 
     setLoading(true);
     try {
-      await requestPasswordReset(email);
+      await requestPasswordReset(email.trim());
       setSuccess(true);
       // Clear email after successful submission
       setTimeout(() => {

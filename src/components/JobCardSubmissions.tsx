@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { FileText, Eye, Calendar, User, RefreshCw, MapPin, Edit2, X, Save } from 'lucide-react';
 import { getJobCardSubmissions, getJobCardSubmission, patchJobCardSubmission, type JobCardSubmissionRecord } from '../lib/api';
 import { FixedJobCardPrintView } from './FixedJobCardPrintView';
+import { InspectionReports } from './InspectionReports';
 
 /** Build a map of fieldId → { label, type, options } from template sections. */
 function buildFieldLabelMap(sections: any[]): Map<string, { label: string; type: string; options?: string[] }> {
@@ -172,6 +173,7 @@ export function JobCardSubmissions() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 md:p-8">
       <div className="max-w-[1500px] mx-auto">
+        <InspectionReports />
         <div className="bg-white rounded-[8px] shadow-lg p-6 mb-6">
           <div className="flex items-center justify-between">
             <div>

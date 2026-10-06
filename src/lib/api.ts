@@ -428,6 +428,8 @@ export async function setPassword(token: string, password: string): Promise<{ su
 export interface Job {
   _id: string;
   jobNumber: string;
+  /** Set when this job was created or linked from an inspection. */
+  inspectionId?: string;
   status?: {
     _id: string;
     name: string;
@@ -2252,8 +2254,14 @@ export async function withdrawWhatsAppConsent(id: string): Promise<{ user: User 
 }
 
 /**
- * Resends invitation email to a user.
+ * Asks the server to email one technician a single-use password reset link.
  */
+export async function sendPasswordRecovery(userId: string): Promise<{ message: string }> {
+  return apiRequest(`/api/users/${userId}/send-password-recovery`, {
+    method: 'POST',
+  });
+}
+
 export async function resendInvitation(userId: string): Promise<{ message: string }> {
   return apiRequest(`/api/users/${userId}/resend-invitation`, {
     method: 'POST',
@@ -2382,6 +2390,7 @@ export async function getImportHistory(): Promise<{ data: ImportHistory }> {
 
 export interface TechnicianAppReleaseInfo {
   version: string | null;
+  versionCode: number | null;
   downloadEnabled: boolean;
   hasApk: boolean;
   fileSize: number | null;
@@ -2404,11 +2413,13 @@ export async function uploadTechnicianAppRelease(
   file: File,
   version: string,
   downloadEnabled: boolean,
+  versionCode?: number | null,
 ): Promise<{ message: string; data: TechnicianAppReleaseInfo }> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('version', version);
   formData.append('downloadEnabled', String(downloadEnabled));
+  if (versionCode) formData.append('versionCode', String(versionCode));
 
   const token = getAuthToken();
   if (!token) {
@@ -2437,10 +2448,11 @@ export async function uploadTechnicianAppRelease(
 export async function updateTechnicianAppReleaseSettings(
   version: string,
   downloadEnabled: boolean,
+  versionCode?: number | null,
 ): Promise<TechnicianAppReleaseInfo> {
   return apiRequest('/api/technician-app/release', {
     method: 'PATCH',
-    body: JSON.stringify({ version, downloadEnabled }),
+    body: JSON.stringify({ version, downloadEnabled, versionCode: versionCode ?? null }),
   });
 }
 
@@ -3998,6 +4010,69 @@ export interface JobCardSubmissionRecord {
 /**
  * Gets all job card submissions.
  */
+export interface InspectionListItem {
+  _id: string;
+  referenceNumber?: string;
+  siteLabel: string;
+  serverReceivedAt: string;
+  status: string;
+  reporter?: { firstName?: string; lastName?: string };
+  customer?: { name?: string };
+  followUpJob?: { _id?: string; jobNumber?: string };
+  attachmentPending?: boolean;
+}
+
+export async function listInspections(): Promise<{ inspections: InspectionListItem[] }> {
+  return apiRequest('/api/inspections');
+}
+
+export async function getInspectionPrefill(id: string): Promise<{
+  customerId: string | null;
+  siteLabel: string;
+  notes: string;
+  followUpJobId: string | null;
+  referenceNumber?: string | null;
+}> {
+  return apiRequest(`/api/inspections/${id}/prefill`);
+}
+
+export async function claimInspectionFollowUp(id: string): Promise<{ state: string; jobId?: string }> {
+  return apiRequest(`/api/inspections/${id}/claim-follow-up`, { method: 'POST' });
+}
+
+export async function releaseInspectionFollowUp(id: string): Promise<void> {
+  await apiRequest(`/api/inspections/${id}/release-follow-up`, { method: 'POST' });
+}
+
+export async function confirmInspectionFollowUp(id: string, jobId: string): Promise<{ jobId: string; attachmentPending?: boolean }> {
+  return apiRequest(`/api/inspections/${id}/confirm-follow-up`, {
+    method: 'POST',
+    body: JSON.stringify({ jobId }),
+  });
+}
+
+export async function retryInspectionAttachment(id: string): Promise<{ attachmentPending?: boolean }> {
+  return apiRequest(`/api/inspections/${id}/retry-attachment`, { method: 'POST' });
+}
+
+export async function linkInspectionJob(id: string, jobId: string): Promise<{ jobId: string }> {
+  return apiRequest(`/api/inspections/${id}/link-job`, {
+    method: 'POST',
+    body: JSON.stringify({ jobId }),
+  });
+}
+
+export async function openInspectionPrint(id: string): Promise<void> {
+  const token = getAuthToken();
+  const response = await fetch(`${apiBase()}/api/inspections/${id}/print`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) throw new Error('The inspection could not be opened');
+  const html = await response.text();
+  const blob = new Blob([html], { type: 'text/html' });
+  window.open(URL.createObjectURL(blob), '_blank', 'noopener');
+}
+
 export async function getJobCardSubmissions(params?: {
   template?: string;
   job?: string;

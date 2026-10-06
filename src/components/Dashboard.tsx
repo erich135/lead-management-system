@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ARS_APP_BUILD } from '../pwa/appBuild';
 import { canAccessMachineReadingWorkflow } from '../lib/readingAccess';
 import {
+  getInspectionPrefill,
   getJobStats,
   getOverdueJobs,
   getStatuses,
@@ -50,7 +51,7 @@ import {
   Gauge,
 } from 'lucide-react';
 import { LeadsList } from './LeadsList';
-import { LeadForm } from './LeadForm';
+import { LeadForm, type InspectionJobPrefill } from './LeadForm';
 import { LeadDetails } from './LeadDetails';
 import SalesLeadsContainer from './SalesLeadsContainer';
 import { SystemManagement } from './SystemManagement';
@@ -156,6 +157,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
   const [showNotificationPanel, setShowNotificationPanel] = useState(false);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
+  const [inspectionFollowUp, setInspectionFollowUp] = useState<InspectionJobPrefill | null>(null);
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
   const [statuses, setStatuses] = useState<Status[]>([]);
@@ -472,16 +474,46 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
     setSelectedLead(lead);
   }
 
-  function handleLeadSaved() {
+  useEffect(() => {
+    const inspectionId = new URLSearchParams(location.search).get('inspection');
+    if (!inspectionId || view !== 'leads') return;
+    void getInspectionPrefill(inspectionId)
+      .then((prefill) => {
+        setInspectionFollowUp({
+          inspectionId,
+          referenceNumber: prefill.referenceNumber || undefined,
+          customerId: prefill.customerId,
+          siteLabel: prefill.siteLabel,
+          notes: prefill.notes,
+        });
+        setShowLeadForm(true);
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : 'The inspection could not be opened in the job form');
+      });
+  }, [location.search, view]);
+
+  function closeLeadForm() {
     setShowLeadForm(false);
+    setInspectionFollowUp(null);
+    if (new URLSearchParams(location.search).get('inspection')) {
+      navigate('/jobs', { replace: true });
+    }
+  }
+
+  function handleLeadSaved() {
+    closeLeadForm();
     loadStats();
     loadOverdueJobs(); // Refresh overdue jobs list
     setLeadsListRefreshKey(prev => prev + 1); // Trigger LeadsList refresh
   }
 
   function handleJobCreated(job: Job) {
-    // Close the form
+    setInspectionFollowUp(null);
     setShowLeadForm(false);
+    if (new URLSearchParams(location.search).get('inspection')) {
+      navigate('/jobs', { replace: true });
+    }
     // Open the job details with the newly created job
     setSelectedLead(job);
     // Refresh stats and lists
@@ -693,6 +725,9 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
 
   return (
     <div className="min-h-screen bg-white pb-20 md:pb-0">
+      <div className="bg-amber-100 px-4 py-2 text-center text-sm font-semibold text-amber-950">
+        Local test environment. API: {import.meta.env.VITE_API_BASE_URL || 'not set'}
+      </div>
       {/* Desktop Navigation */}
       <nav className={`sticky top-0 z-40 hidden md:block backdrop-blur-md bg-white ${isScrolled ? 'shadow-xl' : ''}`}>
         {/* Subtle pattern overlay */}
@@ -2184,7 +2219,8 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           statuses={statuses}
           branches={branches}
           customers={customers}
-          onClose={() => setShowLeadForm(false)}
+          inspectionFollowUp={inspectionFollowUp}
+          onClose={closeLeadForm}
           onSaved={handleLeadSaved}
           onJobCreated={handleJobCreated}
         />

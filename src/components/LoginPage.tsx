@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 import { ForgotPasswordModal } from './ForgotPasswordModal';
+import { PasswordField } from './PasswordField';
 import { AlertCircle, Lock, Mail, Shield, X } from 'lucide-react';
 
 /**
@@ -13,7 +14,9 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(
+    () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('forgot') === '1',
+  );
   const { signIn } = useAuth();
 
   /**
@@ -177,14 +180,13 @@ export function LoginPage() {
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   <Lock className="h-5 w-5 text-ars-body" />
                 </div>
-                <input
+                <PasswordField
                   id="password"
-                  type="password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={setPassword}
                   required
                   autoComplete="current-password"
-                  className="w-full pl-12 pr-4 py-3.5 border-2 border-gray-200 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-ars-primary transition-all duration-200 bg-white focus:bg-white text-ars-heading text-[15px]"
+                  className="w-full pl-12 pr-12 py-3.5 border-2 border-gray-200 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-ars-primary transition-all duration-200 bg-white focus:bg-white text-ars-heading text-[15px]"
                   placeholder="Password"
                 />
               </div>

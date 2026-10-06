@@ -1,5 +1,6 @@
 import {
   buildFieldValueMap,
+  customerDisplayName,
   getFieldDisplayValue,
   isFieldChecked,
   getJobFieldValue,
@@ -43,6 +44,13 @@ export function createFixedJobCardFieldResolver(
           resolveReportNumberField() ||
           getFieldDisplayValue(valueMap, field.id)
         );
+      }
+      if (field.jobFieldKey === 'customer') {
+        return customerDisplayName({
+          populatedName: job?.customer,
+          savedName: getFieldDisplayValue(valueMap, field.id),
+          cashCustomer: job?.cashCustomer,
+        });
       }
       return getJobFieldValue(job, field.jobFieldKey) || getFieldDisplayValue(valueMap, field.id);
     }

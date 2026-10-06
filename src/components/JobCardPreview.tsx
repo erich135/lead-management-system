@@ -38,7 +38,14 @@ function getJobFieldValue(jobData: Record<string, any> | undefined, key: string)
   if (!jobData) return '';
   switch (key) {
     case 'jobNumber': return jobData.jobNumber ?? '';
-    case 'customer': return (typeof jobData.customer === 'object' && jobData.customer?.name) ? jobData.customer.name : (jobData.customer ?? '');
+    case 'customer': {
+      const customer = jobData.customer;
+      const name = typeof customer === 'object' && customer?.name ? customer.name : typeof customer === 'string' ? customer : '';
+      if (name && !/^[a-f0-9]{24}$/i.test(name)) return name;
+      return jobData.cashCustomer && !/^[a-f0-9]{24}$/i.test(String(jobData.cashCustomer))
+        ? String(jobData.cashCustomer)
+        : 'Customer unavailable';
+    }
     case 'cashCustomer': return jobData.cashCustomer ?? '';
     case 'serialNumber': {
       const machines = jobData.machines;

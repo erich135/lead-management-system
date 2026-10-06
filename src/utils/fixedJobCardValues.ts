@@ -51,6 +51,37 @@ export function isFieldChecked(map: Map<string, unknown>, fieldId: string): bool
   return false;
 }
 
+const DATABASE_ID = /^[a-f0-9]{24}$/i;
+
+/**
+ * Returns true when a value is a MongoDB id rather than a display name.
+ */
+export function looksLikeDatabaseId(value: unknown): boolean {
+  return typeof value === 'string' && DATABASE_ID.test(value.trim());
+}
+
+/**
+ * Chooses a customer label without ever showing a raw database id.
+ * A saved name is kept. An unresolved id becomes "Customer unavailable".
+ */
+export function customerDisplayName(input: {
+  populatedName?: unknown;
+  savedName?: unknown;
+  cashCustomer?: unknown;
+}): string {
+  const candidates = [input.populatedName, input.savedName, input.cashCustomer];
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === 'object' && 'name' in candidate) {
+      const name = String((candidate as { name?: unknown }).name || '').trim();
+      if (name && !looksLikeDatabaseId(name)) return name;
+      continue;
+    }
+    const text = candidate === undefined || candidate === null ? '' : String(candidate).trim();
+    if (text && !looksLikeDatabaseId(text) && text !== '[object Object]') return text;
+  }
+  return 'Customer unavailable';
+}
+
 /**
  * Resolves job field value for header auto-fill on print preview.
  */
@@ -58,13 +89,17 @@ export function getJobFieldValue(job: Record<string, unknown> | undefined, key: 
   if (!job) return '';
   switch (key) {
     case 'jobNumber': return String(job.jobNumber ?? '');
-    case 'customer': {
-      const c = job.customer as Record<string, unknown> | string | undefined;
-      if (c && typeof c === 'object' && c.name) return String(c.name);
-      return String(c ?? '');
-    }
+    case 'customer':
+      return customerDisplayName({
+        populatedName: job.customer,
+        cashCustomer: job.cashCustomer,
+      });
     case 'rsrNumber': return String(job.rsrNumber ?? '');
-    default: return String((job as Record<string, unknown>)[key] ?? '');
+    default: {
+      const value = (job as Record<string, unknown>)[key];
+      if (looksLikeDatabaseId(value)) return '';
+      return value !== undefined && value !== null ? String(value) : '';
+    }
   }
 }
 

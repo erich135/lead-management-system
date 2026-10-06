@@ -2389,14 +2389,17 @@ export async function getImportHistory(): Promise<{ data: ImportHistory }> {
 }
 
 export interface TechnicianAppReleaseInfo {
+  id: string | null;
   version: string | null;
   versionCode: number | null;
+  packageName?: string | null;
   downloadEnabled: boolean;
   hasApk: boolean;
   fileSize: number | null;
   originalFileName: string | null;
   uploadedAt: string | null;
   uploadedBy: { name?: string; email?: string } | null;
+  retained?: TechnicianAppReleaseInfo[];
 }
 
 /**
@@ -2413,13 +2416,11 @@ export async function uploadTechnicianAppRelease(
   file: File,
   version: string,
   downloadEnabled: boolean,
-  versionCode?: number | null,
 ): Promise<{ message: string; data: TechnicianAppReleaseInfo }> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('version', version);
   formData.append('downloadEnabled', String(downloadEnabled));
-  if (versionCode) formData.append('versionCode', String(versionCode));
 
   const token = getAuthToken();
   if (!token) {
@@ -2448,17 +2449,47 @@ export async function uploadTechnicianAppRelease(
 export async function updateTechnicianAppReleaseSettings(
   version: string,
   downloadEnabled: boolean,
-  versionCode?: number | null,
+  releaseId?: string | null,
 ): Promise<TechnicianAppReleaseInfo> {
   return apiRequest('/api/technician-app/release', {
     method: 'PATCH',
-    body: JSON.stringify({ version, downloadEnabled, versionCode: versionCode ?? null }),
+    body: JSON.stringify({ version, downloadEnabled, releaseId: releaseId ?? null }),
   });
 }
 
 /**
  * Downloads the latest technician app APK as a file.
  */
+export async function downloadRetainedTechnicianAppApk(releaseId: string, versionLabel?: string): Promise<void> {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  const response = await fetch(`${apiBase()}/api/technician-app/release/archive/${releaseId}/download`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Download failed' } }));
+    throw new Error(error.error?.message || 'Download failed');
+  }
+
+  const blob = await response.blob();
+  const safeVersion = (versionLabel || 'retained').replace(/[^\w.-]+/g, '_');
+  const fileName = `ARS-Technician-${safeVersion}.apk`;
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 export async function downloadTechnicianAppApk(versionLabel?: string): Promise<void> {
   const token = getAuthToken();
   if (!token) {

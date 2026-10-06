@@ -27,6 +27,7 @@ import {
   getTechnicianAppRelease,
   uploadTechnicianAppRelease,
   updateTechnicianAppReleaseSettings,
+  downloadRetainedTechnicianAppApk,
   type TechnicianAppReleaseInfo,
   getRepCodes,
   createRepCode,
@@ -170,6 +171,7 @@ export function SystemManagement() {
   const [techAppVersion, setTechAppVersion] = useState('');
   const [techAppVersionCode, setTechAppVersionCode] = useState('');
   const [techAppDownloadEnabled, setTechAppDownloadEnabled] = useState(false);
+  const [techAppOfferNow, setTechAppOfferNow] = useState(false);
   const [techAppApkFile, setTechAppApkFile] = useState<File | null>(null);
   const [techAppUploading, setTechAppUploading] = useState(false);
   const [techAppSavingSettings, setTechAppSavingSettings] = useState(false);
@@ -294,7 +296,11 @@ export function SystemManagement() {
       return;
     }
 
-    if (!window.confirm('Upload this APK? It will replace the current technician app release.')) {
+    if (!window.confirm(
+      techAppOfferNow
+        ? 'Upload this APK and offer it to technicians? The previous APK file is kept.'
+        : 'Upload this APK without offering it to technicians? The current download stays unchanged and the previous file is kept.',
+    )) {
       return;
     }
 
@@ -304,8 +310,7 @@ export function SystemManagement() {
       const response = await uploadTechnicianAppRelease(
         techAppApkFile,
         techAppVersion.trim(),
-        techAppDownloadEnabled,
-        techAppVersionCode.trim() ? Number(techAppVersionCode.trim()) : null,
+        techAppOfferNow,
       );
       setTechAppRelease(response.data);
       setTechAppApkFile(null);
@@ -336,7 +341,7 @@ export function SystemManagement() {
       const response = await updateTechnicianAppReleaseSettings(
         techAppVersion.trim(),
         techAppDownloadEnabled,
-        techAppVersionCode.trim() ? Number(techAppVersionCode.trim()) : null,
+        techAppRelease?.id,
       );
       setTechAppRelease(response);
       setTechAppMessage('Technician app settings saved.');
@@ -2786,7 +2791,7 @@ alert((response as any).message || 'User invited successfully');
                 </h3>
               </div>
               <p className="text-sm text-ars-body mb-4">
-                Upload the latest Android APK for technicians. Uploading a new file replaces the current release. Technicians download it from Jobs → Tech App when downloads are enabled.
+                Upload the Android APK for technicians. The Android build number is read from the file. The previous APK is kept. Technicians keep the current download until you offer the new file.
               </p>
               {techAppUploading && (
                 <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -2823,17 +2828,12 @@ alert((response as any).message || 'User invited successfully');
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium text-gray-600 mb-1">Android version code</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={techAppVersionCode}
-                    onChange={(e) => setTechAppVersionCode(e.target.value.replace(/[^\d]/g, ''))}
-                    placeholder="e.g. 12"
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[13px]"
-                  />
+                  <label className="block text-[11px] font-medium text-gray-600 mb-1">Android build number</label>
+                  <p className="w-full px-3 py-2.5 border border-gray-200 rounded-[8px] bg-gray-50 text-[13px] text-ars-heading">
+                    {techAppVersionCode || 'Read from the APK on upload'}
+                  </p>
                   <p className="text-xs text-ars-body mt-2">
-                    The number inside the APK, not the 1.0.2 label. Installed apps compare this before offering an update.
+                    Installed apps compare this number from the APK. The version label above does not decide the update.
                   </p>
                 </div>
                 <div>
@@ -2890,7 +2890,7 @@ alert((response as any).message || 'User invited successfully');
                   ) : (
                     <>
                       <Upload className="w-4 h-4" />
-                      UPLOAD &amp; REPLACE APK
+                      UPLOAD APK
                     </>
                   )}
                 </button>
@@ -2913,6 +2913,48 @@ alert((response as any).message || 'User invited successfully');
                   )}
                 </button>
               </div>
+
+              <label className="mt-4 flex items-start gap-3 text-sm text-ars-body">
+                <input
+                  type="checkbox"
+                  checked={techAppOfferNow}
+                  onChange={(e) => setTechAppOfferNow(e.target.checked)}
+                  className="mt-1"
+                />
+                <span>
+                  Offer this uploaded file to technicians now. Leave this off to store the APK without changing the current download.
+                </span>
+              </label>
+
+              {techAppRelease?.retained && techAppRelease.retained.length > 0 && (
+                <div className="mt-5 rounded-lg border border-gray-200 px-4 py-3">
+                  <p className="text-sm font-semibold text-ars-heading mb-2">Kept APK files</p>
+                  <ul className="space-y-2">
+                    {techAppRelease.retained.map((release) => (
+                      <li key={release.id || release.uploadedAt || release.version} className="flex flex-col gap-2 text-sm text-ars-body sm:flex-row sm:items-center sm:justify-between">
+                        <span>
+                          v{release.version || 'unknown'}
+                          {release.versionCode ? ` · build ${release.versionCode}` : ''}
+                          {release.downloadEnabled ? ' · offered to technicians' : ' · not offered'}
+                        </span>
+                        {release.id && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void downloadRetainedTechnicianAppApk(release.id as string, release.version || undefined).catch((err: unknown) => {
+                                setTechAppMessage(err instanceof Error ? err.message : 'Could not download the kept APK');
+                              });
+                            }}
+                            className="rounded-[8px] border border-gray-300 px-3 py-1.5 text-[12px] font-semibold text-ars-heading hover:bg-gray-50"
+                          >
+                            Download kept APK
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
 
             {/* Import Result */}

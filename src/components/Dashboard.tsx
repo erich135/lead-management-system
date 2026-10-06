@@ -725,9 +725,12 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
 
   return (
     <div className="min-h-screen bg-white pb-20 md:pb-0">
-      <div className="bg-amber-100 px-4 py-2 text-center text-sm font-semibold text-amber-950">
-        Local test environment. API: {import.meta.env.VITE_API_BASE_URL || 'not set'}
-      </div>
+      {(import.meta.env.VITE_API_BASE_URL || '').includes('localhost') ||
+      (import.meta.env.VITE_API_BASE_URL || '').includes('127.0.0.1') ? (
+        <div className="bg-amber-100 px-4 py-2 text-center text-sm font-semibold text-amber-950">
+          Local test environment. API: {import.meta.env.VITE_API_BASE_URL}
+        </div>
+      ) : null}
       {/* Desktop Navigation */}
       <nav className={`sticky top-0 z-40 hidden md:block backdrop-blur-md bg-white ${isScrolled ? 'shadow-xl' : ''}`}>
         {/* Subtle pattern overlay */}

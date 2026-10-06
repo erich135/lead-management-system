@@ -710,7 +710,7 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated, i
               <h2 className="text-lg font-bold md:text-xl">Create New Job</h2>
               {inspectionFollowUp ? (
                 <p className="text-sm text-white/90">
-                  Local test. From inspection {inspectionFollowUp.referenceNumber || inspectionFollowUp.siteLabel}. Choose the branch as usual. Leave the job number empty so the normal prefix is used.
+                  From inspection {inspectionFollowUp.referenceNumber || inspectionFollowUp.siteLabel}. Choose the branch as usual. Leave the job number empty so the normal prefix is used.
                 </p>
               ) : null}
             </div>

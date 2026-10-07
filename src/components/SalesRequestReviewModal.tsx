@@ -330,6 +330,10 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
       setError('Request is still loading. Please wait and try Approve again.');
       return;
     }
+    if (detail.officeArchivedAt) {
+      setError('This request is archived. Restore it before approving or creating a job.');
+      return;
+    }
     if (isEditing) {
       setError('Save or Cancel your edits before approving.');
       return;
@@ -382,6 +386,10 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
   async function handleAcceptWithoutJob(): Promise<void> {
     if (!detail?._id) {
       setError('Request is still loading. Please wait and try again.');
+      return;
+    }
+    if (detail.officeArchivedAt) {
+      setError('This request is archived. Restore it before approving or creating a job.');
       return;
     }
     if (isEditing) {
@@ -451,7 +459,7 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
    * Opens the required return-for-correction dialog for a pending request.
    */
   function handleReturn(): void {
-    if (!detail?._id || !isPending || !canDecide) return;
+    if (!detail?._id || !isPending || !canDecide || detail.officeArchivedAt) return;
     if (isEditing) {
       setError('Save or Cancel your edits before returning this RFQ.');
       return;
@@ -465,6 +473,10 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
    */
   async function confirmReturn(instructions: string): Promise<void> {
     if (!detail?._id) return;
+    if (detail.officeArchivedAt) {
+      setError('This request is archived. Restore it before approving or creating a job.');
+      return;
+    }
 
     setActing(true);
     setError(null);
@@ -1007,7 +1019,8 @@ const SalesRequestReviewModal: React.FC<SalesRequestReviewModalProps> = ({
               </>
             ) : (
               canDecide &&
-              isPending && (
+              isPending &&
+              !detail?.officeArchivedAt && (
                 <>
                   <button
                     type="button"

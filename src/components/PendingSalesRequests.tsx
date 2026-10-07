@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
+  Archive,
   BookOpen,
   CheckCircle2,
   ClipboardList,
@@ -13,6 +14,7 @@ import {
   Paperclip,
   Pencil,
   RefreshCw,
+  RotateCcw,
   Search,
   Settings2,
   XCircle,
@@ -20,6 +22,8 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import {
   listSalesRequests,
+  archiveSalesRequest,
+  restoreSalesRequest,
   getSalesRequest,
   getSalesRequestVisibilityOptions,
   type SalesRequest,
@@ -45,7 +49,7 @@ import {
   collectRequestDownloadUrls,
 } from '../utils/repApprovalsDownload';
 
-type AdminQueueTab = 'pending' | 'history' | 'rep_diaries';
+type AdminQueueTab = 'pending' | 'history' | 'archived' | 'rep_diaries';
 type StatusFilter = 'all' | SalesRequestStatus;
 
 /** Display labels for the Rep Approvals page (UI only). */
@@ -96,6 +100,12 @@ function userName(
 /**
  * Formats a date for display on approval cards.
  */
+function officeArchivedByName(item: SalesRequest): string {
+  const actor = item.officeArchivedBy;
+  if (!actor || typeof actor === 'string') return '';
+  return [actor.firstName, actor.lastName].filter(Boolean).join(' ');
+}
+
 function formatSubmittedDate(value?: string): string {
   if (!value) return '—';
   return new Date(value).toLocaleString(undefined, {
@@ -210,6 +220,8 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
   }>({ representatives: [], administrators: [] });
   const [historyHasMore, setHistoryHasMore] = useState(false);
   const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<SalesRequest | null>(null);
+  const [archiveBusy, setArchiveBusy] = useState(false);
   const historyPageRef = useRef(1);
 
   /**
@@ -220,8 +232,14 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
     try {
       const [pendingRes, approvedRes, declinedRes] = await Promise.all([
         listSalesRequests({ status: 'pending', limit: 1 }),
-        listSalesRequests({ status: 'approved', limit: 100, sortBy: 'updatedAt', sortOrder: 'desc' }),
-        listSalesRequests({ status: 'declined', limit: 1 }),
+        listSalesRequests({
+          status: 'approved',
+          limit: 100,
+          sortBy: 'updatedAt',
+          sortOrder: 'desc',
+          officeArchived: 'include',
+        }),
+        listSalesRequests({ status: 'declined', limit: 1, officeArchived: 'include' }),
       ]);
       const approvedToday = approvedRes.requests.filter((row) =>
         isToday(row.approvedAt || row.reviewedAt || row.updatedAt),
@@ -256,7 +274,28 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
       setLoading(true);
     }
     setError(null);
+    if (!(tab === 'history' && appendHistory)) {
+      setRequests([]);
+    }
     try {
+      if (tab === 'archived') {
+        const result = await listSalesRequests({
+          officeArchived: 'only',
+          sortBy: 'officeArchivedAt',
+          sortOrder: 'desc',
+          limit: 100,
+          createdBy: representativeFilter || undefined,
+          assignedAdministrator:
+            administratorFilter && administratorFilter !== 'unassigned'
+              ? administratorFilter
+              : undefined,
+          unassigned: administratorFilter === 'unassigned',
+        });
+        setHistoryHasMore(false);
+        setRequests(result.requests);
+        return;
+      }
+
       if (tab === 'history') {
         const filter = {
           createdBy: representativeFilter || undefined,
@@ -399,6 +438,38 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
   /**
    * Opens the existing full review modal for a request.
    */
+  async function restoreArchived(item: SalesRequest): Promise<void> {
+    setArchiveBusy(true);
+    setError(null);
+    try {
+      await restoreSalesRequest(item._id);
+      setSuccessMessage(`${item.requestNumber} is back in the view for its existing status. No job was changed.`);
+      await loadQueue();
+      await loadStats();
+    } catch (restoreError: unknown) {
+      setError(getErrorMessage(restoreError, 'Could not restore this request'));
+    } finally {
+      setArchiveBusy(false);
+    }
+  }
+
+  async function confirmArchive(): Promise<void> {
+    if (!archiveTarget) return;
+    setArchiveBusy(true);
+    setError(null);
+    try {
+      await archiveSalesRequest(archiveTarget._id);
+      setSuccessMessage(`${archiveTarget.requestNumber} is archived. It stays available under Archived. No job was created.`);
+      setArchiveTarget(null);
+      await loadQueue();
+      await loadStats();
+    } catch (archiveError: unknown) {
+      setError(getErrorMessage(archiveError, 'Could not archive this request'));
+    } finally {
+      setArchiveBusy(false);
+    }
+  }
+
   function openReview(requestId: string, openReturn = false): void {
     setSuccessMessage(null);
     setReviewOpenReturn(openReturn);
@@ -481,6 +552,12 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
       icon: History,
     },
     {
+      id: 'archived' as AdminQueueTab,
+      label: 'Archived',
+      hint: 'Set aside, not a job',
+      icon: Archive,
+    },
+    {
       id: 'rep_diaries' as AdminQueueTab,
       label: 'Rep Diaries',
       hint: 'Forms & diary tools',
@@ -538,7 +615,9 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
                 ? 'Review rep submissions, download attachments, and approve or reject.'
                 : tab === 'history'
                   ? 'Browse approved and rejected submissions for audit and reference.'
-                  : 'Manage rep diary forms used on appointments (Super Admin).'}
+                  : tab === 'archived'
+                    ? 'Sales requests the office has set aside. Restoring puts one back in the view for its existing status.'
+                    : 'Manage rep diary forms used on appointments (Super Admin).'}
             </p>
           </div>
           <button
@@ -710,10 +789,16 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
                 aria-label="Filter by status"
               >
                 <option value="all">All</option>
-                {tab === 'pending' ? (
+                {tab === 'pending' || tab === 'archived' ? (
                   <>
                     <option value="pending">Pending</option>
                     <option value="needs_correction">Needs correction</option>
+                    {tab === 'archived' ? (
+                      <>
+                        <option value="approved">Approved</option>
+                        <option value="declined">Rejected</option>
+                      </>
+                    ) : null}
                   </>
                 ) : (
                   <>
@@ -804,11 +889,19 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
             ) : filteredRequests.length === 0 ? (
               <EmptyState
                 icon={FileText}
-                title={tab === 'pending' ? 'No rep approvals waiting' : 'No approval history yet'}
+                title={
+                  tab === 'pending'
+                    ? 'No rep approvals waiting'
+                    : tab === 'archived'
+                      ? 'No archived sales requests'
+                      : 'No approval history yet'
+                }
                 description={
                   tab === 'pending'
                     ? 'New submissions from sales reps will appear here.'
-                    : 'Approved and rejected requests will appear here for reference.'
+                    : tab === 'archived'
+                      ? 'Requests you archive stay here with their answers and attachments.'
+                      : 'Approved and rejected requests will appear here for reference.'
                 }
               />
             ) : (
@@ -842,6 +935,12 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
                           <p className="mt-1 text-sm font-medium leading-snug text-slate-700">
                             {requestTitle(item)}
                           </p>
+                          {tab === 'archived' && item.officeArchivedAt ? (
+                            <p className="mt-1 text-sm font-semibold text-slate-800">
+                              Archived {formatSubmittedDate(item.officeArchivedAt || undefined)}
+                              {officeArchivedByName(item) ? ` by ${officeArchivedByName(item)}` : ''}. Status kept: {getSalesRequestOutcomeLabel(item)}.
+                            </p>
+                          ) : null}
                           {tab === 'history' && item.status === 'approved' ? (
                             <p className="mt-1 text-sm font-semibold text-slate-800">
                               {isAcceptedWithoutJob(item)
@@ -908,6 +1007,27 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
                             <Eye className="h-4 w-4" />
                             View
                           </button>
+                          {canDecide && tab !== 'archived' && (
+                            <button
+                              type="button"
+                              onClick={() => setArchiveTarget(item)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                            >
+                              <Archive className="h-4 w-4" />
+                              Archive
+                            </button>
+                          )}
+                          {canDecide && tab === 'archived' && (
+                            <button
+                              type="button"
+                              onClick={() => void restoreArchived(item)}
+                              disabled={archiveBusy}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                              Restore
+                            </button>
+                          )}
                           {showDecisionActions && (
                             <>
                               <button
@@ -955,6 +1075,39 @@ export function PendingSalesRequests({ onJobCreated }: PendingSalesRequestsProps
           </div>
         </div>
       </div>
+
+      {archiveTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+            <div className="rounded-t-2xl bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] px-6 py-4 text-white">
+              <h3 className="text-lg font-bold">Archive {archiveTarget.requestNumber}</h3>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-slate-700">
+                Archive {archiveTarget.requestNumber}? It will leave the active queue and remain available in Archived, with its status, answers and attachments kept. This does not create or change a job.
+              </p>
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setArchiveTarget(null)}
+                  disabled={archiveBusy}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void confirmArchive()}
+                  disabled={archiveBusy}
+                  className="rounded-lg bg-[#f7c12b] px-4 py-2 text-sm font-bold text-[#383838] disabled:opacity-50"
+                >
+                  {archiveBusy ? 'Archiving…' : 'Archive'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {reviewRequestId && (
         <SalesRequestReviewModal

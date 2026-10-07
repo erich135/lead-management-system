@@ -4879,6 +4879,8 @@ export interface SalesRequest {
   requestNumber: string;
   requestType: SalesRequestType;
   status: SalesRequestStatus;
+  officeArchivedAt?: string | null;
+  officeArchivedBy?: string | { _id?: string; firstName?: string; lastName?: string } | null;
   formData: Record<string, unknown>;
   salesLead?: string | {
     _id: string;
@@ -4964,6 +4966,7 @@ export async function listSalesRequests(params?: {
   assignedAdministrator?: string;
   unassigned?: boolean;
   includeArchived?: boolean;
+  officeArchived?: 'only' | 'include';
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -4982,12 +4985,21 @@ export async function listSalesRequests(params?: {
   }
   if (params?.unassigned) searchParams.set('unassigned', 'true');
   if (params?.includeArchived) searchParams.set('includeArchived', 'true');
+  if (params?.officeArchived) searchParams.set('officeArchived', params.officeArchived);
   if (params?.page) searchParams.set('page', String(params.page));
   if (params?.limit) searchParams.set('limit', String(params.limit));
   if (params?.sortBy) searchParams.set('sortBy', params.sortBy);
   if (params?.sortOrder) searchParams.set('sortOrder', params.sortOrder);
   const query = searchParams.toString();
   return apiRequest(`/api/sales-requests${query ? `?${query}` : ''}`);
+}
+
+export async function archiveSalesRequest(id: string): Promise<{ request: SalesRequest; alreadyArchived: boolean }> {
+  return apiRequest(`/api/sales-requests/${id}/office-archive`, { method: 'POST' });
+}
+
+export async function restoreSalesRequest(id: string): Promise<{ request: SalesRequest; alreadyActive: boolean }> {
+  return apiRequest(`/api/sales-requests/${id}/office-restore`, { method: 'POST' });
 }
 
 export interface SalesRequestVisibilityOption {

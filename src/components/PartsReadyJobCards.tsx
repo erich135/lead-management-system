@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ClipboardList,
@@ -14,13 +14,21 @@ import {
   getPartsReadyJobs,
   getJobCardTemplates,
   getTechnicians,
+  getBranches,
   createJobCardAssignment,
   updateJobCardAssignment,
   deleteJobCardAssignment,
   type PartsReadyItem,
   type JobCardTemplate,
   type Technician,
+  type Branch,
 } from '../lib/api';
+import {
+  EMPTY_PARTS_READY_FILTERS,
+  filterAndSortPartsReady,
+  type PartsReadyFilters,
+  type PartsReadySortField,
+} from '../utils/partsReadyQueue';
 import { useAuth } from '../contexts/AuthContext';
 
 /**
@@ -59,6 +67,8 @@ export function PartsReadyJobCards() {
   const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>('');
   const [notifyingId, setNotifyingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [filters, setFilters] = useState<PartsReadyFilters>(EMPTY_PARTS_READY_FILTERS);
 
   const canManage = isSuperAdmin || hasPermission('job_card_templates.read');
 
@@ -69,14 +79,16 @@ export function PartsReadyJobCards() {
     setLoading(true);
     setError(null);
     try {
-      const [partsRes, templatesRes, techRes] = await Promise.all([
+      const [partsRes, templatesRes, techRes, branchRes] = await Promise.all([
         getPartsReadyJobs(),
         getJobCardTemplates(false, false, true),
         getTechnicians(),
+        getBranches(),
       ]);
       setItems(partsRes.items || []);
       setTemplates(templatesRes.templates || []);
       setTechnicians(techRes.technicians || []);
+      setBranches(branchRes.branches || []);
     } catch (err: any) {
       setError(err.message || 'Failed to load Parts Ready jobs');
       setItems([]);
@@ -183,7 +195,19 @@ export function PartsReadyJobCards() {
   /**
    * Flattens jobs into one table row per assignment (or one empty row when none yet).
    */
-  const tableRows = items.flatMap((item) => {
+  const visibleItems = useMemo(
+    () => filterAndSortPartsReady(items, filters),
+    [items, filters],
+  );
+  const filtersActive =
+    filters.search.trim() !== '' ||
+    filters.branchId !== '' ||
+    filters.technicianId !== '' ||
+    filters.status !== 'all' ||
+    filters.sortField !== 'dateAdded' ||
+    filters.sortDirection !== 'desc';
+
+  const tableRows = visibleItems.flatMap((item) => {
     const job = item.job as { _id?: string; id?: string };
     const jobId = String(job._id ?? job.id ?? '');
     const assignments =
@@ -232,17 +256,106 @@ export function PartsReadyJobCards() {
         </button>
       </div>
 
+      <div className="mb-4 flex flex-wrap items-end gap-2">
+        <input
+          value={filters.search}
+          onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+          placeholder="Job or customer"
+          className="h-9 w-44 rounded-lg border border-gray-300 px-3 text-sm"
+        />
+        <select
+          value={filters.branchId}
+          onChange={(event) => setFilters((current) => ({ ...current, branchId: event.target.value }))}
+          className="h-9 rounded-lg border border-gray-300 px-2 text-sm"
+          aria-label="Branch"
+        >
+          <option value="">All branches</option>
+          {branches.map((branch) => (
+            <option key={branch._id} value={branch._id}>{branch.name}</option>
+          ))}
+        </select>
+        <select
+          value={filters.technicianId}
+          onChange={(event) => setFilters((current) => ({ ...current, technicianId: event.target.value }))}
+          className="h-9 rounded-lg border border-gray-300 px-2 text-sm"
+          aria-label="Technician"
+        >
+          <option value="">All technicians</option>
+          <option value="unassigned">Unassigned</option>
+          {technicians.map((technician) => (
+            <option key={technician._id} value={technician._id}>{technician.name}</option>
+          ))}
+        </select>
+        <select
+          value={filters.status}
+          onChange={(event) => setFilters((current) => ({
+            ...current,
+            status: event.target.value as PartsReadyFilters['status'],
+          }))}
+          className="h-9 rounded-lg border border-gray-300 px-2 text-sm"
+          aria-label="Form status"
+        >
+          <option value="all">All form statuses</option>
+          <option value="unassigned">No form</option>
+          <option value="assigned">Not started</option>
+          <option value="started">In progress</option>
+          <option value="submitted">Submitted</option>
+        </select>
+        <select
+          value={filters.sortField}
+          onChange={(event) => setFilters((current) => ({
+            ...current,
+            sortField: event.target.value as PartsReadySortField,
+          }))}
+          className="h-9 rounded-lg border border-gray-300 px-2 text-sm"
+          aria-label="Sort by"
+        >
+          <option value="dateAdded">Date added</option>
+          <option value="jobNumber">Job number</option>
+          <option value="customer">Customer</option>
+        </select>
+        <button
+          type="button"
+          onClick={() => setFilters((current) => ({
+            ...current,
+            sortDirection: current.sortDirection === 'asc' ? 'desc' : 'asc',
+          }))}
+          className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 hover:bg-gray-50"
+        >
+          {filters.sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilters(EMPTY_PARTS_READY_FILTERS)}
+          disabled={!filtersActive}
+          className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
+          Clear filters
+        </button>
+        <span className="pb-2 text-xs text-gray-500">
+          {visibleItems.length} of {items.length} jobs
+        </span>
+      </div>
+
       {error && (
         <div className="mb-4 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
           {error}
         </div>
       )}
 
-      {items.length === 0 ? (
+      {visibleItems.length === 0 ? (
         <div className="rounded-xl border border-gray-200 bg-gray-50 p-12 text-center text-gray-600">
           <ClipboardList className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-          <p>No jobs with status &quot;Parts Ready&quot; right now.</p>
-          <p className="text-sm mt-1">When jobs move to Parts Ready, they will appear here.</p>
+          <p>
+            {items.length === 0
+              ? 'No jobs with status "Parts Ready" right now.'
+              : 'No Parts Ready jobs match these filters.'}
+          </p>
+          <p className="text-sm mt-1">
+            {items.length === 0
+              ? 'When jobs move to Parts Ready, they will appear here.'
+              : 'Clear the filters to see the full list.'}
+          </p>
         </div>
       ) : (
         <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">

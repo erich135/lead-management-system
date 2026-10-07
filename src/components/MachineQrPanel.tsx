@@ -15,7 +15,7 @@ interface MachineQrPanelProps {
 /**
  * Compact card shown on the Machines edit pane. Fetches a long-lived signed
  * QR token from the backend and displays the QR code plus a "Print" button
- * that opens a print-friendly window with the 50x50 mm label layout.
+ * that opens a Brother QL-800 layout for a 62 mm continuous label roll.
  *
  * Backend endpoint: GET /api/machines/:id/qr-token (requires `machines.manage`).
  */
@@ -58,38 +58,9 @@ export function MachineQrPanel({
     };
   }, [machineId]);
 
-  /**
-   * Sends the QR label to the Zebra GK420t via Zebra Browser Print (ZPL).
-   * Label: 80 × 80 mm — GK420t is 203 dpi (8 dots/mm) → 640 × 640 dots.
-   * QR: 65 × 65 mm, 40-dot (5 mm) margin each side.
-   * ZPL: ^BQN,2,10 = QR model-2, magnification 10; ^FDLA = error-correction L, mode A.
-   *
-   * Falls back to a browser print popup if Zebra Browser Print is not running.
-   */
-  const handlePrint = async () => {
+  /** Print a 55 mm QR (including its quiet zone) on a 62 mm Brother DK roll. */
+  const handlePrint = () => {
     if (!scanUrl) return;
-
-    // ── Zebra Browser Print (ZPL) ────────────────────────────────────────────
-    const zpl = `^XA^PW640^LL640^FO40,40^BQN,2,10^FDLA,${scanUrl}^FS^XZ`;
-
-    try {
-      const deviceResp = await fetch('http://localhost:9100/default?type=device', { mode: 'cors' });
-      if (deviceResp.ok) {
-        const device = await deviceResp.json();
-        if (device?.connection) {
-          const writeResp = await fetch(device.connection, {
-            method: 'POST',
-            body: zpl,
-            mode: 'cors',
-          });
-          if (writeResp.ok) return; // ZPL sent to Zebra GK420t via Browser Print
-        }
-      }
-    } catch {
-      // Zebra Browser Print not running — fall back to browser print window
-    }
-
-    // ── Browser print fallback ───────────────────────────────────────────────
     const svg = document.getElementById(`machine-qr-${machineId}`) as unknown as SVGSVGElement | null;
     if (!svg) return;
     const serialiser = new XMLSerializer();
@@ -97,19 +68,19 @@ export function MachineQrPanel({
     const html = `<!doctype html>
 <html><head><meta charset="utf-8"/><title>Machine QR Label</title>
 <style>
-  @page { size: 82mm 82mm; margin: 1mm; }
-  body { font-family: Arial, sans-serif; margin: 0; padding: 0; color: #111; }
-  .label { width: 80mm; height: 80mm; display: flex; flex-direction: column;
-           align-items: center; justify-content: center; padding: 5mm;
-           border: 1px dashed #999; box-sizing: border-box; }
-  .label svg { width: 65mm; height: 65mm; }
-  .meta { font-size: 6pt; line-height: 1.15; margin-top: 1mm; text-align: center; }
-  .meta strong { display: block; font-size: 7pt; }
-  @media print { .label { border: none; } .instructions { display: none; } }
-  .instructions { padding: 12px; font-size: 12px; color: #555; }
-</style></head>
+  @page { size: 62mm 75mm; margin: 2mm; }
+  body { font-family: Arial, sans-serif; margin: 0; padding: 0; color: #000; background: #fff; }
+  .label { width: 58mm; display: flex; flex-direction: column;
+           align-items: center; padding: 1.5mm; box-sizing: border-box;
+           break-inside: avoid; page-break-inside: avoid; }
+  .label svg { display: block; width: 55mm; height: 55mm; flex: none; }
+  .meta { width: 55mm; font-size: 8pt; line-height: 1.2; margin-top: 1mm;
+          text-align: center; overflow-wrap: anywhere; }
+  .meta strong { display: block; font-size: 9pt; }
+  @media print { .instructions { display: none; } }
+  .instructions { padding: 12px; font-size: 12px; color: #555; }</style></head>
 <body>
-  <div class="instructions">Press <strong>Ctrl/Cmd + P</strong> to print. Choose "Actual size" for an 80&nbsp;&times;&nbsp;80&nbsp;mm label.<br/>Install <em>Zebra Browser Print</em> for direct ZPL printing to the GK420t.</div>
+  <div class="instructions">Choose <strong>Brother QL-800</strong>, a <strong>62 mm continuous roll</strong>, and <strong>100% / Actual size</strong>. Turn headers and footers off. Label length: <span id="label-length">75</span> mm. The 55 mm QR includes its white border.</div>
   <div class="label">
     ${svgString}
     <div class="meta">
@@ -118,7 +89,18 @@ export function MachineQrPanel({
       ${assetNumber ? `Asset: ${escapeHtml(assetNumber)}` : ''}
     </div>
   </div>
-  <script>window.addEventListener('load', () => setTimeout(() => window.print(), 200));</script>
+  <script>
+    window.addEventListener('load', () => {
+      // Extend the cut length for long machine details without shrinking the QR.
+      const label = document.querySelector('.label');
+      const heightMm = Math.max(75, Math.ceil(label.getBoundingClientRect().height * 25.4 / 96 + 4));
+      const pageStyle = document.createElement('style');
+      pageStyle.textContent = '@page { size: 62mm ' + heightMm + 'mm; margin: 2mm; }';
+      document.head.appendChild(pageStyle);
+      document.getElementById('label-length').textContent = String(heightMm);
+      setTimeout(() => window.print(), 200);
+    });
+  </script>
 </body></html>`;
 
     const w = window.open('', '_blank', 'width=480,height=560');
@@ -164,7 +146,7 @@ export function MachineQrPanel({
               value={scanUrl}
               size={130}
               level="M"
-              includeMargin={false}
+              includeMargin={true}
             />
           </div>
           <p className="text-[10px] text-slate-500 break-all mb-3 font-mono">{scanUrl}</p>

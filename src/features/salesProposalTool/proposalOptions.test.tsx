@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 import React from 'react';
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { EMPTY_COMMERCIAL_OFFER } from './types';
 import { emptyProposedDraft } from './equipmentState';
 import { ProposalOptionBar } from './components/ProposalOptionControls';
 import { MultiOptionManagementSummary } from './pages/ManagementSummaryPage';

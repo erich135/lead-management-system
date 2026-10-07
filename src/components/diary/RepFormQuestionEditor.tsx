@@ -235,7 +235,7 @@ export function RepFormQuestionEditor({
           Back to editor
         </button>
         <DynamicPlannerFormRenderer
-          schema={{ ...draft, type: 'preview' }}
+          schema={{ ...draft, type: 'preview', version: 0 }}
           values={previewValues}
           onChange={() => undefined}
           disabled

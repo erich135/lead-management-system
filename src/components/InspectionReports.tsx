@@ -35,6 +35,7 @@ export function InspectionReports() {
       setMessage(`Already linked to ${inspection.followUpJob.jobNumber || 'a job'}. Open that job to print the inspection.`);
       return;
     }
+    if (!window.confirm('Are you sure you want to create a job')) return;
     navigate(`/jobs?inspection=${inspection._id}`);
   };
 
@@ -75,7 +76,7 @@ export function InspectionReports() {
                 <td>{inspection.customer?.name || inspection.siteLabel}</td>
                 <td>{`${inspection.reporter?.firstName || ''} ${inspection.reporter?.lastName || ''}`.trim()}</td>
                 <td>{new Date(inspection.serverReceivedAt).toLocaleString()}</td>
-                <td className="py-2 space-x-2">
+                <td className="flex items-center gap-8 py-2">
                   <button type="button" className="text-[#0969a9] font-semibold" onClick={() => void openInspectionPrint(inspection._id)}>
                     View & Print
                   </button>

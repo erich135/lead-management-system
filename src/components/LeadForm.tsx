@@ -13,6 +13,8 @@ export interface InspectionJobPrefill {
   customerId?: string | null;
   siteLabel: string;
   notes: string;
+  machineId?: string | null;
+  machineNotListed?: boolean;
 }
 
 interface LeadFormProps {
@@ -175,6 +177,20 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated, i
       setSelectedCustomer(customer);
       setSelectedCustomerName(customer.name);
       setCustomerSearchTerm(customer.name);
+      if (inspectionFollowUp.machineId && !inspectionFollowUp.machineNotListed) {
+        void getMachinesByCustomer(customer._id)
+          .then((machinesData) => {
+            const found = machinesData.machines || [];
+            setMachines(found);
+            if (found.some((machine) => machine._id === inspectionFollowUp.machineId)) {
+              setFormData((current) => ({
+                ...current,
+                machines: [inspectionFollowUp.machineId as string],
+              }));
+            }
+          })
+          .catch(() => undefined);
+      }
     } else if (inspectionFollowUp.siteLabel) {
       setCustomerSelection('cash');
     }

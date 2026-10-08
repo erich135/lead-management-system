@@ -4051,6 +4051,14 @@ export interface InspectionListItem {
   customer?: { name?: string };
   followUpJob?: { _id?: string; jobNumber?: string };
   attachmentPending?: boolean;
+  photosPending?: boolean;
+  machineNotListed?: boolean;
+  machineSnapshot?: {
+    make?: string;
+    model?: string;
+    serialNumber?: string;
+    assetNumber?: string;
+  };
 }
 
 export async function listInspections(): Promise<{ inspections: InspectionListItem[] }> {
@@ -4063,6 +4071,9 @@ export async function getInspectionPrefill(id: string): Promise<{
   notes: string;
   followUpJobId: string | null;
   referenceNumber?: string | null;
+  machineId?: string | null;
+  machineNotListed?: boolean;
+  machineLabel?: string | null;
 }> {
   return apiRequest(`/api/inspections/${id}/prefill`);
 }

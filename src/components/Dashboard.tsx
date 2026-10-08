@@ -485,6 +485,8 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           customerId: prefill.customerId,
           siteLabel: prefill.siteLabel,
           notes: prefill.notes,
+          machineId: prefill.machineId,
+          machineNotListed: prefill.machineNotListed,
         });
         setShowLeadForm(true);
       })

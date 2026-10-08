@@ -10,6 +10,18 @@ import {
   type Job,
 } from '../lib/api';
 
+function inspectionMachineLabel(inspection: InspectionListItem): string {
+  if (inspection.machineNotListed) return 'Machine not listed';
+  const snapshot = inspection.machineSnapshot;
+  if (!snapshot) return '';
+  const name = [snapshot.make, snapshot.model].filter(Boolean).join(' ');
+  const identity = [
+    snapshot.serialNumber ? `Serial ${snapshot.serialNumber}` : '',
+    snapshot.assetNumber ? `Asset ${snapshot.assetNumber}` : '',
+  ].filter(Boolean);
+  return [name, ...identity].filter(Boolean).join(' · ');
+}
+
 /**
  * Office list of submitted inspections. Creating a job uses the existing job form fields and numbering.
  */
@@ -125,7 +137,12 @@ export function InspectionReports() {
             {inspections.map((inspection) => (
               <tr key={inspection._id} className="border-t border-slate-100">
                 <td className="py-2 font-semibold">{inspection.referenceNumber || 'Inspection'}</td>
-                <td>{inspection.customer?.name || inspection.siteLabel}</td>
+                <td>
+                  <div>{inspection.customer?.name || inspection.siteLabel}</div>
+                  {inspectionMachineLabel(inspection) ? (
+                    <div className="text-xs text-slate-500">{inspectionMachineLabel(inspection)}</div>
+                  ) : null}
+                </td>
                 <td>{`${inspection.reporter?.firstName || ''} ${inspection.reporter?.lastName || ''}`.trim()}</td>
                 <td>{new Date(inspection.serverReceivedAt).toLocaleString()}</td>
                 <td className="py-2">
@@ -139,6 +156,9 @@ export function InspectionReports() {
                     <button type="button" className="text-[#383838] font-semibold" onClick={() => openLink(inspection)}>
                       Link job
                     </button>
+                    {inspection.photosPending ? (
+                      <span className="text-xs font-semibold text-amber-800">Photos still uploading</span>
+                    ) : null}
                     {inspection.attachmentPending ? (
                       <button type="button" className="text-amber-800 font-semibold" onClick={() => void retryInspectionAttachment(inspection._id).then(load)}>
                         Retry attachment

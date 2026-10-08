@@ -205,6 +205,7 @@ export function JobCardSubmissions() {
         {view === 'inspections' ? <InspectionReports /> : null}
         {view === 'archived' && archiveType !== 'jobcard' ? <InspectionReports archived /> : null}
         {view === 'inspections' || (view === 'archived' && archiveType === 'inspection') ? null : (
+        <>
         <div className="bg-white rounded-[8px] shadow-lg p-6 mb-6">
           <div className="flex items-center justify-between">
             <div>
@@ -322,7 +323,8 @@ export function JobCardSubmissions() {
             </div>
           )}
         </div>
-        ) : null}
+        </>
+        )}
       </div>
       {archiveTarget ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

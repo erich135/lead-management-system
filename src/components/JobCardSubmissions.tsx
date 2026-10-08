@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { FileText, Eye, Calendar, User, RefreshCw, MapPin, Edit2, X, Save } from 'lucide-react';
-import { getJobCardSubmissions, getJobCardSubmission, patchJobCardSubmission, type JobCardSubmissionRecord } from '../lib/api';
+import { archiveJobCardSubmission, getJobCardSubmissions, getJobCardSubmission, patchJobCardSubmission, restoreJobCardSubmission, type JobCardSubmissionRecord } from '../lib/api';
 import { FixedJobCardPrintView } from './FixedJobCardPrintView';
 import { InspectionReports } from './InspectionReports';
 
@@ -28,6 +28,12 @@ const NON_EDITABLE_TYPES = new Set(['signature', 'photo', 'jobField', 'machineFi
 
 export function JobCardSubmissions() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [view, setView] = useState<'inspections' | 'jobcards' | 'archived'>('inspections');
+  const [archiveType, setArchiveType] = useState<'all' | 'inspection' | 'jobcard'>('all');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [archiveTarget, setArchiveTarget] = useState<JobCardSubmissionRecord | null>(null);
   const [submissions, setSubmissions] = useState<JobCardSubmissionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,8 +53,13 @@ export function JobCardSubmissions() {
     setLoading(true);
     setError(null);
     try {
-      const res = await getJobCardSubmissions();
+      const res = await getJobCardSubmissions({
+        search: search.trim(),
+        page,
+        officeArchived: view === 'archived' ? 'only' : 'exclude',
+      });
       setSubmissions(res.submissions || []);
+      setTotal(res.pagination?.total || 0);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load submissions');
     } finally {
@@ -56,7 +67,7 @@ export function JobCardSubmissions() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, [view, search, page]);
 
   useEffect(() => {
     const submissionId = searchParams.get('submission');
@@ -173,7 +184,27 @@ export function JobCardSubmissions() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 md:p-8">
       <div className="max-w-[1500px] mx-auto">
-        <InspectionReports />
+        <div className="mb-4 flex flex-wrap gap-2">
+          {([
+            ['inspections', 'Inspections'],
+            ['jobcards', 'Job Card Submissions'],
+            ['archived', 'Archived'],
+          ] as const).map(([id, label]) => (
+            <button key={id} type="button" onClick={() => { setView(id); setPage(1); }} className={`rounded-lg px-4 py-2 text-sm font-bold ${view === id ? 'bg-[#0969a9] text-white' : 'bg-white text-[#383838]'}`}>{label}</button>
+          ))}
+        </div>
+        {view === 'archived' ? (
+          <div className="mb-4">
+            <select value={archiveType} onChange={(event) => setArchiveType(event.target.value as 'all' | 'inspection' | 'jobcard')} className="rounded-lg border bg-white px-3 py-2 text-sm">
+              <option value="all">All reports</option>
+              <option value="inspection">Inspections</option>
+              <option value="jobcard">Job cards</option>
+            </select>
+          </div>
+        ) : null}
+        {view === 'inspections' ? <InspectionReports /> : null}
+        {view === 'archived' && archiveType !== 'jobcard' ? <InspectionReports archived /> : null}
+        {view === 'inspections' || (view === 'archived' && archiveType === 'inspection') ? null : (
         <div className="bg-white rounded-[8px] shadow-lg p-6 mb-6">
           <div className="flex items-center justify-between">
             <div>
@@ -185,9 +216,13 @@ export function JobCardSubmissions() {
                 View and print completed job cards from technicians
               </p>
             </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <input value={search} onChange={(event) => { setPage(1); setSearch(event.target.value); }} placeholder="Search report, job, customer or serial" className="rounded-lg border px-3 py-2 text-sm" />
+              <span className="text-sm text-slate-500">{total} matching</span>
             <button type="button" onClick={load} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-sm hover:bg-gray-50">
               <RefreshCw className="w-4 h-4" /> Refresh
             </button>
+            </div>
           </div>
         </div>
 
@@ -229,7 +264,7 @@ export function JobCardSubmissions() {
                         </div>
                         <div className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
-                          <span>{new Date(submission.submittedAt).toLocaleDateString()}</span>
+                                          <span>{new Date(submission.submittedAt).toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' })}</span>
                         </div>
                         {submission.submissionLocation ? (
                           <div className="flex items-center gap-1">
@@ -267,6 +302,11 @@ export function JobCardSubmissions() {
                         <Edit2 className="w-4 h-4" />
                         Edit
                       </button>
+                      {view === 'archived' ? (
+                        <button type="button" onClick={() => void restoreJobCardSubmission(submission._id).then(load)} className="px-4 py-2 rounded-[6px] border text-sm font-semibold">Restore</button>
+                      ) : (
+                        <button type="button" onClick={() => setArchiveTarget(submission)} className="px-4 py-2 rounded-[6px] border text-sm font-semibold">Archive</button>
+                      )}
                       <button
                         type="button"
                         onClick={() => openPreview(submission._id)}
@@ -282,7 +322,20 @@ export function JobCardSubmissions() {
             </div>
           )}
         </div>
+        ) : null}
       </div>
+      {archiveTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6">
+            <h3 className="text-lg font-bold">Archive {archiveTarget.reportNumber || 'this job card'}?</h3>
+            <p className="mt-2 text-sm text-slate-600">It leaves the active list. The job, machine history and technician completion stay unchanged.</p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button type="button" className="rounded-lg border px-4 py-2 text-sm font-bold" onClick={() => setArchiveTarget(null)}>Cancel</button>
+              <button type="button" className="rounded-lg bg-[#f7c12b] px-4 py-2 text-sm font-bold" onClick={() => void archiveJobCardSubmission(archiveTarget._id).then(() => { setArchiveTarget(null); return load(); })}>Archive</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Edit Modal */}
       {editSubmission && (

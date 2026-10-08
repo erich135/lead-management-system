@@ -11,8 +11,7 @@ import { applyWaitingServiceWorker, clearArsCachesAndReload } from '../pwa/pwaUp
 type PromptMode = 'update' | 'chunk' | 'storage' | null;
 
 const COPY: Record<Exclude<PromptMode, null>, string> = {
-  update:
-    'A new version of ARS is available. Update now to make sure you are using the latest version.',
+  update: '',
   chunk: 'ARS could not load part of this version. Update now to continue.',
   storage:
     'ARS could not store the latest version because browser storage is full. Update now to clear the old cache and continue.',
@@ -27,7 +26,6 @@ export function PwaUpdatePrompt() {
     const onUpdate = (event: Event) => {
       const detail = (event as CustomEvent<{ availableBuild?: string | null }>).detail;
       setAvailableBuild(detail?.availableBuild ?? null);
-      setMode((current) => (current === 'chunk' || current === 'storage' ? current : 'update'));
     };
     const onChunk = () => setMode('chunk');
     const onStorage = () => setMode((current) => (current === 'chunk' ? current : 'storage'));
@@ -41,7 +39,7 @@ export function PwaUpdatePrompt() {
     };
   }, []);
 
-  if (!mode) return null;
+  if (!mode || mode === 'update') return null;
 
   async function updateNow() {
     if (applying) return;

@@ -180,7 +180,7 @@ export async function registerArsServiceWorker(): Promise<ServiceWorkerRegistrat
 
   publishDiagnostics({ runningBuild: ARS_APP_BUILD });
   window.setTimeout(() => clearReloadGuard(window.sessionStorage), 15000);
-  reloadWhenControllerChanges();
+  // A newer website build stays waiting. Do not reload a page that may have unsaved work.
 
   const swUrl = resolveServiceWorkerUrl();
   try {

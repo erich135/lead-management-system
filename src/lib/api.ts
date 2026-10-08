@@ -4029,6 +4029,8 @@ export interface JobCardSubmissionRecord {
   reportNumber?: string;
   fieldValues: Array<{ fieldId: string; type: string; value: unknown; signatureData?: string; imageData?: string }>;
   submittedAt: string;
+  officeArchivedAt?: string | null;
+  officeArchivedBy?: { firstName?: string; lastName?: string } | string | null;
   notes?: string;
   submissionLocation?: {
     lat: number;
@@ -4062,10 +4064,54 @@ export interface InspectionListItem {
     serialNumber?: string;
     assetNumber?: string;
   };
+  officeArchivedAt?: string | null;
+  officeArchivedBy?: { firstName?: string; lastName?: string } | string | null;
 }
 
-export async function listInspections(): Promise<{ inspections: InspectionListItem[] }> {
-  return apiRequest('/api/inspections');
+export async function listInspections(params?: {
+  search?: string;
+  linked?: 'yes' | 'no' | '';
+  from?: string;
+  to?: string;
+  page?: number;
+  officeArchived?: 'only' | 'exclude';
+  sortBy?: 'date' | 'customer' | 'reference';
+  sortOrder?: 'asc' | 'desc';
+}): Promise<{ inspections: InspectionListItem[]; pagination?: { total: number; page: number; pages: number } }> {
+  const search = new URLSearchParams();
+  if (params?.search) search.set('search', params.search);
+  if (params?.linked) search.set('linked', params.linked);
+  if (params?.from) search.set('from', params.from);
+  if (params?.to) search.set('to', params.to);
+  if (params?.page) search.set('page', String(params.page));
+  if (params?.officeArchived) search.set('officeArchived', params.officeArchived);
+  if (params?.sortBy) search.set('sortBy', params.sortBy);
+  if (params?.sortOrder) search.set('sortOrder', params.sortOrder);
+  const qs = search.toString();
+  return apiRequest(`/api/inspections${qs ? `?${qs}` : ''}`);
+}
+
+export async function archiveInspection(id: string): Promise<void> {
+  await apiRequest(`/api/inspections/${id}/office-archive`, { method: 'POST' });
+}
+
+export async function restoreInspection(id: string): Promise<void> {
+  await apiRequest(`/api/inspections/${id}/office-restore`, { method: 'POST' });
+}
+
+export async function uploadOfficeInspectionPhoto(id: string, file: File): Promise<void> {
+  const form = new FormData();
+  form.append('file', file);
+  const token = getAuthToken();
+  const response = await fetch(`${apiBase()}/api/inspections/${id}/office-photos`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body?.error?.message || body?.message || 'The photo could not be attached');
+  }
 }
 
 export async function getInspectionPrefill(id: string): Promise<{
@@ -4122,13 +4168,31 @@ export async function getJobCardSubmissions(params?: {
   template?: string;
   job?: string;
   page?: number;
-}): Promise<{ submissions: JobCardSubmissionRecord[]; pagination: { total: number } }> {
+  search?: string;
+  from?: string;
+  to?: string;
+  officeArchived?: 'only' | 'exclude';
+  sortOrder?: 'asc' | 'desc';
+}): Promise<{ submissions: JobCardSubmissionRecord[]; pagination: { total: number; page?: number; pages?: number } }> {
   const search = new URLSearchParams();
   if (params?.template) search.set('template', params.template);
   if (params?.job) search.set('job', params.job);
   if (params?.page) search.set('page', String(params.page));
+  if (params?.search) search.set('search', params.search);
+  if (params?.from) search.set('from', params.from);
+  if (params?.to) search.set('to', params.to);
+  if (params?.officeArchived) search.set('officeArchived', params.officeArchived);
+  if (params?.sortOrder) search.set('sortOrder', params.sortOrder);
   const qs = search.toString();
   return apiRequest(`/api/job-card-submissions${qs ? `?${qs}` : ''}`);
+}
+
+export async function archiveJobCardSubmission(id: string): Promise<void> {
+  await apiRequest(`/api/job-card-submissions/${id}/office-archive`, { method: 'POST' });
+}
+
+export async function restoreJobCardSubmission(id: string): Promise<void> {
+  await apiRequest(`/api/job-card-submissions/${id}/office-restore`, { method: 'POST' });
 }
 
 /**

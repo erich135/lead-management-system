@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  archiveInspection,
   linkInspectionJob,
   listInspections,
   openInspectionPrint,
+  restoreInspection,
   retryInspectionAttachment,
+  uploadOfficeInspectionPhoto,
   type InspectionListItem,
   getJobs,
   type Job,
@@ -32,10 +35,22 @@ function inspectionMachineLabel(inspection: InspectionListItem): string {
 /**
  * Office list of submitted inspections. Creating a job uses the existing job form fields and numbering.
  */
-export function InspectionReports() {
+function formatOfficeDate(value?: string): string {
+  if (!value) return '';
+  return new Date(value).toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' });
+}
+
+export function InspectionReports({ archived = false }: { archived?: boolean }) {
   const navigate = useNavigate();
   const [inspections, setInspections] = useState<InspectionListItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [linked, setLinked] = useState<'' | 'yes' | 'no'>('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const [message, setMessage] = useState('');
+  const [archiveTarget, setArchiveTarget] = useState<InspectionListItem | null>(null);
   const [linkTarget, setLinkTarget] = useState<InspectionListItem | null>(null);
   const [jobSearch, setJobSearch] = useState('');
   const [jobResults, setJobResults] = useState<Job[]>([]);
@@ -46,8 +61,18 @@ export function InspectionReports() {
 
   const load = async () => {
     try {
-      const result = await listInspections();
+      const result = await listInspections({
+        search: search.trim(),
+        linked,
+        from: from ? new Date(`${from}T00:00:00`).toISOString() : '',
+        to: to ? new Date(`${to}T23:59:59`).toISOString() : '',
+        page,
+        officeArchived: archived ? 'only' : 'exclude',
+        sortBy: 'date',
+        sortOrder: 'desc',
+      });
       setInspections(result.inspections || []);
+      setTotal(result.pagination?.total || result.inspections?.length || 0);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Inspections could not be loaded');
     }
@@ -55,7 +80,7 @@ export function InspectionReports() {
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [archived, page, linked, from, to, search]);
 
   useEffect(() => {
     if (!linkTarget) return;
@@ -126,8 +151,24 @@ export function InspectionReports() {
 
   return (
     <div className="bg-white rounded-[8px] shadow-lg p-6 mb-6">
-      <h2 className="text-xl font-bold text-[#383838] mb-2">Inspections</h2>
-      <p className="text-sm text-slate-600 mb-4">Submitted inspections stay here even if no follow-up job is created.</p>
+      <h2 className="text-xl font-bold text-[#383838] mb-2">{archived ? 'Archived inspections' : 'Inspections'}</h2>
+      <p className="text-sm text-slate-600 mb-4">
+        {archived
+          ? 'Archived inspections keep their answers, signatures, photos and linked jobs.'
+          : 'Submitted inspections stay here even if no follow-up job is created.'}
+      </p>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <input value={search} onChange={(event) => { setPage(1); setSearch(event.target.value); }} placeholder="Search reference, customer, serial or asset" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+        <select value={linked} onChange={(event) => { setPage(1); setLinked(event.target.value as '' | 'yes' | 'no'); }} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+          <option value="">Linked and not linked</option>
+          <option value="yes">Linked to a job</option>
+          <option value="no">Not linked</option>
+        </select>
+        <input type="date" value={from} onChange={(event) => { setPage(1); setFrom(event.target.value); }} aria-label="Submitted from" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+        <input type="date" value={to} onChange={(event) => { setPage(1); setTo(event.target.value); }} aria-label="Submitted to" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+        <button type="button" className="text-sm font-semibold text-[#0969a9]" onClick={() => { setSearch(''); setLinked(''); setFrom(''); setTo(''); setPage(1); }}>Clear filters</button>
+        <span className="text-sm text-slate-500">{total} matching</span>
+      </div>
       {message ? <p className="text-sm mb-3 text-[#075a8f]">{message}</p> : null}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -151,18 +192,48 @@ export function InspectionReports() {
                   ) : null}
                 </td>
                 <td>{`${inspection.reporter?.firstName || ''} ${inspection.reporter?.lastName || ''}`.trim()}</td>
-                <td>{new Date(inspection.serverReceivedAt).toLocaleString()}</td>
+                <td>{formatOfficeDate(inspection.serverReceivedAt)}</td>
                 <td className="py-2">
                   <div className="flex flex-wrap items-center gap-8">
                     <button type="button" className="text-[#0969a9] font-semibold" onClick={() => void openInspectionPrint(inspection._id)}>
                       View & Print
                     </button>
-                    <button type="button" className="text-[#383838] font-semibold" onClick={() => createFollowUp(inspection)}>
-                      Create job
-                    </button>
-                    <button type="button" className="text-[#383838] font-semibold" onClick={() => openLink(inspection)}>
-                      Link job
-                    </button>
+                    {archived ? (
+                      <button type="button" className="text-[#383838] font-semibold" onClick={() => void restoreInspection(inspection._id).then(load)}>
+                        Restore
+                      </button>
+                    ) : (
+                      <>
+                        <button type="button" className="text-[#383838] font-semibold" onClick={() => createFollowUp(inspection)}>
+                          Create job
+                        </button>
+                        <button type="button" className="text-[#383838] font-semibold" onClick={() => openLink(inspection)}>
+                          Link job
+                        </button>
+                        <button type="button" className="text-[#383838] font-semibold" onClick={() => setArchiveTarget(inspection)}>
+                          Archive
+                        </button>
+                        <label className="text-[#0969a9] font-semibold cursor-pointer">
+                          Add photos
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            onChange={(event) => {
+                              const file = event.target.files?.[0];
+                              event.target.value = '';
+                              if (!file) return;
+                              void uploadOfficeInspectionPhoto(inspection._id, file)
+                                .then(() => {
+                                  setMessage(`Photo attached to ${inspection.referenceNumber || 'the inspection'}.`);
+                                  return load();
+                                })
+                                .catch((error) => setMessage(error instanceof Error ? error.message : 'The photo could not be attached'));
+                            }}
+                          />
+                        </label>
+                      </>
+                    )}
                     {inspectionPhotosPending(inspection) ? (
                       <span className="text-xs font-semibold text-amber-800">Photos still need uploading</span>
                     ) : null}
@@ -178,6 +249,23 @@ export function InspectionReports() {
           </tbody>
         </table>
       </div>
+      <div className="mt-3 flex items-center gap-3 text-sm">
+        <button type="button" disabled={page <= 1} className="font-semibold disabled:opacity-40" onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</button>
+        <span>Page {page}</span>
+        <button type="button" disabled={inspections.length < 25} className="font-semibold disabled:opacity-40" onClick={() => setPage((current) => current + 1)}>Next</button>
+      </div>
+      {archiveTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-bold">Archive {archiveTarget.referenceNumber || 'this inspection'}?</h3>
+            <p className="mt-2 text-sm text-slate-600">It leaves the active list and stays available under Archived, with its status, answers, signatures, photos and linked job kept. Restore it before creating or linking a new job.</p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button type="button" className="rounded-lg border px-4 py-2 text-sm font-bold" onClick={() => setArchiveTarget(null)}>Cancel</button>
+              <button type="button" className="rounded-lg bg-[#f7c12b] px-4 py-2 text-sm font-bold" onClick={() => void archiveInspection(archiveTarget._id).then(() => { setArchiveTarget(null); setMessage('Inspection archived.'); return load(); })}>Archive</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {createTarget ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

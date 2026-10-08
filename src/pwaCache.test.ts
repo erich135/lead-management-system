@@ -25,7 +25,7 @@ test('production PWA bypasses HTTP cache for sw.js and reloads when a new worker
   assert.match(worker, /caches\.delete/);
   assert.match(worker, /registerQuotaErrorCallback/);
   assert.doesNotMatch(worker, /^self\.skipWaiting\(\);/m);
-  assert.match(prompt, /App update available/);
-  assert.match(prompt, /Update now/);
+  assert.match(prompt, /mode === 'update'/);
+  assert.doesNotMatch(prompt, /A new version of ARS is available/);
   assert.doesNotMatch(prompt, /Dismiss/);
 });

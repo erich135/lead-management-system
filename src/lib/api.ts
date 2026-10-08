@@ -4052,6 +4052,9 @@ export interface InspectionListItem {
   followUpJob?: { _id?: string; jobNumber?: string };
   attachmentPending?: boolean;
   photosPending?: boolean;
+  expectedPhotoCount?: number;
+  photoCount?: number;
+  photos?: unknown[];
   machineNotListed?: boolean;
   machineSnapshot?: {
     make?: string;

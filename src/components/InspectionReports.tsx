@@ -10,6 +10,13 @@ import {
   type Job,
 } from '../lib/api';
 
+function inspectionPhotosPending(inspection: InspectionListItem): boolean {
+  if (inspection.photosPending) return true;
+  const expected = inspection.expectedPhotoCount || 0;
+  const received = inspection.photoCount ?? inspection.photos?.length ?? 0;
+  return expected > 0 && received < expected;
+}
+
 function inspectionMachineLabel(inspection: InspectionListItem): string {
   if (inspection.machineNotListed) return 'Machine not listed';
   const snapshot = inspection.machineSnapshot;
@@ -156,8 +163,8 @@ export function InspectionReports() {
                     <button type="button" className="text-[#383838] font-semibold" onClick={() => openLink(inspection)}>
                       Link job
                     </button>
-                    {inspection.photosPending ? (
-                      <span className="text-xs font-semibold text-amber-800">Photos still uploading</span>
+                    {inspectionPhotosPending(inspection) ? (
+                      <span className="text-xs font-semibold text-amber-800">Photos still need uploading</span>
                     ) : null}
                     {inspection.attachmentPending ? (
                       <button type="button" className="text-amber-800 font-semibold" onClick={() => void retryInspectionAttachment(inspection._id).then(load)}>

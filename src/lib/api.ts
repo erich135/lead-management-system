@@ -4187,6 +4187,52 @@ export async function getJobCardSubmissions(params?: {
   return apiRequest(`/api/job-card-submissions${qs ? `?${qs}` : ''}`);
 }
 
+export interface DeliveryNoteListItem {
+  _id: string;
+  referenceNumber?: string;
+  customerName: string;
+  deliveredAt: string;
+  orderReference?: string;
+  reporter?: { firstName?: string; lastName?: string };
+  officeArchivedAt?: string | null;
+}
+
+export async function listDeliveryNotes(params?: {
+  search?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  officeArchived?: 'only' | 'exclude';
+}): Promise<{ deliveryNotes: DeliveryNoteListItem[]; pagination?: { total: number; page: number; pages: number } }> {
+  const search = new URLSearchParams();
+  if (params?.search) search.set('search', params.search);
+  if (params?.from) search.set('from', params.from);
+  if (params?.to) search.set('to', params.to);
+  if (params?.page) search.set('page', String(params.page));
+  if (params?.officeArchived) search.set('officeArchived', params.officeArchived);
+  const qs = search.toString();
+  return apiRequest(`/api/delivery-notes${qs ? `?${qs}` : ''}`);
+}
+
+export async function archiveDeliveryNote(id: string): Promise<void> {
+  await apiRequest(`/api/delivery-notes/${id}/office-archive`, { method: 'POST' });
+}
+
+export async function restoreDeliveryNote(id: string): Promise<void> {
+  await apiRequest(`/api/delivery-notes/${id}/office-restore`, { method: 'POST' });
+}
+
+export async function openDeliveryNotePrint(id: string): Promise<void> {
+  const token = getAuthToken();
+  const response = await fetch(`${apiBase()}/api/delivery-notes/${id}/print`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) throw new Error('The delivery note could not be opened');
+  const html = await response.text();
+  const blob = new Blob([html], { type: 'text/html' });
+  window.open(URL.createObjectURL(blob), '_blank', 'noopener');
+}
+
 export async function archiveJobCardSubmission(id: string): Promise<void> {
   await apiRequest(`/api/job-card-submissions/${id}/office-archive`, { method: 'POST' });
 }

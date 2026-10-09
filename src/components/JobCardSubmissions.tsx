@@ -4,6 +4,7 @@ import { FileText, Eye, Calendar, User, RefreshCw, MapPin, Edit2, X, Save } from
 import { archiveJobCardSubmission, getJobCardSubmissions, getJobCardSubmission, patchJobCardSubmission, restoreJobCardSubmission, type JobCardSubmissionRecord } from '../lib/api';
 import { FixedJobCardPrintView } from './FixedJobCardPrintView';
 import { InspectionReports } from './InspectionReports';
+import { DeliveryNotes } from './DeliveryNotes';
 
 /** Build a map of fieldId → { label, type, options } from template sections. */
 function buildFieldLabelMap(sections: any[]): Map<string, { label: string; type: string; options?: string[] }> {
@@ -28,8 +29,8 @@ const NON_EDITABLE_TYPES = new Set(['signature', 'photo', 'jobField', 'machineFi
 
 export function JobCardSubmissions() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [view, setView] = useState<'inspections' | 'jobcards' | 'archived'>('inspections');
-  const [archiveType, setArchiveType] = useState<'all' | 'inspection' | 'jobcard'>('all');
+  const [view, setView] = useState<'inspections' | 'delivery' | 'jobcards' | 'archived'>('inspections');
+  const [archiveType, setArchiveType] = useState<'all' | 'inspection' | 'delivery' | 'jobcard'>('all');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -187,6 +188,7 @@ export function JobCardSubmissions() {
         <div className="mb-4 flex flex-wrap gap-2">
           {([
             ['inspections', 'Inspections'],
+            ['delivery', 'Delivery Notes'],
             ['jobcards', 'Job Card Submissions'],
             ['archived', 'Archived'],
           ] as const).map(([id, label]) => (
@@ -195,16 +197,19 @@ export function JobCardSubmissions() {
         </div>
         {view === 'archived' ? (
           <div className="mb-4">
-            <select value={archiveType} onChange={(event) => setArchiveType(event.target.value as 'all' | 'inspection' | 'jobcard')} className="rounded-lg border bg-white px-3 py-2 text-sm">
+            <select value={archiveType} onChange={(event) => setArchiveType(event.target.value as 'all' | 'inspection' | 'delivery' | 'jobcard')} className="rounded-lg border bg-white px-3 py-2 text-sm">
               <option value="all">All reports</option>
               <option value="inspection">Inspections</option>
+              <option value="delivery">Delivery notes</option>
               <option value="jobcard">Job cards</option>
             </select>
           </div>
         ) : null}
         {view === 'inspections' ? <InspectionReports /> : null}
-        {view === 'archived' && archiveType !== 'jobcard' ? <InspectionReports archived /> : null}
-        {view === 'inspections' || (view === 'archived' && archiveType === 'inspection') ? null : (
+        {view === 'archived' && (archiveType === 'all' || archiveType === 'inspection') ? <InspectionReports archived /> : null}
+        {view === 'delivery' ? <DeliveryNotes /> : null}
+        {view === 'archived' && (archiveType === 'all' || archiveType === 'delivery') ? <DeliveryNotes archived /> : null}
+        {view === 'jobcards' || (view === 'archived' && (archiveType === 'all' || archiveType === 'jobcard')) ? (
         <>
         <div className="bg-white rounded-[8px] shadow-lg p-6 mb-6">
           <div className="flex items-center justify-between">
@@ -324,7 +329,7 @@ export function JobCardSubmissions() {
           )}
         </div>
         </>
-        )}
+        ) : null}
       </div>
       {archiveTarget ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

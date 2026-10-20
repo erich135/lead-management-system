@@ -120,6 +120,8 @@ export function NotificationSystem({ onLeadClick }: NotificationSystemProps) {
 
   function getNotificationIcon(type: string) {
     switch (type) {
+      case 'job_card_submitted':
+        return <FileText className="w-5 h-5 text-blue-600" />;
       case 'lead_assigned':
         return <Users className="w-5 h-5 text-blue-500" />;
       case 'lead_status_changed':

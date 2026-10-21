@@ -17,40 +17,26 @@ export function JobCardReportHeader({ title, reportNumber, header }: JobCardRepo
       : 'REPORT NO';
 
   return (
-    <div className="jcr-header mb-3">
-      <div className="flex justify-between items-start gap-4 border-b-2 border-black pb-2">
-        <div className="flex gap-3 items-start flex-1 min-w-0">
+    <div className="jcr-block">
+      <div className="jcr-letterhead">
+        <div className="jcr-brand">
           {header.logoUrl ? (
-            <img src={header.logoUrl} alt="Company logo" className="h-14 w-auto object-contain shrink-0" />
-          ) : (
-            <div className="shrink-0 w-14 h-14 border-2 border-[#0969a9] rounded flex items-center justify-center text-[8px] font-bold text-[#0969a9] text-center leading-tight p-1">
-              AIR
-              <br />
-              ROTARY
-            </div>
-          )}
-          <div className="text-[9px] leading-snug text-gray-800">
-            <div className="font-bold text-[11px] text-black mb-1">{header.companyName}</div>
-            {header.registrationNumber && <div>Reg No: {header.registrationNumber}</div>}
-            {header.vatNumber && <div>VAT No: {header.vatNumber}</div>}
+            <img src={header.logoUrl} alt="Air Rotary Services" className="jcr-logo" />
+          ) : null}
+          <div className="jcr-address">
+            <div className="jcr-company">{header.companyName}</div>
             {header.address && <div>{header.address}</div>}
             {header.city && <div>{header.city}</div>}
-            {header.phone && <div>{header.phone}</div>}
-            {header.email && <div>{header.email}</div>}
           </div>
         </div>
         {reportNumber && (
-          <div className="text-right shrink-0">
-            <div className="text-[9px] text-gray-600 mb-0.5">{reportNumberLabel}</div>
-            <div className="text-lg font-bold text-red-700 border-2 border-red-700 px-2 py-0.5 inline-block">
-              {reportNumber}
-            </div>
+          <div className="jcr-report-no">
+            <div className="jcr-report-no-label">{reportNumberLabel}</div>
+            <div className="jcr-report-no-value">{reportNumber}</div>
           </div>
         )}
       </div>
-      <h1 className="text-center font-bold text-sm uppercase tracking-wide mt-2 border border-black py-1 bg-gray-50">
-        {title}
-      </h1>
+      <h1 className="jcr-doc-title">{title}</h1>
     </div>
   );
 }

@@ -26,31 +26,38 @@ interface RepairStatusReportDocumentProps {
   reportNumber?: string;
 }
 
-const cell = 'border border-black px-1 py-0.5 align-top text-[8px]';
-const th = `${cell} bg-gray-100 font-semibold text-center`;
-
 /**
- * Renders a captured signature image or fallback text in report cells.
+ * Label above a wrapping answer. An empty answer keeps its own line.
  */
-function SignatureCell({
-  resolver,
-  fieldId,
-  fallback,
-}: {
-  resolver: FixedJobCardFieldResolver;
-  fieldId?: string;
-  fallback?: string;
-}) {
-  if (!fieldId) return <>{fallback || ''}</>;
-  const image = resolver.resolveSignatureImage?.(fieldId);
-  if (image) {
-    return <img src={image} alt="Signature" className="inline-block max-h-10 max-w-[90px] object-contain" />;
-  }
-  return <>{fallback || ''}</>;
+function StackedField({ label, value }: { label: string; value: string }) {
+  return (
+    <>
+      <div className="jcr-field-label">{label}</div>
+      <div className="jcr-field-value">{value}</div>
+    </>
+  );
 }
 
 /**
- * Renders the filled Repair Status Report as structured HTML tables matching the paper layout.
+ * Renders a captured signature image inside a fixed slot.
+ */
+function SignatureSlot({
+  resolver,
+  fieldId,
+}: {
+  resolver: FixedJobCardFieldResolver;
+  fieldId?: string;
+}) {
+  const image = fieldId ? resolver.resolveSignatureImage?.(fieldId) : null;
+  return (
+    <div className="jcr-sign-slot">
+      {image ? <img src={image} alt="Signature" /> : null}
+    </div>
+  );
+}
+
+/**
+ * Renders the filled Repair Status Report as structured HTML tables.
  */
 export function RepairStatusReportDocument({
   sections = [],
@@ -67,172 +74,163 @@ export function RepairStatusReportDocument({
   const generalSection = sections.find((s) => s.id === 'rsr_general');
   const workSection = sections.find((s) => s.id === 'rsr_work');
   const signSection = sections.find((s) => s.type === 'signatures' && s.id === 'rsr_signatures');
+  const headerFields = headerSection?.fields || [];
+  const headerRows = [headerFields.slice(0, 4), headerFields.slice(4)].filter((row) => row.length > 0);
+  const serviceFields = serviceSection?.fields || [];
+  const travelFields = workSection?.fields?.slice(1, 7) || [];
 
   return (
-    <div className="job-card-report bg-white text-black p-4" style={{ width: '794px', maxWidth: '100%' }}>
+    <div className="job-card-report">
       <JobCardReportHeader title="Repair Status Report" reportNumber={reportNumber} header={header} />
 
-      {/* Job / machine header */}
-      <table className="w-full border-collapse border border-black mb-2 text-[8px]">
-        <tbody>
-          <tr>
-            {headerSection?.fields?.slice(0, 4).map((field) => (
-              <td key={field.id} className={cell}>
-                <span className="font-semibold">{field.label}</span>
-                <div className="min-h-[14px] mt-0.5">{resolver.resolve(field)}</div>
-              </td>
-            ))}
-          </tr>
-          <tr>
-            {headerSection?.fields?.slice(4).map((field) => (
-              <td key={field.id} className={cell}>
-                <span className="font-semibold">{field.label}</span>
-                <div className="min-h-[14px] mt-0.5">{resolver.resolve(field)}</div>
-              </td>
-            ))}
-          </tr>
-        </tbody>
-      </table>
-
-      {/* Service type */}
-      {serviceSection?.fields && (
-        <table className="w-full border-collapse border border-black mb-2 text-[8px]">
-          <thead>
-            <tr>
-              <th className={th} colSpan={6}>Reason for visit / call</th>
-            </tr>
-          </thead>
+      {headerRows.length > 0 && (
+        <table className="jcr-block">
           <tbody>
-            <tr>
-              {serviceSection.fields.slice(0, 3).map((field) => (
-                <td key={field.id} className={cell} colSpan={2}>
-                  <span className="font-semibold">{field.label}: </span>
-                  {resolver.resolve(field)}
-                </td>
-              ))}
-            </tr>
-            <tr>
-              <td className={cell} colSpan={6}>
-                <span className="font-semibold">
-                  {serviceSection.fields[3]?.label}:{' '}
-                </span>
-                {resolver.resolve(serviceSection.fields[3])}
-              </td>
-            </tr>
-            <tr>
-              {serviceSection.fields.slice(4).map((field) => (
-                <td key={field.id} className={cell} colSpan={3}>
-                  <span className="font-semibold">{field.label}: </span>
-                  {resolver.resolve(field)}
-                </td>
-              ))}
-            </tr>
+            {headerRows.map((row) => (
+              <tr key={row.map((field) => field.id).join('-')}>
+                {row.map((field) => (
+                  <td key={field.id}>
+                    <StackedField label={field.label} value={resolver.resolve(field)} />
+                  </td>
+                ))}
+                {headerRows[0] && row.length < headerRows[0].length && (
+                  <td colSpan={headerRows[0].length - row.length} />
+                )}
+              </tr>
+            ))}
           </tbody>
         </table>
       )}
 
-      <div className="grid grid-cols-2 gap-2 mb-2">
-        {/* HIRA */}
-        {hiraSection?.fields && (
-          <div>
-            <p className="text-[8px] font-bold mb-1">Hazard Identification &amp; Risk Assessment</p>
-            <table className="w-full border-collapse border border-black text-[8px]">
+      {serviceFields.length > 0 && (
+        <table className="jcr-block">
+          <thead>
+            <tr>
+              <th colSpan={6}>Reason for visit / call</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              {serviceFields.slice(0, 3).map((field) => (
+                <td key={field.id} colSpan={2}>
+                  <StackedField label={field.label} value={resolver.resolve(field)} />
+                </td>
+              ))}
+            </tr>
+            {serviceFields[3] && (
+              <tr>
+                <td colSpan={6}>
+                  <StackedField label={serviceFields[3].label} value={resolver.resolve(serviceFields[3])} />
+                </td>
+              </tr>
+            )}
+            {serviceFields.length > 4 && (
+              <tr>
+                {serviceFields.slice(4).map((field) => (
+                  <td key={field.id} colSpan={3}>
+                    <StackedField label={field.label} value={resolver.resolve(field)} />
+                  </td>
+                ))}
+              </tr>
+            )}
+          </tbody>
+        </table>
+      )}
+
+      {hiraSection?.fields && (
+          <table className="jcr-block">
+            <thead>
+              <tr>
+                <th colSpan={4}>Hazard Identification &amp; Risk Assessment</th>
+              </tr>
+              <tr>
+                <th style={{ width: '10%' }}>#</th>
+                <th>Question</th>
+                <th style={{ width: '14%' }}>Yes</th>
+                <th style={{ width: '14%' }}>No</th>
+              </tr>
+            </thead>
+            <tbody>
+              {hiraSection.fields.map((field, idx) => {
+                const ans = resolver.resolve(field);
+                return (
+                  <tr key={field.id}>
+                    <td className="jcr-center">{idx + 1}</td>
+                    <td>{field.label}</td>
+                    <td className="jcr-center">{ans === 'Yes' ? '✓' : ''}</td>
+                    <td className="jcr-center">{ans === 'No' ? '✓' : ''}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+      )}
+
+      {tempSection?.rows?.map((row) => (
+            <table key={row.id} className="jcr-block jcr-keep">
               <thead>
                 <tr>
-                  <th className={`${th} w-6`}>#</th>
-                  <th className={`${th} text-left`}>Question</th>
-                  <th className={`${th} w-10`}>Yes</th>
-                  <th className={`${th} w-10`}>No</th>
+                  <th colSpan={2}>{row.label} (°C)</th>
                 </tr>
               </thead>
               <tbody>
-                {hiraSection.fields.map((field, idx) => {
-                  const ans = resolver.resolve(field);
-                  return (
-                    <tr key={field.id}>
-                      <td className={`${cell} text-center`}>{idx + 1}</td>
-                      <td className={cell}>{field.label}</td>
-                      <td className={`${cell} text-center`}>{ans === 'Yes' ? '✓' : ''}</td>
-                      <td className={`${cell} text-center`}>{ans === 'No' ? '✓' : ''}</td>
-                    </tr>
-                  );
-                })}
+                {row.fields.map((field) => (
+                  <tr key={field.id}>
+                    <td>{field.label}</td>
+                    <td className="jcr-center" style={{ width: '28%' }}>{resolver.resolve(field)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
-          </div>
-        )}
+      ))}
 
-        {/* Technical readings column */}
-        <div className="space-y-2">
-          {tempSection?.rows?.map((row) => (
-            <div key={row.id}>
-              <p className="text-[8px] font-bold mb-0.5">{row.label} (°C)</p>
-              <table className="w-full border-collapse border border-black text-[8px]">
-                <tbody>
-                  {row.fields.map((field) => (
-                    <tr key={field.id}>
-                      <td className={`${cell} w-1/2 font-medium`}>{field.label}</td>
-                      <td className={`${cell} text-center w-16`}>{resolver.resolve(field)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Trip settings & pressures */}
-      <div className="grid grid-cols-2 gap-2 mb-2">
-        {tripSection?.fields && (
-          <table className="w-full border-collapse border border-black text-[8px]">
+      {tripSection?.fields && (
+          <table className="jcr-block jcr-keep">
             <thead>
               <tr>
-                <th className={th} colSpan={2}>Trip Settings (°C / kPA)</th>
+                <th colSpan={2}>Trip Settings (°C / kPA)</th>
               </tr>
             </thead>
             <tbody>
               {tripSection.fields.map((field) => (
                 <tr key={field.id}>
-                  <td className={cell}>{field.label}</td>
-                  <td className={`${cell} text-center w-16`}>{resolver.resolve(field)}</td>
+                  <td>{field.label}</td>
+                  <td className="jcr-center" style={{ width: '28%' }}>{resolver.resolve(field)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        )}
-        {pressSection?.fields && (
-          <table className="w-full border-collapse border border-black text-[8px]">
+      )}
+      {pressSection?.fields && (
+          <table className="jcr-block jcr-keep">
             <thead>
               <tr>
-                <th className={th} colSpan={2}>Pressures (PSI / kPA)</th>
+                <th colSpan={2}>Pressures (PSI / kPA)</th>
               </tr>
             </thead>
             <tbody>
               {pressSection.fields.map((field) => (
                 <tr key={field.id}>
-                  <td className={cell}>{field.label}</td>
-                  <td className={`${cell} text-center w-16`}>{resolver.resolve(field)}</td>
+                  <td>{field.label}</td>
+                  <td className="jcr-center" style={{ width: '28%' }}>{resolver.resolve(field)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+      )}
 
       {generalSection?.fields && (
-        <table className="w-full border-collapse border border-black mb-2 text-[8px]">
+        <table className="jcr-block jcr-keep">
           <thead>
             <tr>
-              <th className={th} colSpan={3}>General Conditions</th>
+              <th colSpan={generalSection.fields.length || 1}>General Conditions</th>
             </tr>
           </thead>
           <tbody>
             <tr>
               {generalSection.fields.map((field) => (
-                <td key={field.id} className={cell}>
-                  <span className="font-semibold">{field.label}: </span>
-                  {resolver.resolve(field)}
+                <td key={field.id}>
+                  <StackedField label={field.label} value={resolver.resolve(field)} />
                 </td>
               ))}
             </tr>
@@ -240,76 +238,78 @@ export function RepairStatusReportDocument({
         </table>
       )}
 
-      {/* Work done & travel */}
       {workSection?.fields && (
-        <table className="w-full border-collapse border border-black mb-2 text-[8px]">
+        <table className="jcr-block jcr-keep">
           <tbody>
             <tr>
-              <td className={`${cell} font-semibold bg-gray-50`} colSpan={6}>
-                Comments — Work Done
+              <td colSpan={3} className="jcr-comments">
+                <StackedField
+                  label="Comments — Work Done"
+                  value={resolver.resolve(workSection.fields[0])}
+                />
               </td>
             </tr>
+            {chunk(travelFields, 3).map((row) => (
+              <tr key={row.map((field) => field.id).join('-')}>
+                {row.map((field) => (
+                  <td key={field.id}>
+                    <StackedField label={field.label} value={resolver.resolve(field)} />
+                  </td>
+                ))}
+              </tr>
+            ))}
             <tr>
-              <td className={cell} colSpan={6} style={{ minHeight: '40px' }}>
-                {resolver.resolve(workSection.fields[0])}
+              <td colSpan={2}>
+                <StackedField
+                  label="Reason for waiting"
+                  value={workSection.fields[7] ? resolver.resolve(workSection.fields[7]) : ''}
+                />
               </td>
-            </tr>
-            <tr>
-              {workSection.fields.slice(1, 7).map((field) => (
-                <td key={field.id} className={cell}>
-                  <span className="font-semibold">{field.label}</span>
-                  <div>{resolver.resolve(field)}</div>
-                </td>
-              ))}
-            </tr>
-            <tr>
-              <td className={cell} colSpan={4}>
-                <span className="font-semibold">Reason for waiting: </span>
-                {workSection.fields[7] && resolver.resolve(workSection.fields[7])}
-              </td>
-              <td className={cell} colSpan={2}>
-                <span className="font-semibold">Was job completed? </span>
-                {workSection.fields[8] && resolver.resolve(workSection.fields[8])}
+              <td>
+                <StackedField
+                  label="Was job completed?"
+                  value={workSection.fields[8] ? resolver.resolve(workSection.fields[8]) : ''}
+                />
               </td>
             </tr>
           </tbody>
         </table>
       )}
 
-      {/* Signatures */}
       {signSection?.fields && (
-        <table className="w-full border-collapse border border-black text-[8px]">
-          <thead>
-            <tr>
-              <th className={th} colSpan={2}>Technician</th>
-              <th className={th} colSpan={2}>Customer</th>
-              <th className={th} colSpan={2}>Closed W/S Supervisor</th>
-            </tr>
-          </thead>
+        <table className="jcr-block jcr-keep">
           <tbody>
             <tr>
-              <td className={cell}>Name: {resolver.resolve(signSection.fields[0])}</td>
-              <td className={cell}>
-                <SignatureCell resolver={resolver} fieldId={signSection.fields[1]?.id} />
-                {resolver.resolve(signSection.fields[2]) ? ` · ${resolver.resolve(signSection.fields[2])}` : ''}
+              <td>
+                <div className="jcr-sign-title">Technician</div>
+                <StackedField label="Name" value={resolver.resolve(signSection.fields[0])} />
+                <div className="jcr-field-label">Signature</div>
+                <SignatureSlot resolver={resolver} fieldId={signSection.fields[1]?.id} />
+                <StackedField label="Date" value={resolver.resolve(signSection.fields[2])} />
               </td>
-              <td className={cell}>Name: {resolver.resolve(signSection.fields[3])}</td>
-              <td className={cell}>
-                <SignatureCell resolver={resolver} fieldId={signSection.fields[4]?.id} />
-                {resolver.resolve(signSection.fields[5]) ? ` · ${resolver.resolve(signSection.fields[5])}` : ''}
+              <td>
+                <div className="jcr-sign-title">Customer</div>
+                <StackedField label="Name" value={resolver.resolve(signSection.fields[3])} />
+                <div className="jcr-field-label">Signature</div>
+                <SignatureSlot resolver={resolver} fieldId={signSection.fields[4]?.id} />
+                <StackedField label="Date" value={resolver.resolve(signSection.fields[5])} />
               </td>
-              <td className={cell} colSpan={2}>
-                <SignatureCell resolver={resolver} fieldId={signSection.fields[6]?.id} />
-                {resolver.resolve(signSection.fields[7]) ? ` · ${resolver.resolve(signSection.fields[7])}` : ''}
+              <td>
+                <div className="jcr-sign-title">Closed W/S Supervisor</div>
+                <div className="jcr-field-label">Signature</div>
+                <SignatureSlot resolver={resolver} fieldId={signSection.fields[6]?.id} />
+                <StackedField label="Date" value={resolver.resolve(signSection.fields[7])} />
               </td>
             </tr>
           </tbody>
         </table>
       )}
-
-      <p className="text-[7px] text-gray-600 mt-2 text-center">
-        White copy to Job File Office · Blue copy to Customer · Yellow copy to Technician
-      </p>
     </div>
   );
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += size) rows.push(items.slice(i, i + size));
+  return rows;
 }

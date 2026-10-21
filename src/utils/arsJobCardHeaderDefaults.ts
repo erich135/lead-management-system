@@ -1,8 +1,8 @@
 import type { HeaderConfig } from '../components/jobCardTypes';
-import { getGlobalHeaderConfig } from './jobCardConfig';
 
 /**
- * Default ARS company header matching the paper job card forms.
+ * Older shared letterhead still read by proposal documents.
+ * Job-card reports do not use these street, postal, phone, or registration lines.
  */
 export const ARS_DEFAULT_HEADER: HeaderConfig = {
   companyName: 'AIR ROTARY SERVICES (PTY) LTD',
@@ -15,13 +15,23 @@ export const ARS_DEFAULT_HEADER: HeaderConfig = {
 };
 
 /**
- * Returns merged header config (global settings with ARS defaults as fallback).
+ * Company block for a printed job card. The street address is the Johannesburg
+ * head office shown on the ARS website. Registration and VAT numbers are not
+ * included here because that website address does not publish current values.
+ */
+export function jobCardLetterhead(): HeaderConfig {
+  return {
+    logoUrl: '/Logo.png',
+    companyName: 'AIR ROTARY SERVICES (PTY) LTD',
+    address: 'Johannesburg (Head Office)',
+    city: 'Centric Park, Block C, 21 Romeo Street, Boksburg, Gauteng, 1459, South Africa',
+  };
+}
+
+/**
+ * Header used by every technician job-card report.
+ * A saved office header cannot put the old postal address back onto the page.
  */
 export function getJobCardReportHeader(): HeaderConfig {
-  const global = getGlobalHeaderConfig();
-  return {
-    ...ARS_DEFAULT_HEADER,
-    ...global,
-    companyName: global.companyName || ARS_DEFAULT_HEADER.companyName,
-  };
+  return jobCardLetterhead();
 }

@@ -111,3 +111,19 @@ export function getMachineFieldValue(machine: Record<string, unknown> | undefine
   const val = machine[key];
   return val !== undefined && val !== null ? String(val) : '';
 }
+
+function machineText(value: unknown): string {
+  if (value === undefined || value === null) return '';
+  return String(value).trim();
+}
+
+/**
+ * Make and model for a "compressor type / machine" cell.
+ * A saved model is kept when the machine record itself has no model.
+ */
+export function machineIdentity(machine: Record<string, unknown> | undefined, savedModel = ''): string {
+  const make = machineText(machine?.make);
+  const model = machineText(machine?.model) || machineText(savedModel);
+  if (make && model && model.toLowerCase().startsWith(make.toLowerCase())) return model;
+  return [make, model].filter(Boolean).join(' ');
+}

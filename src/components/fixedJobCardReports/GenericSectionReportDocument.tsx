@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { JobCardReportHeader } from './JobCardReportHeader';
 import type { HeaderConfig } from '../jobCardTypes';
 import type { FixedJobCardFieldResolver } from '../../utils/fixedJobCardFieldResolver';
@@ -44,13 +45,25 @@ interface GenericSectionReportDocumentProps {
   reportNumber?: string;
 }
 
-const cell = 'border border-black px-1.5 py-1 align-top text-[8px]';
-const labelCell = `${cell} font-semibold bg-gray-50 w-[30%]`;
-const th = `${cell} font-semibold bg-gray-200 text-center`;
+/**
+ * Label above a wrapping answer. An empty answer keeps its own line.
+ */
+function StackedField({ label, value }: { label: string; value: string }) {
+  return (
+    <>
+      <div className="jcr-field-label">{label}</div>
+      <div className="jcr-field-value">{value}</div>
+    </>
+  );
+}
+
+function SectionTitle({ title }: { title: string }) {
+  return <div className="jcr-section-title">{title}</div>;
+}
 
 /**
- * Generic report document renderer for any section-based job card template.
- * Renders header, fields, checklists, yesno lists, measurement tables and signatures.
+ * Generic report document for section-based job cards that do not have a
+ * dedicated paper layout. Custom templates use this same renderer.
  */
 export function GenericSectionReportDocument({
   templateName,
@@ -59,30 +72,27 @@ export function GenericSectionReportDocument({
   header,
   reportNumber,
 }: GenericSectionReportDocumentProps) {
-  const headerSection = sections.find((s) => s.type === 'header');
-  const contentSections = sections.filter((s) => s.type !== 'header' && s.type !== 'signatures');
-  const sigSection = sections.find((s) => s.type === 'signatures');
+  const headerSection = sections.find((section) => section.type === 'header');
+  const contentSections = sections.filter((section) => section.type !== 'header' && section.type !== 'signatures');
+  const sigSection = sections.find((section) => section.type === 'signatures');
 
   return (
-    <div className="job-card-report bg-white text-black p-4" style={{ width: '794px', maxWidth: '100%' }}>
+    <div className="job-card-report">
       <JobCardReportHeader title={templateName} reportNumber={reportNumber} header={header} />
 
-      {/* Header / machine info */}
       {headerSection?.fields && headerSection.fields.length > 0 && (
-        <table className="w-full border-collapse border border-black mb-2 text-[8px]">
+        <table className="jcr-block">
           <tbody>
-            {chunkArray(headerSection.fields, 3).map((row, ri) => (
-              <tr key={ri}>
+            {chunkArray(headerSection.fields, 3).map((row) => (
+              <tr key={row.map((field) => field.id).join('-')}>
                 {row.map((field) => (
-                  <td key={field.id} className={cell} style={{ width: `${100 / 3}%` }}>
-                    <span className="font-semibold block text-gray-600">{field.label}</span>
-                    <div className="min-h-[14px] mt-0.5">{resolver.resolve(field)}</div>
+                  <td key={field.id}>
+                    <StackedField label={field.label} value={resolver.resolve(field)} />
                   </td>
                 ))}
-                {/* Pad last row if needed */}
                 {row.length < 3 &&
-                  Array.from({ length: 3 - row.length }).map((_, i) => (
-                    <td key={`pad-${i}`} className={cell} />
+                  Array.from({ length: 3 - row.length }).map((_, index) => (
+                    <td key={`pad-${index}`} />
                   ))}
               </tr>
             ))}
@@ -90,31 +100,31 @@ export function GenericSectionReportDocument({
         </table>
       )}
 
-      {/* Content sections */}
       {contentSections.map((section) => {
         if (section.type === 'fields') {
           return (
-            <div key={section.id} className="mb-2">
+            <div key={section.id} className="jcr-block">
               <SectionTitle title={section.title} />
-              <table className="w-full border-collapse border border-black text-[8px]">
+              <table>
                 <tbody>
-                  {chunkArray(section.fields || [], 2).map((row, ri) => (
-                    <tr key={ri}>
-                      {row.map((field) => (
+                  {chunkArray(section.fields || [], 2).map((row) => (
+                    <tr key={row.map((field) => field.id).join('-')}>
+                      {row.length === 1 ? (
                         <>
-                          <td key={`${field.id}-lbl`} className={labelCell} style={{ width: '20%' }}>
-                            {field.label}
-                          </td>
-                          <td key={`${field.id}-val`} className={cell} style={{ width: '30%' }}>
-                            <div className="min-h-[14px]">{resolver.resolve(field)}</div>
+                          <td className="jcr-field-label" style={{ width: '22%' }}>{row[0].label}</td>
+                          <td colSpan={3}>
+                            <div className="jcr-field-value">{resolver.resolve(row[0])}</div>
                           </td>
                         </>
-                      ))}
-                      {row.length < 2 && (
-                        <>
-                          <td className={labelCell} style={{ width: '20%' }} />
-                          <td className={cell} style={{ width: '30%' }} />
-                        </>
+                      ) : (
+                        row.map((field) => (
+                          <Fragment key={field.id}>
+                            <td className="jcr-field-label" style={{ width: '22%' }}>{field.label}</td>
+                            <td style={{ width: '28%' }}>
+                              <div className="jcr-field-value">{resolver.resolve(field)}</div>
+                            </td>
+                          </Fragment>
+                        ))
                       )}
                     </tr>
                   ))}
@@ -125,35 +135,30 @@ export function GenericSectionReportDocument({
         }
 
         if (section.type === 'yesno_list') {
+          const hasPartNumber = section.fields?.some((field) => field.companionField);
           return (
-            <div key={section.id} className="mb-2">
+            <div key={section.id} className="jcr-block">
               <SectionTitle title={section.title} />
-              <table className="w-full border-collapse border border-black text-[8px]">
+              <table>
                 <thead>
                   <tr>
-                    <th className={th} style={{ width: '45%' }}>Item</th>
-                    {section.fields?.some((field) => field.companionField) && (
-                      <th className={th} style={{ width: '25%' }}>Part Number</th>
-                    )}
-                    <th className={th} style={{ width: '20%' }}>Yes</th>
-                    <th className={th} style={{ width: '20%' }}>No</th>
+                    <th>Item</th>
+                    {hasPartNumber && <th style={{ width: '24%' }}>Part Number</th>}
+                    <th style={{ width: '12%' }}>Yes</th>
+                    <th style={{ width: '12%' }}>No</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(section.fields || []).map((field) => {
                     const val = resolver.resolve(field);
-                    const isYes = val === 'Yes';
-                    const isNo = val === 'No';
                     return (
                       <tr key={field.id}>
-                        <td className={cell}>{field.label}</td>
-                        {section.fields?.some((item) => item.companionField) && (
-                          <td className={cell}>
-                            {field.companionField ? resolver.resolve(field.companionField) : ''}
-                          </td>
+                        <td>{field.label}</td>
+                        {hasPartNumber && (
+                          <td>{field.companionField ? resolver.resolve(field.companionField) : ''}</td>
                         )}
-                        <td className={`${cell} text-center`}>{isYes ? '✓' : ''}</td>
-                        <td className={`${cell} text-center`}>{isNo ? '✓' : ''}</td>
+                        <td className="jcr-center">{val === 'Yes' ? '✓' : ''}</td>
+                        <td className="jcr-center">{val === 'No' ? '✓' : ''}</td>
                       </tr>
                     );
                   })}
@@ -165,16 +170,17 @@ export function GenericSectionReportDocument({
 
         if (section.type === 'checklist') {
           return (
-            <div key={section.id} className="mb-2">
+            <div key={section.id} className="jcr-block">
               <SectionTitle title={section.title} />
-              <table className="w-full border-collapse border border-black text-[8px]">
+              <table>
                 <thead>
                   <tr>
-                    <th className={th} style={{ width: '6%' }}>#</th>
-                    <th className={th} style={{ width: '54%' }}>Description</th>
-                    <th className={th} style={{ width: '15%' }}>Pass</th>
-                    <th className={th} style={{ width: '15%' }}>Fail</th>
-                    <th className={th} style={{ width: '10%' }}>Value</th>
+                    <th style={{ width: '8%' }}>#</th>
+                    <th>Description</th>
+                    <th style={{ width: '12%' }}>Pass</th>
+                    <th style={{ width: '12%' }}>Fail</th>
+                    <th style={{ width: '14%' }}>Value</th>
+                    <th style={{ width: '22%' }}>Comments</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -185,11 +191,12 @@ export function GenericSectionReportDocument({
                     const isValue = !isPass && !isFail && statusRaw !== 'N/A' && statusRaw !== '';
                     return (
                       <tr key={item.id}>
-                        <td className={`${cell} text-center`}>{item.number ?? ''}</td>
-                        <td className={cell}>{item.label}</td>
-                        <td className={`${cell} text-center`}>{isPass ? '✓' : ''}</td>
-                        <td className={`${cell} text-center`}>{isFail ? '✓' : ''}</td>
-                        <td className={`${cell} text-center`}>{isValue ? statusRaw : ''}</td>
+                        <td className="jcr-center">{item.number ?? ''}</td>
+                        <td>{item.label}</td>
+                        <td className="jcr-center">{isPass ? '✓' : ''}</td>
+                        <td className="jcr-center">{isFail ? '✓' : ''}</td>
+                        <td className="jcr-center">{isValue ? statusRaw : ''}</td>
+                        <td>{resolver.resolveChecklistComment(item.id)}</td>
                       </tr>
                     );
                   })}
@@ -201,35 +208,29 @@ export function GenericSectionReportDocument({
 
         if (section.type === 'measurement_table') {
           const allColumns = Array.from(
-            new Set((section.rows || []).flatMap((r) => r.fields.map((f) => f.label)))
+            new Set((section.rows || []).flatMap((row) => row.fields.map((field) => field.label)))
           );
           return (
-            <div key={section.id} className="mb-2">
+            <div key={section.id} className="jcr-block">
               <SectionTitle title={section.title} />
-              <table className="w-full border-collapse border border-black text-[8px]">
+              <table>
                 <thead>
                   <tr>
-                    <th className={th} style={{ width: '25%' }}>Row</th>
+                    <th>Row</th>
                     {allColumns.map((col) => (
-                      <th key={col} className={th}>
-                        {col}
-                      </th>
+                      <th key={col}>{col}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {(section.rows || []).map((row) => {
-                    const fieldMap = new Map(row.fields.map((f) => [f.label, f]));
+                    const fieldMap = new Map(row.fields.map((field) => [field.label, field]));
                     return (
                       <tr key={row.id}>
-                        <td className={`${cell} font-semibold`}>{row.label || ''}</td>
+                        <td className="jcr-field-label">{row.label || ''}</td>
                         {allColumns.map((col) => {
                           const field = fieldMap.get(col);
-                          return (
-                            <td key={col} className={`${cell} text-center`}>
-                              {field ? resolver.resolve(field) : ''}
-                            </td>
-                          );
+                          return <td key={col}>{field ? resolver.resolve(field) : ''}</td>;
                         })}
                       </tr>
                     );
@@ -243,32 +244,32 @@ export function GenericSectionReportDocument({
         return null;
       })}
 
-      {/* Sign-off */}
       {sigSection?.fields && sigSection.fields.length > 0 && (
-        <div className="mb-2">
+        <div className="jcr-block">
           <SectionTitle title={sigSection.title} />
-          <table className="w-full border-collapse border border-black text-[8px]">
+          <table>
             <tbody>
-              {chunkArray(sigSection.fields, 3).map((row, ri) => (
-                <tr key={ri}>
+              {chunkArray(sigSection.fields, 3).map((row) => (
+                <tr key={row.map((field) => field.id).join('-')}>
                   {row.map((field) => (
-                    <td key={field.id} className={cell}>
-                      <span className="font-semibold block text-gray-600">{field.label}</span>
-                      <div className="min-h-[20px] mt-0.5">
-                        {field.type === 'signature'
-                          ? (() => {
-                              const img = resolver.resolveSignatureImage?.(field.id);
-                              return img ? (
-                                <img src={img} alt="Signature" className="max-h-10 max-w-[90px] object-contain" />
-                              ) : null;
-                            })()
-                          : resolver.resolve(field)}
-                      </div>
+                    <td key={field.id}>
+                      {field.type === 'signature' ? (
+                        <>
+                          <div className="jcr-field-label">{field.label}</div>
+                          <div className="jcr-sign-slot">
+                            {resolver.resolveSignatureImage?.(field.id) ? (
+                              <img src={resolver.resolveSignatureImage(field.id) || ''} alt="Signature" />
+                            ) : null}
+                          </div>
+                        </>
+                      ) : (
+                        <StackedField label={field.label} value={resolver.resolve(field)} />
+                      )}
                     </td>
                   ))}
                   {row.length < 3 &&
-                    Array.from({ length: 3 - row.length }).map((_, i) => (
-                      <td key={`pad-${i}`} className={cell} />
+                    Array.from({ length: 3 - row.length }).map((_, index) => (
+                      <td key={`pad-${index}`} />
                     ))}
                 </tr>
               ))}
@@ -280,18 +281,8 @@ export function GenericSectionReportDocument({
   );
 }
 
-function SectionTitle({ title }: { title: string }) {
-  return (
-    <div className="bg-gray-700 text-white text-[8px] font-semibold px-2 py-0.5 uppercase tracking-wide mb-0">
-      {title}
-    </div>
-  );
-}
-
 function chunkArray<T>(arr: T[], size: number): T[][] {
   const result: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) {
-    result.push(arr.slice(i, i + size));
-  }
+  for (let i = 0; i < arr.length; i += size) result.push(arr.slice(i, i + size));
   return result;
 }

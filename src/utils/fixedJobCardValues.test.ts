@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { customerDisplayName, getJobFieldValue } from './fixedJobCardValues.ts';
+import { customerDisplayName, getJobFieldValue, machineIdentity } from './fixedJobCardValues.ts';
 
 const customerId = '69129a864d19b88d7684db94';
 
@@ -26,5 +26,18 @@ test('an unresolved customer id is never shown', () => {
   assert.equal(
     customerDisplayName({ populatedName: customerId, savedName: customerId }),
     'Customer unavailable',
+  );
+});
+
+test('a compressor type shows make and model, and keeps a saved model', () => {
+  assert.equal(
+    machineIdentity({ make: 'Atlas Copco', model: 'GA 75' }, ''),
+    'Atlas Copco GA 75',
+  );
+  assert.equal(machineIdentity(undefined, 'GA 75'), 'GA 75');
+  assert.equal(machineIdentity({ make: 'Atlas Copco', model: '' }, ''), 'Atlas Copco');
+  assert.equal(
+    machineIdentity({ make: 'Atlas Copco', model: 'Atlas Copco GA 75' }, ''),
+    'Atlas Copco GA 75',
   );
 });

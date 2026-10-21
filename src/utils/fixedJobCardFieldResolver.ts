@@ -5,8 +5,11 @@ import {
   isFieldChecked,
   getJobFieldValue,
   getMachineFieldValue,
+  machineIdentity,
   type FieldValueEntry,
 } from './fixedJobCardValues';
+
+const COMPRESSOR_TYPE_FIELDS = new Set(['rsr_machine', 'blank_machine']);
 
 export interface TemplateFieldRef {
   id: string;
@@ -55,10 +58,11 @@ export function createFixedJobCardFieldResolver(
       return getJobFieldValue(job, field.jobFieldKey) || getFieldDisplayValue(valueMap, field.id);
     }
     if (field.type === 'machineField' && field.machineFieldKey) {
-      return (
-        getMachineFieldValue(machine, field.machineFieldKey) ||
-        getFieldDisplayValue(valueMap, field.id)
-      );
+      const saved = getFieldDisplayValue(valueMap, field.id);
+      if (COMPRESSOR_TYPE_FIELDS.has(field.id)) {
+        return machineIdentity(machine, saved);
+      }
+      return getMachineFieldValue(machine, field.machineFieldKey) || saved;
     }
     if (field.type === 'yesno' || field.type === 'checkbox') {
       const v = valueMap.get(field.id);

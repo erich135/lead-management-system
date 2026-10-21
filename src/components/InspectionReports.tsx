@@ -186,7 +186,7 @@ export function InspectionReports({ archived = false }: { archived?: boolean }) 
               <tr key={inspection._id} className="border-t border-slate-100">
                 <td className="py-2 font-semibold">{inspection.referenceNumber || 'Inspection'}</td>
                 <td>
-                  <div>{inspection.customer?.name || inspection.siteLabel}</div>
+                  <div>{inspection.siteLabel || 'Not captured'}</div>
                   {inspectionMachineLabel(inspection) ? (
                     <div className="text-xs text-slate-500">{inspectionMachineLabel(inspection)}</div>
                   ) : null}

@@ -834,6 +834,13 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
 
     try {
       let payload: any = { ...job };
+      delete payload.statusHistory;
+      delete payload.createdAt;
+      delete payload.updatedAt;
+      delete payload.createdBy;
+      delete payload.creationSource;
+      delete payload._id;
+      delete payload.__v;
       if (payload.techBooked && typeof payload.techBooked === 'object') {
         payload.techBooked = payload.techBooked._id;
       }

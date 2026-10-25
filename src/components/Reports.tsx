@@ -391,6 +391,27 @@ export function Reports({ statuses, branches }: ReportsProps) {
     return { startDate, endDate };
   }
 
+  function readableCalendarDate(value: string): string {
+    const [year, month, day] = value.split('-');
+    const names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const monthName = names[Number(month) - 1];
+    if (!year || !monthName || !day) return value;
+    return `${Number(day)} ${monthName} ${year}`;
+  }
+
+  function performanceRangeLine(): string {
+    const { startDate, endDate } = getDateRange();
+    if (!startDate || !endDate) return 'All available records. No date limit is applied.';
+    return `${readableCalendarDate(startDate)} to ${readableCalendarDate(endDate)} · Coordinated Universal Time`;
+  }
+
+  function conversionRangeLine(): string {
+    if (!conversionDateFrom && !conversionDateTo) return 'All loaded jobs. No date limit is applied.';
+    const from = conversionDateFrom ? readableCalendarDate(conversionDateFrom) : 'the earliest loaded job';
+    const to = conversionDateTo ? readableCalendarDate(conversionDateTo) : 'the latest loaded job';
+    return `${from} to ${to} · this computer's local time`;
+  }
+
   /**
    * Loads user performance data based on selected filters.
    */
@@ -830,7 +851,9 @@ export function Reports({ statuses, branches }: ReportsProps) {
     // Combine all data with section headers
     const data = [
       [`Customer Report - ${customerName}`],
-      [`Date Range: ${startDate} to ${endDate}`],
+      ['Shows jobs, machines and saved actions for one customer. Values exclude VAT.'],
+      [`Job date range: ${performanceRangeLine()}`],
+      ['Jobs are matched on their start date. The job list stops at 1,000. Machines are every machine for this customer and are not limited by the date range. Invoiced means an invoice date is stored. Quoted means a quote date is stored and no invoice date is stored. The remaining amount is jobs with neither date; that is not the In Progress status.'],
       [],
       ['=== JOBS ==='],
       jobHeaders,
@@ -928,7 +951,13 @@ export function Reports({ statuses, branches }: ReportsProps) {
       }
     });
 
-    const data = [headers, ...rows];
+    const data = [
+      ['Shows machines and the jobs linked to them. All available records are included. No date limit is applied.'],
+      ['The job list stops at 10,000 jobs. Service due means recorded hours have reached 90% of the next service hours. A machine can appear once for each linked job.'],
+      [],
+      headers,
+      ...rows,
+    ];
     const ws = XLSX.utils.aoa_to_sheet(data);
     
     const wb = XLSX.utils.book_new();
@@ -1015,7 +1044,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
         oj.currentStatus || '',
         oj.expectedNextStatus || '',
       ]);
-      data = [[sectionTitle], [`Filters: ${filtersString}`], [`Date Range: ${startDate} to ${endDate}`], [], headers, ...rows];
+      data = [[sectionTitle], ['Shows jobs that are past their allowed follow-up time, and jobs that have reached 80% of that time.'], ['This list is not limited by the date range. Finished statuses and several statuses that are not followed up are left out unless hidden jobs are included.'], [`Selected date range, which does not filter this list: ${performanceRangeLine()}`], [`Filters: ${filtersString}`], [], headers, ...rows];
       filename = `Overdue-Jobs-${startDate}-to-${endDate}.xlsx`;
     } else if (activeSection === 'jobs') {
       const filteredData = getFilteredJobs();
@@ -1055,7 +1084,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
           formatDate(job.storePackDate),
         ];
       });
-      data = [[sectionTitle], [`Filters: ${filtersString}`], [`Date Range: ${startDate} to ${endDate}`], [], headers, ...rows];
+      data = [[sectionTitle], ['Jobs for the selected admin, representative or technician, matched on the job start date. The list stops at 10,000 jobs.'], [`Date range: ${performanceRangeLine()}`], ['The end of the range is the beginning of that Coordinated Universal Time date, not the end of a South African day.'], [`Filters: ${filtersString}`], [], headers, ...rows];
       filename = `All-Jobs-${startDate}-to-${endDate}.xlsx`;
     } else if (activeSection === 'activities') {
       const headers = ['Date', 'Time', 'Action', 'Resource Type', 'Description', 'IP Address'];
@@ -1067,7 +1096,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
         act.description || '',
         act.ipAddress || '',
       ]);
-      data = [[sectionTitle], [`Date Range: ${startDate} to ${endDate}`], [], headers, ...rows];
+      data = [[sectionTitle], ['Saved actions in the selected date range. Opening a record is included when that action was saved. This is not the Recorded Work report. The list stops at 1,000 actions.'], [`Date range: ${performanceRangeLine()}`], ['Times follow the clock on this computer. The range ends at the beginning of the end date in Coordinated Universal Time.'], [], headers, ...rows];
       filename = `Activities-${startDate}-to-${endDate}.xlsx`;
     } else if (activeSection === 'conversion') {
       // Use conversionJobs directly (already filtered by the useEffect)
@@ -1088,7 +1117,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
         job.notes || '',
         job.feedback || '',
       ]);
-      data = [[sectionTitle], [`Filters: ${filtersString}`], [], headers, ...rows];
+      data = [[sectionTitle], ['Average days between the dates stored on each job. The steps use different jobs, so they do not add up to the total. This is not the Recorded Work report.'], [`Date range: ${conversionRangeLine()}`], ['A job is included by its start date, or by the date it was created when no start date is stored. The list stops at 10,000 jobs.'], [`Filters: ${filtersString}`], [], headers, ...rows];
       filename = `Conversion-Tracker-${new Date().toISOString().split('T')[0]}.xlsx`;
     }
 
@@ -1105,7 +1134,6 @@ export function Reports({ statuses, branches }: ReportsProps) {
    * Export current section to PDF format
    */
   function exportToPDF() {
-    const { startDate, endDate } = getDateRange();
     const sectionTitle = getSectionTitle();
     const filtersString = getActiveFiltersString();
     const doc = new jsPDF({ orientation: 'landscape' });
@@ -1115,10 +1143,17 @@ export function Reports({ statuses, branches }: ReportsProps) {
     doc.text(sectionTitle, 14, 20);
     
     // Add filters and date range
-    doc.setFontSize(10);
-    doc.text(`Filters: ${filtersString}`, 14, 28);
-    doc.text(`Date Range: ${startDate} to ${endDate}`, 14, 34);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 40);
+    doc.setFontSize(9);
+    const pdfNote = activeSection === 'overdue'
+      ? 'Jobs past their follow-up time, plus jobs at 80% of that time. This list is not limited by the date range.'
+      : activeSection === 'jobs'
+      ? `Jobs matched on start date. ${performanceRangeLine()}. The list stops at 10,000 jobs.`
+      : activeSection === 'activities'
+      ? `Saved actions, including opening a record. Not Recorded Work. ${performanceRangeLine()}. The on-screen list shows 100; this file matches that shorter list.`
+      : `Days between dates stored on each job. Steps do not add up to the total. ${conversionRangeLine()}.`;
+    const pdfLines = doc.splitTextToSize(`${pdfNote} Filters: ${filtersString}`, 260);
+    doc.text(pdfLines, 14, 28);
+    const pdfTableStart = 28 + pdfLines.length * 4 + 6;
 
     let headers: string[] = [];
     let rows: any[][] = [];
@@ -1194,7 +1229,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
     autoTable(doc, {
       head: [headers],
       body: rows,
-      startY: 46,
+      startY: pdfTableStart,
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [59, 130, 246], textColor: 255 },
       alternateRowStyles: { fillColor: [245, 245, 245] },
@@ -2043,9 +2078,9 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-8 border border-gray-200 rounded-xl">
+      <div className="reports-readable max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-8 border border-gray-200 rounded-xl">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
           <h2 className="text-2xl font-bold text-ars-heading">Reports & Analytics</h2>
           {activeTab === 'user-performance' && (
             <div className="relative">
@@ -2105,10 +2140,10 @@ export function Reports({ statuses, branches }: ReportsProps) {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-gray-200">
+        <div className="flex gap-2 mb-6 border-b border-gray-200 overflow-x-auto">
           <button
             onClick={() => setActiveTab('user-performance')}
-            className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+            className={`px-4 sm:px-6 py-3 font-semibold whitespace-nowrap shrink-0 transition-colors border-b-2 ${
               activeTab === 'user-performance'
                 ? 'border-ars-primary text-ars-primary'
                 : 'border-transparent text-ars-body hover:text-ars-heading'
@@ -2119,7 +2154,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
           </button>
           <button
             onClick={() => setActiveTab('customer')}
-            className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+            className={`px-4 sm:px-6 py-3 font-semibold whitespace-nowrap shrink-0 transition-colors border-b-2 ${
               activeTab === 'customer'
                 ? 'border-ars-primary text-ars-primary'
                 : 'border-transparent text-ars-body hover:text-ars-heading'
@@ -2130,7 +2165,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
           </button>
           <button
             onClick={() => setActiveTab('machine')}
-            className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+            className={`px-4 sm:px-6 py-3 font-semibold whitespace-nowrap shrink-0 transition-colors border-b-2 ${
               activeTab === 'machine'
                 ? 'border-ars-primary text-ars-primary'
                 : 'border-transparent text-ars-body hover:text-ars-heading'
@@ -2141,7 +2176,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
           </button>
           <button
             onClick={() => setActiveTab('admin-activity')}
-            className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+            className={`px-4 sm:px-6 py-3 font-semibold whitespace-nowrap shrink-0 transition-colors border-b-2 ${
               activeTab === 'admin-activity'
                 ? 'border-ars-primary text-ars-primary'
                 : 'border-transparent text-ars-body hover:text-ars-heading'
@@ -2161,6 +2196,20 @@ export function Reports({ statuses, branches }: ReportsProps) {
         {/* User Performance Report */}
         {activeTab === 'user-performance' && (
           <div className="space-y-6">
+            <div className="bg-white rounded-xl border border-gray-200 px-4 py-3 space-y-2">
+              <p className="text-sm text-gray-800">Shows jobs, values, saved actions and overdue follow-ups for the selected admin, representative or technician.</p>
+              <p className="text-sm font-medium text-gray-900">{performanceRangeLine()}</p>
+              <p className="text-sm text-gray-800 border border-gray-300 rounded-lg px-3 py-2">The job list stops at 10,000 jobs. The activity list stops at 1,000 actions. Overdue jobs are not limited by this date range.</p>
+              <details className="text-sm text-gray-700">
+                <summary className="cursor-pointer font-medium text-gray-900">How this is counted</summary>
+                <div className="mt-2 space-y-2">
+                  <p>When a date range is selected, jobs are included by their start date. The dates are Coordinated Universal Time calendar dates, from the beginning of the first date through the beginning of the last date. This is not a South African calendar period.</p>
+                  <p>Choosing an admin, representative or technician matches the code or technician currently stored on the job. It does not show who created the job or changed its status.</p>
+                  <p>Total value adds the value excluding VAT on the loaded jobs. Saved actions use the same dates and can include opening a record. That activity list is not the Recorded Work report.</p>
+                  <p>The Overdue Jobs number on the summary card counts only jobs already past the allowed follow-up time. The Overdue Jobs section also includes jobs that have reached 80% of that time.</p>
+                </div>
+              </details>
+            </div>
             {/* Filters */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <h3 className="text-lg font-bold text-ars-heading mb-4">
@@ -2334,6 +2383,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                   <FileText className="w-5 h-5 text-[#f7c12b] flex-shrink-0" />
                 </div>
                 <p className="text-3xl font-bold text-ars-heading truncate">{userStats.totalJobs.toLocaleString()}</p>
+                <p className="text-xs text-gray-600 mt-2">Jobs in the selected range, matched on start date.</p>
                 {userStats.totalJobs > 0 && (
                   <p className="text-xs text-ars-primary mt-2">Click to view list →</p>
                 )}
@@ -2345,6 +2395,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                   <Banknote className="w-5 h-5 text-[#f7c12b] flex-shrink-0" />
                 </div>
                 <p className="text-3xl font-bold text-ars-heading truncate">R{userStats.totalValue.toLocaleString()}</p>
+                <p className="text-xs text-gray-600 mt-2">Value excluding VAT on those jobs.</p>
               </div>
 
               <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -2353,6 +2404,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                   <TrendingUp className="w-5 h-5 text-[#f7c12b] flex-shrink-0" />
                 </div>
                 <p className="text-3xl font-bold text-ars-heading truncate">{userStats.totalActivities.toLocaleString()}</p>
+                <p className="text-xs text-gray-600 mt-2">Saved actions in the range, including opening a record. Not Recorded Work.</p>
               </div>
 
               <div 
@@ -2366,6 +2418,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                   <AlertCircle className="w-5 h-5 text-[#f7c12b] flex-shrink-0" />
                 </div>
                 <p className="text-3xl font-bold text-ars-heading truncate">{userStats.overdueCount.toLocaleString()}</p>
+                <p className="text-xs text-gray-600 mt-2">Already past the follow-up time. Jobs that are only approaching it are not included here.</p>
                 {userStats.overdueCount > 0 && (
                   <p className="text-xs text-red-500 mt-2">Click to view list →</p>
                 )}
@@ -2426,7 +2479,12 @@ export function Reports({ statuses, branches }: ReportsProps) {
             {/* Overdue Jobs */}
             {activeSection === 'overdue' && userOverdueJobs.length > 0 && (
               <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-                <h3 className="text-lg font-bold text-ars-heading mb-4">Overdue Jobs</h3>
+                <h3 className="text-lg font-bold text-ars-heading">Overdue Jobs</h3>
+                <p className="text-sm text-gray-700 mt-1 mb-4">Jobs that are past their allowed follow-up time, and jobs that have reached 80% of that time. This list is not limited by the date range above.</p>
+                <details className="text-sm text-gray-700 mb-4">
+                  <summary className="cursor-pointer font-medium text-gray-900">How this is counted</summary>
+                  <p className="mt-2">Days are measured from the last status change. Finished statuses, and several statuses that are not followed up, are left out unless Show Hidden Jobs is selected. The summary card above counts only jobs already past the allowed time.</p>
+                </details>
                 
                 {/* Overdue Jobs Filters */}
                 <div className="mb-4 p-4 bg-gray-50 rounded-lg overflow-visible">
@@ -2723,7 +2781,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
             {/* Recent Activities */}
             {activeSection === 'activities' && userActivities.length > 0 && (
               <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-                <h3 className="text-lg font-bold text-ars-heading mb-4">Recent Activities</h3>
+                <h3 className="text-lg font-bold text-ars-heading">Recent Activities</h3>
+                <p className="text-sm text-gray-700 mt-1 mb-4">The latest saved actions in the selected range, including opening a record. This screen shows 100. It is not the Recorded Work report.</p>
                 <div className="space-y-2 max-h-[600px] overflow-y-auto">
                   {userActivities.slice(0, 100).map(activity => (
                     <div key={activity._id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
@@ -2760,7 +2819,8 @@ export function Reports({ statuses, branches }: ReportsProps) {
             {/* Jobs List */}
             {activeSection === 'jobs' && userJobs.length > 0 && (
               <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-                <h3 className="text-lg font-bold text-ars-heading mb-4">Jobs ({getFilteredJobs().length})</h3>
+                <h3 className="text-lg font-bold text-ars-heading">Jobs ({getFilteredJobs().length})</h3>
+                <p className="text-sm text-gray-700 mt-1 mb-4">Jobs in the selected range, matched on start date, for the selected admin, representative or technician.</p>
                 
                 {/* Jobs Filters */}
                 <div className="mb-4 p-4 bg-gray-50 rounded-lg overflow-visible">
@@ -3089,13 +3149,25 @@ export function Reports({ statuses, branches }: ReportsProps) {
             {/* Conversion Time Tracker */}
             {activeSection === 'conversion' && (
               <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <h3 className="text-lg font-bold text-ars-heading">Conversion Time Tracker</h3>
-                  <HelpIcon 
-                    title={helpContent.reports.conversionTracker.title}
-                    content={helpContent.reports.conversionTracker.description}
-                    position="right"
-                  />
+                <div className="mb-4">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-ars-heading">Conversion Time Tracker</h3>
+                    <HelpIcon 
+                      title={helpContent.reports.conversionTracker.title}
+                      content={helpContent.reports.conversionTracker.description}
+                      position="right"
+                    />
+                  </div>
+                  <p className="text-sm text-gray-800 mt-1">Shows the average number of days between dates stored on each job.</p>
+                  <p className="text-sm font-medium text-gray-900 mt-1">{conversionRangeLine()}</p>
+                  <details className="text-sm text-gray-700 mt-2">
+                    <summary className="cursor-pointer font-medium text-gray-900">How this is counted</summary>
+                    <div className="mt-2 space-y-2">
+                      <p>A step is included only when both dates are present and the later date is not before the earlier one. Each step can use a different set of jobs, so the steps do not add up to the total.</p>
+                      <p>Complete workflow averages only jobs that have a start date, quote date, sent-to-client date, purchase-order date, register date and invoice date, in that order. This uses the dates on the job, not the person who changed the status. It is not the Recorded Work report. The list stops at 10,000 jobs.</p>
+                      <p>The selected dates use this computer's local time, from the start of the first day through the end of the last day. A job is included by its start date, or by the date it was created when no start date is stored.</p>
+                    </div>
+                  </details>
                 </div>
                 
                 {/* Conversion Tracker Filters */}
@@ -3594,6 +3666,19 @@ export function Reports({ statuses, branches }: ReportsProps) {
         {/* Customer Report */}
         {activeTab === 'customer' && (
           <div className="space-y-6">
+            <div className="bg-white rounded-xl border border-gray-200 px-4 py-3 space-y-2">
+              <p className="text-sm text-gray-800">Shows jobs, machines and saved actions for one customer.</p>
+              <p className="text-sm font-medium text-gray-900">{performanceRangeLine()}</p>
+              <p className="text-sm text-gray-800 border border-gray-300 rounded-lg px-3 py-2">The job list stops at 1,000 jobs. Machines are not limited by the date range. Saved actions stop at 1,000.</p>
+              <details className="text-sm text-gray-700">
+                <summary className="cursor-pointer font-medium text-gray-900">How this is counted</summary>
+                <div className="mt-2 space-y-2">
+                  <p>Jobs are included by their start date, using Coordinated Universal Time calendar dates. The range ends at the beginning of the last date. Values exclude VAT.</p>
+                  <p>Invoiced is the value of jobs with an invoice date. Quoted is the value of jobs with a quote date and no invoice date. The remaining amount is jobs with neither date. That remaining amount is not the In Progress status.</p>
+                  <p>Months follow this computer's local time and use the start date, or the date the job was created when no start date is stored. Team figures use the admin, representative or technician currently stored on the job.</p>
+                </div>
+              </details>
+            </div>
             {/* Customer Selection */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <h3 className="text-lg font-bold text-ars-heading mb-4">
@@ -3701,6 +3786,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       <TrendingUp className="w-5 h-5 text-purple-500" />
                     </div>
                     <p className="text-3xl font-bold text-ars-heading">R{Math.round(customerStats.avgJobValue).toLocaleString()}</p>
+                    <p className="text-xs text-gray-600 mt-2">Total value excluding VAT, divided by the number of jobs.</p>
                   </div>
                 </div>
 
@@ -3720,6 +3806,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       }`}
                     >
                       <p className="text-sm font-medium text-green-800 mb-1">Invoiced</p>
+                      <p className="text-xs text-green-800 mb-1">Jobs with an invoice date.</p>
                       <p className="text-2xl font-bold text-green-900">R{customerStats.invoicedValue.toLocaleString()}</p>
                       <p className="text-xs text-green-700 mt-1">
                         {customerJobs.filter(j => j.invoiceDate).length} jobs invoiced
@@ -3737,6 +3824,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       }`}
                     >
                       <p className="text-sm font-medium text-blue-800 mb-1">Quoted (Pending)</p>
+                      <p className="text-xs text-blue-800 mb-1">Jobs with a quote date and no invoice date. This is not the Quoted status.</p>
                       <p className="text-2xl font-bold text-blue-900">R{customerStats.quotedValue.toLocaleString()}</p>
                       <p className="text-xs text-blue-700 mt-1">
                         {customerJobs.filter(j => j.dateQuoted && !j.invoiceDate).length} jobs quoted
@@ -3754,6 +3842,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       }`}
                     >
                       <p className="text-sm font-medium text-gray-800 mb-1">In Progress</p>
+                      <p className="text-xs text-gray-700 mb-1">Jobs with no quote date and no invoice date. This is not the In Progress status.</p>
                       <p className="text-2xl font-bold text-gray-900">R{customerStats.pendingValue.toLocaleString()}</p>
                       <p className="text-xs text-gray-700 mt-1">
                         {customerJobs.filter(j => !j.dateQuoted && !j.invoiceDate).length} jobs in progress
@@ -3771,6 +3860,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     <FileText className="w-5 h-5" />
                     Jobs by Status
                   </h3>
+                  <p className="text-sm text-gray-700 -mt-2 mb-4">The status currently stored on each job in this list, with the value excluding VAT.</p>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                     {Object.entries(customerStats.jobsByStatus)
                       .sort((a, b) => b[1].count - a[1].count)
@@ -3791,6 +3881,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                       <TrendingUp className="w-5 h-5" />
                       Revenue Over Time
                     </h3>
+                    <p className="text-sm text-gray-700 -mt-2 mb-4">Value excluding VAT by month, using this computer's local time. A job uses its start date, or the date it was created when no start date is stored.</p>
                     <div className="overflow-x-auto">
                       <div className="flex gap-2 min-w-max pb-2">
                         {Object.entries(customerStats.jobsByMonth)
@@ -3825,6 +3916,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                     <Users className="w-5 h-5" />
                     Team Involvement
                   </h3>
+                  <p className="text-sm text-gray-700 -mt-2 mb-4">Grouped by the admin, representative or technician currently stored on the job. This does not show who performed each action.</p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* Admins */}
                     <div>
@@ -3940,6 +4032,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                               </div>
                               <div>
                                 <p className="text-xs text-ars-body">Jobs Done</p>
+                                <p className="text-[11px] text-gray-500">Linked jobs in this list, not the Job Done status.</p>
                                 <p className="font-semibold text-ars-heading">{machineJobsList.length}</p>
                               </div>
                               <div>
@@ -4117,6 +4210,18 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
         {activeTab === 'machine' && (
           <div className="space-y-6">
+            <div className="bg-white rounded-xl border border-gray-200 px-4 py-3 space-y-2">
+              <p className="text-sm text-gray-800">Shows machines and the jobs linked to them.</p>
+              <p className="text-sm font-medium text-gray-900">All available records. No date limit is applied.</p>
+              <p className="text-sm text-gray-800 border border-gray-300 rounded-lg px-3 py-2">The job list stops at 10,000 jobs. People who are not super admins see only machines linked to jobs they can see.</p>
+              <details className="text-sm text-gray-700">
+                <summary className="cursor-pointer font-medium text-gray-900">How this is counted</summary>
+                <div className="mt-2 space-y-2">
+                  <p>A job is listed under a machine when that machine is stored on the job. The value is the job value excluding VAT.</p>
+                  <p>Service due means the recorded hours have reached 90% of the next service hours. Jobs linked to the machine are all matching jobs in the loaded list, not jobs in the Job Done status.</p>
+                </div>
+              </details>
+            </div>
             {/* Filters */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <h3 className="text-lg font-bold text-ars-heading mb-4">

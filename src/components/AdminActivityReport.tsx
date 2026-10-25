@@ -1,8 +1,8 @@
 /**
  * AdminActivityReport.tsx
  *
- * Shows how many jobs each admin created (= quotations) per day / week /
- * month / YTD with an average-per-working-day column.
+ * Recorded work by the person who acted, plus a separate count of jobs by the
+ * admin code currently stored on the job.
  *
  * All figures are derived from job.createdAt so every job is counted
  * regardless of whether startDate was filled in.
@@ -25,6 +25,7 @@ import {
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { AdminWorkActivityPanel } from './AdminWorkActivityPanel';
 import {
   Activity,
   Bell,
@@ -279,8 +280,16 @@ export function AdminActivityReport({ branches }: Props) {
     const wb = XLSX.utils.book_new();
 
     // Sheet 1 — main table
-    const ws = XLSX.utils.aoa_to_sheet([head, ...rows]);
-    ws['!cols'] = [{ wch: 14 }, { wch: 22 }, { wch: 30 }, { wch: 20 }, { wch: 14 }, { wch: 14 }];
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['Counts jobs created during the period, grouped by the admin code currently on each job. It does not identify who created the job or performed the work.'],
+      ['Jobs with no admin code, and jobs that are no longer active, are left out. Changing an admin code can change these historical results.'],
+      [`Daily ${data.meta.dailyLabel} is the reference day. Weekly ${data.meta.weeklyLabel} runs Monday through Sunday and can include later days. Monthly ${data.meta.monthlyLabel} is the full month. Last 3 months ${data.meta.last3mLabel}. Last 6 months ${data.meta.last6mLabel}. ${data.meta.ytdLabel} stops at the end of the reference day. South African time.`],
+      [`Average per day is the year-to-date count divided by ${data.meta.workingDays} weekdays. Weekends are left out. Public holidays still count as working days.`],
+      [],
+      head,
+      ...rows,
+    ]);
+    ws['!cols'] = [{ wch: 36 }, { wch: 22 }, { wch: 30 }, { wch: 22 }, { wch: 28 }, { wch: 28 }, { wch: 16 }, { wch: 14 }];
     XLSX.utils.book_append_sheet(wb, ws, 'Admin Activity');
 
     // Sheet 2 — YTD distribution data (for manual chart creation)
@@ -313,16 +322,18 @@ export function AdminActivityReport({ branches }: Props) {
     doc.text('Admin Activity Report', 14, 18);
     doc.setFontSize(9);
     doc.setTextColor(107, 114, 128);
-    doc.text(
-      `Reference date: ${data.meta.dailyLabel}   ·   Working days YTD: ${data.meta.workingDays}   ·   Generated: ${new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' })}`,
-      14, 25,
+    const note = doc.splitTextToSize(
+      `Counts jobs created during the period, grouped by the admin code currently on each job. It does not identify who created the job. Jobs with no admin code are left out. Changing an admin code can change historical results. Weekly ${data.meta.weeklyLabel} runs through Sunday. Monthly ${data.meta.monthlyLabel} is the full month. Year to date stops on the reference day. South African time. Average uses ${data.meta.workingDays} weekdays.`,
+      270,
     );
+    doc.text(note, 14, 25);
+    const tableStart = 25 + note.length * 4 + 4;
 
     // Table
     autoTable(doc, {
       head: [head],
       body: rows.map((r) => r.map(String)),
-      startY: 30,
+      startY: tableStart,
       styles: { fontSize: 9, cellPadding: 4 },
       headStyles: { fillColor: [26, 86, 219], textColor: 255, fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [248, 250, 252] },
@@ -468,8 +479,8 @@ export function AdminActivityReport({ branches }: Props) {
             <Activity className="w-5 h-5 text-ars-primary" />
             Admin Activity Report
           </h2>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Quotation output per admin — one job created = one quotation
+          <p className="text-sm text-gray-700 mt-1">
+            This page has two separate counts. Recorded work shows who created a job or changed its status. Jobs by assigned admin code groups created jobs by the code currently on the job.
           </p>
         </div>
         <button
@@ -480,6 +491,8 @@ export function AdminActivityReport({ branches }: Props) {
           Schedule this Report
         </button>
       </div>
+
+      {data?.work && <AdminWorkActivityPanel work={data.work} referenceLabel={data.meta.dailyLabel} />}
 
       {/* ── Schedule modal ────────────────────────────────────────────────── */}
       {scheduleOpen && (
@@ -894,14 +907,19 @@ export function AdminActivityReport({ branches }: Props) {
             {/* Table header bar */}
             <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <h3 className="font-bold text-ars-heading">Performance Summary</h3>
+                <h3 className="font-bold text-ars-heading">Jobs by assigned admin code</h3>
+                <p className="text-sm text-gray-800 mt-1">Counts jobs created during the period, grouped by the admin code currently on each job. It does not identify who created the job or performed the work.</p>
                 {data.meta && (
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Working days so far this year: <span className="font-semibold text-gray-600">{data.meta.workingDays}</span>
-                    &nbsp;·&nbsp;
-                    Reference date: <span className="font-semibold text-gray-600">{data.meta.dailyLabel}</span>
-                  </p>
+                  <div className="text-sm text-gray-700 mt-2 space-y-1">
+                    <p>Reference day: {data.meta.dailyLabel} · South African time.</p>
+                    <p>Daily is that full day. Weekly is {data.meta.weeklyLabel}, Monday through Sunday, and can include days after the reference day. Monthly is {data.meta.monthlyLabel}, the full calendar month, and can include days after the reference day.</p>
+                    <p>Last 3 months: {data.meta.last3mLabel}. Last 6 months: {data.meta.last6mLabel}. Year to date: {data.meta.ytdLabel}, from 1 January through the end of the reference day.</p>
+                  </div>
                 )}
+                <details className="mt-2 text-sm text-gray-700">
+                  <summary className="cursor-pointer font-medium text-gray-900">How this is counted</summary>
+                  <p className="mt-2">Jobs with no admin code, and jobs that are no longer active, are left out. Changing an admin code can move a job into a different column, including jobs created on earlier dates. The average is the year-to-date count divided by weekdays from 1 January through the reference day ({data.meta?.workingDays ?? 0} weekdays). Weekends are left out. Public holidays are still treated as working days. This average is not recorded work.</p>
+                </details>
               </div>
               {/* Export buttons */}
               <div className="flex gap-2">
@@ -967,7 +985,7 @@ export function AdminActivityReport({ branches }: Props) {
                       {/* YTD */}
                       <th className="px-5 py-4 text-center min-w-[120px]">
                         <div className="font-semibold text-xs uppercase tracking-widest">{data.meta.ytdLabel}</div>
-                        <div className="text-[11px] text-blue-200 font-normal mt-0.5">Jan 1 → today</div>
+                        <div className="text-[11px] text-blue-200 font-normal mt-0.5">Through the reference day</div>
                       </th>
 
                       {/* Avg */}

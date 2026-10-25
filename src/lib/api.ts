@@ -1613,9 +1613,46 @@ export interface AdminActivityMeta {
   workingDays: number;
 }
 
+export interface AdminWorkEvent {
+  activityId: string;
+  jobNumber: string;
+  personId: string;
+  personName: string;
+  at: string;
+  actionType: 'create' | 'status_change';
+  category: 'new_job' | 'quotation' | 'registration' | 'sent_to_invoice';
+  quotationDetail?: 'quoted' | 'await_po' | 'sent_to_client';
+  fromStatus?: string;
+  toStatus?: string;
+  evidence: string;
+}
+
+export interface AdminWorkPerson {
+  personId: string;
+  personName: string;
+  newJobs: number;
+  quotation: number;
+  quoted: number;
+  awaitPo: number;
+  sentToClient: number;
+  registration: number;
+  sentToInvoice: number;
+}
+
+export interface AdminWorkReport {
+  windows: Array<{ key: 'day' | 'week' | 'month' | 'year'; label: string; phrase?: string; from: string; to: string }>;
+  coverageByWindow?: Array<{ key: 'day' | 'week' | 'month' | 'year'; missingCreations: number; warning: string | null }>;
+  counts: Record<'day' | 'week' | 'month' | 'year', AdminWorkPerson[]>;
+  events: AdminWorkEvent[];
+  exceptions: Array<{ jobNumber?: string; at?: string; reason: string }>;
+  statusNotes: string[];
+  coverageNote: string;
+}
+
 export interface AdminActivityData {
   rows: AdminActivityRow[];
   meta: AdminActivityMeta;
+  work?: AdminWorkReport;
 }
 
 export async function getAdminActivitySummary(params: {

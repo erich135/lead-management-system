@@ -442,7 +442,7 @@ export function ChatWidget() {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-24 right-8 bg-[#0969a9] text-white p-4 rounded-full hover:bg-[#0969a9]/90 transition-all z-30"
+        className="fixed bottom-24 right-8 max-md:bottom-[5.25rem] max-md:right-3 max-md:p-3 bg-[#0969a9] text-white p-4 rounded-full hover:bg-[#0969a9]/90 transition-all z-30"
         title="Open Chat"
         aria-label="Open Chat"
       >

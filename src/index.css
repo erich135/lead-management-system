@@ -26,6 +26,14 @@
   z-index: 1;
 }
 
+/* Keep report text clear of the chat button and the mobile navigation. */
+@media (max-width: 767px) {
+  .reports-readable {
+    padding-right: 5.75rem;
+    padding-bottom: 7.5rem;
+  }
+}
+
 /* Mobile app-like styles */
 @layer base {
   body {

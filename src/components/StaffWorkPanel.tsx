@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import * as XLSX from 'xlsx';
-import { getJobs, getStaffWork, getStaffWorkHistory, type Job, type StaffWorkData, type StaffWorkDetail } from '../lib/api';
+import { downloadStaffWorkbook, getJobs, getStaffWork, getStaffWorkHistory, type Job, type StaffWorkData, type StaffWorkDetail } from '../lib/api';
 
 const CATEGORIES = [
   { key: 'new_job', label: 'New jobs created' },
@@ -105,45 +104,17 @@ export function StaffWorkPanel({ onOpenJob, initialDate }: { onOpenJob?: (job: J
 
   const exportExcel = async () => {
     if (!data) return;
-    const allDetails = [];
-    let nextPage = 1;
-    let pages = 1;
-    while (nextPage <= pages && nextPage <= 40) {
-      const result = await getStaffWork({
-        preset, date, from: preset === 'custom' ? from : undefined, to: preset === 'custom' ? to : undefined,
-        personId, toStatus, jobNumber: appliedJob, detailPersonId: drillPerson, category, page: nextPage,
-      });
-      allDetails.push(...result.details);
-      pages = result.detailPages;
-      nextPage += 1;
-    }
-    const book = XLSX.utils.book_new();
-    const summary: Array<Array<string | number>> = [
-      ['What work was recorded?'],
-      [data.phrase],
-      [`Performed by: ${data.people.find((person) => person.personId === personId)?.personName || 'All staff'}`],
-      [`Status changed to: ${toStatus === 'all' ? 'All statuses' : toStatus}`],
-      [`Job number: ${appliedJob || 'All jobs'}`],
-      ['Numbers count different jobs. A job can appear in more than one column, so the columns must not be added together.'],
-      ...(data.statusSelected ? [['This view contains status-change activity only. New jobs are not applicable because creating a job is a separate action.']] : []),
-      ...(data.warning ? [[`${data.warning} These jobs cannot reliably be attributed to a person.`]] : []),
-      [],
-      ['Staff member', 'New jobs created', 'Quoting steps', 'Registration / parts steps', 'Sent for invoicing'],
-      ...data.rows.map((row) => [row.personName, row.newJobs === null ? 'Not applicable' : row.newJobs, row.quotation, row.registration, row.sentToInvoice]),
-    ];
-    const summarySheet = XLSX.utils.aoa_to_sheet(summary);
-    summarySheet['!cols'] = [{ wch: 32 }, { wch: 22 }, { wch: 18 }, { wch: 30 }, { wch: 20 }];
-    summarySheet['E1'] = { t: 's', v: 'Open supporting details', l: { Target: '#Details!A1' } };
-    XLSX.utils.book_append_sheet(book, summarySheet, 'Summary');
-    const details = [
-      ['These rows match the selected range and filters. They are the evidence for the summary counts.'],
-      ['Job number', 'Staff member', 'Action time (Johannesburg)', 'Recorded action', 'Previous status', 'New status'],
-      ...allDetails.map((event) => [event.jobNumber, event.personName, sast(event.at), actionLabel(event), event.fromStatus || '', event.toStatus || '']),
-    ];
-    const detailSheet = XLSX.utils.aoa_to_sheet(details);
-    detailSheet['!cols'] = [{ wch: 16 }, { wch: 28 }, { wch: 28 }, { wch: 36 }, { wch: 22 }, { wch: 22 }];
-    XLSX.utils.book_append_sheet(book, detailSheet, 'Details');
-    XLSX.writeFile(book, `Staff_Work_${date}.xlsx`);
+    await downloadStaffWorkbook({
+      preset,
+      date,
+      from: preset === 'custom' ? from : undefined,
+      to: preset === 'custom' ? to : undefined,
+      personId,
+      toStatus,
+      jobNumber: appliedJob,
+      detailPersonId: drillPerson,
+      category,
+    });
   };
 
   return (
@@ -193,9 +164,30 @@ export function StaffWorkPanel({ onOpenJob, initialDate }: { onOpenJob?: (job: J
       {loading && <p className="mt-3 text-sm text-gray-600">Loading recorded work…</p>}
       {data && !error && (
         <>
-          {data.statusSelected && <p className="mt-4 text-sm text-gray-800">This view contains status changes to {toStatus} only. New jobs are not applicable, because creating a job is a separate action.</p>}
+          {data.statusSelected && <p className="mt-4 text-sm text-gray-800">Showing different jobs moved to {toStatus}. The four headline categories are used only when all statuses are selected. Every matching action remains in the list below.</p>}
           {data.warning && <p className="mt-3 rounded border border-amber-300 bg-amber-100 px-3 py-2 text-sm text-amber-950" data-testid="creation-coverage-warning">{data.warning} These jobs cannot reliably be attributed to a person.</p>}
           <div className="mt-4 overflow-x-auto">
+            {data.statusSelected ? (
+              <table className="w-full min-w-[420px] text-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-left">
+                    <th className="px-3 py-3">Staff member</th>
+                    <th className="px-3 py-3 text-center">Different jobs moved to {toStatus}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.statusRows.length === 0 && <tr><td colSpan={2} className="px-3 py-4 text-gray-600">No recorded change to {toStatus} in this period. That is not the same as nobody doing any work.</td></tr>}
+                  {data.statusRows.map((row) => (
+                    <tr key={row.personId} className="border-t border-gray-100">
+                      <td className="px-3 py-3 font-semibold">{row.personName}</td>
+                      <td className="px-3 py-3 text-center">
+                        <button type="button" aria-pressed={drillPerson === row.personId} onClick={() => { setDrillPerson(row.personId); setCategory('all'); setPage(1); }} className={`min-w-12 rounded px-2 py-1 text-lg font-bold underline ${drillPerson === row.personId ? 'bg-[#096da2] text-white' : 'bg-sky-50 text-[#00669c]'}`}>{row.jobs}</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
             <table className="w-full min-w-[590px] text-sm">
               <thead>
                 <tr className="bg-gray-50 text-left">
@@ -204,7 +196,7 @@ export function StaffWorkPanel({ onOpenJob, initialDate }: { onOpenJob?: (job: J
                 </tr>
               </thead>
               <tbody>
-                {data.rows.length === 0 && <tr><td colSpan={5} className="px-3 py-4 text-gray-600">No qualifying action was recorded for this selection. Zero means no recorded action, not that nobody did any work.</td></tr>}
+                {data.rows.length === 0 && <tr><td colSpan={5} className="px-3 py-4 text-gray-600">No qualifying action was recorded in the four headline columns. Zero means no recorded action in those stages, not that nobody did any work.</td></tr>}
                 {data.rows.map((row) => (
                   <tr key={row.personId} className="border-t border-gray-100">
                     <td className="px-3 py-3 font-semibold">{row.personName}</td>
@@ -213,7 +205,7 @@ export function StaffWorkPanel({ onOpenJob, initialDate }: { onOpenJob?: (job: J
                       const selected = drillPerson === row.personId && category === item.key;
                       return (
                         <td key={item.key} className="px-3 py-3 text-center">
-                          {value === null ? <span className="text-gray-500">Not applicable</span> : value === 0 ? <span className="text-gray-400">0</span> : (
+                          {value === null || value === 0 ? <span className="text-gray-400">0</span> : (
                             <button type="button" aria-pressed={selected} onClick={() => { setDrillPerson(row.personId); setCategory(item.key); setPage(1); }} className={`min-w-12 rounded px-2 py-1 text-lg font-bold underline ${selected ? 'bg-[#096da2] text-white' : 'bg-sky-50 text-[#00669c]'}`}>{value}</button>
                           )}
                         </td>
@@ -223,9 +215,11 @@ export function StaffWorkPanel({ onOpenJob, initialDate }: { onOpenJob?: (job: J
                 ))}
               </tbody>
             </table>
+            )}
           </div>
-          <p className="mt-3 text-sm text-gray-600">Numbers count different jobs. Select a number to see the work behind it.</p>
-          <p className="text-sm text-gray-600">A job can appear in more than one column. Do not add the columns together. Zero means no qualifying action was recorded, not that the person did no other work.</p>
+          {!data.statusSelected && <p className="mt-3 text-sm text-gray-600">Numbers count different jobs. Select a number to see the work behind it.</p>}
+          {!data.statusSelected && <p className="text-sm text-gray-600">A job can appear in more than one column. Do not add the columns together. Zero means no qualifying action was recorded, not that the person did no other work.</p>}
+          {data.statusSelected && <p className="mt-3 text-sm text-gray-600">The number is different jobs. The list below keeps every recorded action, so the action count can be higher.</p>}
           <details className="mt-4 border-t border-gray-200 pt-3 text-sm">
             <summary className="cursor-pointer font-semibold">What does each column mean?</summary>
             <dl className="mt-3 grid gap-2 sm:grid-cols-[180px_1fr]">

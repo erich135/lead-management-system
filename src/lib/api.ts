@@ -1620,7 +1620,7 @@ export interface AdminWorkEvent {
   personName: string;
   at: string;
   actionType: 'create' | 'status_change';
-  category: 'new_job' | 'quotation' | 'registration' | 'sent_to_invoice';
+  category: 'new_job' | 'quotation' | 'registration' | 'sent_to_invoice' | 'other';
   quotationDetail?: 'quoted' | 'await_po' | 'sent_to_client';
   fromStatus?: string;
   toStatus?: string;
@@ -1671,10 +1671,16 @@ export interface StaffWorkDetail {
   personName: string;
   at: string;
   actionType: 'create' | 'status_change';
-  category: 'new_job' | 'quotation' | 'registration' | 'sent_to_invoice';
+  category: 'new_job' | 'quotation' | 'registration' | 'sent_to_invoice' | 'other';
   fromStatus?: string;
   toStatus?: string;
   evidence?: string;
+}
+
+export interface StatusMoveRow {
+  personId: string;
+  personName: string;
+  jobs: number;
 }
 
 export interface StaffWorkData {
@@ -1682,7 +1688,9 @@ export interface StaffWorkData {
   from: string;
   to: string;
   statusSelected: boolean;
+  outsideHeadline: boolean;
   rows: StaffWorkRow[];
+  statusRows: StatusMoveRow[];
   people: Array<{ personId: string; personName: string }>;
   statuses: string[];
   missingCreations: number;
@@ -1713,6 +1721,37 @@ export async function getStaffWork(params: {
     if (value !== undefined && value !== '') qs.set(key, String(value));
   });
   return apiRequest<StaffWorkData>(`/api/jobs/staff-work?${qs.toString()}`);
+}
+
+export async function downloadStaffWorkbook(params: {
+  preset: 'day' | 'week' | 'month' | 'year' | 'custom';
+  date?: string;
+  from?: string;
+  to?: string;
+  personId?: string;
+  toStatus?: string;
+  jobNumber?: string;
+  detailPersonId?: string;
+  category?: string;
+}): Promise<void> {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== '') qs.set(key, String(value));
+  });
+  const token = getAuthToken();
+  const response = await fetch(`${apiBase()}/api/jobs/staff-work/export?${qs.toString()}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) throw new Error('The spreadsheet could not be prepared.');
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `Staff_Work_${params.date || 'report'}.xlsx`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 export async function getStaffWorkHistory(jobNumber: string): Promise<{

@@ -1655,6 +1655,76 @@ export interface AdminActivityData {
   work?: AdminWorkReport;
 }
 
+export interface StaffWorkRow {
+  personId: string;
+  personName: string;
+  newJobs: number | null;
+  quotation: number;
+  registration: number;
+  sentToInvoice: number;
+}
+
+export interface StaffWorkDetail {
+  activityId: string;
+  jobNumber: string;
+  personId: string;
+  personName: string;
+  at: string;
+  actionType: 'create' | 'status_change';
+  category: 'new_job' | 'quotation' | 'registration' | 'sent_to_invoice';
+  fromStatus?: string;
+  toStatus?: string;
+  evidence?: string;
+}
+
+export interface StaffWorkData {
+  phrase: string;
+  from: string;
+  to: string;
+  statusSelected: boolean;
+  rows: StaffWorkRow[];
+  people: Array<{ personId: string; personName: string }>;
+  statuses: string[];
+  missingCreations: number;
+  warning: string | null;
+  unparsedCount: number;
+  coverageNote: string;
+  distinctJobs: number;
+  recordedActions: number;
+  page: number;
+  pageSize: number;
+  detailPages: number;
+  details: StaffWorkDetail[];
+}
+
+export async function getStaffWork(params: {
+  preset: 'day' | 'week' | 'month' | 'year' | 'custom';
+  date?: string;
+  from?: string;
+  to?: string;
+  personId?: string;
+  toStatus?: string;
+  jobNumber?: string;
+  category?: string;
+  page?: number;
+}): Promise<StaffWorkData> {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== '') qs.set(key, String(value));
+  });
+  return apiRequest<StaffWorkData>(`/api/jobs/staff-work?${qs.toString()}`);
+}
+
+export async function getStaffWorkHistory(jobNumber: string): Promise<{
+  jobNumber: string;
+  jobId: string;
+  unparsed: number;
+  note: string;
+  events: StaffWorkDetail[];
+}> {
+  return apiRequest(`/api/jobs/staff-work/history?jobNumber=${encodeURIComponent(jobNumber)}`);
+}
+
 export async function getAdminActivitySummary(params: {
   date?: string;
   adminCodes?: string[];

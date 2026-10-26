@@ -1,11 +1,8 @@
 /**
  * AdminActivityReport.tsx
  *
- * Recorded work by the person who acted, plus a separate count of jobs by the
- * admin code currently stored on the job.
- *
- * All figures are derived from job.createdAt so every job is counted
- * regardless of whether startDate was filled in.
+ * Staff Work uses the recorded-work service. The table below is a separate
+ * count of jobs by the admin code currently stored on the job.
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
@@ -21,11 +18,12 @@ import {
   updateAdminActivityScheduleConfig,
   sendAdminActivityNow,
   AdminActivityScheduleConfig,
+  type Job,
 } from '../lib/api';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { AdminWorkActivityPanel } from './AdminWorkActivityPanel';
+import { StaffWorkPanel } from './StaffWorkPanel';
 import {
   Activity,
   Bell,
@@ -55,6 +53,7 @@ type AdminRow = AdminActivityRow;
 
 interface Props {
   branches: { _id: string; name: string }[];
+  onOpenJob?: (job: Job) => void;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -100,7 +99,7 @@ function heatClass(value: number, avg: number): string {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function AdminActivityReport({ branches }: Props) {
+export function AdminActivityReport({ branches, onOpenJob }: Props) {
   // ── Filter state ─────────────────────────────────────────────────────────
   const [selectedDate, setSelectedDate] = useState(todayIso());
   const [selectedAdmins, setSelectedAdmins] = useState<string[]>([]);
@@ -492,7 +491,7 @@ export function AdminActivityReport({ branches }: Props) {
         </button>
       </div>
 
-      {data?.work && <AdminWorkActivityPanel work={data.work} referenceLabel={data.meta.dailyLabel} />}
+      <StaffWorkPanel onOpenJob={onOpenJob} initialDate={selectedDate} />
 
       {/* ── Schedule modal ────────────────────────────────────────────────── */}
       {scheduleOpen && (

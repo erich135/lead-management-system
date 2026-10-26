@@ -62,6 +62,7 @@ import {
 } from 'lucide-react';
 import { LeadDetails } from './LeadDetails';
 import { AdminActivityReport } from './AdminActivityReport';
+import { StaffWorkPanel } from './StaffWorkPanel';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -80,7 +81,7 @@ type UserRole = 'admin' | 'rep' | 'technician';
 
 type DateRangePreset = 'today' | 'this-month' | 'last-month' | 'all-time' | 'custom';
 
-type UserPerformanceSection = 'overdue' | 'jobs' | 'activities' | 'conversion';
+type UserPerformanceSection = 'overdue' | 'jobs' | 'activities' | 'conversion' | 'staff-work';
 
 type StatsPanelType = 
   | 'user-total-jobs' 
@@ -2473,8 +2474,23 @@ export function Reports({ statuses, branches }: ReportsProps) {
                   <TrendingUp className="w-4 h-4" />
                   Conversion Tracker
                 </button>
+                <button
+                  onClick={() => setActiveSection('staff-work')}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 ${
+                    activeSection === 'staff-work'
+                      ? 'bg-[#096da2] text-white shadow-md'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  Staff Work
+                </button>
               </div>
             </div>
+
+            {activeSection === 'staff-work' && (
+              <StaffWorkPanel onOpenJob={setSelectedJob} />
+            )}
 
             {/* Overdue Jobs */}
             {activeSection === 'overdue' && userOverdueJobs.length > 0 && (
@@ -4901,7 +4917,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
 
       {/* Admin Activity Report */}
       {activeTab === 'admin-activity' && (
-        <AdminActivityReport branches={branches} />
+        <AdminActivityReport branches={branches} onOpenJob={setSelectedJob} />
       )}
 
       </div>

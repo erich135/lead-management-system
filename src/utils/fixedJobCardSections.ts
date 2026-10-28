@@ -205,6 +205,32 @@ export function insertSectionBeforeSignOff(
 }
 
 /**
+ * Inserts a section directly after the section with the given id (for example straight after
+ * Job Information). Falls back to just before the sign-off block when the id is unknown or is
+ * the sign-off block itself, so nothing can ever be placed below the sign-off.
+ */
+export function insertSectionAfter(
+  sections: FixedFormSection[],
+  newSection: FixedFormSection,
+  afterSectionId?: string
+): FixedFormSection[] {
+  const index = afterSectionId ? sections.findIndex((section) => section.id === afterSectionId) : -1;
+  if (index < 0 || sections[index].type === 'signatures') {
+    return insertSectionBeforeSignOff(sections, newSection);
+  }
+  const next = [...sections];
+  next.splice(index + 1, 0, newSection);
+  return next;
+}
+
+/**
+ * Sections a new section can be placed after: everything except the sign-off block.
+ */
+export function sectionsAvailableForInsertAfter(sections: FixedFormSection[]): FixedFormSection[] {
+  return sections.filter((section) => section.type !== 'signatures');
+}
+
+/**
  * Returns how many items in a section are currently visible.
  */
 export function countSectionVisibleItems(section: FixedFormSection): { visible: number; total: number } {

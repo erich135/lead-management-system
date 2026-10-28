@@ -1,53 +1,29 @@
-## Production branch policy — confirmed 21 September 2026
+# ARS office agent instructions
 
-- Frontend production uses `main` only.
-- Backend production uses `master` only.
-- Merge and test development work on those branches before deployment.
-- Server checkouts must remain on these named branches, never detached HEAD.
-- Verify server HEAD equals the corresponding published production commit.
-- Preserve other developers' changes and stashes. Never force-push production.
-- Cape Town SSH uses `ARS-CapeTown-2026.pem`, never `arsapp.pem`.
+Air Rotary Services. Read `C:\Dev\ARS-Workspace\AGENTS.md` first. This file adds rules for `apps/ars-app-frontend`.
 
-This policy supersedes older branch and SSH-key references below. Historical
-release and reconciliation branches are not current production sources.
+`knowledge-base/AI-CONTEXT.md` is not in the workspace yet. Do not describe it as read. Branch choice comes from the workspace file, not from `docs/DAILY-START-CHECKLIST.md` or `docs/WORKSPACE-README.md`.
 
-# ARS App AI Instructions
+## Change limits
 
-This is a production application used by Air Rotory Services staff and technicians.
+Inspect the screen and the API it calls before editing. Keep the change small. Do not install packages, commit, or push unless the task says so.
 
-## Critical rules
+Do not change authentication, permissions, or the job-status workflow unless the task names that change. The job screen must leave status history on the server. A status conflict stays a visible error and does not pretend the save succeeded.
 
-- Do not edit files unless explicitly instructed.
-- First inspect and explain the plan.
-- Do not delete files.
-- Do not rename files without approval.
-- Do not change authentication logic.
-- Do not change job status workflow.
-- Do not change branch, rep, admin, approval, or technician permissions.
-- Do not change database schema unless specifically approved.
-- Do not install packages without approval.
-- Do not commit.
-- Do not push.
-- Keep changes small and reviewable.
-- Show diffs after changes.
-- If unsure, stop and ask.
+Preserve allocation, approvals, and technician access unless the task changes them.
 
-## Current task
+## Reporting for management
 
-We are updating job card templates that are sent to technicians through the Android mobile app.
+Leana’s Staff Work presentation stays clear and short. Put the date and filters once above the table. Do not pack explanations into column headings.
 
-## Main objective
+- Show the figures the API returns. Do not recalculate Staff Work in the browser.
+- A zero is a real zero. A failed request is an error, not zero activity.
+- Screen filters must match the filters sent to the API. Staff Work does not inherit the Activities row limit or the overdue-job filters.
+- Supporting actions stay available from the summary.
+- The job’s current status is not a substitute for the historical action.
+- Excel download uses the API workbook.
+- Check the affected screen after a UI change, including an empty or error state when the change can produce one.
 
-Improve the technician job card template without breaking existing jobs, job allocation, job status flow, approvals, or technician access.
+## Reference
 
-## Required workflow
-
-1. Inspect relevant files.
-2. Identify where job card data is created.
-3. Identify where backend sends job card data.
-4. Identify where frontend/mobile app receives job card data.
-5. Identify where frontend/mobile app renders the job card.
-6. Propose a safe implementation plan.
-7. Wait for approval.
-8. Implement one small step at a time.
-9. Show git diff after each change.
+When the knowledge base exists, use its office-module and Staff Work references instead of copying them into this file.

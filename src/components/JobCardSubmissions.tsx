@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { FileText, Eye, Calendar, User, RefreshCw, MapPin, Edit2, X, Save } from 'lucide-react';
-import { archiveJobCardSubmission, getJobCardSubmissions, getJobCardSubmission, patchJobCardSubmission, restoreJobCardSubmission, type JobCardSubmissionRecord } from '../lib/api';
+import { archiveJobCardSubmission, getJobCardSubmissions, getJobCardSubmission, patchJobCardSubmission, restoreJobCardSubmission, type JobCardPhotoReport, type JobCardSubmissionRecord } from '../lib/api';
+import { photoCountText } from '../utils/jobCardPhotos';
 import { FixedJobCardPrintView } from './FixedJobCardPrintView';
 import { InspectionReports } from './InspectionReports';
 import { DeliveryNotes } from './DeliveryNotes';
@@ -41,6 +42,7 @@ export function JobCardSubmissions() {
   const [previewData, setPreviewData] = useState<{
     submission: JobCardSubmissionRecord;
     machine?: Record<string, unknown>;
+    photoReport?: JobCardPhotoReport;
   } | null>(null);
 
   // Edit modal state
@@ -262,6 +264,19 @@ export function JobCardSubmissions() {
                         {submission.reportNumber && (
                           <span className="text-sm text-red-700 font-medium">#{submission.reportNumber}</span>
                         )}
+                        {submission.photoSummary && (
+                          <span
+                            className={
+                              submission.photoSummary.complete
+                                ? 'text-xs font-medium rounded-md border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-emerald-900'
+                                : 'text-xs font-medium rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-amber-900'
+                            }
+                            title={submission.photoSummary.complete ? 'All photographs received' : 'Photographs are still being uploaded from the technician device'}
+                          >
+                            Photos: {photoCountText(submission.photoSummary.receivedTotal, submission.photoSummary.expectedTotal)}
+                            {submission.photoSummary.complete ? '' : ' - incomplete'}
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-4 text-sm text-gray-600">
                         <div className="flex items-center gap-1">
@@ -416,6 +431,8 @@ export function JobCardSubmissions() {
           machine={previewData.machine}
           reportNumber={previewData.submission.reportNumber}
           hasSubmissionLocation={!!previewData.submission.submissionLocation}
+          submissionId={previewData.submission._id}
+          photoReport={previewData.photoReport}
           onClose={closePreview}
         />
       )}

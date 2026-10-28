@@ -331,6 +331,90 @@
   min-height: 64px;
 }
 
+/* Job card photographs (Photo questions) */
+.jcr-photo-banner {
+  margin: 8px 0 0;
+  padding: 6px 8px;
+  border: 1px solid #b45309;
+  background: #fffbeb;
+  color: #78350f;
+  font-weight: 700;
+}
+
+.jcr-photo-group {
+  margin: 0 0 6px;
+}
+
+.jcr-photo-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 6px;
+  border: 1px solid #111111;
+  border-top: 0;
+  background: #f3f4f6;
+}
+
+.jcr-photo-question {
+  font-weight: 700;
+}
+
+.jcr-photo-incomplete {
+  color: #b45309;
+  font-weight: 700;
+}
+
+.jcr-photo-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid #111111;
+  border-top: 0;
+}
+
+.jcr-photo-tile {
+  min-width: 0;
+  height: 170px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  text-align: center;
+}
+
+.jcr-photo-missing,
+.jcr-photo-error,
+.jcr-photo-pending {
+  border-style: dashed;
+  color: #6b7280;
+  padding: 6px;
+}
+
+.jcr-photo-error {
+  border-color: #b91c1c;
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.jcr-photo-open {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.jcr-photo-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 /* Job card filled report — print */
 @media print {
   body:has(.job-card-print-root) * {
@@ -381,6 +465,18 @@
 
   .job-card-report tr {
     page-break-inside: avoid;
+  }
+
+  .jcr-photo-row-block,
+  .jcr-photo-tile {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* The photograph viewer is a screen-only overlay. */
+  .job-card-print-root > .jcr-lightbox,
+  .jcr-lightbox {
+    display: none !important;
   }
 }
 

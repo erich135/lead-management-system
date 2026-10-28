@@ -1,6 +1,13 @@
 import { JobCardReportHeader } from './JobCardReportHeader';
+import { PhotoCompletenessNotice, PhotoSectionBlock } from './JobCardPhotoBlocks';
 import type { HeaderConfig } from '../jobCardTypes';
 import type { FixedJobCardFieldResolver } from '../../utils/fixedJobCardFieldResolver';
+import {
+  nonPhotoFields,
+  partitionPhotoSections,
+  sectionHasPhotoFields,
+  type JobCardPhotoRenderData,
+} from '../../utils/jobCardPhotos';
 
 interface ChecklistItem {
   id: string;
@@ -30,6 +37,8 @@ interface MechanicalChecklistReportDocumentProps {
   resolver: FixedJobCardFieldResolver;
   header: HeaderConfig;
   reportNumber?: string;
+  /** Photographs for Photo questions; omitted when the submission has none. */
+  photos?: JobCardPhotoRenderData;
 }
 
 /**
@@ -62,11 +71,17 @@ function SignatureSlot({
  * Renders the filled Mechanical Checklist report as structured HTML tables.
  */
 export function MechanicalChecklistReportDocument({
-  sections = [],
+  sections: templateSections = [],
   resolver,
   header,
   reportNumber,
+  photos,
 }: MechanicalChecklistReportDocumentProps) {
+  // Photo questions are printed as photographs below, never as answer cells.
+  const sections = templateSections.map((s) =>
+    sectionHasPhotoFields(s) ? { ...s, fields: nonPhotoFields(s.fields) } : s
+  );
+  const photoSections = partitionPhotoSections(templateSections);
   const headerSection = sections.find((s) => s.type === 'header');
   const checklistSection = sections.find((s) => s.type === 'checklist');
   const commentsSection = sections.find((s) => s.id === 'mc_comments');
@@ -75,7 +90,11 @@ export function MechanicalChecklistReportDocument({
   const leftItems = items.filter((item) => item.number <= 27);
   const rightItems = items.filter((item) => item.number > 27);
   const headerFields = headerSection?.fields || [];
-  const headerRows = [headerFields.slice(0, 4), headerFields.slice(4)].filter((row) => row.length > 0);
+  // Two header rows. Up to 8 fields this is the original 4 + rest split; newer template
+  // versions with extra hour readings (Load / Next Service Hours) widen the rows instead
+  // of adding a third row, so the one-page print height is unchanged.
+  const headerRowSize = Math.max(4, Math.ceil(headerFields.length / 2));
+  const headerRows = [headerFields.slice(0, headerRowSize), headerFields.slice(headerRowSize)].filter((row) => row.length > 0);
 
   const renderChecklist = () => {
     const rowCount = Math.max(leftItems.length, rightItems.length);
@@ -116,6 +135,7 @@ export function MechanicalChecklistReportDocument({
         reportNumber={reportNumber}
         header={header}
       />
+      <PhotoCompletenessNotice photos={photos} />
 
       {headerRows.length > 0 && (
         <table className="jcr-block">
@@ -136,6 +156,10 @@ export function MechanicalChecklistReportDocument({
         </table>
       )}
 
+      {photoSections.afterHeader.map((section) => (
+        <PhotoSectionBlock key={section.id} section={section} photos={photos} />
+      ))}
+
       {renderChecklist()}
 
       {commentsSection?.fields?.[0] && (
@@ -152,6 +176,10 @@ export function MechanicalChecklistReportDocument({
           </tbody>
         </table>
       )}
+
+      {photoSections.beforeSignOff.map((section) => (
+        <PhotoSectionBlock key={section.id} section={section} photos={photos} />
+      ))}
 
       {signSection?.fields && (
         <table className="jcr-block">

@@ -29,6 +29,7 @@ import {
 } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { canAccessMachineReadingWorkflow } from '../lib/readingAccess';
+import { loadHoursPayload } from '../lib/loadHours';
 import { MachineQrPanel } from './MachineQrPanel';
 import { MachineActivityHistory } from './MachineActivityHistory';
 import { MachineRSRMetadataEditModal } from './MachineRSRMetadataEditModal';
@@ -117,7 +118,8 @@ export function Machines() {
 
   // Edit state
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
-  const [editForm, setEditForm] = useState<Partial<Machine>>({});
+  // Load Hours is edited as raw input text; loadHoursPayload() turns it into number | null on save.
+  const [editForm, setEditForm] = useState<Partial<Omit<Machine, 'loadHours'>> & { loadHours?: string | number | null }>({});
   const [saving, setSaving] = useState(false);
   const [whatsAppTesting, setWhatsAppTesting] = useState(false);
   const [whatsAppTestResult, setWhatsAppTestResult] = useState<{ ok: boolean; message: string } | null>(null);
@@ -160,7 +162,7 @@ export function Machines() {
   const [createForm, setCreateForm] = useState<any>({
     make: '', model: '', serialNumber: '', assetNumber: '', machineType: '',
     ownershipType: 'customer', serviceType: 'hours',
-    machineHours: 0, nextServiceHours: 0,
+    machineHours: 0, nextServiceHours: 0, loadHours: '',
     lastServiceDate: '', nextServiceDate: '',
     currentLocation: '', lastOilSampleDate: '', oilSampleComment: '', yearOfManufacture: '',
     customerId: '', cashCustomer: '', isRental: false,
@@ -352,6 +354,8 @@ export function Machines() {
       serviceType: machine.serviceType || 'hours',
       machineHours: machine.machineHours || 0,
       nextServiceHours: machine.nextServiceHours || 0,
+      // Load Hours is optional: keep blank as blank (never coerce to 0).
+      loadHours: typeof machine.loadHours === 'number' ? String(machine.loadHours) : '',
       lastServiceDate: machine.lastServiceDate ? machine.lastServiceDate.split('T')[0] : '',
       nextServiceDate: machine.nextServiceDate ? machine.nextServiceDate.split('T')[0] : '',
       lastOilSampleDate: machine.lastOilSampleDate ? machine.lastOilSampleDate.split('T')[0] : '',
@@ -404,6 +408,8 @@ export function Machines() {
       payload.readingFrequencyDays = Number(payload.readingFrequencyDays) || 30;
       if (!payload.cashCustomer) delete payload.cashCustomer;
       if (!payload.currentLocation) delete payload.currentLocation;
+      // Load Hours: blank clears the value (null); otherwise send the number as entered (0 and decimals allowed).
+      payload.loadHours = loadHoursPayload(payload.loadHours);
 
       const response = await updateMachine(editingMachine._id, payload);
       // Update local state
@@ -447,6 +453,10 @@ export function Machines() {
         if (createForm.nextServiceDate) payload.nextServiceDate = createForm.nextServiceDate;
       }
       if (createForm.lastOilSampleDate) payload.lastOilSampleDate = createForm.lastOilSampleDate;
+      {
+        const loadHours = loadHoursPayload(createForm.loadHours);
+        if (loadHours !== null) payload.loadHours = loadHours;
+      }
       if (createForm.contactPerson?.trim()) payload.contactPerson = createForm.contactPerson.trim();
       if (createForm.whatsAppNumber?.trim()) payload.whatsAppNumber = createForm.whatsAppNumber.trim();
       payload.readingFrequencyDays = Number(createForm.readingFrequencyDays) || 30;
@@ -462,7 +472,7 @@ export function Machines() {
       setCreateForm({
         make: '', model: '', serialNumber: '', assetNumber: '', machineType: '',
         ownershipType: 'customer', serviceType: 'hours',
-        machineHours: 0, nextServiceHours: 0,
+        machineHours: 0, nextServiceHours: 0, loadHours: '',
         lastServiceDate: '', nextServiceDate: '',
         currentLocation: '', lastOilSampleDate: '', oilSampleComment: '', yearOfManufacture: '',
         customerId: '', cashCustomer: '', isRental: false,
@@ -493,7 +503,7 @@ export function Machines() {
         'Machine ID', 'Record Updated At',
         'Make', 'Model', 'Serial Number', 'Asset Number', 'Machine Type',
         'Customer', 'Cash Customer', 'Ownership Type', 'Is Rental', 'Service Type',
-        'Machine Hours', 'Next Service Hours',
+        'Machine Hours', 'Next Service Hours', 'Load Hours',
         'Last Service Date', 'Next Service Date',
         'Current Location', 'Last Oil Sample Date', 'Oil Sample Comment',
         'Year of Manufacture',
@@ -528,6 +538,7 @@ export function Machines() {
           m.serviceType ?? '',
           m.machineHours ?? '',
           m.nextServiceHours ?? '',
+          m.loadHours ?? '',
           m.lastServiceDate ? new Date(m.lastServiceDate).toLocaleDateString('en-ZA') : '',
           m.nextServiceDate ? new Date(m.nextServiceDate).toLocaleDateString('en-ZA') : '',
           m.currentLocation ?? '',
@@ -1607,6 +1618,18 @@ export function Machines() {
                                       className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
                                   </div>
+                                  <div>
+                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Load Hours</label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="any"
+                                      placeholder="Optional"
+                                      value={editForm.loadHours ?? ''}
+                                      onChange={(e) => setEditForm({ ...editForm, loadHours: e.target.value })}
+                                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                  </div>
                                 </>
                               )}
                               {editForm.serviceType === 'date' && (
@@ -1815,6 +1838,10 @@ export function Machines() {
                                   <div>
                                     <div className="text-xs font-semibold text-slate-400 uppercase">Next Service Hours</div>
                                     <div className="text-sm font-medium text-slate-800 mt-0.5">{machine.nextServiceHours || 0}</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-xs font-semibold text-slate-400 uppercase">Load Hours</div>
+                                    <div className="text-sm font-medium text-slate-800 mt-0.5">{typeof machine.loadHours === 'number' ? machine.loadHours : '—'}</div>
                                   </div>
                                 </>
                               )}
@@ -2607,6 +2634,10 @@ export function Machines() {
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Next Service Hours</label>
                     <input type="number" value={createForm.nextServiceHours} onChange={e => setCreateForm({ ...createForm, nextServiceHours: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Load Hours</label>
+                    <input type="number" min="0" step="any" placeholder="Optional" value={createForm.loadHours ?? ''} onChange={e => setCreateForm({ ...createForm, loadHours: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent" />
                   </div>
                 </>)}
                 {createForm.serviceType === 'date' && (<>

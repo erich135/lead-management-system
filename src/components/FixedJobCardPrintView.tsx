@@ -5,6 +5,10 @@ import { createFixedJobCardFieldResolver } from '../utils/fixedJobCardFieldResol
 import { getJobCardReportHeader } from '../utils/arsJobCardHeaderDefaults';
 import { exportElementToPdf } from '../utils/exportJobCardPdf';
 import { filterVisibleSections } from '../utils/fixedJobCardSections';
+import type { JobCardPhotoReport } from '../lib/api';
+import { photoLoadCounts, type JobCardPhotoRenderData } from '../utils/jobCardPhotos';
+import { useJobCardPhotoImages } from '../hooks/useJobCardPhotoImages';
+import { JobCardPhotoLightbox } from './JobCardPhotoLightbox';
 import { MechanicalChecklistReportDocument } from './fixedJobCardReports/MechanicalChecklistReportDocument';
 import { RepairStatusReportDocument } from './fixedJobCardReports/RepairStatusReportDocument';
 import { GenericSectionReportDocument } from './fixedJobCardReports/GenericSectionReportDocument';
@@ -13,6 +17,7 @@ interface FixedJobCardPrintViewProps {
   template: {
     name: string;
     templateKey?: string;
+    layoutKey?: string;
     sections?: unknown[];
   };
   fieldValues: FieldValueEntry[];
@@ -22,6 +27,10 @@ interface FixedJobCardPrintViewProps {
   isPreviewSample?: boolean;
   /** When false, shows that the technician submitted without GPS. */
   hasSubmissionLocation?: boolean;
+  /** Submission to load photographs from (office view of a real submission). */
+  submissionId?: string;
+  /** Photograph progress for the submission; absent when it has no photographs. */
+  photoReport?: JobCardPhotoReport;
   onClose: () => void;
 }
 
@@ -36,20 +45,30 @@ export function FixedJobCardPrintView({
   reportNumber,
   isPreviewSample = false,
   hasSubmissionLocation,
+  submissionId,
+  photoReport,
   onClose,
 }: FixedJobCardPrintViewProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
+  const [lightbox, setLightbox] = useState<{ url: string; caption: string } | null>(null);
+  const images = useJobCardPhotoImages(submissionId, photoReport);
+  const photos: JobCardPhotoRenderData | undefined = photoReport?.hasManifest
+    ? { report: photoReport, images, onOpen: setLightbox }
+    : undefined;
+  const photoLoad = photoLoadCounts(photoReport, images);
+  const photosLoading = photoLoad.loading > 0;
   const visibleSections = filterVisibleSections((template.sections || []) as never[]);
   const resolver = createFixedJobCardFieldResolver(fieldValues, job, machine, reportNumber);
   const header = getJobCardReportHeader();
-  const isMechanical = template.templateKey === 'mechanical_checklist';
+  const layoutKey = template.layoutKey || (template.templateKey === 'mechanical_checklist' || template.templateKey === 'repair_status_report' || template.templateKey === 'generator_b_service' || template.templateKey === 'dryer_sla' ? template.templateKey : 'generic');
 
   /**
    * Downloads the on-screen filled report as PDF (WYSIWYG capture).
    */
   const handleDownloadPdf = async () => {
+    if (photosLoading) return;
     const reportEl = printRef.current?.querySelector('.job-card-report') as HTMLElement | null;
     const target = reportEl || printRef.current;
     if (!target) return;
@@ -76,6 +95,9 @@ export function FixedJobCardPrintView({
    * Opens the browser print dialog for the filled report.
    */
   const handlePrint = () => {
+    // Authenticated photographs are fetched with a token, so wait until they have all loaded
+    // (or visibly failed) rather than printing empty frames.
+    if (photosLoading) return;
     window.print();
   };
 
@@ -94,6 +116,11 @@ export function FixedJobCardPrintView({
               Location not enabled by technician — GPS was declined, blocked, or unavailable on their device
             </p>
           )}
+          {photosLoading && (
+            <p className="text-xs text-blue-900 bg-blue-50 border border-blue-200 rounded px-2 py-1 mt-1 ml-1 inline-block">
+              Loading photographs ({photoLoad.total - photoLoad.loading} of {photoLoad.total}) - printing is available once they have loaded
+            </p>
+          )}
           {hasSubmissionLocation === true && (
             <p className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 mt-1 inline-block">
               Technician enabled location — GPS was attached to this submission
@@ -104,14 +131,15 @@ export function FixedJobCardPrintView({
           <button
             type="button"
             onClick={handlePrint}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded border border-gray-300 text-sm hover:bg-gray-50"
+            disabled={photosLoading}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded border border-gray-300 text-sm hover:bg-gray-50 disabled:opacity-60"
           >
             <Printer className="w-4 h-4" /> Print
           </button>
           <button
             type="button"
             onClick={handleDownloadPdf}
-            disabled={exporting}
+            disabled={exporting || photosLoading}
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-amber-500 text-gray-900 text-sm font-medium hover:bg-amber-600 disabled:opacity-60"
           >
             {exporting ? (
@@ -132,19 +160,21 @@ export function FixedJobCardPrintView({
         className="flex-1 overflow-auto p-4 print:p-0 print:overflow-visible bg-gray-200 print:bg-white"
       >
         <div ref={printRef} className="mx-auto print:mx-0">
-          {template.templateKey === 'mechanical_checklist' ? (
+          {layoutKey === 'mechanical_checklist' ? (
             <MechanicalChecklistReportDocument
               sections={visibleSections as never[]}
               resolver={resolver}
               header={header}
               reportNumber={reportNumber}
+              photos={photos}
             />
-          ) : template.templateKey === 'repair_status_report' ? (
+          ) : layoutKey === 'repair_status_report' ? (
             <RepairStatusReportDocument
               sections={visibleSections as never[]}
               resolver={resolver}
               header={header}
               reportNumber={reportNumber}
+              photos={photos}
             />
           ) : (
             <GenericSectionReportDocument
@@ -153,10 +183,14 @@ export function FixedJobCardPrintView({
               resolver={resolver}
               header={header}
               reportNumber={reportNumber}
+              photos={photos}
             />
           )}
         </div>
       </div>
+      {lightbox && (
+        <JobCardPhotoLightbox url={lightbox.url} caption={lightbox.caption} onClose={() => setLightbox(null)} />
+      )}
     </div>
   );
 }

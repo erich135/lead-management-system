@@ -4,6 +4,7 @@
  * Supports role-based filtering and export functionality.
  */
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { formatLoadHours } from '../lib/loadHours';
 import { 
   getJobs, 
   getActivities, 
@@ -828,13 +829,14 @@ export function Reports({ statuses, branches }: ReportsProps) {
     ]);
 
     // Machines data
-    const machineHeaders = ['Make', 'Model', 'Serial Number', 'Machine Hours', 'Next Service Hours'];
+    const machineHeaders = ['Make', 'Model', 'Serial Number', 'Machine Hours', 'Next Service Hours', 'Load Hours'];
     const machineRows = customerMachines.map(machine => [
       machine.make || '',
       machine.model || '',
       machine.serialNumber || '',
       machine.machineHours || 0,
       machine.nextServiceHours || 0,
+      formatLoadHours(machine.loadHours),
     ]);
 
     // Activities data
@@ -883,7 +885,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
   function exportMachineReport() {
     // Machine and Job data
     const headers = [
-      'Machine Make', 'Machine Model', 'Serial Number', 'Customer', 'Machine Hours', 'Next Service Hours',
+      'Machine Make', 'Machine Model', 'Serial Number', 'Customer', 'Machine Hours', 'Next Service Hours', 'Load Hours',
       'Job Number', 'Job Status', 'Start Date', 'Date Quoted', 'Value ex VAT', 'Admin', 'Rep Code', 'Technician', 'Branch', 'Description', 'Notes', 'Feedback',
       'RSR Number', 'PO Number', 'PO Date', 'Invoice Number', 'Invoice Date'
     ];
@@ -914,6 +916,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
           customerName,
           machine.machineHours || '',
           machine.nextServiceHours || '',
+          formatLoadHours(machine.loadHours),
           // Job columns (must match headers length)
           '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
         ]);
@@ -930,6 +933,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
             customerName,
             machine.machineHours || '',
             machine.nextServiceHours || '',
+            formatLoadHours(machine.loadHours),
             job.jobNumber || '',
             job.status?.name || '',
             formatDate(job.startDate),

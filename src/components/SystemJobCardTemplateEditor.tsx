@@ -29,8 +29,11 @@ import {
   getNextChecklistNumber,
   canDeleteTemplateSection,
   createEmptyCustomSection,
-  insertSectionBeforeSignOff,
+  findSignOffSectionIndex,
+  insertSectionAfter,
+  sectionsAvailableForInsertAfter,
 } from '../utils/fixedJobCardSections';
+import { sectionHasPhotoFields } from '../utils/jobCardPhotos';
 
 interface SystemJobCardTemplateEditorProps {
   template: JobCardTemplate & {
@@ -39,6 +42,8 @@ interface SystemJobCardTemplateEditorProps {
   };
   onClose: () => void;
   onSaved?: (template: JobCardTemplate) => void;
+  /** Server flag: may forms with Photo questions be assigned? Undefined when not known. */
+  photoQuestionsEnabled?: boolean;
 }
 
 type QuestionDraft = {
@@ -70,6 +75,7 @@ function fieldTypeLabel(type: string, inputType?: string): string {
   if (type === 'yesno') return 'Yes / No';
   if (type === 'textarea') return 'Text area';
   if (type === 'signature') return 'Signature';
+  if (type === 'photo') return 'Photo (one or more, optional)';
   if (type === 'jobField' || type === 'machineField') return 'Auto-filled';
   if (type === 'select') return 'Select one';
   return 'Text';
@@ -82,6 +88,7 @@ export function SystemJobCardTemplateEditor({
   template,
   onClose,
   onSaved,
+  photoQuestionsEnabled,
 }: SystemJobCardTemplateEditorProps) {
   const [sections, setSections] = useState<FixedFormSection[]>(
     () => JSON.parse(JSON.stringify(template.sections || [])) as FixedFormSection[]
@@ -99,9 +106,14 @@ export function SystemJobCardTemplateEditor({
   >(null);
   const [draft, setDraft] = useState<QuestionDraft>(EMPTY_DRAFT);
   const [showSectionModal, setShowSectionModal] = useState(false);
-  const [sectionDraft, setSectionDraft] = useState<{ title: string; type: AddableSectionType }>({
+  const [sectionDraft, setSectionDraft] = useState<{
+    title: string;
+    type: AddableSectionType;
+    afterId: string;
+  }>({
     title: '',
     type: 'fields',
+    afterId: '',
   });
 
   const isSystemTemplate = Boolean(template.isSystemTemplate);
@@ -115,8 +127,15 @@ export function SystemJobCardTemplateEditor({
   /**
    * Persists section configuration to the backend.
    */
+  const formLocked = Boolean(template.formLocked || template.immutableAt);
+  const hasPhotoQuestions = sections.some(sectionHasPhotoFields);
+  const insertAfterOptions = sectionsAvailableForInsertAfter(sections);
+  const signOffIndex = findSignOffSectionIndex(sections);
+  const defaultInsertAfterId =
+    signOffIndex > 0 ? sections[signOffIndex - 1].id : insertAfterOptions[insertAfterOptions.length - 1]?.id ?? '';
+
   const handleSave = async () => {
-    if (!template._id) return;
+    if (!template._id || formLocked) return;
     setSaving(true);
     setError(null);
     try {
@@ -330,7 +349,7 @@ export function SystemJobCardTemplateEditor({
             id: generateCustomFieldId('field'),
             label: draft.label.trim(),
             type: section.type === 'yesno_list' ? 'yesno' : draft.type,
-            required: draft.required,
+            required: draft.type === 'photo' ? false : draft.required,
             options:
               draft.type === 'select'
                 ? draft.options
@@ -375,7 +394,7 @@ export function SystemJobCardTemplateEditor({
                       ...field,
                       label: draft.label.trim(),
                       type: draft.type,
-                      required: draft.required,
+                      required: draft.type === 'photo' ? false : draft.required,
                       unit: draft.unit || undefined,
                       options:
                         draft.type === 'select'
@@ -468,15 +487,15 @@ export function SystemJobCardTemplateEditor({
   };
 
   /**
-   * Inserts a new custom section before the sign-off block.
+   * Inserts a new custom section after the chosen section (never below sign-off).
    */
   const addSection = () => {
     if (!sectionDraft.title.trim()) return;
     const newSection = createEmptyCustomSection(sectionDraft.type, sectionDraft.title);
-    setSections((prev) => insertSectionBeforeSignOff(prev, newSection));
+    setSections((prev) => insertSectionAfter(prev, newSection, sectionDraft.afterId || defaultInsertAfterId));
     setExpanded((prev) => ({ ...prev, [newSection.id]: true }));
     setShowSectionModal(false);
-    setSectionDraft({ title: '', type: 'fields' });
+    setSectionDraft({ title: '', type: 'fields', afterId: '' });
   };
 
   /**
@@ -565,7 +584,7 @@ export function SystemJobCardTemplateEditor({
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || formLocked}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0969a9] text-white text-sm font-medium hover:bg-[#075a8f] disabled:opacity-60"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -589,11 +608,30 @@ export function SystemJobCardTemplateEditor({
           <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">{error}</div>
         )}
 
+        {formLocked && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-950">
+            This form is already used by job cards. To make changes, create a new version. Existing job cards will continue using the original.
+          </div>
+        )}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-900">
           Toggle sections or individual questions on/off. Use <strong>Add section</strong> to insert new
-          blocks above sign-off. Job information and sign-off stay on every form. Hidden items won&apos;t
-          appear on the technician app or printed report.
+          blocks after any section above sign-off (for example straight after Job information). Job
+          information and sign-off stay on every form. Hidden items won&apos;t appear on the technician app
+          or printed report.
         </div>
+        {hasPhotoQuestions && photoQuestionsEnabled === false && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-950" data-testid="photo-flag-off">
+            This form has Photo questions, but photo questions are switched off on this server. You can
+            still edit and save it, but it cannot be assigned to technicians until photo questions are
+            enabled by an administrator (server setting <code>JOB_CARD_PHOTO_QUESTIONS_ENABLED</code>).
+          </div>
+        )}
+        {hasPhotoQuestions && photoQuestionsEnabled === true && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-900" data-testid="photo-flag-on">
+            This form has Photo questions. Photographs are optional, can be several per question, and are
+            uploaded from the technician&apos;s mobile app; office users see them on the submitted job card.
+          </div>
+        )}
 
         {sections.map((section) => {
           const sectionVisible = isTemplateItemVisible(section);
@@ -607,11 +645,14 @@ export function SystemJobCardTemplateEditor({
               {section.type === 'signatures' && (
                 <button
                   type="button"
-                  onClick={() => setShowSectionModal(true)}
+                  onClick={() => {
+                    setSectionDraft((prev) => ({ ...prev, afterId: defaultInsertAfterId }));
+                    setShowSectionModal(true);
+                  }}
                   className="w-full mb-4 py-3 px-4 rounded-lg border-2 border-dashed border-[#0969a9] text-[#0969a9] bg-blue-50/50 hover:bg-blue-50 flex items-center justify-center gap-2 text-sm font-semibold"
                 >
                   <Plus className="w-4 h-4" />
-                  Add section (above sign-off)
+                  Add section
                 </button>
               )}
 
@@ -718,7 +759,8 @@ export function SystemJobCardTemplateEditor({
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-1">Add section</h3>
             <p className="text-sm text-gray-600 mb-4">
-              New sections are inserted above sign-off. Add questions inside the section after creating it.
+              Choose where the new section goes. Nothing can be placed below sign-off. Add questions inside
+              the section after creating it.
             </p>
             <label className="block text-sm font-medium text-gray-700 mb-1">Section title</label>
             <input
@@ -744,12 +786,25 @@ export function SystemJobCardTemplateEditor({
               <option value="checklist">Checklist (pass / fail / N/A)</option>
               <option value="yesno_list">Yes / No list</option>
             </select>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Insert after</label>
+            <select
+              value={sectionDraft.afterId || defaultInsertAfterId}
+              onChange={(e) => setSectionDraft((prev) => ({ ...prev, afterId: e.target.value }))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-4"
+              data-testid="insert-after-select"
+            >
+              {insertAfterOptions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.title || s.id}
+                </option>
+              ))}
+            </select>
             <div className="flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => {
                   setShowSectionModal(false);
-                  setSectionDraft({ title: '', type: 'fields' });
+                  setSectionDraft({ title: '', type: 'fields', afterId: '' });
                 }}
                 className="px-4 py-2 rounded-lg border border-gray-300 text-sm hover:bg-gray-50"
               >
@@ -1006,8 +1061,16 @@ function QuestionModal({ mode, section, draft, setDraft, onClose, onSave }: Ques
                 <option value="yesno">Yes / No</option>
                 <option value="textarea">Text area</option>
                 <option value="select">Select one</option>
+                {section.type === 'fields' && <option value="photo">Photo (one or more photographs)</option>}
               </select>
             </label>
+          )}
+
+          {draft.type === 'photo' && (
+            <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3">
+              Photographs are always optional. The technician can attach several photographs to this
+              question from the mobile app. They appear under this question on the job card and printed report.
+            </p>
           )}
 
           {isMeasurement && mode === 'add' && section.rows && section.rows.length > 1 && (
@@ -1053,7 +1116,7 @@ function QuestionModal({ mode, section, draft, setDraft, onClose, onSave }: Ques
             </label>
           )}
 
-          {!isChecklist && !isMeasurement && (
+          {!isChecklist && !isMeasurement && draft.type !== 'photo' && (
             <label className="inline-flex items-center gap-2 text-sm">
               <input
                 type="checkbox"

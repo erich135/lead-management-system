@@ -171,6 +171,7 @@ function AppContent() {
             <Dashboard view="jobCardTemplates" />
           </ProtectedRoute>
         } />
+        <Route path="/delivery-notes" element={<ProtectedRoute><Dashboard view="deliveryNotes" /></ProtectedRoute>} />
         <Route path="/job-card-submissions" element={
           <ProtectedRoute>
             <Dashboard view="jobCardSubmissions" />

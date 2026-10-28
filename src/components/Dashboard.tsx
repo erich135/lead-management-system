@@ -66,6 +66,7 @@ import { NotificationBell } from './NotificationBell';
 import { NotificationPanel } from './NotificationPanel';
 import { JobCardTemplates } from './JobCardTemplates';
 import { JobCardSubmissions } from './JobCardSubmissions';
+import { DeliveryNotes } from './DeliveryNotes';
 import { PartsReadyJobCards } from './PartsReadyJobCards';
 import { PendingMachineReadings } from './PendingMachineReadings';
 import PendingSalesRequests from './PendingSalesRequests';
@@ -83,7 +84,7 @@ import {
   isSalesProposalToolPath,
 } from '../features/salesProposalTool/navigation';
 
-type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady' | 'pendingReadings' | 'pendingSalesRequests' | 'techApp' | 'salesProposalTool';
+type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'deliveryNotes' | 'partsReady' | 'pendingReadings' | 'pendingSalesRequests' | 'techApp' | 'salesProposalTool';
 
 interface DashboardProps {
   view?: View;
@@ -116,6 +117,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
     if (path === '/activities') return 'activities';
     if (path === '/machines') return 'machines';
     if (path === '/job-card-templates') return 'jobCardTemplates';
+    if (path === '/delivery-notes') return 'deliveryNotes';
     if (path === '/job-card-submissions') return 'jobCardSubmissions';
     if (path === '/parts-ready') return 'partsReady';
     if (path === '/pending-machine-readings') return 'pendingReadings';
@@ -141,6 +143,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
       machines: '/machines',
       jobCardTemplates: '/job-card-templates',
       jobCardSubmissions: '/job-card-submissions',
+      deliveryNotes: '/delivery-notes',
       partsReady: '/parts-ready',
       pendingReadings: '/pending-machine-readings',
       pendingSalesRequests: '/pending-sales-requests',
@@ -836,6 +839,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                             <span>Job Card Templates</span>
                           </Link>
                         )}
+                        {(isSuperAdmin || hasPermission('job_card_submissions.read')) && <Link to="/delivery-notes" onClick={() => setIsJobsMenuExpanded(false)} className="block px-4 py-2.5 text-sm text-[#383838] hover:bg-gray-100">Delivery Notes</Link>}
                         {(isSuperAdmin || hasPermission('job_card_submissions.read')) && (
                           <Link
                             to="/job-card-submissions"
@@ -2149,6 +2153,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
           <JobCardTemplates />
         )}
 
+        {view === 'deliveryNotes' && (isSuperAdmin || hasPermission('job_card_submissions.read')) && <DeliveryNotes management />}
         {view === 'jobCardSubmissions' && (isSuperAdmin || hasPermission('job_card_submissions.read')) && (
           <JobCardSubmissions />
         )}

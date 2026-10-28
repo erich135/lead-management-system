@@ -1021,6 +1021,8 @@ export interface Machine {
   serviceType?: 'hours' | 'date';
   machineHours: number;
   nextServiceHours: number;
+  /** Optional Load Hours (V.11 Phase 3). Blank = null/undefined, never 0. */
+  loadHours?: number | null;
   lastServiceDate?: string;
   nextServiceDate?: string;
   lastOilSampleDate?: string;
@@ -1981,6 +1983,7 @@ export async function createMachine(machineData: {
   serviceType?: 'hours' | 'date';
   machineHours?: number;
   nextServiceHours?: number;
+  loadHours?: number;
   lastServiceDate?: string;
   nextServiceDate?: string;
 }): Promise<{ machine: Machine }> {
@@ -4029,24 +4032,37 @@ export interface JobCardTemplate {
   createdAt?: string;
   updatedAt?: string;
   isActive?: boolean;
+  layoutKey?: string;
+  version?: number;
+  versionFamilyId?: string;
+  sourceTemplateId?: string;
+  immutableAt?: string | null;
+  archivedAt?: string | null;
+  formLocked?: boolean;
+  /** True when the form has at least one Photo question (set by the server). */
+  hasPhotoQuestions?: boolean;
 }
 
 export interface JobCardTemplatesResponse {
   templates: JobCardTemplate[];
+  /** Whether forms with Photo questions may be assigned (server flag, off by default). */
+  photoQuestionsEnabled?: boolean;
 }
 
 export interface JobCardTemplateResponse {
   template: JobCardTemplate;
+  photoQuestionsEnabled?: boolean;
 }
 
 /**
  * Gets all job card templates.
  */
-export async function getJobCardTemplates(includeInactive?: boolean, systemOnly?: boolean, partsReadyOnly?: boolean): Promise<JobCardTemplatesResponse> {
+export async function getJobCardTemplates(includeInactive?: boolean, systemOnly?: boolean, partsReadyOnly?: boolean, archived?: boolean): Promise<JobCardTemplatesResponse> {
   const search = new URLSearchParams();
   if (includeInactive) search.set('includeInactive', 'true');
   if (systemOnly) search.set('systemOnly', 'true');
   if (partsReadyOnly) search.set('partsReadyOnly', 'true');
+  if (archived) search.set('archived', 'true');
   const qs = search.toString();
   return await apiRequest<JobCardTemplatesResponse>(`/api/job-card-templates${qs ? `?${qs}` : ''}`);
 }
@@ -4084,6 +4100,24 @@ export async function updateJobCardTemplate(id: string, template: Partial<JobCar
 export async function deleteJobCardTemplate(id: string): Promise<void> {
   return await apiRequest(`/api/job-card-templates/${id}`, {
     method: 'DELETE',
+  });
+}
+
+export async function archiveJobCardTemplate(id: string): Promise<JobCardTemplateResponse> {
+  return await apiRequest(`/api/job-card-templates/${id}/archive`, { method: 'POST' });
+}
+
+export async function restoreJobCardTemplate(id: string): Promise<JobCardTemplateResponse> {
+  return await apiRequest(`/api/job-card-templates/${id}/restore`, { method: 'POST' });
+}
+
+export async function createJobCardTemplateVersion(
+  id: string,
+  data: { name: string; description?: string },
+): Promise<JobCardTemplateResponse> {
+  return await apiRequest(`/api/job-card-templates/${id}/versions`, {
+    method: 'POST',
+    body: JSON.stringify(data),
   });
 }
 
@@ -4184,6 +4218,51 @@ export interface JobCardSubmissionRecord {
     accuracy?: number;
     capturedAt?: string;
   };
+  /** Present on list responses for submissions that declared expected photographs. */
+  photoSummary?: { expectedTotal: number; receivedTotal: number; missingTotal: number; complete: boolean };
+}
+
+/** Photograph progress for one Photo question of a submission. */
+export interface JobCardPhotoReportQuestion {
+  questionId: string;
+  expected: number;
+  received: number;
+  missing: number;
+  photos: Array<{
+    clientPhotoId: string;
+    received: boolean;
+    size?: number;
+    mimeType?: string;
+    checksum?: string;
+    uploadedAt?: string;
+  }>;
+}
+
+/** Photograph progress for a whole submission (what was promised vs. what has arrived). */
+export interface JobCardPhotoReport {
+  hasManifest: boolean;
+  expectedTotal: number;
+  receivedTotal: number;
+  missingTotal: number;
+  complete: boolean;
+  questions: JobCardPhotoReportQuestion[];
+}
+
+/**
+ * Fetches one received job card photograph with the signed-in user's token.
+ * The file is never reachable by a public URL; callers turn the blob into an object URL.
+ */
+export async function fetchJobCardPhotoBlob(submissionId: string, clientPhotoId: string): Promise<Blob> {
+  const token = getAuthToken();
+  if (!token) throw new Error('No authentication token found');
+  const response = await fetch(
+    `${apiBase()}/api/job-card-submissions/${encodeURIComponent(submissionId)}/photos/${encodeURIComponent(clientPhotoId)}/file`,
+    { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' },
+  );
+  if (!response.ok) {
+    throw new Error(response.status === 404 ? 'Photograph not available' : 'Photograph could not be loaded');
+  }
+  return response.blob();
 }
 
 /**
@@ -4341,7 +4420,23 @@ export interface DeliveryNoteListItem {
   orderReference?: string;
   reporter?: { firstName?: string; lastName?: string };
   officeArchivedAt?: string | null;
+  workflow?: 'office';
+  status?: 'draft' | 'assigned' | 'completed';
+  revision?: number;
+  customer?: string;
+  branch?: string;
+  job?: string;
+  jobNumber?: string;
+  customerAddress?: string;
+  assignedTechnician?: string | { _id: string; name: string };
+  assignedAt?: string;
+  deliveryOutcome?: 'full' | 'partial';
+  comments?: string;
+  items?: Array<{ itemId: string; description: string; partNumber?: string; unit?: string; expectedQuantity: number; quantity?: number; reason?: string }>;
 }
+export async function getDeliveryNote(id: string): Promise<{deliveryNote:DeliveryNoteListItem}> { return apiRequest(`/api/delivery-notes/${id}`); }
+export async function saveDeliveryDraft(id: string | undefined, body: Record<string, unknown>): Promise<{deliveryNote:DeliveryNoteListItem}> {return apiRequest(id?`/api/delivery-notes/${id}/draft`:'/api/delivery-notes/drafts',{method:id?'PUT':'POST',body:JSON.stringify(body)});}
+export async function assignDeliveryNote(id:string,body:Record<string,unknown>):Promise<{deliveryNote:DeliveryNoteListItem}>{return apiRequest(`/api/delivery-notes/${id}/assign`,{method:'POST',body:JSON.stringify(body)});}
 
 export async function listDeliveryNotes(params?: {
   search?: string;
@@ -4349,6 +4444,9 @@ export async function listDeliveryNotes(params?: {
   to?: string;
   page?: number;
   officeArchived?: 'only' | 'exclude';
+  status?: 'outstanding' | 'completed';
+  outcome?: string;
+  technician?: string;
 }): Promise<{ deliveryNotes: DeliveryNoteListItem[]; pagination?: { total: number; page: number; pages: number } }> {
   const search = new URLSearchParams();
   if (params?.search) search.set('search', params.search);
@@ -4356,6 +4454,9 @@ export async function listDeliveryNotes(params?: {
   if (params?.to) search.set('to', params.to);
   if (params?.page) search.set('page', String(params.page));
   if (params?.officeArchived) search.set('officeArchived', params.officeArchived);
+  if (params?.status) search.set('status', params.status);
+  if (params?.outcome) search.set('outcome', params.outcome);
+  if (params?.technician) search.set('technician', params.technician);
   const qs = search.toString();
   return apiRequest(`/api/delivery-notes${qs ? `?${qs}` : ''}`);
 }
@@ -4393,6 +4494,7 @@ export async function restoreJobCardSubmission(id: string): Promise<void> {
 export async function getJobCardSubmission(id: string): Promise<{
   submission: JobCardSubmissionRecord;
   machine?: Record<string, unknown>;
+  photoReport?: JobCardPhotoReport;
 }> {
   return apiRequest(`/api/job-card-submissions/${id}`);
 }

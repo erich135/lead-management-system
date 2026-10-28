@@ -1,7 +1,14 @@
 import { Fragment } from 'react';
 import { JobCardReportHeader } from './JobCardReportHeader';
+import { PhotoCompletenessNotice, PhotoGroupsForSection } from './JobCardPhotoBlocks';
 import type { HeaderConfig } from '../jobCardTypes';
 import type { FixedJobCardFieldResolver } from '../../utils/fixedJobCardFieldResolver';
+import {
+  buildSectionPhotoGroups,
+  nonPhotoFields,
+  sectionHasPhotoFields,
+  type JobCardPhotoRenderData,
+} from '../../utils/jobCardPhotos';
 
 interface FixedFormField {
   id: string;
@@ -43,6 +50,8 @@ interface GenericSectionReportDocumentProps {
   resolver: FixedJobCardFieldResolver;
   header: HeaderConfig;
   reportNumber?: string;
+  /** Photographs for Photo questions; omitted when the submission has none. */
+  photos?: JobCardPhotoRenderData;
 }
 
 /**
@@ -71,6 +80,7 @@ export function GenericSectionReportDocument({
   resolver,
   header,
   reportNumber,
+  photos,
 }: GenericSectionReportDocumentProps) {
   const headerSection = sections.find((section) => section.type === 'header');
   const contentSections = sections.filter((section) => section.type !== 'header' && section.type !== 'signatures');
@@ -79,6 +89,7 @@ export function GenericSectionReportDocument({
   return (
     <div className="job-card-report">
       <JobCardReportHeader title={templateName} reportNumber={reportNumber} header={header} />
+      <PhotoCompletenessNotice photos={photos} />
 
       {headerSection?.fields && headerSection.fields.length > 0 && (
         <table className="jcr-block">
@@ -101,6 +112,47 @@ export function GenericSectionReportDocument({
       )}
 
       {contentSections.map((section) => {
+        if (section.type === 'fields' && sectionHasPhotoFields(section)) {
+          // Ordinary answers keep their table; photographs follow under their own question
+          // headings. A section that only holds photo questions prints nothing without photos.
+          const answerFields = nonPhotoFields(section.fields);
+          const hasPhotos = buildSectionPhotoGroups(section, photos?.report).length > 0;
+          if (answerFields.length === 0 && !hasPhotos) return null;
+          return (
+            <div key={section.id} className="jcr-block">
+              <SectionTitle title={section.title} />
+              {answerFields.length > 0 && (
+                <table>
+                  <tbody>
+                    {chunkArray(answerFields, 2).map((row) => (
+                      <tr key={row.map((field) => field.id).join('-')}>
+                        {row.length === 1 ? (
+                          <>
+                            <td className="jcr-field-label" style={{ width: '22%' }}>{row[0].label}</td>
+                            <td colSpan={3}>
+                              <div className="jcr-field-value">{resolver.resolve(row[0])}</div>
+                            </td>
+                          </>
+                        ) : (
+                          row.map((field) => (
+                            <Fragment key={field.id}>
+                              <td className="jcr-field-label" style={{ width: '22%' }}>{field.label}</td>
+                              <td style={{ width: '28%' }}>
+                                <div className="jcr-field-value">{resolver.resolve(field)}</div>
+                              </td>
+                            </Fragment>
+                          ))
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              <PhotoGroupsForSection section={section} photos={photos} />
+            </div>
+          );
+        }
+
         if (section.type === 'fields') {
           return (
             <div key={section.id} className="jcr-block">

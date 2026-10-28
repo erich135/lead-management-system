@@ -1,6 +1,13 @@
 import { JobCardReportHeader } from './JobCardReportHeader';
+import { PhotoCompletenessNotice, PhotoSectionBlock } from './JobCardPhotoBlocks';
 import type { HeaderConfig } from '../jobCardTypes';
 import type { FixedJobCardFieldResolver } from '../../utils/fixedJobCardFieldResolver';
+import {
+  nonPhotoFields,
+  partitionPhotoSections,
+  sectionHasPhotoFields,
+  type JobCardPhotoRenderData,
+} from '../../utils/jobCardPhotos';
 
 interface FixedFormField {
   id: string;
@@ -24,6 +31,8 @@ interface RepairStatusReportDocumentProps {
   resolver: FixedJobCardFieldResolver;
   header: HeaderConfig;
   reportNumber?: string;
+  /** Photographs for Photo questions; omitted when the submission has none. */
+  photos?: JobCardPhotoRenderData;
 }
 
 /**
@@ -60,11 +69,17 @@ function SignatureSlot({
  * Renders the filled Repair Status Report as structured HTML tables.
  */
 export function RepairStatusReportDocument({
-  sections = [],
+  sections: templateSections = [],
   resolver,
   header,
   reportNumber,
+  photos,
 }: RepairStatusReportDocumentProps) {
+  // Photo questions are printed as photographs below, never as answer cells.
+  const sections = templateSections.map((s) =>
+    sectionHasPhotoFields(s) ? { ...s, fields: nonPhotoFields(s.fields) } : s
+  );
+  const photoSections = partitionPhotoSections(templateSections);
   const headerSection = sections.find((s) => s.type === 'header');
   const serviceSection = sections.find((s) => s.id === 'rsr_service_type');
   const hiraSection = sections.find((s) => s.id === 'rsr_hira');
@@ -82,6 +97,7 @@ export function RepairStatusReportDocument({
   return (
     <div className="job-card-report">
       <JobCardReportHeader title="Repair Status Report" reportNumber={reportNumber} header={header} />
+      <PhotoCompletenessNotice photos={photos} />
 
       {headerRows.length > 0 && (
         <table className="jcr-block">
@@ -101,6 +117,10 @@ export function RepairStatusReportDocument({
           </tbody>
         </table>
       )}
+
+      {photoSections.afterHeader.map((section) => (
+        <PhotoSectionBlock key={section.id} section={section} photos={photos} />
+      ))}
 
       {serviceFields.length > 0 && (
         <table className="jcr-block">
@@ -275,6 +295,10 @@ export function RepairStatusReportDocument({
           </tbody>
         </table>
       )}
+
+      {photoSections.beforeSignOff.map((section) => (
+        <PhotoSectionBlock key={section.id} section={section} photos={photos} />
+      ))}
 
       {signSection?.fields && (
         <table className="jcr-block jcr-keep">

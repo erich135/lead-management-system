@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import {
   ClipboardList,
   Edit,
-  Trash2,
   Eye,
   X,
   CheckCircle,
@@ -16,8 +15,10 @@ import {
   getJobCardTemplates,
   updateJobCardTemplate,
   createJobCardTemplate,
-  deleteJobCardTemplate,
   duplicateJobCardTemplate,
+  archiveJobCardTemplate,
+  restoreJobCardTemplate,
+  createJobCardTemplateVersion,
   createBlankJobCardTemplate,
   type JobCardTemplate,
 } from '../lib/api';
@@ -27,6 +28,7 @@ import { FixedJobCardPrintView } from './FixedJobCardPrintView';
 import { SystemJobCardTemplateEditor } from './SystemJobCardTemplateEditor';
 import { countVisibleTemplateFields, countAllTemplateFields } from '../utils/fixedJobCardSections';
 import { generateDummyJobCardPreviewData } from '../utils/fixedJobCardDummyData';
+import { matchesTemplateSearch, sourceTemplateName, versionLabel } from '../utils/jobCardTemplateListing';
 
 /**
  * Returns whether a template uses the mobile section-based form structure.
@@ -69,6 +71,9 @@ export function JobCardTemplates() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [search, setSearch] = useState('');
+  const [photoQuestionsEnabled, setPhotoQuestionsEnabled] = useState<boolean | undefined>(undefined);
 
   /**
    * Loads templates from the API.
@@ -77,8 +82,9 @@ export function JobCardTemplates() {
     setLoading(true);
     setError(null);
     try {
-      const response = await getJobCardTemplates();
+      const response = await getJobCardTemplates(false, false, false, showArchived);
       setTemplates(response.templates || []);
+      setPhotoQuestionsEnabled(response.photoQuestionsEnabled);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load templates');
     } finally {
@@ -88,7 +94,7 @@ export function JobCardTemplates() {
 
   useEffect(() => {
     loadTemplates();
-  }, []);
+  }, [showArchived]);
 
   useEffect(() => {
     if (!successMessage) return;
@@ -206,17 +212,46 @@ export function JobCardTemplates() {
   };
 
   /**
-   * Soft-deletes a custom template.
+   * Archives a form so it cannot be chosen for new assignments.
    */
-  const handleDelete = async (templateId: string) => {
-    if (!confirm('Are you sure you want to delete this template?')) return;
+  const handleArchive = async (templateId: string) => {
     try {
       setLoading(true);
-      await deleteJobCardTemplate(templateId);
+      await archiveJobCardTemplate(templateId);
       await loadTemplates();
-      setSuccessMessage('Template deleted');
+      setSuccessMessage('Form archived. Existing job cards still use it.');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to delete template');
+      setError(err instanceof Error ? err.message : 'Failed to archive form');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRestore = async (templateId: string) => {
+    try {
+      setLoading(true);
+      await restoreJobCardTemplate(templateId);
+      await loadTemplates();
+      setSuccessMessage('Form restored for new assignments. It stays locked if job cards already use it.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to restore form');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateVersion = async (template: JobCardTemplate) => {
+    const suggested = `${template.name} V${(template.version || 1) + 1}`;
+    const name = window.prompt('Name for the new version. Existing job cards keep the original.', suggested);
+    if (!name?.trim() || !template._id) return;
+    try {
+      setLoading(true);
+      const saved = await createJobCardTemplateVersion(template._id, { name: name.trim() });
+      setShowArchived(false);
+      setSuccessMessage('New version created. The original form was not changed.');
+      if (saved.template) setSystemViewTemplate(saved.template);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to create a new version');
     } finally {
       setLoading(false);
     }
@@ -251,6 +286,7 @@ export function JobCardTemplates() {
     return (
       <SystemJobCardTemplateEditor
         template={systemViewTemplate}
+        photoQuestionsEnabled={photoQuestionsEnabled}
         onClose={() => {
           setSystemViewTemplate(null);
           loadTemplates();
@@ -295,11 +331,12 @@ export function JobCardTemplates() {
     );
   }
 
-  const systemTemplates = templates.filter((t) => t.isSystemTemplate);
-  const customSectionTemplates = templates.filter(
+  const visibleTemplates = templates.filter((t) => matchesTemplateSearch(t, search));
+  const systemTemplates = visibleTemplates.filter((t) => t.isSystemTemplate);
+  const customSectionTemplates = visibleTemplates.filter(
     (t) => !t.isSystemTemplate && t.sections && t.sections.length > 0
   );
-  const legacyTemplates = templates.filter(
+  const legacyTemplates = visibleTemplates.filter(
     (t) => !t.isSystemTemplate && (!t.sections || t.sections.length === 0)
   );
 
@@ -336,14 +373,32 @@ export function JobCardTemplates() {
         <FileCheck className="w-4 h-4" />
         Preview filled form (sample)
       </button>
-      {variant === 'custom' && template._id && (
+      {template._id && (
         <button
           type="button"
-          onClick={() => handleDelete(template._id!)}
-          className="w-full px-4 py-2.5 border border-red-200 text-red-700 bg-red-50 rounded-[6px] hover:bg-red-100 flex items-center justify-center gap-2 text-sm font-medium"
+          onClick={() => handleCreateVersion(template)}
+          className="w-full px-4 py-2.5 border border-gray-300 text-gray-800 bg-white rounded-[6px] hover:bg-gray-50 flex items-center justify-center gap-2 text-sm font-medium"
         >
-          <Trash2 className="w-4 h-4" />
-          Delete form
+          <Copy className="w-4 h-4" />
+          Create new version
+        </button>
+      )}
+      {template._id && !showArchived && (
+        <button
+          type="button"
+          onClick={() => handleArchive(template._id!)}
+          className="w-full px-4 py-2.5 border border-gray-300 text-gray-700 bg-white rounded-[6px] hover:bg-gray-50 text-sm font-medium"
+        >
+          Archive
+        </button>
+      )}
+      {template._id && showArchived && (
+        <button
+          type="button"
+          onClick={() => handleRestore(template._id!)}
+          className="w-full px-4 py-2.5 border border-[#0969a9] text-[#0969a9] bg-white rounded-[6px] hover:bg-blue-50 text-sm font-medium"
+        >
+          Restore
         </button>
       )}
     </div>
@@ -362,7 +417,31 @@ export function JobCardTemplates() {
             the same — create a new blank form or duplicate a standard form, then add sections and
             questions. Technicians fill these in on the mobile app.
           </p>
-          <button
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowArchived(false)}
+                className={`px-3 py-1.5 rounded text-sm ${showArchived ? 'bg-gray-100 text-gray-700' : 'bg-[#0969a9] text-white'}`}
+              >
+                Active forms
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowArchived(true)}
+                className={`px-3 py-1.5 rounded text-sm ${showArchived ? 'bg-[#0969a9] text-white' : 'bg-gray-100 text-gray-700'}`}
+              >
+                Archived forms
+              </button>
+            </div>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search forms by name or version (e.g. V2)"
+              aria-label="Search forms"
+              className="mt-4 w-full max-w-md border border-gray-300 rounded-[6px] px-3 py-2 text-sm"
+            />
+            <button
             type="button"
             onClick={() => {
               setShowCreateModal(true);
@@ -392,6 +471,31 @@ export function JobCardTemplates() {
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-[8px] mb-4">
             {error}
+          </div>
+        )}
+
+        {!loading && templates.length > 0 && visibleTemplates.length === 0 && (
+          <div className="bg-white rounded-[8px] shadow-lg p-8 mb-6 text-center">
+            <p className="text-gray-800 font-medium">No forms match "{search.trim()}".</p>
+          </div>
+        )}
+
+        {!loading && templates.length === 0 && (
+          <div className="bg-white rounded-[8px] shadow-lg p-8 mb-6 text-center">
+            <p className="text-gray-800 font-medium">
+              {showArchived
+                ? 'No archived forms.'
+                : 'No active form is currently available for new assignments.'}
+            </p>
+            {!showArchived && (
+              <button
+                type="button"
+                onClick={() => setShowArchived(true)}
+                className="mt-4 px-4 py-2 border border-[#0969a9] text-[#0969a9] rounded text-sm"
+              >
+                Open archived forms
+              </button>
+            )}
           </div>
         )}
 
@@ -431,6 +535,12 @@ export function JobCardTemplates() {
                           ? `${fieldCount} of ${totalFields} questions visible to technicians`
                           : 'Questions not loaded — re-run npm run seed:job-card-templates'}
                       </p>
+                      {template.hasPhotoQuestions && (
+                        <p className={`text-xs font-medium mb-3 ${photoQuestionsEnabled === false ? 'text-amber-800' : 'text-gray-600'}`}>
+                          Includes Photo questions
+                          {photoQuestionsEnabled === false ? ' - cannot be assigned until photo questions are enabled on the server' : ''}
+                        </p>
+                      )}
                       {renderSectionFormActions(template, 'system')}
                     </div>
                   );
@@ -440,7 +550,9 @@ export function JobCardTemplates() {
 
             {customSectionTemplates.length > 0 ? (
               <div className="mb-8">
-                <h2 className="text-lg font-semibold text-gray-800 mb-3">Custom forms (mobile-ready)</h2>
+                <h2 className="text-lg font-semibold text-gray-800 mb-3">
+                  {showArchived ? 'Archived custom forms' : 'Active custom forms'} (mobile-ready)
+                </h2>
                 <p className="text-sm text-gray-600 mb-4">
                   These are copies or variants based on the standard forms. Assign them from{' '}
                   <strong>Parts Ready – Job Cards</strong> like the system forms.
@@ -456,16 +568,34 @@ export function JobCardTemplates() {
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <h3 className="font-semibold text-lg text-gray-800">{template.name}</h3>
-                          <span className="text-xs font-semibold px-2 py-0.5 rounded bg-blue-200 text-blue-900">
-                            Custom
+                          <span className="flex shrink-0 gap-1">
+                            {versionLabel(template) && (
+                              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-200 text-emerald-900">
+                                {versionLabel(template)}
+                              </span>
+                            )}
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-blue-200 text-blue-900">
+                              Custom
+                            </span>
                           </span>
                         </div>
+                        {sourceTemplateName(template, templates) && (
+                          <p className="text-xs text-gray-500 mb-2">
+                            Version {template.version} of {sourceTemplateName(template, templates)}
+                          </p>
+                        )}
                         {template.description && (
                           <p className="text-sm text-gray-600 mb-2">{template.description}</p>
                         )}
                         <p className="text-sm font-medium text-[#0969a9] mb-4">
                           {fieldCount} of {totalFields} questions visible to technicians
                         </p>
+                        {template.hasPhotoQuestions && (
+                          <p className={`text-xs font-medium mb-3 ${photoQuestionsEnabled === false ? 'text-amber-800' : 'text-gray-600'}`}>
+                            Includes Photo questions
+                            {photoQuestionsEnabled === false ? ' - cannot be assigned until photo questions are enabled on the server' : ''}
+                          </p>
+                        )}
                         {renderSectionFormActions(template, 'custom')}
                       </div>
                     );
@@ -527,10 +657,10 @@ export function JobCardTemplates() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => template._id && handleDelete(template._id)}
-                          className="px-3 py-2 bg-red-50 rounded"
+                          onClick={() => template._id && (showArchived ? handleRestore(template._id) : handleArchive(template._id))}
+                          className="px-3 py-2 bg-gray-50 rounded text-sm"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          {showArchived ? 'Restore' : 'Archive'}
                         </button>
                       </div>
                     </div>

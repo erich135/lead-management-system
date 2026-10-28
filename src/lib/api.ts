@@ -617,6 +617,7 @@ export async function getJobs(params?: {
   status?: string;
   branch?: string;
   customer?: string;
+  customerMatch?: 'exact';
   search?: string;
   page?: number;
   limit?: number;
@@ -635,6 +636,7 @@ export async function getJobs(params?: {
   if (params?.status) queryParams.append('status', params.status);
   if (params?.branch) queryParams.append('branch', params.branch);
   if (params?.customer) queryParams.append('customer', params.customer);
+  if (params?.customerMatch) queryParams.append('customerMatch', params.customerMatch);
   if (params?.search) queryParams.append('search', params.search);
   if (params?.page) queryParams.append('page', params.page.toString());
   if (params?.limit) queryParams.append('limit', params.limit.toString());

@@ -37,7 +37,7 @@ export function DeliveryNotes({ archived = false, management = false }: {
     const [message, setMessage] = useState(''), [draft, setDraft] = useState<Draft | null>(null), [busy, setBusy] = useState(false);
     const lock = useRef(false);
     const [customerSearch,setCustomerSearch]=useState(''),[jobSearch,setJobSearch]=useState('');
-    const findDeliveryJobs=useCallback(async(search:string):Promise<DeliveryLookupOption[]>=>{if(!draft?.customerId)return [];return (await getJobs({customer:draft.customerId,search,allTime:'true',limit:100})).jobs.map(j=>({id:j._id,label:j.jobNumber,branchId:typeof j.branch==='object'?j.branch?._id:undefined}));},[draft?.customerId]);
+    const findDeliveryJobs=useCallback(async(search:string):Promise<DeliveryLookupOption[]>=>{if(!draft?.customerId)return [];return (await getJobs({customer:draft.customerId,customerMatch:'exact',search,allTime:'true',limit:100})).jobs.map(j=>({id:j._id,label:j.jobNumber,branchId:typeof j.branch==='object'?j.branch?._id:undefined}));},[draft?.customerId]);
     const [techs, setTechs] = useState<Array<{
         _id: string;
         name: string;

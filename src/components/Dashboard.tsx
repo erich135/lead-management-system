@@ -49,6 +49,7 @@ import {
   Smartphone,
   ScanLine,
   Gauge,
+  Truck,
 } from 'lucide-react';
 import { LeadsList } from './LeadsList';
 import { LeadForm, type InspectionJobPrefill } from './LeadForm';
@@ -67,6 +68,7 @@ import { NotificationPanel } from './NotificationPanel';
 import { JobCardTemplates } from './JobCardTemplates';
 import { JobCardSubmissions } from './JobCardSubmissions';
 import { DeliveryNotes } from './DeliveryNotes';
+import { TechnicianActivity } from './TechnicianActivity';
 import { PartsReadyJobCards } from './PartsReadyJobCards';
 import { PendingMachineReadings } from './PendingMachineReadings';
 import PendingSalesRequests from './PendingSalesRequests';
@@ -84,7 +86,7 @@ import {
   isSalesProposalToolPath,
 } from '../features/salesProposalTool/navigation';
 
-type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'deliveryNotes' | 'partsReady' | 'pendingReadings' | 'pendingSalesRequests' | 'techApp' | 'salesProposalTool';
+type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'deliveryNotes' | 'technicianActivity' | 'partsReady' | 'pendingReadings' | 'pendingSalesRequests' | 'techApp' | 'salesProposalTool';
 
 interface DashboardProps {
   view?: View;
@@ -118,6 +120,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
     if (path === '/machines') return 'machines';
     if (path === '/job-card-templates') return 'jobCardTemplates';
     if (path === '/delivery-notes') return 'deliveryNotes';
+    if (path === '/technician-activity') return 'technicianActivity';
     if (path === '/job-card-submissions') return 'jobCardSubmissions';
     if (path === '/parts-ready') return 'partsReady';
     if (path === '/pending-machine-readings') return 'pendingReadings';
@@ -144,6 +147,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
       jobCardTemplates: '/job-card-templates',
       jobCardSubmissions: '/job-card-submissions',
       deliveryNotes: '/delivery-notes',
+      technicianActivity: '/technician-activity',
       partsReady: '/parts-ready',
       pendingReadings: '/pending-machine-readings',
       pendingSalesRequests: '/pending-sales-requests',
@@ -784,12 +788,12 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                     <button
                       onClick={() => setIsJobsMenuExpanded(!isJobsMenuExpanded)}
                       className={`group relative px-4 py-2.5 rounded-[8px] font-medium text-sm transition-all duration-300 flex items-center gap-2 ${
-                        view === 'leads' || view === 'jobCardTemplates' || view === 'jobCardSubmissions' || view === 'partsReady' || view === 'techApp'
+                        view === 'leads' || view === 'deliveryNotes' || view === 'technicianActivity' || view === 'jobCardTemplates' || view === 'jobCardSubmissions' || view === 'partsReady' || view === 'techApp'
                           ? 'bg-[#f7c12b] text-[#383838] shadow-lg scale-105 hover:brightness-95'
                           : 'text-[#383838] hover:text-[#f7c12b]'
                       }`}
                     >
-                      <FileText className={`w-4 h-4 transition-transform ${view === 'leads' || view === 'jobCardTemplates' || view === 'jobCardSubmissions' || view === 'partsReady' || view === 'techApp' ? 'scale-110' : ''}`} />
+                      <FileText className={`w-4 h-4 transition-transform ${view === 'leads' || view === 'deliveryNotes' || view === 'technicianActivity' || view === 'jobCardTemplates' || view === 'jobCardSubmissions' || view === 'partsReady' || view === 'techApp' ? 'scale-110' : ''}`} />
                       <span>Jobs</span>
                       {isJobsMenuExpanded ? (
                         <ChevronUp className="w-3 h-3" />
@@ -839,7 +843,8 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
                             <span>Job Card Templates</span>
                           </Link>
                         )}
-                        {(isSuperAdmin || hasPermission('job_card_submissions.read')) && <Link to="/delivery-notes" onClick={() => setIsJobsMenuExpanded(false)} className="block px-4 py-2.5 text-sm text-[#383838] hover:bg-gray-100">Delivery Notes</Link>}
+                        {(isSuperAdmin || hasPermission('job_card_submissions.read')) && <Link to="/delivery-notes" onClick={() => setIsJobsMenuExpanded(false)} className={`px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${view === 'deliveryNotes' ? 'bg-[#f7c12b]/20 text-[#383838] font-medium' : 'text-[#383838] hover:bg-gray-100'}`}><Truck className="w-4 h-4" /><span>Delivery Notes</span></Link>}
+                        {isSuperAdmin && <Link to="/technician-activity" onClick={() => setIsJobsMenuExpanded(false)} className={`px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${view === 'technicianActivity' ? 'bg-[#f7c12b]/20 text-[#383838] font-medium' : 'text-[#383838] hover:bg-gray-100'}`}><Smartphone className="w-4 h-4" /><span>Technician Activity</span></Link>}
                         {(isSuperAdmin || hasPermission('job_card_submissions.read')) && (
                           <Link
                             to="/job-card-submissions"
@@ -2154,6 +2159,7 @@ export function Dashboard({ view: initialView }: DashboardProps = {}) {
         )}
 
         {view === 'deliveryNotes' && (isSuperAdmin || hasPermission('job_card_submissions.read')) && <DeliveryNotes management />}
+        {view === 'technicianActivity' && <TechnicianActivity />}
         {view === 'jobCardSubmissions' && (isSuperAdmin || hasPermission('job_card_submissions.read')) && (
           <JobCardSubmissions />
         )}

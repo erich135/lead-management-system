@@ -1,4 +1,4 @@
-import { LayoutDashboard, FileText, BarChart3, Calendar, Users, Menu, X, Bell, LogOut, Clock, Cog, Briefcase, Smartphone, ScanLine, ClipboardList, Gauge } from 'lucide-react';
+import { LayoutDashboard, FileText, BarChart3, Calendar, Users, Menu, X, Bell, LogOut, Clock, Cog, Briefcase, Smartphone, ScanLine, ClipboardList, Gauge, Truck } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,7 +10,7 @@ import {
   SALES_PROPOSAL_TOOL_PATH,
 } from '../features/salesProposalTool/navigation';
 
-type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'partsReady' | 'techApp' | 'pendingReadings' | 'pendingSalesRequests' | 'salesProposalTool';
+type View = 'dashboard' | 'leads' | 'salesLeads' | 'reports' | 'admin' | 'diary' | 'activities' | 'machines' | 'jobCardTemplates' | 'jobCardSubmissions' | 'deliveryNotes' | 'technicianActivity' | 'partsReady' | 'techApp' | 'pendingReadings' | 'pendingSalesRequests' | 'salesProposalTool';
 
 interface MobileNavigationProps {
   currentView: View;
@@ -49,6 +49,8 @@ export function MobileNavigation({
     if (path === '/machines') return 'machines';
     if (path === '/job-card-templates') return 'jobCardTemplates';
     if (path === '/job-card-submissions') return 'jobCardSubmissions';
+    if (path === '/delivery-notes') return 'deliveryNotes';
+    if (path === '/technician-activity') return 'technicianActivity';
     if (path === '/parts-ready') return 'partsReady';
     if (path === '/tech-app') return 'techApp';
     if (path === '/pending-machine-readings') return 'pendingReadings';
@@ -160,6 +162,11 @@ export function MobileNavigation({
 
               {/* Menu Items */}
               <div className="space-y-2">
+                {(user?.isSuperAdmin || hasPermission('job_card_submissions.read')) && <div aria-label="Jobs">
+                  <p className="px-4 py-2 text-xs font-semibold text-gray-500">Jobs</p>
+                  <Link to="/delivery-notes" onClick={() => setShowMenu(false)} className={`w-full flex items-center gap-4 p-4 rounded-[8px] ${activeView === 'deliveryNotes' ? 'bg-ars-secondary/20' : 'bg-gray-50 hover:bg-gray-100'}`}><Truck className="w-5 h-5" /><span className="font-medium">Delivery Notes</span></Link>
+                  {user?.isSuperAdmin && <Link to="/technician-activity" onClick={() => setShowMenu(false)} className={`w-full flex items-center gap-4 p-4 rounded-[8px] ${activeView === 'technicianActivity' ? 'bg-ars-secondary/20' : 'bg-gray-50 hover:bg-gray-100'}`}><Smartphone className="w-5 h-5" /><span className="font-medium">Technician Activity</span></Link>}
+                </div>}
                 {/* Activities */}
                 <Link
                   to="/activities"

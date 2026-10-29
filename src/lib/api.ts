@@ -4,6 +4,10 @@
  */
 
 import { resolveApiBaseUrl } from './resolveApiBaseUrl';
+import type { TechnicianActivityResult } from './technicianActivity';
+export function getTechnicianActivity(): Promise<TechnicianActivityResult> {
+  return apiRequest('/api/technician-activity');
+}
 
 // Re-export types from types/index.ts for convenience
 export type {

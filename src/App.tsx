@@ -177,6 +177,7 @@ function AppContent() {
             <Dashboard view="jobCardSubmissions" />
           </ProtectedRoute>
         } />
+        <Route path="/technician-activity" element={<ProtectedRoute><Dashboard view="technicianActivity" /></ProtectedRoute>} />
         <Route path="/parts-ready" element={
           <ProtectedRoute>
             <Dashboard view="partsReady" />

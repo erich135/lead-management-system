@@ -27,3 +27,7 @@ Leana’s Staff Work presentation stays clear and short. Put the date and filter
 ## Reference
 
 When the knowledge base exists, use its office-module and Staff Work references instead of copying them into this file.
+
+## Terminal completion status
+
+Finish the final task response with the mandatory workspace handover summary followed immediately by exactly one terminal status on its own final line: `COMPLETED`, `BLOCKED`, or `AWAITING APPROVAL`. Do not append text after it or substitute vague words like "Done" or "Stopped".

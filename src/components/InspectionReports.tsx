@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { EditReportDetails } from './EditReportDetails';
 import {
   archiveInspection,
   linkInspectionJob,
@@ -41,6 +43,8 @@ function formatOfficeDate(value?: string): string {
 }
 
 export function InspectionReports({ archived = false }: { archived?: boolean }) {
+  const { isAdmin } = useAuth();
+  const [detailsTarget, setDetailsTarget] = useState<string | null>(null);
   const navigate = useNavigate();
   const [inspections, setInspections] = useState<InspectionListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -198,6 +202,7 @@ export function InspectionReports({ archived = false }: { archived?: boolean }) 
                     <button type="button" className="text-[#0969a9] font-semibold" onClick={() => void openInspectionPrint(inspection._id)}>
                       View & Print
                     </button>
+                    {isAdmin && <button type="button" className="text-[#0969a9] font-semibold" onClick={() => setDetailsTarget(inspection._id)}>Edit Report Details</button>}
                     {archived ? (
                       <button type="button" className="text-[#383838] font-semibold" onClick={() => void restoreInspection(inspection._id).then(load)}>
                         Restore
@@ -254,6 +259,7 @@ export function InspectionReports({ archived = false }: { archived?: boolean }) 
         <span>Page {page}</span>
         <button type="button" disabled={inspections.length < 25} className="font-semibold disabled:opacity-40" onClick={() => setPage((current) => current + 1)}>Next</button>
       </div>
+      {detailsTarget && <EditReportDetails kind="inspection" id={detailsTarget} onClose={() => setDetailsTarget(null)} onSaved={load} />}
       {archiveTarget ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">

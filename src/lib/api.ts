@@ -52,6 +52,21 @@ function apiBase(): string {
   return resolveApiBaseUrl();
 }
 
+export type OfficeReportKind = 'inspection' | 'job-card';
+export const OFFICE_REPORT_FIELDS = { make: 'Machine make', model: 'Model', assetNumber: 'Unit / machine identification', serialNumber: 'Serial number', currentLocation: 'Current location', contactPerson: 'Contact person', contactNumber: 'Contact number' } as const;
+export type OfficeReportValues = Partial<Record<keyof typeof OFFICE_REPORT_FIELDS, string>>;
+export interface OfficeReportPresentation { revision: number; overrides: OfficeReportValues; fieldOverrides: Record<string, string> }
+export interface OfficeReportDetails extends OfficeReportPresentation {
+  reference: string; original: OfficeReportValues; effective: OfficeReportValues;
+  history: Array<{ revision: number; createdAt: string; administrator: { id: string; name: string }; reason: string; changes: Array<{ field: keyof typeof OFFICE_REPORT_FIELDS; originalValue: string; previousValue: string; newValue: string }> }>;
+}
+export function getOfficeReportDetails(kind: OfficeReportKind, id: string): Promise<OfficeReportDetails> {
+  return apiRequest(`/api/reports/details/${kind}/${id}`);
+}
+export function saveOfficeReportDetails(kind: OfficeReportKind, id: string, revision: number, values: OfficeReportValues, reason: string): Promise<OfficeReportDetails> {
+  return apiRequest(`/api/reports/details/${kind}/${id}`, { method: 'POST', body: JSON.stringify({ revision, values, reason }) });
+}
+
 /**
  * API response wrapper type.
  */
@@ -4391,8 +4406,25 @@ export async function openInspectionPrint(id: string): Promise<void> {
   });
   if (!response.ok) throw new Error('The inspection could not be opened');
   const html = await response.text();
-  const blob = new Blob([html], { type: 'text/html' });
-  window.open(URL.createObjectURL(blob), '_blank', 'noopener');
+  const popup = window.open('', '_blank');
+  if (!popup) throw new Error('Allow pop-ups to open the inspection report');
+  popup.opener = null;
+  popup.document.open(); popup.document.write(html); popup.document.close();
+  const print = popup.document.getElementById('print-report');
+  if (print) { print.textContent = 'Print'; print.title = 'Browser printing keeps the existing full-size photograph layout'; }
+  const save = popup.document.createElement('button');
+  save.type = 'button'; save.className = 'no-print'; save.textContent = 'Download PDF (optimised)';
+  save.title = 'Compact PDF photograph copies. Full-resolution originals remain available in Office.';
+  save.style.cssText = 'margin:16px 8px;padding:10px 16px;font-weight:700;background:#0969a9;color:white;border:0;border-radius:8px';
+  print?.after(save);
+  save.addEventListener('click', async () => {
+    save.disabled = true; save.textContent = 'Preparing PDF...';
+    try {
+      const { downloadOptimizedOfficePdf } = await import('../utils/optimizedOfficePdf');
+      await downloadOptimizedOfficePdf(popup.document.body, `${popup.document.title}.pdf`, true);
+    } catch (error) { popup.alert(error instanceof Error ? error.message : 'PDF export failed'); }
+    finally { save.disabled = false; save.textContent = 'Download PDF (optimised)'; }
+  });
 }
 
 export async function getJobCardSubmissions(params?: {
@@ -4497,10 +4529,23 @@ export async function restoreJobCardSubmission(id: string): Promise<void> {
 /**
  * Gets a single job card submission with machine data for print preview.
  */
+export interface JobCardWorkEvent {
+  _id?: string;
+  action: 'start' | 'finish';
+  user?: { firstName?: string; lastName?: string } | string | null;
+  deviceTime?: string | null;
+  serverReceivedAt?: string | null;
+  location?: { lat?: number; lng?: number; accuracy?: number } | null;
+  sessionId?: string;
+}
+
 export async function getJobCardSubmission(id: string): Promise<{
+  officeDetails?: OfficeReportPresentation;
   submission: JobCardSubmissionRecord;
   machine?: Record<string, unknown>;
   photoReport?: JobCardPhotoReport;
+  finishWork?: { deviceTime: string | null; clockWarning: boolean };
+  workEvents?: JobCardWorkEvent[];
 }> {
   return apiRequest(`/api/job-card-submissions/${id}`);
 }

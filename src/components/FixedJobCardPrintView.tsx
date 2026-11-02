@@ -3,17 +3,22 @@ import { X, Download, Printer, Loader2 } from 'lucide-react';
 import type { FieldValueEntry } from '../utils/fixedJobCardValues';
 import { createFixedJobCardFieldResolver } from '../utils/fixedJobCardFieldResolver';
 import { getJobCardReportHeader } from '../utils/arsJobCardHeaderDefaults';
-import { exportElementToPdf } from '../utils/exportJobCardPdf';
+import { downloadOptimizedOfficePdf } from '../utils/optimizedOfficePdf';
 import { filterVisibleSections } from '../utils/fixedJobCardSections';
-import type { JobCardPhotoReport } from '../lib/api';
+import type { JobCardPhotoReport, JobCardWorkEvent } from '../lib/api';
 import { photoLoadCounts, type JobCardPhotoRenderData } from '../utils/jobCardPhotos';
 import { useJobCardPhotoImages } from '../hooks/useJobCardPhotoImages';
 import { JobCardPhotoLightbox } from './JobCardPhotoLightbox';
 import { MechanicalChecklistReportDocument } from './fixedJobCardReports/MechanicalChecklistReportDocument';
 import { RepairStatusReportDocument } from './fixedJobCardReports/RepairStatusReportDocument';
 import { GenericSectionReportDocument } from './fixedJobCardReports/GenericSectionReportDocument';
+import { JobCardWorkEvents } from './fixedJobCardReports/JobCardWorkEvents';
+import { OfficeReportDetailsSummary } from './EditReportDetails';
+import type { OfficeReportPresentation } from '../lib/api';
 
 interface FixedJobCardPrintViewProps {
+  officeDetails?: OfficeReportPresentation;
+  onEditReportDetails?: () => void;
   template: {
     name: string;
     templateKey?: string;
@@ -24,6 +29,10 @@ interface FixedJobCardPrintViewProps {
   job?: Record<string, unknown>;
   machine?: Record<string, unknown>;
   reportNumber?: string;
+  submittedAt?: string | null;
+  finishWorkDeviceTime?: string | null;
+  finishWorkClockWarning?: boolean;
+  workEvents?: JobCardWorkEvent[];
   isPreviewSample?: boolean;
   /** When false, shows that the technician submitted without GPS. */
   hasSubmissionLocation?: boolean;
@@ -38,11 +47,17 @@ interface FixedJobCardPrintViewProps {
  * Admin print preview for filled job cards — structured tables matching the paper report layout.
  */
 export function FixedJobCardPrintView({
+  officeDetails,
+  onEditReportDetails,
   template,
   fieldValues,
   job,
   machine,
   reportNumber,
+  submittedAt,
+  finishWorkDeviceTime,
+  finishWorkClockWarning,
+  workEvents,
   isPreviewSample = false,
   hasSubmissionLocation,
   submissionId,
@@ -60,8 +75,9 @@ export function FixedJobCardPrintView({
   const photoLoad = photoLoadCounts(photoReport, images);
   const photosLoading = photoLoad.loading > 0;
   const visibleSections = filterVisibleSections((template.sections || []) as never[]);
-  const resolver = createFixedJobCardFieldResolver(fieldValues, job, machine, reportNumber);
+  const resolver = createFixedJobCardFieldResolver(fieldValues, job, machine, reportNumber, officeDetails?.fieldOverrides);
   const header = getJobCardReportHeader();
+  const reportFooter = submissionId && !isPreviewSample ? <><OfficeReportDetailsSummary details={officeDetails} /><JobCardWorkEvents events={workEvents} /></> : undefined;
   const layoutKey = template.layoutKey || (template.templateKey === 'mechanical_checklist' || template.templateKey === 'repair_status_report' || template.templateKey === 'generator_b_service' || template.templateKey === 'dryer_sla' ? template.templateKey : 'generic');
 
   /**
@@ -79,7 +95,7 @@ export function FixedJobCardPrintView({
     setExporting(true);
     try {
       const safeName = template.name.replace(/\s+/g, '_');
-      await exportElementToPdf(
+      await downloadOptimizedOfficePdf(
         target,
         `${safeName}_${reportNumber || 'filled'}.pdf`
       );
@@ -128,6 +144,7 @@ export function FixedJobCardPrintView({
           )}
         </div>
         <div className="flex items-center gap-2">
+          {onEditReportDetails && <button type="button" onClick={onEditReportDetails} className="border rounded px-3 py-1.5 text-sm">Edit Report Details</button>}
           <button
             type="button"
             onClick={handlePrint}
@@ -162,6 +179,10 @@ export function FixedJobCardPrintView({
         <div ref={printRef} className="mx-auto print:mx-0">
           {layoutKey === 'mechanical_checklist' ? (
             <MechanicalChecklistReportDocument
+              reportFooter={reportFooter}
+              submittedAt={submittedAt}
+              finishWorkDeviceTime={finishWorkDeviceTime}
+              finishWorkClockWarning={finishWorkClockWarning}
               sections={visibleSections as never[]}
               resolver={resolver}
               header={header}
@@ -170,6 +191,10 @@ export function FixedJobCardPrintView({
             />
           ) : layoutKey === 'repair_status_report' ? (
             <RepairStatusReportDocument
+              reportFooter={reportFooter}
+              submittedAt={submittedAt}
+              finishWorkDeviceTime={finishWorkDeviceTime}
+              finishWorkClockWarning={finishWorkClockWarning}
               sections={visibleSections as never[]}
               resolver={resolver}
               header={header}
@@ -178,6 +203,10 @@ export function FixedJobCardPrintView({
             />
           ) : (
             <GenericSectionReportDocument
+              reportFooter={reportFooter}
+              submittedAt={submittedAt}
+              finishWorkDeviceTime={finishWorkDeviceTime}
+              finishWorkClockWarning={finishWorkClockWarning}
               templateName={template.name}
               sections={visibleSections as never[]}
               resolver={resolver}

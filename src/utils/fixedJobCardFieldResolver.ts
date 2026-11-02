@@ -25,7 +25,8 @@ export function createFixedJobCardFieldResolver(
   fieldValues: FieldValueEntry[],
   job?: Record<string, unknown>,
   machine?: Record<string, unknown>,
-  reportNumber?: string
+  reportNumber?: string,
+  officeFieldOverrides: Record<string, string> = {}
 ) {
   const valueMap = buildFieldValueMap(fieldValues);
 
@@ -41,6 +42,7 @@ export function createFixedJobCardFieldResolver(
    * Resolves a single field to its display string for the printed report.
    */
   const resolve = (field: TemplateFieldRef): string => {
+    if (Object.prototype.hasOwnProperty.call(officeFieldOverrides, field.id)) return officeFieldOverrides[field.id];
     if (field.type === 'jobField' && field.jobFieldKey) {
       if (field.jobFieldKey === 'rsrNumber' || field.jobFieldKey === 'reportNumber') {
         return (

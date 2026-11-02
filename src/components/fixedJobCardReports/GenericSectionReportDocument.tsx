@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+import { OperationalSignOffReference, formatOperationalSignOffTime, operationalSignOffLabel } from './OperationalSignOffReference';
 import { Fragment } from 'react';
 import { JobCardReportHeader } from './JobCardReportHeader';
 import { PhotoCompletenessNotice, PhotoGroupsForSection } from './JobCardPhotoBlocks';
@@ -50,6 +52,10 @@ interface GenericSectionReportDocumentProps {
   resolver: FixedJobCardFieldResolver;
   header: HeaderConfig;
   reportNumber?: string;
+  reportFooter?: ReactNode;
+  submittedAt?: string | null;
+  finishWorkDeviceTime?: string | null;
+  finishWorkClockWarning?: boolean;
   /** Photographs for Photo questions; omitted when the submission has none. */
   photos?: JobCardPhotoRenderData;
 }
@@ -80,6 +86,10 @@ export function GenericSectionReportDocument({
   resolver,
   header,
   reportNumber,
+  reportFooter,
+  submittedAt,
+  finishWorkDeviceTime,
+  finishWorkClockWarning,
   photos,
 }: GenericSectionReportDocumentProps) {
   const headerSection = sections.find((section) => section.type === 'header');
@@ -315,7 +325,7 @@ export function GenericSectionReportDocument({
                           </div>
                         </>
                       ) : (
-                        <StackedField label={field.label} value={resolver.resolve(field)} />
+                        <StackedField label={field.type === 'date' ? operationalSignOffLabel(`${field.id} ${field.label}`) : field.label} value={field.type === 'date' ? formatOperationalSignOffTime(finishWorkDeviceTime) : resolver.resolve(field)} />
                       )}
                     </td>
                   ))}
@@ -329,6 +339,8 @@ export function GenericSectionReportDocument({
           </table>
         </div>
       )}
+      <OperationalSignOffReference submittedAt={submittedAt} finishWorkClockWarning={finishWorkClockWarning} />
+      {reportFooter}
     </div>
   );
 }

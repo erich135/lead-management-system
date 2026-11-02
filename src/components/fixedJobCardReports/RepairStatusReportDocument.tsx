@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+import { OperationalSignOffReference, formatOperationalSignOffTime, operationalSignOffLabel } from './OperationalSignOffReference';
 import { JobCardReportHeader } from './JobCardReportHeader';
 import { PhotoCompletenessNotice, PhotoSectionBlock } from './JobCardPhotoBlocks';
 import type { HeaderConfig } from '../jobCardTypes';
@@ -31,6 +33,10 @@ interface RepairStatusReportDocumentProps {
   resolver: FixedJobCardFieldResolver;
   header: HeaderConfig;
   reportNumber?: string;
+  reportFooter?: ReactNode;
+  submittedAt?: string | null;
+  finishWorkDeviceTime?: string | null;
+  finishWorkClockWarning?: boolean;
   /** Photographs for Photo questions; omitted when the submission has none. */
   photos?: JobCardPhotoRenderData;
 }
@@ -73,6 +79,10 @@ export function RepairStatusReportDocument({
   resolver,
   header,
   reportNumber,
+  reportFooter,
+  submittedAt,
+  finishWorkDeviceTime,
+  finishWorkClockWarning,
   photos,
 }: RepairStatusReportDocumentProps) {
   // Photo questions are printed as photographs below, never as answer cells.
@@ -309,25 +319,27 @@ export function RepairStatusReportDocument({
                 <StackedField label="Name" value={resolver.resolve(signSection.fields[0])} />
                 <div className="jcr-field-label">Signature</div>
                 <SignatureSlot resolver={resolver} fieldId={signSection.fields[1]?.id} />
-                <StackedField label="Date" value={resolver.resolve(signSection.fields[2])} />
+                <StackedField label={operationalSignOffLabel('tech')} value={formatOperationalSignOffTime(finishWorkDeviceTime)} />
               </td>
               <td>
                 <div className="jcr-sign-title">Customer</div>
                 <StackedField label="Name" value={resolver.resolve(signSection.fields[3])} />
                 <div className="jcr-field-label">Signature</div>
                 <SignatureSlot resolver={resolver} fieldId={signSection.fields[4]?.id} />
-                <StackedField label="Date" value={resolver.resolve(signSection.fields[5])} />
+                <StackedField label={operationalSignOffLabel('cust')} value={formatOperationalSignOffTime(finishWorkDeviceTime)} />
               </td>
               <td>
                 <div className="jcr-sign-title">Closed W/S Supervisor</div>
                 <div className="jcr-field-label">Signature</div>
                 <SignatureSlot resolver={resolver} fieldId={signSection.fields[6]?.id} />
-                <StackedField label="Date" value={resolver.resolve(signSection.fields[7])} />
+                <StackedField label={operationalSignOffLabel('supervisor')} value={formatOperationalSignOffTime(finishWorkDeviceTime)} />
               </td>
             </tr>
           </tbody>
         </table>
       )}
+      <OperationalSignOffReference submittedAt={submittedAt} finishWorkClockWarning={finishWorkClockWarning} />
+      {reportFooter}
     </div>
   );
 }

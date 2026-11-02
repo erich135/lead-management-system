@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { FileText, Eye, Calendar, User, RefreshCw, MapPin, Edit2, X, Save } from 'lucide-react';
-import { archiveJobCardSubmission, getJobCardSubmissions, getJobCardSubmission, patchJobCardSubmission, restoreJobCardSubmission, type JobCardPhotoReport, type JobCardSubmissionRecord } from '../lib/api';
+import { archiveJobCardSubmission, getJobCardSubmissions, getJobCardSubmission, patchJobCardSubmission, restoreJobCardSubmission, type JobCardPhotoReport, type JobCardSubmissionRecord, type JobCardWorkEvent } from '../lib/api';
 import { photoCountText } from '../utils/jobCardPhotos';
 import { FixedJobCardPrintView } from './FixedJobCardPrintView';
 import { InspectionReports } from './InspectionReports';
 import { DeliveryNotes } from './DeliveryNotes';
+import { EditReportDetails } from './EditReportDetails';
+import { useAuth } from '../contexts/AuthContext';
+import type { OfficeReportPresentation } from '../lib/api';
 
 /** Build a map of fieldId → { label, type, options } from template sections. */
 function buildFieldLabelMap(sections: any[]): Map<string, { label: string; type: string; options?: string[] }> {
@@ -29,6 +32,8 @@ function buildFieldLabelMap(sections: any[]): Map<string, { label: string; type:
 const NON_EDITABLE_TYPES = new Set(['signature', 'photo', 'jobField', 'machineField']);
 
 export function JobCardSubmissions() {
+  const { isAdmin } = useAuth();
+  const [detailsTarget, setDetailsTarget] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [view, setView] = useState<'inspections' | 'delivery' | 'jobcards' | 'archived'>('inspections');
   const [archiveType, setArchiveType] = useState<'all' | 'inspection' | 'delivery' | 'jobcard'>('all');
@@ -40,9 +45,12 @@ export function JobCardSubmissions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<{
+    officeDetails?: OfficeReportPresentation;
     submission: JobCardSubmissionRecord;
     machine?: Record<string, unknown>;
     photoReport?: JobCardPhotoReport;
+    finishWork?: { deviceTime: string | null; clockWarning: boolean };
+    workEvents?: JobCardWorkEvent[];
   } | null>(null);
 
   // Edit modal state
@@ -425,17 +433,24 @@ export function JobCardSubmissions() {
 
       {previewData && (
         <FixedJobCardPrintView
+          officeDetails={previewData.officeDetails}
+          onEditReportDetails={isAdmin ? () => setDetailsTarget(previewData.submission._id) : undefined}
           template={previewData.submission.template}
           fieldValues={previewData.submission.fieldValues}
           job={previewData.submission.job as Record<string, unknown>}
           machine={previewData.machine}
           reportNumber={previewData.submission.reportNumber}
+          submittedAt={previewData.submission.submittedAt}
+          finishWorkDeviceTime={previewData.finishWork?.deviceTime}
+          finishWorkClockWarning={previewData.finishWork?.clockWarning}
+          workEvents={previewData.workEvents}
           hasSubmissionLocation={!!previewData.submission.submissionLocation}
           submissionId={previewData.submission._id}
           photoReport={previewData.photoReport}
           onClose={closePreview}
         />
       )}
+      {detailsTarget && <EditReportDetails kind="job-card" id={detailsTarget} onClose={() => setDetailsTarget(null)} onSaved={() => openPreview(detailsTarget)} />}
     </div>
   );
 }

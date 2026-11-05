@@ -6,6 +6,7 @@ export interface MachineActionFields {
   mergeStatus?: string;
   redirectStatus?: string;
   canonicalMachineId?: string;
+  officeArchivedAt?: string | null;
 }
 
 /** Immutable machine identity captured when a row starts a machine-specific flow. */
@@ -14,6 +15,11 @@ export interface MachineActionContext {
   canonicalMachineId: string;
   generation: number;
   isReadOnly: boolean;
+}
+
+/** Live canonical machine hidden by office archive. Dedup-retired rows stay retired even if a date is present. */
+export function isOfficeArchivedMachine(machine: MachineActionFields): boolean {
+  return Boolean(machine.officeArchivedAt) && !isRetiredMachine(machine);
 }
 
 export function isRetiredMachine(machine: MachineActionFields): boolean {

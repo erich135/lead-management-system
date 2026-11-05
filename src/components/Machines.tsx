@@ -3,6 +3,8 @@ import {
   getMachines,
   createMachine,
   updateMachine,
+  archiveMachine,
+  restoreMachine,
   relinkMachineToCustomer,
   getMachineRSRs,
   uploadRSR,
@@ -74,6 +76,7 @@ import {
   createMachineActionContext,
   hasConfirmedCanonicalResolution,
   isCurrentMachineActionRequest,
+  isOfficeArchivedMachine,
   isRetiredMachine,
   type MachineActionContext,
 } from '../lib/machineActionState';
@@ -207,6 +210,14 @@ export function Machines() {
   const [relinkCustomerId, setRelinkCustomerId] = useState('');
   const [relinkSaving, setRelinkSaving] = useState(false);
   const [relinkError, setRelinkError] = useState<string | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<Machine | null>(null);
+  const [archiveReason, setArchiveReason] = useState('');
+  const [archiveBusy, setArchiveBusy] = useState(false);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [restoreTarget, setRestoreTarget] = useState<Machine | null>(null);
+  const [restoreBusy, setRestoreBusy] = useState(false);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const handleRelink = async () => {
     if (!relinkMachine || !relinkCustomerId || isRetiredMachine(relinkMachine)) return;
@@ -226,6 +237,46 @@ export function Machines() {
     }
   };
 
+  const confirmArchive = async () => {
+    if (!archiveTarget || !canManageMachines || isRetiredMachine(archiveTarget)) return;
+    const reason = archiveReason.trim();
+    if (!reason) {
+      setArchiveError('An archive reason is required.');
+      return;
+    }
+    setArchiveBusy(true);
+    setArchiveError(null);
+    try {
+      await archiveMachine(archiveTarget._id, reason);
+      setActionMessage(`${archiveTarget.make} ${archiveTarget.model} is office-archived. Its history is unchanged.`);
+      setArchiveTarget(null);
+      setArchiveReason('');
+      setExpandedMachineId(null);
+      await loadMachines(1);
+    } catch (err: any) {
+      setArchiveError(err.message || 'Could not archive this machine');
+    } finally {
+      setArchiveBusy(false);
+    }
+  };
+
+  const confirmRestore = async () => {
+    if (!restoreTarget || !canManageMachines || !isOfficeArchivedMachine(restoreTarget)) return;
+    setRestoreBusy(true);
+    setRestoreError(null);
+    try {
+      await restoreMachine(restoreTarget._id);
+      setActionMessage(`${restoreTarget.make} ${restoreTarget.model} is restored to its active category.`);
+      setRestoreTarget(null);
+      setExpandedMachineId(null);
+      await loadMachines(1);
+    } catch (err: any) {
+      setRestoreError(err.message || 'Could not restore this machine');
+    } finally {
+      setRestoreBusy(false);
+    }
+  };
+
   const handleSort = (field: string) => {
     if (sortField === field) {
       setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -235,18 +286,24 @@ export function Machines() {
     }
   };
 
+  const machineQuery = useCallback((page: number, limit: number) => {
+    const params: any = { page, limit };
+    if (searchQuery.trim()) params.search = searchQuery.trim();
+    if (customerFilter) params.customerId = customerFilter;
+    if (ownershipFilter === 'archived') {
+      params.dbStatus = 'archived';
+    } else {
+      params.officeArchive = 'exclude';
+      if (ownershipFilter) params.ownershipType = ownershipFilter;
+    }
+    return params;
+  }, [searchQuery, customerFilter, ownershipFilter]);
+
   // Load all machines on mount and when filters change
   const loadMachines = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const params: any = { page, limit: 50 };
-      if (searchQuery.trim()) params.search = searchQuery.trim();
-      if (customerFilter) params.customerId = customerFilter;
-      if (ownershipFilter === 'archived') {
-        params.dbStatus = 'archived';
-      } else if (ownershipFilter) {
-        params.ownershipType = ownershipFilter;
-      }
+      const params = machineQuery(page, 50);
       if (sortField) {
         params.sortField = sortField;
         params.sortDir = sortDir;
@@ -259,7 +316,7 @@ export function Machines() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, customerFilter, ownershipFilter, sortField, sortDir]);
+  }, [machineQuery, sortField, sortDir]);
 
   useEffect(() => {
     const debounce = setTimeout(() => loadMachines(1), 300);
@@ -488,14 +545,7 @@ export function Machines() {
 
   const handleExportCSV = async () => {
     try {
-      const params: any = { page: 1, limit: 99999 };
-      if (searchQuery.trim()) params.search = searchQuery.trim();
-      if (customerFilter) params.customerId = customerFilter;
-      if (ownershipFilter === 'archived') {
-        params.dbStatus = 'archived';
-      } else if (ownershipFilter) {
-        params.ownershipType = ownershipFilter;
-      }
+      const params = machineQuery(1, 99999);
       const response = await getMachines(params);
       const rows = response.machines || [];
 
@@ -568,14 +618,7 @@ export function Machines() {
 
   const handleExportContactReminders = async () => {
     try {
-      const params: any = { page: 1, limit: 99999 };
-      if (searchQuery.trim()) params.search = searchQuery.trim();
-      if (customerFilter) params.customerId = customerFilter;
-      if (ownershipFilter === 'archived') {
-        params.dbStatus = 'archived';
-      } else if (ownershipFilter) {
-        params.ownershipType = ownershipFilter;
-      }
+      const params = machineQuery(1, 99999);
       const response = await getMachines(params);
       const rows = response.machines || [];
       const stamp = new Date().toISOString().split('T')[0];
@@ -1232,6 +1275,9 @@ export function Machines() {
         <div className="mt-3 text-sm text-slate-500">
           {loading ? 'Loading...' : `${pagination.total} machine${pagination.total !== 1 ? 's' : ''} found`}
         </div>
+        {actionMessage && (
+          <p className="mt-2 text-sm font-medium text-green-700">{actionMessage}</p>
+        )}
       </div>
 
       {/* Machines Table */}
@@ -1278,6 +1324,7 @@ export function Machines() {
               const isEditing = editingMachine?._id === machine._id;
               const custType = getCustomerType(machine);
               const isReadOnlyMachine = isRetiredMachine(machine);
+              const officeArchived = isOfficeArchivedMachine(machine);
               const hasCanonicalResolution = hasConfirmedCanonicalResolution(machine);
               const rsrContext = machineRSRContext?.requestedMachineId === machine._id
                 ? machineRSRContext
@@ -1300,7 +1347,12 @@ export function Machines() {
                           {machine.make} {machine.model}
                           {isReadOnlyMachine && (
                             <span className="text-[10px] font-medium text-amber-700 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded-full flex-shrink-0">
-                              Archived
+                              Dedup retired
+                            </span>
+                          )}
+                          {officeArchived && (
+                            <span className="text-[10px] font-medium text-slate-700 bg-slate-100 border border-slate-300 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                              Office archived
                             </span>
                           )}
                         </div>
@@ -1389,7 +1441,7 @@ export function Machines() {
                           <div className="flex items-center gap-2">
                             {!isEditing ? (
                               <>
-                               {!isReadOnlyMachine && (
+                               {!isReadOnlyMachine && !officeArchived && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleEdit(machine); }}
                                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -1398,7 +1450,34 @@ export function Machines() {
                                 Edit
                               </button>
                               )}
-                               {!isReadOnlyMachine && machine.cashCustomer && (
+                               {canManageMachines && !isReadOnlyMachine && !officeArchived && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setArchiveTarget(machine);
+                                    setArchiveReason('');
+                                    setArchiveError(null);
+                                  }}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
+                                >
+                                  Archive
+                                </button>
+                               )}
+                               {canManageMachines && officeArchived && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRestoreTarget(machine);
+                                    setRestoreError(null);
+                                  }}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
+                                >
+                                  Restore
+                                </button>
+                               )}
+                               {!isReadOnlyMachine && !officeArchived && machine.cashCustomer && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1879,8 +1958,32 @@ export function Machines() {
                             </div>
                           )}
 
+                          {officeArchived && (
+                            <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                              <p className="font-medium">This machine is office-archived.</p>
+                              <p className="mt-0.5 text-xs text-slate-600">The same record, customer, ownership and history are kept. Restore returns it to its active category.</p>
+                              {machine.officeArchiveReason && (
+                                <p className="mt-1 text-xs text-slate-600">Reason: {machine.officeArchiveReason}</p>
+                              )}
+                            </div>
+                          )}
+                          {Array.isArray(machine.officeArchiveHistory) && machine.officeArchiveHistory.length > 0 && (
+                            <div className="mb-4">
+                              <div className="text-xs font-bold text-slate-400 uppercase mb-1">Office archive history</div>
+                              <ul className="space-y-1 text-sm text-slate-700">
+                                {machine.officeArchiveHistory.map((event, index) => (
+                                  <li key={`${event.at}-${event.action}-${index}`}>
+                                    {event.action === 'archive' ? 'Archived' : 'Restored'} by {event.actorName || 'Office user'}
+                                    {event.at ? ` on ${new Date(event.at).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' })}` : ''}
+                                    {event.reason ? ` — ${event.reason}` : ''}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
                           {/* QR creation remains available only for active canonical machines. */}
-                          {!isReadOnlyMachine && machine._id && (
+                          {!isReadOnlyMachine && !officeArchived && machine._id && (
                             <div className="mt-4">
                               <MachineQrPanel
                                 machineId={machine._id}
@@ -1908,7 +2011,7 @@ export function Machines() {
                                 <span className="text-xs font-normal text-slate-400">({machineRSRs.length})</span>
                               )}
                             </h4>
-                            {!isReadOnlyMachine && rsrContext && (
+                            {!isReadOnlyMachine && !officeArchived && rsrContext && (
                               <button
                                 type="button"
                                 onClick={(event) => {
@@ -2810,6 +2913,42 @@ export function Machines() {
                   {dedupConfirming ? 'Merging...' : 'Merge Duplicates'}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {archiveTarget && (
+        <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+            <h3 className="text-lg font-bold text-slate-800">Archive {archiveTarget.make} {archiveTarget.model}?</h3>
+            <p className="mt-2 text-sm text-slate-600">The machine stays on this record, with its customer, ownership, jobs and readings. It moves to Archived and stops new reminders and QR submissions.</p>
+            <label className="block mt-4 text-xs font-semibold text-slate-500 uppercase" htmlFor="office-archive-reason">Reason</label>
+            <textarea
+              id="office-archive-reason"
+              value={archiveReason}
+              onChange={(event) => setArchiveReason(event.target.value)}
+              rows={3}
+              className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+            />
+            {archiveError && <p className="mt-2 text-sm text-red-600">{archiveError}</p>}
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" className="rounded-lg border px-4 py-2 text-sm font-bold" onClick={() => setArchiveTarget(null)} disabled={archiveBusy}>Cancel</button>
+              <button type="button" className="rounded-lg bg-[#f7c12b] px-4 py-2 text-sm font-bold disabled:opacity-50" onClick={() => void confirmArchive()} disabled={archiveBusy || !archiveReason.trim()}>Archive</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {restoreTarget && (
+        <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+            <h3 className="text-lg font-bold text-slate-800">Restore {restoreTarget.make} {restoreTarget.model}?</h3>
+            <p className="mt-2 text-sm text-slate-600">The same machine returns to {restoreTarget.ownershipType === 'ars_rental' ? 'ARS Rental Units' : "Customer's Own"}. Archive history is kept.</p>
+            {restoreError && <p className="mt-2 text-sm text-red-600">{restoreError}</p>}
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" className="rounded-lg border px-4 py-2 text-sm font-bold" onClick={() => setRestoreTarget(null)} disabled={restoreBusy}>Cancel</button>
+              <button type="button" className="rounded-lg bg-[#f7c12b] px-4 py-2 text-sm font-bold disabled:opacity-50" onClick={() => void confirmRestore()} disabled={restoreBusy}>Restore</button>
             </div>
           </div>
         </div>

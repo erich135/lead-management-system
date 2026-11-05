@@ -154,6 +154,10 @@ export function MachineScanPage() {
       setSubmitError('Please enter a valid hour-meter reading.');
       return;
     }
+    if (machine?.acceptingReadings === false) {
+      setSubmitError('This machine is archived and is not accepting new readings.');
+      return;
+    }
     if (machine && hoursNum < machine.machineHours) {
       setSubmitError(
         `Reading is lower than the previous reading (${machine.machineHours}). Please re-check.`,
@@ -328,6 +332,12 @@ export function MachineScanPage() {
           </details>
         )}
 
+        {machine.acceptingReadings === false ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            This machine is archived. New meter readings are not being accepted. Earlier readings stay listed above.
+          </div>
+        ) : (
+        <>
         {/* Hours */}
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-1">
@@ -516,6 +526,8 @@ export function MachineScanPage() {
             'Submit reading'
           )}
         </button>
+        </>
+        )}
       </form>
     </Shell>
   );

@@ -1074,8 +1074,20 @@ export interface Machine {
   lastReadingRequestSentAt?: string;
   /** Salesperson-selected Machine Spec Library record for this physical machine. */
   specLibraryRecordId?: string | null;
+  officeArchivedAt?: string | null;
+  officeArchivedBy?: string | null;
+  officeArchiveReason?: string | null;
+  officeArchiveHistory?: MachineOfficeArchiveEvent[];
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface MachineOfficeArchiveEvent {
+  action: 'archive' | 'restore';
+  at: string;
+  by?: string;
+  actorName: string;
+  reason?: string;
 }
 
 export interface ImportableMachineRow {
@@ -1879,6 +1891,7 @@ export async function getMachines(params?: {
   sortDir?: 'asc' | 'desc';
   ownershipType?: 'ars_rental' | 'customer' | '';
   dbStatus?: 'active' | 'archived';
+  officeArchive?: 'exclude';
 }): Promise<{ machines: Machine[]; pagination: any }> {
   const queryParams = new URLSearchParams();
   if (params?.customerId) queryParams.append('customerId', params.customerId);
@@ -1889,6 +1902,7 @@ export async function getMachines(params?: {
   if (params?.sortDir) queryParams.append('sortDir', params.sortDir);
   if (params?.ownershipType) queryParams.append('ownershipType', params.ownershipType);
   if (params?.dbStatus) queryParams.append('dbStatus', params.dbStatus);
+  if (params?.officeArchive) queryParams.append('officeArchive', params.officeArchive);
   
   const query = queryParams.toString();
   const response = await apiRequest<{ machines: Machine[]; pagination: any }>(`/api/machines${query ? `?${query}` : ''}`);
@@ -2021,6 +2035,19 @@ export async function updateMachine(id: string, machineData: Partial<Machine>): 
   return apiRequest(`/api/machines/${id}`, {
     method: 'PUT',
     body: JSON.stringify(machineData),
+  });
+}
+
+export async function archiveMachine(id: string, reason: string): Promise<{ machine: Machine }> {
+  return apiRequest(`/api/machines/${id}/office-archive`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function restoreMachine(id: string): Promise<{ machine: Machine }> {
+  return apiRequest(`/api/machines/${id}/office-restore`, {
+    method: 'POST',
   });
 }
 
@@ -6700,6 +6727,7 @@ export interface PublicMachineForScan {
   nextServiceHours: number;
   serviceType: 'hours' | 'date';
   serviceDue: boolean;
+  acceptingReadings?: boolean;
 }
 
 export type MachineReadingSubmissionStatus = 'pending' | 'approved' | 'rejected';

@@ -4,6 +4,7 @@ import {
   createMachineActionContext,
   hasConfirmedCanonicalResolution,
   isCurrentMachineActionRequest,
+  isOfficeArchivedMachine,
   isRetiredMachine,
 } from './machineActionState.ts';
 
@@ -64,4 +65,18 @@ test('keeps RSR actions bound to their rendered machine instead of a later expan
 test('does not show a canonical banner when the backend did not confirm a different canonical machine', () => {
   assert.equal(hasConfirmedCanonicalResolution(activeMachine), false);
   assert.equal(hasConfirmedCanonicalResolution({ _id: 'retired-without-resolution', dbStatus: 'archived' }), false);
+});
+
+test('treats office archive as separate from a dedup-retired machine', () => {
+  const officeArchived = {
+    _id: 'office-archived',
+    dbStatus: 'active',
+    isActive: true,
+    officeArchivedAt: '2026-11-05T08:00:00.000Z',
+  };
+  assert.equal(isOfficeArchivedMachine(officeArchived), true);
+  assert.equal(isRetiredMachine(officeArchived), false);
+  assert.equal(isOfficeArchivedMachine(retiredMachine), false);
+  assert.equal(isOfficeArchivedMachine({ ...retiredMachine, officeArchivedAt: '2026-11-05T08:00:00.000Z' }), false);
+  assert.equal(isOfficeArchivedMachine(activeMachine), false);
 });

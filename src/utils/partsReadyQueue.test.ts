@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import {
   compareJobNumbers,
+  DEFAULT_PARTS_READY_TAB,
   filterAndSortPartsReady,
+  selectPartsReadyRows,
+  type PartsReadyFilters,
   type PartsReadyQueueItem,
+  type PartsReadyQueueTab,
 } from "./partsReadyQueue.ts";
 
 const items: PartsReadyQueueItem[] = [
@@ -89,5 +93,99 @@ const wrongPair = filterAndSortPartsReady(items, {
   sortDirection: "asc",
 });
 assert.deepEqual(wrongPair.map((item) => item.job.jobNumber), []);
+
+const mixed: PartsReadyQueueItem[] = [
+  {
+    job: {
+      _id: "job-mixed",
+      jobNumber: "J15",
+      createdAt: "2026-10-05T00:00:00.000Z",
+      customer: { name: "Quantum Foods" },
+      branch: { _id: "branch-ct", name: "Cape Town" },
+    },
+    assignments: [
+      { _id: "open-1", status: "assigned", technician: { _id: "tech-1", name: "Abel" } },
+      { _id: "open-2", status: "started", technician: { _id: "tech-2", name: "Nico" } },
+      {
+        _id: "done-1",
+        status: "submitted",
+        technician: { _id: "tech-1", name: "Abel" },
+        submission: { submittedAt: "2026-10-06" },
+      },
+    ],
+  },
+  {
+    job: {
+      _id: "job-open",
+      jobNumber: "J3",
+      createdAt: "2026-10-02T00:00:00.000Z",
+      customer: { name: "Acme Plant" },
+      branch: { _id: "branch-jhb", name: "Johannesburg" },
+    },
+    assignments: [],
+  },
+  {
+    job: {
+      _id: "job-done",
+      jobNumber: "J8",
+      createdAt: "2026-10-04T00:00:00.000Z",
+      customer: { name: "Harbour Mill" },
+      branch: { _id: "branch-ct", name: "Cape Town" },
+    },
+    assignments: [
+      {
+        _id: "done-2",
+        status: "started",
+        technician: { _id: "tech-2", name: "Nico" },
+        submission: { submittedAt: "2026-10-07" },
+      },
+    ],
+  },
+];
+
+function rowIds(items: PartsReadyQueueItem[], tab: PartsReadyQueueTab, filters: Partial<PartsReadyFilters> = {}) {
+  const visible = filterAndSortPartsReady(items, {
+    search: "",
+    branchId: "",
+    technicianId: "",
+    status: "all",
+    sortField: "jobNumber",
+    sortDirection: "asc",
+    ...filters,
+  });
+  return selectPartsReadyRows(visible, tab).map((row) => ({
+    jobNumber: row.item.job.jobNumber,
+    assignmentId: row.assignment?._id ?? "unassigned",
+    submittedAt: row.assignment?.submission?.submittedAt,
+  }));
+}
+
+assert.equal(DEFAULT_PARTS_READY_TAB, "outstanding");
+
+assert.deepEqual(rowIds(mixed, "outstanding"), [
+  { jobNumber: "J3", assignmentId: "unassigned", submittedAt: undefined },
+  { jobNumber: "J15", assignmentId: "open-1", submittedAt: undefined },
+  { jobNumber: "J15", assignmentId: "open-2", submittedAt: undefined },
+]);
+
+assert.deepEqual(rowIds(mixed, "submitted"), [
+  { jobNumber: "J8", assignmentId: "done-2", submittedAt: "2026-10-07" },
+  { jobNumber: "J15", assignmentId: "done-1", submittedAt: "2026-10-06" },
+]);
+
+assert.deepEqual(rowIds(mixed, "outstanding", { search: "quantum", branchId: "branch-ct" }), [
+  { jobNumber: "J15", assignmentId: "open-1", submittedAt: undefined },
+  { jobNumber: "J15", assignmentId: "open-2", submittedAt: undefined },
+]);
+
+assert.deepEqual(rowIds(mixed, "submitted", { search: "quantum", technicianId: "tech-1" }), [
+  { jobNumber: "J15", assignmentId: "done-1", submittedAt: "2026-10-06" },
+]);
+
+assert.deepEqual(
+  rowIds(mixed, "submitted", { branchId: "branch-ct", sortField: "dateAdded", sortDirection: "desc" })
+    .map((row) => row.jobNumber),
+  ["J15", "J8"],
+);
 
 console.log("parts ready queue checks passed");

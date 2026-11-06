@@ -24,9 +24,12 @@ import {
   type Branch,
 } from '../lib/api';
 import {
+  DEFAULT_PARTS_READY_TAB,
   EMPTY_PARTS_READY_FILTERS,
   filterAndSortPartsReady,
+  selectPartsReadyRows,
   type PartsReadyFilters,
+  type PartsReadyQueueTab,
   type PartsReadySortField,
 } from '../utils/partsReadyQueue';
 import { useAuth } from '../contexts/AuthContext';
@@ -69,6 +72,7 @@ export function PartsReadyJobCards() {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [filters, setFilters] = useState<PartsReadyFilters>(EMPTY_PARTS_READY_FILTERS);
+  const [queueTab, setQueueTab] = useState<PartsReadyQueueTab>(DEFAULT_PARTS_READY_TAB);
 
   const canManage = isSuperAdmin || hasPermission('job_card_templates.read');
 
@@ -193,7 +197,7 @@ export function PartsReadyJobCards() {
   };
 
   /**
-   * Flattens jobs into one table row per assignment (or one empty row when none yet).
+   * Search and filters still keep a matching job whole. The tab then keeps each assignment row.
    */
   const visibleItems = useMemo(
     () => filterAndSortPartsReady(items, filters),
@@ -207,22 +211,17 @@ export function PartsReadyJobCards() {
     filters.sortField !== 'dateAdded' ||
     filters.sortDirection !== 'desc';
 
-  const tableRows = visibleItems.flatMap((item) => {
+  const tableRows = selectPartsReadyRows(visibleItems, queueTab).map(({ item, assignment }, index) => {
     const job = item.job as { _id?: string; id?: string };
     const jobId = String(job._id ?? job.id ?? '');
-    const assignments =
-      item.assignments && item.assignments.length > 0
-        ? item.assignments
-        : item.assignment
-          ? [item.assignment]
-          : [null];
-    return assignments.map((assignment, index) => ({
+    return {
       item,
       jobId,
       assignment,
       rowKey: assignment?._id ? `${jobId}-${assignment._id}` : `${jobId}-unassigned-${index}`,
-    }));
+    };
   });
+  const jobsOnTab = new Set(tableRows.map((row) => row.jobId)).size;
 
   if (loading) {
     return (
@@ -333,8 +332,30 @@ export function PartsReadyJobCards() {
           Clear filters
         </button>
         <span className="pb-2 text-xs text-gray-500">
-          {visibleItems.length} of {items.length} jobs
+          {jobsOnTab} of {items.length} jobs
         </span>
+      </div>
+
+      <div className="mb-4 flex gap-2 border-b border-gray-200" role="tablist" aria-label="Parts Ready job cards">
+        {([
+          ['outstanding', 'Outstanding'],
+          ['submitted', 'Submitted'],
+        ] as const).map(([tab, label]) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={queueTab === tab}
+            onClick={() => setQueueTab(tab)}
+            className={`border-b-2 px-4 py-2 text-sm font-medium ${
+              queueTab === tab
+                ? 'border-amber-500 text-amber-800'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {error && (
@@ -343,18 +364,24 @@ export function PartsReadyJobCards() {
         </div>
       )}
 
-      {visibleItems.length === 0 ? (
+      {visibleItems.length === 0 || tableRows.length === 0 ? (
         <div className="rounded-xl border border-gray-200 bg-gray-50 p-12 text-center text-gray-600">
           <ClipboardList className="w-12 h-12 mx-auto mb-3 text-gray-400" />
           <p>
             {items.length === 0
               ? 'No jobs with status "Parts Ready" right now.'
-              : 'No Parts Ready jobs match these filters.'}
+              : tableRows.length === 0 && visibleItems.length > 0
+                ? queueTab === 'outstanding'
+                  ? 'No outstanding job cards on this tab.'
+                  : 'No submitted job cards on this tab.'
+                : 'No Parts Ready jobs match these filters.'}
           </p>
           <p className="text-sm mt-1">
             {items.length === 0
               ? 'When jobs move to Parts Ready, they will appear here.'
-              : 'Clear the filters to see the full list.'}
+              : tableRows.length === 0 && visibleItems.length > 0
+                ? 'The other tab still has the remaining rows for these jobs.'
+                : 'Clear the filters to see the full list.'}
           </p>
         </div>
       ) : (

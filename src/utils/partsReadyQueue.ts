@@ -26,6 +26,9 @@ export interface PartsReadyQueueItem {
 export type PartsReadySortField = "jobNumber" | "customer" | "dateAdded";
 export type PartsReadySortDirection = "asc" | "desc";
 export type PartsReadyStatusFilter = "all" | "unassigned" | "assigned" | "started" | "submitted";
+export type PartsReadyQueueTab = "outstanding" | "submitted";
+
+export const DEFAULT_PARTS_READY_TAB: PartsReadyQueueTab = "outstanding";
 
 export interface PartsReadyFilters {
   search: string;
@@ -45,9 +48,11 @@ export const EMPTY_PARTS_READY_FILTERS: PartsReadyFilters = {
   sortDirection: "desc",
 };
 
-function assignmentsOf(item: PartsReadyQueueItem): PartsReadyQueueAssignment[] {
+function assignmentsOf<T extends PartsReadyQueueItem>(
+  item: T,
+): Array<NonNullable<T["assignments"]>[number]> {
   if (item.assignments && item.assignments.length > 0) return item.assignments;
-  if (item.assignment) return [item.assignment];
+  if (item.assignment) return [item.assignment as NonNullable<T["assignments"]>[number]];
   return [];
 }
 
@@ -109,6 +114,40 @@ function assignmentMatchesStatus(
   if (status === "unassigned") return !assignment;
   if (assignment?.submission || assignment?.status === "submitted") return status === "submitted";
   return assignment?.status === status;
+}
+
+/**
+ * A submitted row has a linked submission or the assignment status submitted.
+ * An unassigned job has no assignment and stays on Outstanding.
+ */
+export function partsReadyAssignmentIsSubmitted(
+  assignment: PartsReadyQueueAssignment | null | undefined,
+): boolean {
+  return Boolean(assignment?.submission) || assignment?.status === "submitted";
+}
+
+export function partsReadyAssignmentMatchesTab(
+  assignment: PartsReadyQueueAssignment | null | undefined,
+  tab: PartsReadyQueueTab,
+): boolean {
+  const submitted = partsReadyAssignmentIsSubmitted(assignment);
+  return tab === "submitted" ? submitted : !submitted;
+}
+
+/**
+ * Keeps one row per assignment. A mixed job contributes each row to its own tab.
+ */
+export function selectPartsReadyRows<T extends PartsReadyQueueItem>(
+  items: T[],
+  tab: PartsReadyQueueTab,
+): Array<{ item: T; assignment: NonNullable<T["assignments"]>[number] | null }> {
+  return items.flatMap((item) => {
+    const forms = assignmentsOf(item);
+    const rows: Array<NonNullable<T["assignments"]>[number] | null> = forms.length > 0 ? forms : [null];
+    return rows
+      .filter((assignment) => partsReadyAssignmentMatchesTab(assignment, tab))
+      .map((assignment) => ({ item, assignment }));
+  });
 }
 
 /**

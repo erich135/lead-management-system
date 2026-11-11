@@ -2,7 +2,7 @@
  * System Management component for super admin.
  * Provides user management, role/permission assignment, and import functionality.
  */
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { ARS_APP_BUILD } from '../pwa/appBuild';
 import { BranchPermissionsSection } from './BranchPermissionsSection';
 import { 
@@ -80,15 +80,16 @@ import {
   getReadingEscalationAdminCodes,
   getReadingEscalationGaps,
   assignReadingEscalationAdminCode,
-  exportCustomerAdminCodes,
+  exportCustomerMaster,
+  previewCustomerMaster,
+  applyCustomerMaster,
+  type CustomerMasterApplyResult,
+  type CustomerMasterPreview,
   type ReadingEscalationAdminCodeOption,
-  type ReadingAdminExportFilter,
 } from '../lib/api';
-import { ReadingEscalationAdminImport } from './ReadingEscalationAdminImport';
+import { CustomerMasterPreviewPanel } from './CustomerMasterPreviewPanel';
 import {
-  DEFAULT_READING_ADMIN_EXPORT_FILTER,
   READING_ADMIN_CLEAR,
-  READING_ADMIN_EXPORT_FILTERS,
   assignedAdminCodeId,
   customerUpdatePayload,
   readingEscalationAdminCodeLabel,
@@ -235,10 +236,13 @@ export function SystemManagement() {
   const [readingAdminCodes, setReadingAdminCodes] = useState<ReadingEscalationAdminCodeOption[]>([]);
   const [readingAdminGaps, setReadingAdminGaps] = useState<Array<{ customerId: string; customerName: string; reason: string }>>([]);
   const [readingAdminDraft, setReadingAdminDraft] = useState('');
-  const [readingAdminExportFilter, setReadingAdminExportFilter] = useState<ReadingAdminExportFilter>(DEFAULT_READING_ADMIN_EXPORT_FILTER);
-  const [exportingReadingAdmins, setExportingReadingAdmins] = useState(false);
-  const [showReadingAdminImport, setShowReadingAdminImport] = useState(false);
-  
+  const [exportingCustomerMaster, setExportingCustomerMaster] = useState(false);
+  const [previewingCustomerMaster, setPreviewingCustomerMaster] = useState(false);
+  const [applyingCustomerMaster, setApplyingCustomerMaster] = useState(false);
+  const [customerMasterPreview, setCustomerMasterPreview] = useState<CustomerMasterPreview | null>(null);
+  const [customerMasterFile, setCustomerMasterFile] = useState<File | null>(null);
+  const [customerMasterApplyResult, setCustomerMasterApplyResult] = useState<CustomerMasterApplyResult | null>(null);
+  const customerMasterFileRef = useRef<HTMLInputElement>(null);
   // Invite user state
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [inviteFormData, setInviteFormData] = useState({
@@ -4822,40 +4826,86 @@ alert((response as any).message || 'User invited successfully');
                   </div>
 
                   {isSuperAdmin && (
-                    <div className="flex flex-wrap items-center gap-3 mb-4">
-                      <select
-                        value={readingAdminExportFilter}
-                        onChange={e => setReadingAdminExportFilter(e.target.value as ReadingAdminExportFilter)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-                      >
-                        {READING_ADMIN_EXPORT_FILTERS.map(option => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
-                      <button
-                        disabled={exportingReadingAdmins}
-                        onClick={async () => {
-                          setExportingReadingAdmins(true);
-                          try {
-                            await exportCustomerAdminCodes(readingAdminExportFilter, 'xlsx');
-                          } catch (err: any) {
-                            alert(err.message || 'Failed to export Customer Admin Codes');
-                          } finally {
-                            setExportingReadingAdmins(false);
-                          }
-                        }}
-                        className="px-3 py-2 border border-indigo-300 text-indigo-700 rounded-[8px] font-bold text-[13px] hover:bg-indigo-50 transition-colors flex items-center gap-2 disabled:opacity-50"
-                      >
-                        <Download className="w-4 h-4" />
-                        {exportingReadingAdmins ? 'EXPORTING...' : 'Export Customer Admin Codes'}
-                      </button>
-                      <button
-                        onClick={() => setShowReadingAdminImport(true)}
-                        className="px-3 py-2 border border-indigo-300 text-indigo-700 rounded-[8px] font-bold text-[13px] hover:bg-indigo-50 transition-colors flex items-center gap-2"
-                      >
-                        <Upload className="w-4 h-4" />
-                        Import Customer Admin Codes
-                      </button>
+                    <div className="mb-4">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          disabled={exportingCustomerMaster}
+                          onClick={async () => {
+                            setExportingCustomerMaster(true);
+                            try {
+                              await exportCustomerMaster();
+                            } catch (err: any) {
+                              alert(err.message || 'Failed to export Customer Master');
+                            } finally {
+                              setExportingCustomerMaster(false);
+                            }
+                          }}
+                          className="px-3 py-2 border border-[#0969a9] text-[#0969a9] rounded-[8px] font-bold text-[13px] hover:bg-blue-50 transition-colors flex items-center gap-2 disabled:opacity-50"
+                        >
+                          <Download className="w-4 h-4" />
+                          {exportingCustomerMaster ? 'EXPORTING...' : 'Export Customer Master'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={previewingCustomerMaster}
+                          onClick={() => customerMasterFileRef.current?.click()}
+                          className="px-3 py-2 border border-[#0969a9] text-[#0969a9] rounded-[8px] font-bold text-[13px] hover:bg-blue-50 transition-colors flex items-center gap-2 disabled:opacity-50"
+                        >
+                          <Upload className="w-4 h-4" />
+                          {previewingCustomerMaster ? 'CHECKING...' : 'Import Customer Master'}
+                        </button>
+                        <input
+                          ref={customerMasterFileRef}
+                          type="file"
+                          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                          className="hidden"
+                          onChange={async (event) => {
+                            const file = event.target.files?.[0];
+                            event.target.value = '';
+                            if (!file) return;
+                            setPreviewingCustomerMaster(true);
+                            setCustomerMasterApplyResult(null);
+                            try {
+                              setCustomerMasterFile(file);
+                              setCustomerMasterPreview(await previewCustomerMaster(file));
+                            } catch (err: any) {
+                              alert(err.message || 'Failed to preview Customer Master');
+                            } finally {
+                              setPreviewingCustomerMaster(false);
+                            }
+                          }}
+                        />
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">Exports every Active and Archived customer. Import previews the workbook. Customer records change only after you confirm the preview.</p>
+                      {customerMasterPreview && (
+                        <CustomerMasterPreviewPanel
+                          preview={customerMasterPreview}
+                          applying={applyingCustomerMaster}
+                          applyResult={customerMasterApplyResult}
+                          onApply={async () => {
+                            if (!customerMasterFile || !customerMasterPreview) {
+                              throw new Error('Preview the workbook again before applying it');
+                            }
+                            setApplyingCustomerMaster(true);
+                            try {
+                              const result = await applyCustomerMaster(customerMasterFile, customerMasterPreview);
+                              setCustomerMasterApplyResult(result);
+                              if (result.recordsChanged > 0) {
+                                const customersResponse = await getCustomers({ limit: 10000 });
+                                setCustomers(customersResponse.customers || []);
+                              }
+                            } finally {
+                              setApplyingCustomerMaster(false);
+                            }
+                          }}
+                          onClose={() => {
+                            setCustomerMasterPreview(null);
+                            setCustomerMasterFile(null);
+                            setCustomerMasterApplyResult(null);
+                          }}
+                        />
+                      )}
                     </div>
                   )}
 
@@ -5090,7 +5140,7 @@ alert((response as any).message || 'User invited successfully');
                             </button>
                             <button
                               onClick={async () => {
-                                if (!confirm(`Archive "${c.name}"?\n\nThis will hide the customer from all lists. You can restore it later from \'Show Archived\'.`)) return;
+                                if (!confirm(`Archive "${c.name}"?\n\nThe customer record and its ID stay in place. New jobs, machines and delivery notes cannot select it. Existing records keep this customer. You can restore it later from Show Archived.`)) return;
                                 try {
                                   await updateCustomer(c._id, { isActive: false });
                                   setCustomers(prev => prev.filter(x => x._id !== c._id));
@@ -5179,15 +5229,6 @@ alert((response as any).message || 'User invited successfully');
           </div>
         )}
       </div>
-
-      {showReadingAdminImport && isSuperAdmin && (
-        <ReadingEscalationAdminImport
-          onClose={() => setShowReadingAdminImport(false)}
-          onImportComplete={() => {
-            void loadReferenceData();
-          }}
-        />
-      )}
 
       {/* Invite User Modal */}
       {showInviteForm && (

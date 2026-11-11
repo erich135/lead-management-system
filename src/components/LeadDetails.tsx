@@ -639,12 +639,19 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
       return;
     }
 
-    const selectedCustomer = customers.find(c => c._id === customerId);
+    const currentId = job.customer && typeof job.customer === 'object' ? job.customer._id : '';
+    if (customerId === currentId) return;
+
+    const retained = originalJobBeforeEdit?.customer && typeof originalJobBeforeEdit.customer === 'object'
+      ? originalJobBeforeEdit.customer
+      : null;
+    const selectedCustomer = customers.find(c => c._id === customerId)
+      || (retained && retained._id === customerId ? retained : undefined);
     if (!selectedCustomer) return;
 
     setJob({ 
       ...job, 
-      customer: { _id: selectedCustomer._id, name: selectedCustomer.name },
+      customer: { _id: selectedCustomer._id, name: selectedCustomer.name, isActive: selectedCustomer.isActive },
       cashCustomer: undefined, // Clear cash customer when selecting regular customer
       machines: [] // Reset machines when customer changes
     });
@@ -1491,6 +1498,18 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                       style={{ fontSize: '15px' }} className="w-full px-4 py-3 border border-gray-300 rounded-[8px] focus:ring-2 focus:ring-ars-primary focus:border-transparent"
                     >
                       <option value="">Select Customer</option>
+                      {(() => {
+                        const retained = originalJobBeforeEdit?.customer && typeof originalJobBeforeEdit.customer === 'object'
+                          ? originalJobBeforeEdit.customer
+                          : null;
+                        if (!retained || customers.some((customer) => customer._id === retained._id)) return null;
+                        const archived = retained.isActive === false || customers.length > 0;
+                        return (
+                          <option value={retained._id}>
+                            {retained.name}{archived ? ' (Archived)' : ''}
+                          </option>
+                        );
+                      })()}
                       {customers && customers.length > 0 ? (
                         customers.map((customer) => (
                           <option key={customer._id} value={customer._id}>
@@ -1503,7 +1522,7 @@ export function LeadDetails({ lead: initialLead, statuses, branches, adminCodes 
                     </select>
                   ) : (
                     <div className="px-4 py-3 bg-gray-50 rounded-[8px]">
-                      <span className="text-ars-heading text-[15px]">{job.customer?.name || '-'}</span>
+                      <span className="text-ars-heading text-[15px]">{job.customer?.name || '-'}{job.customer?.isActive === false ? ' (Archived)' : ''}</span>
                     </div>
                   )}
                 </div>

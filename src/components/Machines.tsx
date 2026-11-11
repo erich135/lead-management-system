@@ -1650,6 +1650,19 @@ export function Machines() {
                                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                                 >
                                   <option value="">— No linked customer —</option>
+                                  {(() => {
+                                    const linked = editingMachine?.customer && typeof editingMachine.customer === 'object'
+                                      ? editingMachine.customer
+                                      : null;
+                                    const linkedId = linked?._id || (typeof editingMachine?.customer === 'string' ? editingMachine.customer : '');
+                                    if (!linkedId || customers.some((customer) => customer._id === linkedId)) return null;
+                                    const linkedName = linked?.name || 'Current customer';
+                                    return (
+                                      <option value={linkedId}>
+                                        {linkedName}{customers.length > 0 ? ' (Archived)' : ''}
+                                      </option>
+                                    );
+                                  })()}
                                   {customers.map(c => (
                                     <option key={c._id} value={c._id}>{c.name}</option>
                                   ))}

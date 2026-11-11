@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { archiveDeliveryNote, restoreDeliveryNote, listDeliveryNotes, openDeliveryNotePrint, getDeliveryNote, saveDeliveryDraft, assignDeliveryNote, getCustomers, getJobs, getTechnicians, getBranches, type DeliveryNoteListItem } from '../lib/api';
+import { archiveDeliveryNote, restoreDeliveryNote, listDeliveryNotes, openDeliveryNotePrint, getDeliveryNote, saveDeliveryDraft, assignDeliveryNote, getCustomers, getCustomerSelectionStatus, searchDeliveryCustomerJobs, getTechnicians, getBranches, type DeliveryNoteListItem } from '../lib/api';
 import {DeliveryLookup, type DeliveryLookupOption} from './DeliveryLookup';
 const findDeliveryCustomers = async (search:string):Promise<DeliveryLookupOption[]> => (await getCustomers({search,limit:50})).customers.map(c=>({id:c._id,label:c.name}));
 type Part = {
@@ -36,8 +36,8 @@ export function DeliveryNotes({ archived = false, management = false }: {
     const [notes, setNotes] = useState<DeliveryNoteListItem[]>([]), [page, setPage] = useState(1), [total, setTotal] = useState(0), [search, setSearch] = useState(''), [outcome, setOutcome] = useState('');
     const [message, setMessage] = useState(''), [draft, setDraft] = useState<Draft | null>(null), [busy, setBusy] = useState(false);
     const lock = useRef(false);
-    const [customerSearch,setCustomerSearch]=useState(''),[jobSearch,setJobSearch]=useState('');
-    const findDeliveryJobs=useCallback(async(search:string):Promise<DeliveryLookupOption[]>=>{if(!draft?.customerId)return [];return (await getJobs({customer:draft.customerId,customerMatch:'exact',search,allTime:'true',limit:100})).jobs.map(j=>({id:j._id,label:j.jobNumber,branchId:typeof j.branch==='object'?j.branch?._id:undefined}));},[draft?.customerId]);
+    const [customerSearch,setCustomerSearch]=useState(''),[jobSearch,setJobSearch]=useState(''),[customerArchived,setCustomerArchived]=useState(false);
+    const findDeliveryJobs=useCallback(async(search:string):Promise<DeliveryLookupOption[]>=>{if(!draft?.customerId)return [];return (await searchDeliveryCustomerJobs(draft.customerId,search)).jobs.map(j=>({id:j._id,label:j.statusName?`${j.jobNumber} — ${j.statusName}`:j.jobNumber}));},[draft?.customerId]);
     const [techs, setTechs] = useState<Array<{
         _id: string;
         name: string;
@@ -103,15 +103,35 @@ export function DeliveryNotes({ archived = false, management = false }: {
             await load();
         });
     }
-    async function edit(id: string) { await run(async () => { const n = (await getDeliveryNote(id)).deliveryNote; setCustomerSearch(n.customerName||'');setJobSearch(n.jobNumber||'');setDraft({ id: n._id, revision: n.revision || 0, clientDraftId: 'existing-draft', customerId: n.customer || '', customerName: n.customerName, jobId: n.job || '', branchId: n.branch || '', technicianId: typeof n.assignedTechnician === 'string' ? n.assignedTechnician : n.assignedTechnician?._id || '', instructions: n.comments || '', items: (n.items || []).map(p => ({ ...p, partNumber: p.partNumber || '', unit: p.unit || '', expectedQuantity: String(p.expectedQuantity || '') })) }); }); }
+    async function edit(id: string) {
+        await run(async () => {
+            const n = (await getDeliveryNote(id)).deliveryNote;
+            const customerId = n.customer || '';
+            let archived = false;
+            let searchName = n.customerName || '';
+            if (customerId) {
+                try {
+                    const status = await getCustomerSelectionStatus(customerId);
+                    archived = status.selectable === false;
+                    if (archived) searchName = `${n.customerName || status.name} (Archived)`;
+                } catch {
+                    archived = false;
+                }
+            }
+            setCustomerArchived(archived);
+            setCustomerSearch(searchName);
+            setJobSearch(n.jobNumber || '');
+            setDraft({ id: n._id, revision: n.revision || 0, clientDraftId: 'existing-draft', customerId, customerName: n.customerName, jobId: n.job || '', branchId: n.branch || '', technicianId: typeof n.assignedTechnician === 'string' ? n.assignedTechnician : n.assignedTechnician?._id || '', instructions: n.comments || '', items: (n.items || []).map(p => ({ ...p, partNumber: p.partNumber || '', unit: p.unit || '', expectedQuantity: String(p.expectedQuantity || '') })) });
+        });
+    }
     return <section className="bg-white rounded-lg shadow p-6">
- <div className="flex justify-between"><h1 className="text-2xl font-bold">Delivery Notes</h1>{management && canPrepare && !draft && <button className="bg-[#0969a9] text-white rounded-lg px-4 py-2" onClick={() => {setCustomerSearch('');setJobSearch('');setDraft(blank());}}>Create Delivery Note</button>}</div>
+ <div className="flex justify-between"><h1 className="text-2xl font-bold">Delivery Notes</h1>{management && canPrepare && !draft && <button className="bg-[#0969a9] text-white rounded-lg px-4 py-2" onClick={() => {setCustomerSearch('');setJobSearch('');setCustomerArchived(false);setDraft(blank());}}>Create Delivery Note</button>}</div>
  {message && <p role="status" className="my-3 p-3 bg-blue-50">{message}</p>}
  {management && <div className="flex gap-4 my-4">{['outstanding', 'completed', 'archived'].map(t => <button key={t} className={tab === t ? 'font-bold text-[#0969a9]' : 'text-slate-600'} onClick={() => { setTab(t); setPage(1); }}>{t === 'outstanding' ? 'Active / outstanding' : t === 'completed' ? 'Completed' : 'Archived'}</button>)}</div>}
  {draft && <div className="my-4 border rounded-xl p-4 space-y-4"><fieldset disabled={busy}><h2 className="text-lg font-bold">{draft.id ? 'Edit delivery draft' : 'Create Delivery Note'}</h2>
- <div>Customer (required)<DeliveryLookup label="Customer search" value={customerSearch} selected={!!draft.customerId} search={findDeliveryCustomers} onChange={value=>{setCustomerSearch(value);setJobSearch('');patch({customerId:'',customerName:'',jobId:''});}} onSelect={c=>{setCustomerSearch(c.label);setJobSearch('');patch({customerId:c.id,customerName:c.label,jobId:''});}}/></div>
+ <div>Customer (required)<DeliveryLookup label="Customer search" value={customerSearch} selected={!!draft.customerId} search={findDeliveryCustomers} onChange={value=>{setCustomerSearch(value);if(!value.trim()){setCustomerArchived(false);setJobSearch('');patch({customerId:'',customerName:'',jobId:''});return;}if(customerArchived&&draft.customerId)return;setJobSearch('');patch({customerId:'',customerName:'',jobId:''});}} onSelect={c=>{setCustomerArchived(false);setCustomerSearch(c.label);setJobSearch('');patch({customerId:c.id,customerName:c.label,jobId:''});}}/>{customerArchived&&<p className="text-sm text-slate-600">Archived. This note keeps its original customer.</p>}</div>
  <label className="block">Branch<select aria-label="Branch" className={input} value={draft.branchId} onChange={e => patch({ branchId: e.target.value })}><option value="">Choose branch</option>{branches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}</select></label>
- <div>Job Number (optional)<DeliveryLookup key={draft.customerId} label="Job search" value={jobSearch} selected={!!draft.jobId} disabled={!draft.customerId} search={findDeliveryJobs} onChange={value=>{setJobSearch(value);patch({jobId:''});}} onSelect={j=>{setJobSearch(j.label);patch({jobId:j.id,branchId:j.branchId||draft.branchId});}}/>{draft.jobId&&<button type="button" onClick={()=>{setJobSearch('');patch({jobId:''});}}>Clear linked job</button>}</div>
+ <div>Job Number (optional)<DeliveryLookup key={draft.customerId} label="Job search" value={jobSearch} selected={!!draft.jobId} disabled={!draft.customerId} search={findDeliveryJobs} onChange={value=>{setJobSearch(value);patch({jobId:''});}} onSelect={j=>{setJobSearch(j.label);patch({jobId:j.id});}}/>{draft.jobId&&<button type="button" onClick={()=>{setJobSearch('');patch({jobId:''});}}>Clear linked job</button>}</div>
  <h3 className="font-bold">Parts to deliver ({draft.items.length})</h3><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr><th>Description *</th><th>Part number</th><th>Expected quantity *</th><th>Unit</th><th>Draft row actions</th></tr></thead><tbody>{draft.items.map((p, i) => <tr key={p.itemId}>{(['description', 'partNumber', 'expectedQuantity', 'unit'] as const).map(k => <td key={k}><input aria-label={`${k} ${i + 1}`} className={input} type={k === 'expectedQuantity' ? 'number' : 'text'} min={k === 'expectedQuantity' ? '0' : undefined} step="any" value={p[k]} onChange={e => patch({ items: draft.items.map(q => q.itemId === p.itemId ? { ...q, [k]: e.target.value } : q) })}/></td>)}<td className="whitespace-nowrap"><button aria-label={`Move part ${i + 1} up`} disabled={i === 0} onClick={() => { const a = [...draft.items]; [a[i - 1], a[i]] = [a[i], a[i - 1]]; patch({ items: a }); }}>Up</button> <button aria-label={`Move part ${i + 1} down`} disabled={i === draft.items.length - 1} onClick={() => { const a = [...draft.items]; [a[i], a[i + 1]] = [a[i + 1], a[i]]; patch({ items: a }); }}>Down</button> <button type="button" aria-label={`Remove part ${i + 1}`} onClick={() => patch({ items: draft.items.filter(q => q.itemId !== p.itemId) })}>Remove</button></td></tr>)}</tbody></table></div><button className="font-bold text-[#0969a9]" onClick={() => patch({ items: [...draft.items, part()] })}>Add Part</button>
  <label className="block">Technician<select aria-label="Technician" className={input} value={draft.technicianId} onChange={e => patch({ technicianId: e.target.value })}><option value="">Choose technician before assignment</option>{techs.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}</select></label>
  <label className="block">Delivery instructions<textarea aria-label="Delivery instructions" className={input} value={draft.instructions} onChange={e => patch({ instructions: e.target.value })}/></label>

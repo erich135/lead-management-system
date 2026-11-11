@@ -458,6 +458,7 @@ export interface Job {
   customer?: {
     _id: string;
     name: string;
+    isActive?: boolean;
   };
   cashCustomer?: string;
   notes?: string;
@@ -850,6 +851,7 @@ export interface Customer {
   address?: string;
   phone?: string;
   email?: string;
+  isActive?: boolean;
   readingEscalationAdminCodeId?: string | ReadingEscalationAdminCodeRef | null;
 }
 
@@ -1276,6 +1278,10 @@ export async function deleteStatus(id: string): Promise<void> {
 /**
  * Gets all customers.
  */
+export async function getCustomerSelectionStatus(id: string): Promise<{ name: string; selectable: boolean }> {
+  return apiRequest(`/api/reference/customers/${encodeURIComponent(id)}/selection`);
+}
+
 export async function getCustomers(params?: { search?: string; page?: number; limit?: number; includeArchived?: boolean }): Promise<{ customers: Customer[]; pagination: any }> {
   const queryParams = new URLSearchParams();
   if (params?.search) queryParams.append('search', params.search);
@@ -1324,6 +1330,141 @@ export async function assignReadingEscalationAdminCode(
     method: 'PUT',
     body: JSON.stringify({ adminCodeId }),
   });
+}
+
+export async function exportCustomerMaster(): Promise<void> {
+  const token = getAuthToken();
+  if (!token) throw new Error('No authentication token found');
+  const response = await fetch(`${apiBase()}/api/customer-master/export`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Export failed' } }));
+    throw new Error(error.error?.message || 'Export failed');
+  }
+  const blob = await response.blob();
+  const disposition = response.headers.get('content-disposition') || '';
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Johannesburg' }).format(new Date());
+  const filename = disposition.match(/filename="([^"]+)"/)?.[1] || `customer-master-${today}.xlsx`;
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}
+
+export interface CustomerMasterPreviewChange {
+  field: string;
+  label: string;
+  before: string;
+  after: string;
+}
+
+export interface CustomerMasterArchiveImpact {
+  customerId: string;
+  customerName: string;
+  currentStatus: 'Active' | 'Archive';
+  proposedStatus: 'Archive';
+  linkedJobs: number;
+  linkedMachines: number;
+  openDeliveryNotes: number;
+  inspections: number;
+  activeReadingReminders: number;
+  salesProposals: number;
+  bouwaDrafts: number;
+  blocked: boolean;
+  blockReasons: string[];
+}
+
+export type CustomerMasterPreviewOutcome = 'unchanged' | 'proposed' | 'invalid' | 'conflict' | 'blocked';
+
+export interface CustomerMasterPreviewRow {
+  rowNumber: number;
+  customerId: string | null;
+  customerName: string;
+  outcome: CustomerMasterPreviewOutcome;
+  messages: string[];
+  changes: CustomerMasterPreviewChange[];
+  currentStatus: 'Active' | 'Archive' | null;
+  proposedStatus: 'Active' | 'Archive' | null;
+  archiveImpact: CustomerMasterArchiveImpact | null;
+}
+
+export interface CustomerMasterPreview {
+  previewOnly: true;
+  applyAvailable: boolean;
+  recordsToChange: number;
+  workbookSha256: string;
+  planFingerprint: string;
+  summary: {
+    totalRows: number;
+    unchanged: number;
+    detailCorrections: number;
+    adminCodeChanges: number;
+    proposedArchives: number;
+    proposedRestores: number;
+    missingCustomerIds: number;
+    invalidRows: number;
+    conflicts: number;
+    blocked: number;
+  };
+  rows: CustomerMasterPreviewRow[];
+  missingCustomers: Array<{
+    customerId: string;
+    customerName: string;
+    customerStatus: 'Active' | 'Archive';
+    message: string;
+  }>;
+}
+
+export async function previewCustomerMaster(file: File): Promise<CustomerMasterPreview> {
+  const token = getAuthToken();
+  if (!token) throw new Error('No authentication token found');
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await fetch(`${apiBase()}/api/customer-master/preview`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: { message: 'Customer Master preview failed' } }));
+    throw new Error(error.error?.message || 'Customer Master preview failed');
+  }
+  const body = await response.json();
+  return body.data;
+}
+
+export interface CustomerMasterApplyResult {
+  recordsChanged: number;
+  alreadyApplied: boolean;
+  approvalId: string | null;
+  mode: 'transaction' | 'ordered' | 'none';
+  appliedCustomerIds: string[];
+  preview: CustomerMasterPreview;
+}
+
+export async function applyCustomerMaster(file: File, preview: CustomerMasterPreview): Promise<CustomerMasterApplyResult> {
+  const token = getAuthToken();
+  if (!token) throw new Error('No authentication token found');
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('confirm', 'APPROVE AND APPLY');
+  formData.append('workbookSha256', preview.workbookSha256);
+  formData.append('planFingerprint', preview.planFingerprint);
+  const response = await fetch(`${apiBase()}/api/customer-master/apply`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  const body = await response.json().catch(() => ({ error: { message: 'Customer Master apply failed' } }));
+  if (!response.ok) {
+    throw new Error(body.error?.message || 'Customer Master apply failed');
+  }
+  return body.data;
 }
 
 export async function exportCustomerAdminCodes(
@@ -4498,6 +4639,10 @@ export interface DeliveryNoteListItem {
   deliveryOutcome?: 'full' | 'partial';
   comments?: string;
   items?: Array<{ itemId: string; description: string; partNumber?: string; unit?: string; expectedQuantity: number; quantity?: number; reason?: string }>;
+}
+export async function searchDeliveryCustomerJobs(customerId: string, search: string): Promise<{ jobs: Array<{ _id: string; jobNumber: string; statusName: string }> }> {
+  const query = new URLSearchParams({ customerId, search });
+  return apiRequest(`/api/delivery-notes/customer-jobs?${query.toString()}`);
 }
 export async function getDeliveryNote(id: string): Promise<{deliveryNote:DeliveryNoteListItem}> { return apiRequest(`/api/delivery-notes/${id}`); }
 export async function saveDeliveryDraft(id: string | undefined, body: Record<string, unknown>): Promise<{deliveryNote:DeliveryNoteListItem}> {return apiRequest(id?`/api/delivery-notes/${id}/draft`:'/api/delivery-notes/drafts',{method:id?'PUT':'POST',body:JSON.stringify(body)});}

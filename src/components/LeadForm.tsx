@@ -1,5 +1,5 @@
 import { useState, FormEvent, useEffect, useRef } from 'react';
-import { createJob, getJobs, getStatuses, getBranches, getCustomers, createCustomer, getTechnicians, getServiceDescriptions, getJobSources, getRepCodes, getAdminCodes, getMachinesByCustomer, getRentalMachines, createMachine, getMachineTypes, resolveCanonicalMachineSelections, claimInspectionFollowUp, confirmInspectionFollowUp, releaseInspectionFollowUp, type Status, type Branch, type Customer, type Technician, type ServiceDescription, type JobSource, type RepCode, type AdminCode, type Machine, type MachineType, type Job } from '../lib/api';
+import { createJob, getJobs, getStatuses, getBranches, getCustomers, getTechnicians, getServiceDescriptions, getJobSources, getRepCodes, getAdminCodes, getMachinesByCustomer, getRentalMachines, createMachine, getMachineTypes, resolveCanonicalMachineSelections, claimInspectionFollowUp, confirmInspectionFollowUp, releaseInspectionFollowUp, type Status, type Branch, type Customer, type Technician, type ServiceDescription, type JobSource, type RepCode, type AdminCode, type Machine, type MachineType, type Job } from '../lib/api';
 import { X, Plus, Wrench } from 'lucide-react';
 import { HelpIcon } from './ui';
 import { helpContent } from '../config/helpContent';
@@ -62,9 +62,6 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated, i
   // Customer search states
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
-  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
-  const [showCustomerConfirmation, setShowCustomerConfirmation] = useState(false);
-  const [pendingCustomerName, setPendingCustomerName] = useState('');
   const customerDropdownRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState<{
@@ -371,63 +368,12 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated, i
     }, 100);
   }
 
-  /**
-   * Handles creating a new customer on the fly.
-   */
-  async function handleCreateCustomer() {
-    if (!customerSearchTerm || customerSearchTerm.length < 2) {
-      setError('Please enter a customer name (at least 2 characters)');
-      return;
-    }
-
-    // Show confirmation dialog first
-    setPendingCustomerName(customerSearchTerm.trim());
-    setShowCustomerConfirmation(true);
-    setShowCustomerDropdown(false);
-  }
-
-  /**
-   * Actually creates the customer after confirmation.
-   */
-  async function confirmCreateCustomer() {
-    try {
-      setIsCreatingCustomer(true);
-      setShowCustomerConfirmation(false);
-      setError('');
-      const response = await createCustomer(pendingCustomerName);
-      const newCustomer = response.customer;
-      
-      // Select the newly created customer
-      handleCustomerSelect(newCustomer);
-      setIsCreatingCustomer(false);
-      setPendingCustomerName('');
-    } catch (err: any) {
-      console.error('Error creating customer:', err);
-      setError(err.message || 'Failed to create customer');
-      setIsCreatingCustomer(false);
-    }
-  }
-
-  /**
-   * Cancels customer creation.
-   */
-  function cancelCreateCustomer() {
-    setShowCustomerConfirmation(false);
-    setPendingCustomerName('');
-    setShowCustomerDropdown(true);
-  }
-
   // Filter customers based on search term
   const filteredCustomers = customerSearchTerm.length > 0
     ? allCustomers.filter(c => 
         c.name.toLowerCase().includes(customerSearchTerm.toLowerCase())
       ).slice(0, 50) // Limit to 50 results for performance
     : allCustomers.slice(0, 50);
-
-  // Check if exact match exists (for showing "Create" button)
-  const exactMatchExists = allCustomers.some(
-    c => c.name.toLowerCase() === customerSearchTerm.toLowerCase().trim()
-  );
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -679,46 +625,6 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated, i
         </div>
       )}
 
-      {showCustomerConfirmation && (
-        <div className="fixed inset-0 flex items-center justify-center p-4 z-[100] bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-4xl">⚠️</span>
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-3">
-                Confirm New Customer
-              </h3>
-              <p className="text-slate-600 mb-2">
-                Are you sure you want to create:
-              </p>
-              <p className="text-2xl font-bold text-[#0969a9] mb-4 px-4 py-3 bg-blue-50 rounded-lg break-words">
-                "{pendingCustomerName}"
-              </p>
-              <p className="text-sm text-slate-500">
-                This will add a new customer to the system.
-              </p>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={cancelCreateCustomer}
-                disabled={isCreatingCustomer}
-                className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-bold text-[14px] hover:bg-gray-200 transition-all uppercase disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmCreateCustomer}
-                disabled={isCreatingCustomer}
-                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] text-white rounded-lg font-bold text-[14px] hover:shadow-lg transition-all uppercase disabled:opacity-50"
-              >
-                {isCreatingCustomer ? 'Creating...' : 'Yes, Create'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 backdrop-blur-sm md:items-center md:p-4">
         <div className="max-h-[92dvh] w-full max-w-4xl overflow-y-auto rounded-t-2xl bg-white shadow-2xl md:max-h-[90vh] md:rounded-2xl">
           <div className="sticky top-0 flex items-center justify-between rounded-t-2xl bg-gradient-to-r from-[#0969a9] to-[#0a7bc4] px-4 py-3 text-white md:px-6 md:py-4">
@@ -824,23 +730,6 @@ export function LeadForm({ statuses, branches, onClose, onSaved, onJobCreated, i
                 {/* Dropdown */}
                 {showCustomerDropdown && (
                   <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {/* Create new customer option */}
-                    {customerSearchTerm.length >= 2 && !exactMatchExists && (
-                      <button
-                        type="button"
-                        onClick={handleCreateCustomer}
-                        disabled={isCreatingCustomer}
-                        className="w-full px-4 py-3 text-left flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium border-b border-blue-200"
-                      >
-                        <Plus className="w-4 h-4" />
-                        {isCreatingCustomer ? (
-                          <span>Creating "{customerSearchTerm}"...</span>
-                        ) : (
-                          <span>Create "{customerSearchTerm}" as new customer</span>
-                        )}
-                      </button>
-                    )}
-                    
                     {/* Customer list */}
                     {filteredCustomers.length > 0 ? (
                       filteredCustomers.map((customer) => (

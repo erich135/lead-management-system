@@ -22,6 +22,10 @@ function inspectionPhotosPending(inspection: InspectionListItem): boolean {
   return expected > 0 && received < expected;
 }
 
+export function inspectionLinkJobSearch(search: string): { search: string; limit: 20; allTime: 'true' } {
+  return { search: search.trim(), limit: 20, allTime: 'true' };
+}
+
 function inspectionMachineLabel(inspection: InspectionListItem): string {
   if (inspection.machineNotListed) return 'Machine not listed';
   const snapshot = inspection.machineSnapshot;
@@ -91,7 +95,7 @@ export function InspectionReports({ archived = false }: { archived?: boolean }) 
     let cancelled = false;
     const timer = window.setTimeout(() => {
       setJobsLoading(true);
-      void getJobs({ search: jobSearch.trim(), limit: 20 })
+      void getJobs(inspectionLinkJobSearch(jobSearch))
         .then((found) => {
           if (!cancelled) setJobResults(found.jobs || []);
         })

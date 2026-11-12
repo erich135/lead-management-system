@@ -10,6 +10,18 @@ export function OfficeReportDetailsSummary({ details }: { details?: OfficeReport
   </section>;
 }
 
+export function officeReportCorrectionCommit(
+  effective: OfficeReportValues,
+  values: OfficeReportValues,
+  reason: string,
+): { requested: false; error: string } | { requested: true; changed: OfficeReportValues; reason: string } {
+  const trimmedReason = reason.trim();
+  if (!trimmedReason) return { requested: false, error: 'A reason for the correction is required.' };
+  const changed = Object.fromEntries(Object.entries(values).filter(([key, value]) => value !== effective[key as keyof OfficeReportValues])) as OfficeReportValues;
+  if (Object.keys(changed).length === 0) return { requested: false, error: 'No report details changed.' };
+  return { requested: true, changed, reason: trimmedReason };
+}
+
 export function EditReportDetails({ kind, id, onClose, onSaved }: { kind: OfficeReportKind; id: string; onClose: () => void; onSaved: () => void | Promise<void> }) {
   const [details, setDetails] = useState<OfficeReportDetails | null>(null);
   const [values, setValues] = useState<OfficeReportValues>({});
@@ -19,10 +31,11 @@ export function EditReportDetails({ kind, id, onClose, onSaved }: { kind: Office
   useEffect(() => { let active = true; getOfficeReportDetails(kind, id).then(data => { if (active) { setDetails(data); setValues(data.effective); } }).catch(err => { if (active) setError(err.message); }); return () => { active = false; }; }, [kind, id]);
   async function save() {
     if (!details) return;
+    const commit = officeReportCorrectionCommit(details.effective, values, reason);
+    if (!commit.requested) { setError(commit.error); return; }
     setSaving(true); setError('');
     try {
-      const changed = Object.fromEntries(Object.entries(values).filter(([key, value]) => value !== details.effective[key as keyof OfficeReportValues]));
-      const updated = await saveOfficeReportDetails(kind, id, details.revision, changed, reason);
+      const updated = await saveOfficeReportDetails(kind, id, details.revision, commit.changed, commit.reason);
       setDetails(updated); setValues(updated.effective); setReason('');
       await onSaved();
     } catch (err) { setError(err instanceof Error ? err.message : 'Correction could not be saved'); }
@@ -34,7 +47,7 @@ export function EditReportDetails({ kind, id, onClose, onSaved }: { kind: Office
       <p className="text-sm text-gray-600 my-3">Corrections apply to this report only. Original submissions, signatures and machine/customer records are retained.</p>
       {error && <p role="alert" className="text-red-700 my-2">{error}</p>}
       {!details && !error && <p>Loading report details…</p>}
-      {details && <form onSubmit={event => { event.preventDefault(); void save(); }}>
+      {details && <form noValidate onSubmit={event => { event.preventDefault(); void save(); }}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{Object.entries(OFFICE_REPORT_FIELDS).map(([key, label]) => <label key={key} className="text-sm">{label}<input className="block border rounded p-2 w-full" maxLength={500} value={values[key as keyof OfficeReportValues] || ''} onChange={event => setValues(current => ({ ...current, [key]: event.target.value }))} /></label>)}</div>
         <label className="block text-sm mt-3">Reason for correction<textarea required maxLength={1000} className="block border rounded p-2 w-full" value={reason} onChange={event => setReason(event.target.value)} /></label>
         <div className="flex gap-3 mt-4"><button disabled={saving} className="bg-amber-400 rounded px-4 py-2 disabled:opacity-50">{saving ? 'Saving…' : 'Save correction'}</button><button type="button" disabled={saving} onClick={onClose} className="border rounded px-4 py-2">Close</button></div>

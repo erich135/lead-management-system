@@ -4641,6 +4641,7 @@ export interface DeliveryNoteListItem {
   assignedAt?: string;
   deliveryOutcome?: 'full' | 'partial';
   comments?: string;
+  instruction?: { instructions?: string; items?: DeliveryNoteListItem["items"] };
   items?: Array<{ itemId: string; description: string; partNumber?: string; unit?: string; expectedQuantity: number; quantity?: number; reason?: string }>;
 }
 export async function searchDeliveryCustomerJobs(customerId: string, search: string): Promise<{ jobs: Array<{ _id: string; jobNumber: string; statusName: string }> }> {
@@ -4650,6 +4651,9 @@ export async function searchDeliveryCustomerJobs(customerId: string, search: str
 export async function getDeliveryNote(id: string): Promise<{deliveryNote:DeliveryNoteListItem}> { return apiRequest(`/api/delivery-notes/${id}`); }
 export async function saveDeliveryDraft(id: string | undefined, body: Record<string, unknown>): Promise<{deliveryNote:DeliveryNoteListItem}> {return apiRequest(id?`/api/delivery-notes/${id}/draft`:'/api/delivery-notes/drafts',{method:id?'PUT':'POST',body:JSON.stringify(body)});}
 export async function assignDeliveryNote(id:string,body:Record<string,unknown>):Promise<{deliveryNote:DeliveryNoteListItem}>{return apiRequest(`/api/delivery-notes/${id}/assign`,{method:'POST',body:JSON.stringify(body)});}
+export async function correctAssignedDelivery(id: string, body: Record<string, unknown>): Promise<{ deliveryNote: DeliveryNoteListItem }> {
+  return apiRequest(`/api/delivery-notes/${id}/instruction`, { method: 'PUT', body: JSON.stringify(body) });
+}
 
 export async function listDeliveryNotes(params?: {
   search?: string;
@@ -4657,7 +4661,7 @@ export async function listDeliveryNotes(params?: {
   to?: string;
   page?: number;
   officeArchived?: 'only' | 'exclude';
-  status?: 'outstanding' | 'completed';
+  status?: 'outstanding' | 'completed' | 'any';
   outcome?: string;
   technician?: string;
 }): Promise<{ deliveryNotes: DeliveryNoteListItem[]; pagination?: { total: number; page: number; pages: number } }> {

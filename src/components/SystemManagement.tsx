@@ -94,6 +94,7 @@ import {
   customerUpdatePayload,
   readingEscalationAdminCodeLabel,
 } from '../lib/readingEscalationAdmin';
+import { customerMatchesAliasSearch, matchingTradingName, normalizeCustomerAlias } from '../lib/customerAlias';
 import { useAuth } from '../contexts/AuthContext';
 import { USERS } from '../constants/permissions';
 import { 
@@ -228,6 +229,7 @@ export function SystemManagement() {
   const [customerSearch, setCustomerSearch] = useState('');
   const [showCustomerForm, setShowCustomerForm] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [aliasDraft, setAliasDraft] = useState('');
   const [newCustomer, setNewCustomer] = useState({ name: '', address: '', phone: '', email: '', defaultContactPerson: '', defaultWhatsAppNumber: '' });
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [showArchivedCustomers, setShowArchivedCustomers] = useState(false);
@@ -4934,7 +4936,7 @@ alert((response as any).message || 'User invited successfully');
                           {editingCustomer ? `Edit: ${editingCustomer.name}` : 'New Customer'}
                         </h4>
                         <button
-                          onClick={() => { setEditingCustomer(null); setShowCustomerForm(false); }}
+                          onClick={() => { setEditingCustomer(null); setAliasDraft(''); setShowCustomerForm(false); }}
                           className="p-1 hover:bg-gray-200 rounded transition-colors"
                         >
                           <X className="w-4 h-4" />
@@ -5001,6 +5003,63 @@ alert((response as any).message || 'User invited successfully');
                             placeholder="e.g., +27821234567"
                           />
                         </div>
+                        {editingCustomer && (
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-semibold text-ars-body mb-1">Trading names</label>
+                            <p className="text-xs text-gray-500 mb-2">Other names for this same customer. They do not create a new customer or change jobs and machines.</p>
+                            <div className="space-y-2">
+                              {(editingCustomer.aliases || []).map((alias, index) => (
+                                <div key={`${alias.alias}-${index}`} className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
+                                  <div>
+                                    <p className="text-sm font-medium text-ars-heading">{alias.alias}</p>
+                                    {alias.addedAt ? (
+                                      <p className="text-xs text-gray-500">Added {new Date(alias.addedAt).toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' })}{alias.addedBy ? ` by ${alias.addedBy}` : ''}</p>
+                                    ) : null}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    className="text-sm font-semibold text-red-700"
+                                    onClick={() => setEditingCustomer({
+                                      ...editingCustomer,
+                                      aliases: (editingCustomer.aliases || []).filter((_, aliasIndex) => aliasIndex !== index),
+                                    })}
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="mt-2 flex gap-2">
+                              <input
+                                type="text"
+                                value={aliasDraft}
+                                onChange={(event) => setAliasDraft(event.target.value)}
+                                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-[15px]"
+                                placeholder="e.g., Twin Saver"
+                              />
+                              <button
+                                type="button"
+                                className="px-4 py-2.5 border border-[#0969a9] text-[#0969a9] rounded-[8px] font-bold text-[13px]"
+                                onClick={() => {
+                                  const alias = aliasDraft.trim().replace(/\s+/g, ' ');
+                                  if (!normalizeCustomerAlias(alias)) {
+                                    alert('A trading name needs letters or numbers.');
+                                    return;
+                                  }
+                                  const current = editingCustomer.aliases || [];
+                                  if (current.some((item) => normalizeCustomerAlias(item.alias) === normalizeCustomerAlias(alias))) {
+                                    alert('That trading name is already on this customer.');
+                                    return;
+                                  }
+                                  setEditingCustomer({ ...editingCustomer, aliases: [...current, { alias }] });
+                                  setAliasDraft('');
+                                }}
+                              >
+                                Add
+                              </button>
+                            </div>
+                          </div>
+                        )}
                         <div className="md:col-span-2">
                           <label className="block text-sm font-semibold text-ars-body mb-1">Reading Escalation Admin Code</label>
                           {isSuperAdmin ? (
@@ -5082,7 +5141,7 @@ alert((response as any).message || 'User invited successfully');
                           {savingCustomer ? 'SAVING...' : editingCustomer ? 'UPDATE' : 'CREATE'}
                         </button>
                         <button
-                          onClick={() => { setEditingCustomer(null); setShowCustomerForm(false); }}
+                          onClick={() => { setEditingCustomer(null); setAliasDraft(''); setShowCustomerForm(false); }}
                           className="px-4 py-2.5 border border-gray-300 rounded-[8px] font-bold text-[14px] hover:bg-gray-50 transition-colors"
                         >
                           CANCEL
@@ -5094,11 +5153,14 @@ alert((response as any).message || 'User invited successfully');
                   {/* Customers List */}
                   <div className="space-y-2">
                     {customers
-                      .filter(c => !customerSearch || c.name.toLowerCase().includes(customerSearch.toLowerCase()))
+                      .filter(c => customerMatchesAliasSearch(c, customerSearch))
                       .map(c => (
                         <div key={c._id} className="flex items-start justify-between p-4 bg-gray-50 rounded-xl border border-gray-200 gap-4">
                           <div className="flex-1 min-w-0">
                             <p className="font-semibold text-ars-heading">{c.name}</p>
+                            {matchingTradingName(c, customerSearch) ? (
+                              <p className="text-xs font-medium text-[#0969a9]">Trading name: {matchingTradingName(c, customerSearch)}</p>
+                            ) : null}
                             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
                               {(c as any).address && (
                                 <span className="text-xs text-ars-body flex items-center gap-1">
@@ -5131,6 +5193,7 @@ alert((response as any).message || 'User invited successfully');
                               onClick={() => {
                                 setShowCustomerForm(false);
                                 setEditingCustomer(c);
+                                setAliasDraft('');
                                 setReadingAdminDraft(assignedAdminCodeId(c.readingEscalationAdminCodeId) || '');
                               }}
                               className="p-2 text-ars-primary hover:bg-blue-50 rounded-lg transition-colors"
@@ -5159,7 +5222,7 @@ alert((response as any).message || 'User invited successfully');
                           </div>
                         </div>
                       ))}
-                    {customers.filter(c => !customerSearch || c.name.toLowerCase().includes(customerSearch.toLowerCase())).length === 0 && (
+                    {customers.filter(c => customerMatchesAliasSearch(c, customerSearch)).length === 0 && (
                       <p className="text-center text-ars-body py-8">
                         {customerSearch ? 'No customers match your search.' : 'No customers found.'}
                       </p>

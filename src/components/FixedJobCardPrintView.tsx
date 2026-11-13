@@ -19,6 +19,8 @@ import type { OfficeReportPresentation } from '../lib/api';
 interface FixedJobCardPrintViewProps {
   officeDetails?: OfficeReportPresentation;
   onEditReportDetails?: () => void;
+  onLinkMachine?: () => void;
+  machineAssociation?: { customerName: string; effectiveMachineLabel: string; originalMachineLabel: string } | null;
   template: {
     name: string;
     templateKey?: string;
@@ -28,6 +30,8 @@ interface FixedJobCardPrintViewProps {
   fieldValues: FieldValueEntry[];
   job?: Record<string, unknown>;
   machine?: Record<string, unknown>;
+  originalReportInformation?: Record<string, unknown> | null;
+  technicianReportInformation?: Record<string, unknown> | null;
   reportNumber?: string;
   submittedAt?: string | null;
   finishWorkDeviceTime?: string | null;
@@ -49,10 +53,14 @@ interface FixedJobCardPrintViewProps {
 export function FixedJobCardPrintView({
   officeDetails,
   onEditReportDetails,
+  onLinkMachine,
+  machineAssociation,
   template,
   fieldValues,
   job,
   machine,
+  originalReportInformation,
+  technicianReportInformation,
   reportNumber,
   submittedAt,
   finishWorkDeviceTime,
@@ -145,6 +153,7 @@ export function FixedJobCardPrintView({
         </div>
         <div className="flex items-center gap-2">
           {onEditReportDetails && <button type="button" onClick={onEditReportDetails} className="border rounded px-3 py-1.5 text-sm">Edit Report Details</button>}
+          {onLinkMachine && <button type="button" onClick={onLinkMachine} className="border rounded px-3 py-1.5 text-sm">Link to Machine</button>}
           <button
             type="button"
             onClick={handlePrint}
@@ -177,6 +186,21 @@ export function FixedJobCardPrintView({
         className="flex-1 overflow-auto p-4 print:p-0 print:overflow-visible bg-gray-200 print:bg-white"
       >
         <div ref={printRef} className="mx-auto print:mx-0">
+          {machineAssociation && (
+            <section className="mb-4 rounded-lg border border-slate-300 bg-white p-4 text-sm">
+              <h3 className="font-semibold">Office machine association</h3>
+              <p>Customer: {machineAssociation.customerName}</p>
+              <p>Effective machine: {machineAssociation.effectiveMachineLabel}</p>
+              <p className="text-xs text-slate-600">Original submitted machine: {machineAssociation.originalMachineLabel}. The report snapshot below is unchanged.</p>
+            </section>
+          )}
+          {technicianReportInformation && (
+            <section className="mb-4 rounded-lg border border-slate-300 bg-white p-4 text-sm">
+              <h3 className="font-semibold">Report-specific machine details</h3>
+              <p>The report below uses the technician’s corrected details where they were supplied.</p>
+              <p className="text-xs text-slate-600">Original submission: {[originalReportInformation?.make, originalReportInformation?.model, originalReportInformation?.serialNumber].filter(Boolean).join(" ") || "Not captured"}{originalReportInformation?.machineHours === 0 ? " · 0 hours" : typeof originalReportInformation?.machineHours === "number" ? ` · ${originalReportInformation.machineHours} hours` : ""}.</p>
+            </section>
+          )}
           {layoutKey === 'mechanical_checklist' ? (
             <MechanicalChecklistReportDocument
               reportFooter={reportFooter}

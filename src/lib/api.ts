@@ -852,6 +852,8 @@ export interface Customer {
   phone?: string;
   email?: string;
   isActive?: boolean;
+  aliases?: Array<{ alias: string; normalized?: string; addedBy?: string; addedAt?: string }>;
+  matchedAlias?: string;
   readingEscalationAdminCodeId?: string | ReadingEscalationAdminCodeRef | null;
 }
 
@@ -1307,7 +1309,7 @@ export async function createCustomer(data: string | { name: string; address?: st
 /**
  * Updates a customer's name and/or WhatsApp defaults.
  */
-export async function updateCustomer(id: string, data: { name?: string; defaultContactPerson?: string; defaultWhatsAppNumber?: string; address?: string; phone?: string; email?: string; isActive?: boolean }): Promise<{ customer: Customer }> {
+export async function updateCustomer(id: string, data: { name?: string; defaultContactPerson?: string; defaultWhatsAppNumber?: string; address?: string; phone?: string; email?: string; isActive?: boolean; aliases?: string[] }): Promise<{ customer: Customer }> {
   return apiRequest(`/api/reference/customers/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
@@ -4480,6 +4482,7 @@ export interface InspectionListItem {
   };
   officeArchivedAt?: string | null;
   officeArchivedBy?: { firstName?: string; lastName?: string } | string | null;
+  associationCorrection?: { revision: number; effectiveCustomerName: string; effectiveMachineLabel: string; machineUnlinked: boolean } | null;
 }
 
 export async function listInspections(params?: {
@@ -4715,6 +4718,8 @@ export async function getJobCardSubmission(id: string): Promise<{
   officeDetails?: OfficeReportPresentation;
   submission: JobCardSubmissionRecord;
   machine?: Record<string, unknown>;
+  originalReportInformation?: Record<string, unknown> | null;
+  technicianReportInformation?: Record<string, unknown> | null;
   photoReport?: JobCardPhotoReport;
   finishWork?: { deviceTime: string | null; clockWarning: boolean };
   workEvents?: JobCardWorkEvent[];
@@ -7067,4 +7072,89 @@ export async function rejectMachineReadingSubmission(
       body: JSON.stringify({ rejectionReason }),
     },
   );
+}
+
+export interface NotificationSubscriptionChoice {
+  typeId: 'service_due' | 'checklist' | string;
+  enabled: boolean;
+}
+
+export interface NotificationRecipientRecord {
+  _id: string;
+  email: string;
+  displayName: string;
+  group: 'global' | 'customer';
+  customerId?: string | null;
+  active: boolean;
+  subscriptions: NotificationSubscriptionChoice[];
+  audit?: Array<{ at: string; actorId: string; action: string; detail: string }>;
+}
+
+export interface MachineTechnicianReport {
+  id: string;
+  kind: 'inspection' | 'job-card';
+  reference: string;
+  submittedAt: string | null;
+  technicianName: string;
+}
+
+export function getMachineTechnicianReports(machineId: string): Promise<{ reports: MachineTechnicianReport[] }> {
+  return apiRequest(`/api/machines/${machineId}/technician-reports`);
+}
+
+export interface JobCardMachineAssociation {
+  revision: number;
+  customerId: string;
+  customerName: string;
+  originalMachineLabel: string;
+  effectiveMachineLabel: string;
+  machines: Array<{ _id: string; label: string; officeArchived: boolean }>;
+  history: Array<{ revision: number; createdAt: string; administrator: { name: string }; reason: string; machineLabel: string }>;
+}
+
+export function getJobCardMachineAssociation(id: string): Promise<JobCardMachineAssociation> {
+  return apiRequest(`/api/job-card-submissions/${id}/machine-association`);
+}
+
+export function saveJobCardMachineAssociation(id: string, body: { revision: number; machineId: string; reason: string }): Promise<JobCardMachineAssociation> {
+  return apiRequest(`/api/job-card-submissions/${id}/machine-association`, { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function getNotificationRecipients(): Promise<{
+  dryRun: boolean;
+  types: Array<{ typeId: string; label: string }>;
+  recipients: NotificationRecipientRecord[];
+}> {
+  return apiRequest('/api/notification-recipients');
+}
+
+export function getInspectionAssociation(id: string): Promise<{
+  revision: number;
+  original: { customerId: string | null; customerName: string; machineUnlinked: boolean; machineLabel: string; siteLabel: string };
+  effective: { customerId: string | null; customerName: string; machineUnlinked: boolean; machineLabel: string; siteLabel: string };
+  history: Array<{ revision: number; createdAt: string; administrator: { name: string }; reason: string; previous: { customerName: string; machineLabel: string }; next: { customerName: string; machineLabel: string } }>;
+}> {
+  return apiRequest(`/api/inspections/${id}/association`);
+}
+
+export function getInspectionAssociationMachines(id: string, customerId: string): Promise<{ machines: Array<{ _id: string; label: string; officeArchived: boolean }> }> {
+  return apiRequest(`/api/inspections/${id}/association-machines?customerId=${encodeURIComponent(customerId)}`);
+}
+
+export function saveInspectionAssociation(id: string, body: { revision: number; customerId: string; machineId: string | null; reason: string }): Promise<{ revision: number }> {
+  return apiRequest(`/api/inspections/${id}/association`, { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function saveNotificationRecipient(body: {
+  email: string;
+  displayName: string;
+  group: 'global' | 'customer';
+  customerId?: string | null;
+  active?: boolean;
+  enabledTypeIds: string[];
+}, id?: string): Promise<{ recipient: NotificationRecipientRecord }> {
+  return apiRequest(id ? `/api/notification-recipients/${id}` : '/api/notification-recipients', {
+    method: id ? 'PUT' : 'POST',
+    body: JSON.stringify(body),
+  });
 }

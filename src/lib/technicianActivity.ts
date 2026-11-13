@@ -13,9 +13,13 @@ export interface TechnicianActivityRow {
   deliveryAssigned: number; deliveryCompleted: number; lastDeliveryAt: string | null;
   legacyDeliveryCount: number; lastLegacyDeliveryReceivedAt: string | null;
   devices: AppDeviceObservation[];
+  /** Routine APK compliance only. The technician remains visible and assignable. */
+  complianceExcluded?: boolean;
 }
 export interface TechnicianActivityResult {
   generatedAt: string; technicians: TechnicianActivityRow[]; unmappedDevices: AppDeviceObservation[];
+  /** Reported OTA ids are compared with this value. Null never implies an OTA is current. */
+  publishedOtaUpdateId?: string | null;
 }
 /** Freshness describes the observation, never current connectivity or an installation claim. */
 export function observationFreshness(receivedAt: string | null | undefined, referenceAt: string): string {
@@ -77,16 +81,27 @@ export function reportingContact(row: TechnicianActivityRow, referenceAt: string
   return { at, status };
 }
 
+/** A reported OTA id is current only when it matches the published id. A missing id is Unknown. */
+export function otaVersion(row: TechnicianActivityRow, publishedOtaId: string | null | undefined, referenceAt: string) {
+  const target = publishedOtaId?.trim() || null;
+  const fresh = row.devices.filter(d => observedTime(d.lastReceivedAt, referenceAt) !== null);
+  const reported = fresh.filter(d => !!d.otaUpdateId?.trim());
+  const older = target ? reported.filter(d => d.otaUpdateId !== target) : [];
+  const state: VersionState = !target || !reported.length ? 'unknown' : older.length ? 'outdated' : fresh.length === reported.length ? 'current' : 'unknown';
+  return { state, reported, older };
+}
+
 export function technicianSummary(rows: TechnicianActivityRow[], targetBuild: number | null, referenceAt: string) {
   const active = rows.filter(t => t.active);
+  const compliance = active.filter(t => !t.complianceExcluded);
   const isRecent = (t: TechnicianActivityRow) => {
     const last = recordedActivities(t, referenceAt)[0];
     return !!last && Date.parse(referenceAt) - Date.parse(last.at) <= 7 * DAY;
   };
   return { active: active.length, inactive: rows.length - active.length,
     recentlyActive: active.filter(isRecent).length,
-    needUpdate: active.filter(t => technicianVersion(t, targetBuild, referenceAt).state === 'outdated').length,
-    unknown: active.filter(t => { const report = technicianVersion(t, targetBuild, referenceAt); return !report.known.length || report.unknown > 0; }).length };
+    needUpdate: compliance.filter(t => technicianVersion(t, targetBuild, referenceAt).state === 'outdated').length,
+    unknown: compliance.filter(t => { const report = technicianVersion(t, targetBuild, referenceAt); return !report.known.length || report.unknown > 0; }).length };
 }
 
 export function filterTechnicians(rows: TechnicianActivityRow[], options: {

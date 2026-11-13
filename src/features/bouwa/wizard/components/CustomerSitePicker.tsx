@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Building2, Check, Loader2, MapPin, Search, X } from 'lucide-react';
 
+import { customerSearchLabel } from '../../../../lib/customerAlias';
 import { getCustomers, getMachinesByCustomer } from '../../../../lib/api';
 import type { Customer, Machine } from '../../../../lib/api';
 import {
@@ -166,7 +167,7 @@ export function CustomerSitePicker({
                     className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
                   >
                     <span className="block font-medium text-slate-800">
-                      {customer.name}
+                      {customerSearchLabel(customer)}
                     </span>
                     {customer.address ? (
                       <span className="block truncate text-xs text-slate-500">

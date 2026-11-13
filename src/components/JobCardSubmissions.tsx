@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { FileText, Eye, Calendar, User, RefreshCw, MapPin, Edit2, X, Save } from 'lucide-react';
-import { archiveJobCardSubmission, getJobCardSubmissions, getJobCardSubmission, patchJobCardSubmission, restoreJobCardSubmission, type JobCardPhotoReport, type JobCardSubmissionRecord, type JobCardWorkEvent } from '../lib/api';
+import { archiveJobCardSubmission, getJobCardSubmissions, getJobCardSubmission, getJobCardMachineAssociation, patchJobCardSubmission, restoreJobCardSubmission, type JobCardMachineAssociation, type JobCardPhotoReport, type JobCardSubmissionRecord, type JobCardWorkEvent } from '../lib/api';
 import { photoCountText } from '../utils/jobCardPhotos';
 import { FixedJobCardPrintView } from './FixedJobCardPrintView';
 import { InspectionReports } from './InspectionReports';
 import { DeliveryNotes } from './DeliveryNotes';
 import { EditReportDetails } from './EditReportDetails';
+import { JobCardMachineLink } from './JobCardMachineLink';
 import { useAuth } from '../contexts/AuthContext';
 import type { OfficeReportPresentation } from '../lib/api';
 
@@ -34,6 +35,8 @@ const NON_EDITABLE_TYPES = new Set(['signature', 'photo', 'jobField', 'machineFi
 export function JobCardSubmissions() {
   const { isAdmin } = useAuth();
   const [detailsTarget, setDetailsTarget] = useState<string | null>(null);
+  const [machineAssociation, setMachineAssociation] = useState<JobCardMachineAssociation | null>(null);
+  const [linkMachine, setLinkMachine] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const [view, setView] = useState<'inspections' | 'delivery' | 'jobcards' | 'archived'>('inspections');
   const [archiveType, setArchiveType] = useState<'all' | 'inspection' | 'delivery' | 'jobcard'>('all');
@@ -48,6 +51,8 @@ export function JobCardSubmissions() {
     officeDetails?: OfficeReportPresentation;
     submission: JobCardSubmissionRecord;
     machine?: Record<string, unknown>;
+    originalReportInformation?: Record<string, unknown> | null;
+    technicianReportInformation?: Record<string, unknown> | null;
     photoReport?: JobCardPhotoReport;
     finishWork?: { deviceTime: string | null; clockWarning: boolean };
     workEvents?: JobCardWorkEvent[];
@@ -89,6 +94,8 @@ export function JobCardSubmissions() {
     try {
       const data = await getJobCardSubmission(id);
       setPreviewData(data);
+      const association = await getJobCardMachineAssociation(id).catch(() => null);
+      setMachineAssociation(association);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load submission');
     }
@@ -96,6 +103,8 @@ export function JobCardSubmissions() {
 
   const closePreview = () => {
     setPreviewData(null);
+    setMachineAssociation(null);
+    setLinkMachine(false);
     searchParams.delete('submission');
     setSearchParams(searchParams);
   };
@@ -435,10 +444,14 @@ export function JobCardSubmissions() {
         <FixedJobCardPrintView
           officeDetails={previewData.officeDetails}
           onEditReportDetails={isAdmin ? () => setDetailsTarget(previewData.submission._id) : undefined}
+          onLinkMachine={isAdmin ? () => setLinkMachine(true) : undefined}
+          machineAssociation={machineAssociation}
           template={previewData.submission.template}
           fieldValues={previewData.submission.fieldValues}
           job={previewData.submission.job as Record<string, unknown>}
           machine={previewData.machine}
+          originalReportInformation={previewData.originalReportInformation}
+          technicianReportInformation={previewData.technicianReportInformation}
           reportNumber={previewData.submission.reportNumber}
           submittedAt={previewData.submission.submittedAt}
           finishWorkDeviceTime={previewData.finishWork?.deviceTime}
@@ -451,6 +464,7 @@ export function JobCardSubmissions() {
         />
       )}
       {detailsTarget && <EditReportDetails kind="job-card" id={detailsTarget} onClose={() => setDetailsTarget(null)} onSaved={() => openPreview(detailsTarget)} />}
+      {linkMachine && previewData && <JobCardMachineLink submissionId={previewData.submission._id} onClose={() => setLinkMachine(false)} onSaved={() => openPreview(previewData.submission._id)} />}
     </div>
   );
 }

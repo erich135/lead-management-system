@@ -7,6 +7,8 @@ import {
   restoreMachine,
   relinkMachineToCustomer,
   getMachineRSRs,
+  getMachineTechnicianReports,
+  openInspectionPrint,
   uploadRSR,
   getMachineRSRUrl,
   getRSRDocumentUrl,
@@ -24,6 +26,7 @@ import {
   resolveCanonicalMachineSelections,
   type Machine,
   type MachineRSR,
+  type MachineTechnicianReport,
   type Customer,
   type CustomerWithMachines,
   type MachineType,
@@ -129,6 +132,8 @@ export function Machines() {
 
   // RSR state
   const [machineRSRs, setMachineRSRs] = useState<MachineRSR[]>([]);
+  const [technicianReports, setTechnicianReports] = useState<MachineTechnicianReport[]>([]);
+  const [loadingTechnicianReports, setLoadingTechnicianReports] = useState(false);
   const [loadingRSRs, setLoadingRSRs] = useState(false);
   const [machineRSRContext, setMachineRSRContext] = useState<MachineActionContext | null>(null);
 
@@ -353,13 +358,33 @@ export function Machines() {
   useEffect(() => {
     if (!machineRSRContext) {
       setMachineRSRs([]);
+      setTechnicianReports([]);
       setLoadingRSRs(false);
+      setLoadingTechnicianReports(false);
       return;
     }
     let cancelled = false;
     const context = machineRSRContext;
     setMachineRSRs([]);
+    setTechnicianReports([]);
     setLoadingRSRs(true);
+    setLoadingTechnicianReports(true);
+    void getMachineTechnicianReports(context.requestedMachineId)
+      .then((result) => {
+        if (!cancelled && isCurrentMachineActionRequest(context, machineRequestGenerationRef.current)) {
+          setTechnicianReports(result.reports || []);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled && isCurrentMachineActionRequest(context, machineRequestGenerationRef.current)) {
+          console.error('Error loading technician reports:', error);
+        }
+      })
+      .finally(() => {
+        if (!cancelled && isCurrentMachineActionRequest(context, machineRequestGenerationRef.current)) {
+          setLoadingTechnicianReports(false);
+        }
+      });
     void getMachineRSRs(context.requestedMachineId)
       .then((rsrs) => {
         if (!cancelled && isCurrentMachineActionRequest(context, machineRequestGenerationRef.current)) {
@@ -2011,6 +2036,33 @@ export function Machines() {
                           {/* Canonical-group history is read-only; retired records resolve to the confirmed target. */}
                           {machine._id && (!isReadOnlyMachine || hasCanonicalResolution) && (
                             <MachineActivityHistory machineId={hasCanonicalResolution ? machine.canonicalMachineId! : machine._id} />
+                          )}
+                        </div>
+
+                        <div className="border-t border-slate-200 px-5 py-4">
+                          <h4 className="mb-3 text-sm font-semibold text-slate-700">Technician Reports</h4>
+                          {rsrContext && loadingTechnicianReports ? (
+                            <div className="flex items-center justify-center py-4">
+                              <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                            </div>
+                          ) : !rsrContext || technicianReports.length === 0 ? (
+                            <p className="text-sm text-slate-500">No technician reports are associated with this machine.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {technicianReports.map((report) => (
+                                <div key={`${report.kind}-${report.id}`} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium text-slate-800">{report.kind === 'inspection' ? 'Inspection' : 'Technician RSR'} {report.reference}</p>
+                                    <p className="text-xs text-slate-500">{report.technicianName}{report.submittedAt ? ` · ${new Date(report.submittedAt).toLocaleDateString('en-ZA', { timeZone: 'Africa/Johannesburg' })}` : ''}</p>
+                                  </div>
+                                  {report.kind === 'inspection' ? (
+                                    <button type="button" className="text-sm font-semibold text-[#0969a9]" onClick={() => void openInspectionPrint(report.id)}>View</button>
+                                  ) : (
+                                    <a className="text-sm font-semibold text-[#0969a9]" href={`/job-card-submissions?submission=${report.id}`}>View</a>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
                           )}
                         </div>
 

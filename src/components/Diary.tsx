@@ -5,6 +5,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { getDiaryJobs, getJobs, getTechnicians, getStatuses, getBranches, getCustomers, getServiceDescriptions, getRepCodes, createJob, updateJob, Job, Technician, Status, Branch, Customer, ServiceDescription, RepCode } from '../lib/api';
+import { customerSearchLabel } from '../lib/customerAlias';
 import { formatDate } from '../utils/dateFormat';
 import { useAuth } from '../contexts/AuthContext';
 import { Download, Calendar, Filter, Search, ChevronLeft, ChevronRight, Table, X, Plus, Loader2 } from 'lucide-react';
@@ -1150,7 +1151,7 @@ function QuickBookModal({ date, branches, allTechnicians, onClose, onBooked }: Q
                             }}
                             className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors"
                           >
-                            {c.name}
+                            {customerSearchLabel(c)}
                           </button>
                         ))}
                       </div>

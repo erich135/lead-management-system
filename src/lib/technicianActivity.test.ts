@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  filterTechnicians, recordedActivities, reportingContact, technicianSummary, technicianVersion,
+  filterTechnicians, otaVersion, recordedActivities, reportingContact, technicianSummary, technicianVersion,
   type AppDeviceObservation, type TechnicianActivityRow,
 } from './technicianActivity.ts';
 
@@ -80,6 +80,26 @@ test('live search, active/version filters and deterministic sorts do not mutate 
   assert.deepEqual(filterTechnicians(rows,{...options,sort:'outstanding-desc'}).map(t=>t.id),['b','c','a']);
   assert.deepEqual(filterTechnicians(rows,{...options,sort:'activity-desc'}).map(t=>t.id),['a','b','c']);
   assert.deepEqual(rows.map(t=>t.id),['b','a','c']);
+});
+test('OTA identity stays separate from the native APK and a missing OTA id is never current', () => {
+  const current = row('ota', { devices: [{ ...device(21), otaUpdateId: 'published-ota' }] });
+  const other = row('other-ota', { devices: [{ ...device(21), otaUpdateId: 'older-ota' }] });
+  const missing = row('no-ota', { devices: [{ ...device(21), otaUpdateId: null }] });
+  assert.equal(technicianVersion(current, 21, now).state, 'current');
+  assert.equal(otaVersion(current, 'published-ota', now).state, 'current');
+  assert.equal(otaVersion(other, 'published-ota', now).state, 'outdated');
+  assert.equal(otaVersion(missing, 'published-ota', now).state, 'unknown');
+  assert.equal(otaVersion(current, null, now).state, 'unknown');
+  assert.notEqual(otaVersion(other, 'published-ota', now).state, technicianVersion(other, 20, now).state);
+});
+test('Workshop and Subcontractor ids are omitted from the update count and remain active', () => {
+  const workshop = row('691296eaf6dec4423332b0a2', { name: 'Workshop', complianceExcluded: true, devices: [device(20)], lastLoginAt: now });
+  const field = row('field', { devices: [device(20)] });
+  const summary = technicianSummary([workshop, field], 21, now);
+  assert.equal(summary.needUpdate, 1);
+  assert.equal(summary.active, 2);
+  assert.equal(summary.recentlyActive, 1);
+  assert.equal(technicianVersion(workshop, 21, now).state, 'outdated');
 });
 test('missing release metadata never implies build 21 or confirmed outdated', () => {
   const t=row('known native',{devices:[device(20)]});

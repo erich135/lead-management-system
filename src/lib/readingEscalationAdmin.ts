@@ -48,6 +48,7 @@ export function customerUpdatePayload(customer: Customer) {
     email: customer.email,
     defaultContactPerson: customer.defaultContactPerson,
     defaultWhatsAppNumber: customer.defaultWhatsAppNumber,
+    aliases: (customer.aliases || []).map((alias) => alias.alias),
   };
 }
 

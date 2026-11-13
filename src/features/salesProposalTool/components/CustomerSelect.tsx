@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Search, X } from 'lucide-react';
 import { getCustomers, type Customer } from '../../../lib/api';
+import { customerSearchLabel } from '../../../lib/customerAlias';
 import { SEARCH_MENU_PANEL, searchMenuWrapClass } from '../searchOverlay';
 
 interface CustomerSelectProps {
@@ -113,7 +114,7 @@ export function CustomerSelect({
                     setResults([]);
                   }}
                 >
-                  {customer.name}
+                  {customerSearchLabel(customer)}
                 </button>
               </li>
             ))}

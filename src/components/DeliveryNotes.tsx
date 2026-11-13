@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { archiveDeliveryNote, restoreDeliveryNote, listDeliveryNotes, openDeliveryNotePrint, getDeliveryNote, saveDeliveryDraft, assignDeliveryNote, getCustomers, getCustomerSelectionStatus, searchDeliveryCustomerJobs, getTechnicians, getBranches, type DeliveryNoteListItem } from '../lib/api';
 import {DeliveryLookup, type DeliveryLookupOption} from './DeliveryLookup';
-const findDeliveryCustomers = async (search:string):Promise<DeliveryLookupOption[]> => (await getCustomers({search,limit:50})).customers.map(c=>({id:c._id,label:c.name}));
+import { customerSearchLabel } from '../lib/customerAlias';
+const findDeliveryCustomers = async (search:string):Promise<DeliveryLookupOption[]> => (await getCustomers({search,limit:50})).customers.map(c=>({id:c._id,label:customerSearchLabel(c)}));
 type Part = {
     itemId: string;
     description: string;

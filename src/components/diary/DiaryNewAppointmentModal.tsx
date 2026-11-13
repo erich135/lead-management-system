@@ -9,6 +9,7 @@ import {
   getCustomers,
   getSalesLeads,
 } from '../../lib/api';
+import { customerSearchLabel } from '../../lib/customerAlias';
 import { branchIdForSelectedRep } from '../../lib/repBranchSelection';
 import { AddressAutocomplete } from '../AddressAutocomplete';
 import { SmartDateInput } from '../SmartDateInput';
@@ -263,7 +264,7 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
 
         const customerMatches = (customerResponse.customers || [])
           .filter((customer) =>
-            customer.name.toLowerCase().startsWith(normalizedQuery),
+            customer.name.toLowerCase().startsWith(normalizedQuery) || Boolean(customer.matchedAlias),
           )
           .map(
             (customer): ClientSuggestion => ({
@@ -847,7 +848,7 @@ const DiaryNewAppointmentModal: React.FC<DiaryNewAppointmentModalProps> = ({
                         onClick={() => handleSelectCustomer(customer)}
                         className="flex min-h-[52px] w-full flex-col justify-center border-b border-gray-100 px-3.5 py-3 text-left last:border-b-0 hover:bg-gray-50"
                       >
-                        <span className="font-semibold text-gray-900">{customer.name}</span>
+                        <span className="font-semibold text-gray-900">{customerSearchLabel(customer)}</span>
                         {(customer.defaultContactPerson ||
                           customer.phone ||
                           customer.address) && (

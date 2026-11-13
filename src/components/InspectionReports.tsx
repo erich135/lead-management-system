@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { EditReportDetails } from './EditReportDetails';
+import { InspectionAssociationCorrection } from './InspectionAssociationCorrection';
 import {
   archiveInspection,
   linkInspectionJob,
@@ -49,6 +50,7 @@ function formatOfficeDate(value?: string): string {
 export function InspectionReports({ archived = false }: { archived?: boolean }) {
   const { isAdmin } = useAuth();
   const [detailsTarget, setDetailsTarget] = useState<string | null>(null);
+  const [associationTarget, setAssociationTarget] = useState<InspectionListItem | null>(null);
   const navigate = useNavigate();
   const [inspections, setInspections] = useState<InspectionListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -195,6 +197,12 @@ export function InspectionReports({ archived = false }: { archived?: boolean }) 
                 <td className="py-2 font-semibold">{inspection.referenceNumber || 'Inspection'}</td>
                 <td>
                   <div>{inspection.siteLabel || 'Not captured'}</div>
+                  {inspection.associationCorrection ? (
+                    <>
+                      <div className="text-xs text-[#075a8f]">Corrected customer: {inspection.associationCorrection.effectiveCustomerName}</div>
+                      <div className="text-xs text-[#075a8f]">Corrected machine: {inspection.associationCorrection.effectiveMachineLabel}</div>
+                    </>
+                  ) : null}
                   {inspectionMachineLabel(inspection) ? (
                     <div className="text-xs text-slate-500">{inspectionMachineLabel(inspection)}</div>
                   ) : null}
@@ -207,6 +215,7 @@ export function InspectionReports({ archived = false }: { archived?: boolean }) 
                       View & Print
                     </button>
                     {isAdmin && <button type="button" className="text-[#0969a9] font-semibold" onClick={() => setDetailsTarget(inspection._id)}>Edit Report Details</button>}
+                    {isAdmin && <button type="button" className="text-[#0969a9] font-semibold" onClick={() => setAssociationTarget(inspection)}>Correct Customer / Machine</button>}
                     {archived ? (
                       <button type="button" className="text-[#383838] font-semibold" onClick={() => void restoreInspection(inspection._id).then(load)}>
                         Restore
@@ -264,6 +273,7 @@ export function InspectionReports({ archived = false }: { archived?: boolean }) 
         <button type="button" disabled={inspections.length < 25} className="font-semibold disabled:opacity-40" onClick={() => setPage((current) => current + 1)}>Next</button>
       </div>
       {detailsTarget && <EditReportDetails kind="inspection" id={detailsTarget} onClose={() => setDetailsTarget(null)} onSaved={load} />}
+      {associationTarget && <InspectionAssociationCorrection inspection={associationTarget} onClose={() => setAssociationTarget(null)} onSaved={load} />}
       {archiveTarget ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">

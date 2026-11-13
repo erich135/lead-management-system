@@ -4,6 +4,7 @@
  * Supports role-based filtering and export functionality.
  */
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { customerSearchLabel } from '../lib/customerAlias';
 import { formatLoadHours } from '../lib/loadHours';
 import { 
   getJobs, 
@@ -4293,7 +4294,7 @@ export function Reports({ statuses, branches }: ReportsProps) {
                                 className="w-full px-3 py-2 text-left hover:bg-blue-50 flex items-center gap-2 border-b border-gray-100 last:border-0 text-[13px]"
                               >
                                 <Building2 className="w-4 h-4 text-gray-400" />
-                                <span className="truncate">{customer.name}</span>
+                                <span className="truncate">{customerSearchLabel(customer)}</span>
                               </button>
                             ))
                           ) : (

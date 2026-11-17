@@ -1,5 +1,6 @@
 import { getAuthToken } from '../lib/api';
 import { resolveApiBaseUrl } from '../lib/resolveApiBaseUrl';
+import { inspectionPhotoSectionFrom, layoutInspectionPdfPages } from './inspectionPhotoPdfLayout';
 
 export const PDF_PHOTO_DPI = 144;
 export const PDF_PHOTO_QUALITY = 0.75;
@@ -36,7 +37,7 @@ export async function prepareOfficePdf(element: HTMLElement, inspection = false)
   const document = element.ownerDocument;
   const clone = element.cloneNode(true) as HTMLElement;
   const width = element.getBoundingClientRect().width || 794;
-  const photos: Array<{ src: string; caption: string }> = [];
+  const photos: Array<{ src: string; sectionKey: string; heading: string }> = [];
   const sourceImages = [...element.querySelectorAll<HTMLImageElement>('img')];
   const images = [...clone.querySelectorAll<HTMLImageElement>('img')];
   for (let i = 0; i < sourceImages.length; i++) {
@@ -59,7 +60,8 @@ export async function prepareOfficePdf(element: HTMLElement, inspection = false)
       context.drawImage(source, 0, 0, size.width, size.height);
       image.src = canvas.toDataURL('image/jpeg', PDF_PHOTO_QUALITY);
       if (inspection) {
-        photos.push({ src: image.src, caption: `Photograph ${photos.length + 1}` });
+        const section = inspectionPhotoSectionFrom(source);
+        photos.push({ src: image.src, sectionKey: section.sectionKey, heading: section.heading });
         (image.parentElement?.tagName === 'A' ? image.parentElement : image).remove();
       }
     } else {
@@ -70,15 +72,18 @@ export async function prepareOfficePdf(element: HTMLElement, inspection = false)
   clone.querySelectorAll('.jcr-photo-open').forEach(button => button.replaceWith(...button.childNodes));
   clone.querySelectorAll('script, iframe, object, embed, link, meta, base, button, .no-print').forEach(node => node.remove());
   if (inspection && photos.length) {
-    [...clone.querySelectorAll('h2')].filter(h => h.textContent?.trim() === 'Photos').forEach(h => h.remove());
-    for (let offset = 0; offset < photos.length; offset += 4) {
+    clone.querySelectorAll('h2.photo-section').forEach(heading => heading.remove());
+    if (!clone.querySelector('img.photo')) {
+      [...clone.querySelectorAll('h2')].filter(heading => heading.textContent?.trim() === 'Photos').forEach(heading => heading.remove());
+    }
+    for (const pagePhotos of layoutInspectionPdfPages(photos)) {
       const page = document.createElement('section'); page.className = 'pdf-photo-page';
-      const heading = document.createElement('h2'); heading.textContent = 'Inspection photographs'; page.append(heading);
+      const heading = document.createElement('h2'); heading.textContent = pagePhotos.heading; page.append(heading);
       const grid = document.createElement('div'); grid.className = 'pdf-photo-grid'; page.append(grid);
-      for (const photo of photos.slice(offset, offset + 4)) {
+      for (const photo of pagePhotos.photos) {
         const figure = document.createElement('figure');
-        const image = document.createElement('img'); image.src = photo.src; image.alt = photo.caption;
-        const caption = document.createElement('figcaption'); caption.textContent = photo.caption;
+        const image = document.createElement('img'); image.src = photo.src; image.alt = pagePhotos.heading;
+        const caption = document.createElement('figcaption'); caption.textContent = pagePhotos.heading;
         figure.append(image, caption); grid.append(figure);
       }
       clone.append(page);

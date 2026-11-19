@@ -4,6 +4,7 @@
  */
 
 import { resolveApiBaseUrl } from './resolveApiBaseUrl';
+import { openReportDocument } from './openReportDocument';
 import type { TechnicianActivityResult } from './technicianActivity';
 export function getTechnicianActivity(): Promise<TechnicianActivityResult> {
   return apiRequest('/api/technician-activity');
@@ -4572,29 +4573,32 @@ export async function linkInspectionJob(id: string, jobId: string): Promise<{ jo
 
 export async function openInspectionPrint(id: string): Promise<void> {
   const token = getAuthToken();
-  const response = await fetch(`${apiBase()}/api/inspections/${id}/print`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  if (!response.ok) throw new Error('The inspection could not be opened');
-  const html = await response.text();
-  const popup = window.open('', '_blank');
-  if (!popup) throw new Error('Allow pop-ups to open the inspection report');
-  popup.opener = null;
-  popup.document.open(); popup.document.write(html); popup.document.close();
-  const print = popup.document.getElementById('print-report');
-  if (print) { print.textContent = 'Print'; print.title = 'Browser printing keeps the existing full-size photograph layout'; }
-  const save = popup.document.createElement('button');
-  save.type = 'button'; save.className = 'no-print'; save.textContent = 'Download PDF (optimised)';
-  save.title = 'Compact PDF photograph copies. Full-resolution originals remain available in Office.';
-  save.style.cssText = 'margin:16px 8px;padding:10px 16px;font-weight:700;background:#0969a9;color:white;border:0;border-radius:8px';
-  print?.after(save);
-  save.addEventListener('click', async () => {
-    save.disabled = true; save.textContent = 'Preparing PDF...';
-    try {
-      const { downloadOptimizedOfficePdf } = await import('../utils/optimizedOfficePdf');
-      await downloadOptimizedOfficePdf(popup.document.body, `${popup.document.title}.pdf`, true);
-    } catch (error) { popup.alert(error instanceof Error ? error.message : 'PDF export failed'); }
-    finally { save.disabled = false; save.textContent = 'Download PDF (optimised)'; }
+  await openReportDocument({
+    blockedMessage: 'Allow pop-ups to open the inspection report',
+    loadHtml: async () => {
+      const response = await fetch(`${apiBase()}/api/inspections/${id}/print`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) throw new Error('The inspection could not be opened');
+      return response.text();
+    },
+    prepare: (popup) => {
+      const print = popup.document.getElementById('print-report');
+      if (print) { print.textContent = 'Print'; print.title = 'Browser printing keeps the existing full-size photograph layout'; }
+      const save = popup.document.createElement('button');
+      save.type = 'button'; save.className = 'no-print'; save.textContent = 'Download PDF (optimised)';
+      save.title = 'Compact PDF photograph copies. Full-resolution originals remain available in Office.';
+      save.style.cssText = 'margin:16px 8px;padding:10px 16px;font-weight:700;background:#0969a9;color:white;border:0;border-radius:8px';
+      print?.after(save);
+      save.addEventListener('click', async () => {
+        save.disabled = true; save.textContent = 'Preparing PDF...';
+        try {
+          const { downloadOptimizedOfficePdf } = await import('../utils/optimizedOfficePdf');
+          await downloadOptimizedOfficePdf(popup.document.body, `${popup.document.title}.pdf`, true);
+        } catch (error) { popup.alert(error instanceof Error ? error.message : 'PDF export failed'); }
+        finally { save.disabled = false; save.textContent = 'Download PDF (optimised)'; }
+      });
+    },
   });
 }
 
@@ -4688,13 +4692,16 @@ export async function restoreDeliveryNote(id: string): Promise<void> {
 
 export async function openDeliveryNotePrint(id: string): Promise<void> {
   const token = getAuthToken();
-  const response = await fetch(`${apiBase()}/api/delivery-notes/${id}/print`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  await openReportDocument({
+    blockedMessage: 'Allow pop-ups to open the delivery note',
+    loadHtml: async () => {
+      const response = await fetch(`${apiBase()}/api/delivery-notes/${id}/print`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) throw new Error('The delivery note could not be opened');
+      return response.text();
+    },
   });
-  if (!response.ok) throw new Error('The delivery note could not be opened');
-  const html = await response.text();
-  const blob = new Blob([html], { type: 'text/html' });
-  window.open(URL.createObjectURL(blob), '_blank', 'noopener');
 }
 
 export async function archiveJobCardSubmission(id: string): Promise<void> {

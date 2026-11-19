@@ -28,15 +28,15 @@ export function inspectionLinkJobSearch(search: string): { search: string; limit
 }
 
 function inspectionMachineLabel(inspection: InspectionListItem): string {
-  if (inspection.machineNotListed) return 'Machine not listed';
   const snapshot = inspection.machineSnapshot;
-  if (!snapshot) return '';
-  const name = [snapshot.make, snapshot.model].filter(Boolean).join(' ');
+  const name = [snapshot?.make, snapshot?.model].filter(Boolean).join(' ');
   const identity = [
-    snapshot.serialNumber ? `Serial ${snapshot.serialNumber}` : '',
-    snapshot.assetNumber ? `Asset ${snapshot.assetNumber}` : '',
+    snapshot?.serialNumber ? `Serial ${snapshot.serialNumber}` : '',
+    snapshot?.assetNumber ? `Asset ${snapshot.assetNumber}` : '',
   ].filter(Boolean);
-  return [name, ...identity].filter(Boolean).join(' · ');
+  const detail = [name, ...identity].filter(Boolean).join(' · ');
+  if (inspection.machineNotListed) return detail ? `Machine not listed · ${detail}` : 'Machine not listed';
+  return detail;
 }
 
 /**
@@ -211,7 +211,7 @@ export function InspectionReports({ archived = false }: { archived?: boolean }) 
                 <td>{formatOfficeDate(inspection.serverReceivedAt)}</td>
                 <td className="py-2">
                   <div className="flex flex-wrap items-center gap-8">
-                    <button type="button" className="text-[#0969a9] font-semibold" onClick={() => void openInspectionPrint(inspection._id)}>
+                    <button type="button" className="text-[#0969a9] font-semibold" onClick={() => void openInspectionPrint(inspection._id).catch((error) => setMessage(error instanceof Error ? error.message : 'The inspection could not be opened'))}>
                       View & Print
                     </button>
                     {isAdmin && <button type="button" className="text-[#0969a9] font-semibold" onClick={() => setDetailsTarget(inspection._id)}>Edit Report Details</button>}

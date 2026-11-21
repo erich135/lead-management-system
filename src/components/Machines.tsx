@@ -670,7 +670,7 @@ export function Machines() {
       ? getRSRDocumentUrl(rsr._id) // already contains ?token=
       : `${getMachineRSRUrl(context.requestedMachineId, rsr._id)}?token=${token}`;
     const link = document.createElement('a');
-    link.href = href;
+    link.href = `${href}&disposition=attachment`;
     link.download = rsr.fileName;
     link.target = '_blank';
     document.body.appendChild(link);

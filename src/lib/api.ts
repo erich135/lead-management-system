@@ -3228,6 +3228,7 @@ export interface Activity {
     lastName?: string;
     email: string;
   } | string;
+  actor?: { id: string; name?: string; email?: string; source: string };
   action: string;
   resourceType: string;
   resourceId?: string;
@@ -3255,6 +3256,7 @@ export interface ActivitiesResponse {
  * Gets activities with optional filtering.
  */
 export async function getActivities(params?: {
+  search?: string;
   userId?: string;
   action?: string;
   resourceType?: string;
@@ -3267,6 +3269,7 @@ export async function getActivities(params?: {
   sortOrder?: 'asc' | 'desc';
 }): Promise<ActivitiesResponse> {
   const queryParams = new URLSearchParams();
+  if (params?.search) queryParams.append('search', params.search);
   if (params?.userId) queryParams.append('userId', params.userId);
   if (params?.action) queryParams.append('action', params.action);
   if (params?.resourceType) queryParams.append('resourceType', params.resourceType);

@@ -7,8 +7,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { getActivities, getUsers, getEmailLogs, Activity, User, EmailLog } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
-import { Clock, User as UserIcon, Filter, Search, RefreshCw, ChevronLeft, ChevronRight, Mail, CheckCircle, XCircle } from 'lucide-react';
+import { Clock, Filter, Search, RefreshCw, ChevronLeft, ChevronRight, Mail, CheckCircle, XCircle } from 'lucide-react';
 import { SmartDateInput } from './SmartDateInput';
+import { activityActorLabel, formatActivityTimestamp } from '../lib/activityPresentation';
 import { formatDateTime } from '../utils/dateFormat';
 
 export function Activities() {
@@ -47,12 +48,14 @@ export function Activities() {
   const [emailLogsEmailFilter, setEmailLogsEmailFilter] = useState<string>('');
   const [emailLogsTypeFilter, setEmailLogsTypeFilter] = useState<string>('');
 
-  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const [activitySearch, setActivitySearch] = useState('');
+  const activityRequest = useRef(0);
 
   /**
    * Loads activities from the API with current filters.
    */
   const loadActivities = async () => {
+    const request = ++activityRequest.current;
     try {
       setLoading(true);
       setError(null);
@@ -64,6 +67,7 @@ export function Activities() {
         sortOrder: 'desc',
       };
 
+      if (activitySearch) params.search = activitySearch;
       if (filterAction) params.action = filterAction;
       if (filterResourceType) params.resourceType = filterResourceType;
       if (filterUserId) params.userId = filterUserId;
@@ -71,14 +75,16 @@ export function Activities() {
       if (filterEndDate) params.endDate = filterEndDate;
 
       const response = await getActivities(params);
+      if (request !== activityRequest.current) return;
       setActivities(response.activities);
       setTotalPages(response.pagination.pages);
       setTotal(response.pagination.total);
     } catch (err: any) {
+      if (request !== activityRequest.current) return;
       setError(err.message || 'Failed to load activities');
       console.error('Error loading activities:', err);
     } finally {
-      setLoading(false);
+      if (request === activityRequest.current) setLoading(false);
     }
   };
 
@@ -133,7 +139,7 @@ export function Activities() {
 
   useEffect(() => {
     loadActivities();
-  }, [page, filterAction, filterResourceType, filterUserId, filterStartDate, filterEndDate]);
+  }, [page, filterAction, filterResourceType, filterUserId, filterStartDate, filterEndDate, activitySearch]);
 
   useEffect(() => {
     if (user?.isSuperAdmin) {
@@ -151,25 +157,11 @@ export function Activities() {
    * Handles search with debounce.
    */
   useEffect(() => {
-    if (debounceTimer.current) {
-      clearTimeout(debounceTimer.current);
-    }
-
-    debounceTimer.current = setTimeout(() => {
-      if (searchTerm) {
-        // Filter activities client-side by search term
-        // This is a simple implementation - you could also add server-side search
-        loadActivities();
-      } else {
-        loadActivities();
-      }
+    const timer = setTimeout(() => {
+      setPage(1);
+      setActivitySearch(searchTerm.trim());
     }, 500);
-
-    return () => {
-      if (debounceTimer.current) {
-        clearTimeout(debounceTimer.current);
-      }
-    };
+    return () => clearTimeout(timer);
   }, [searchTerm]);
 
   /**
@@ -704,46 +696,19 @@ export function Activities() {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {activities
-                      .filter((activity) => {
-                        if (!searchTerm) return true;
-                        const searchLower = searchTerm.toLowerCase();
-                        return (
-                          activity.description.toLowerCase().includes(searchLower) ||
-                          activity.action.toLowerCase().includes(searchLower) ||
-                          activity.resourceType.toLowerCase().includes(searchLower) ||
-                          (typeof activity.userId === 'object' && activity.userId?.email?.toLowerCase().includes(searchLower)) || false
-                        );
-                      })
                       .map((activity) => (
                         <tr
                           key={activity._id}
                           className="hover:bg-gray-50 transition-colors"
                         >
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-ars-heading">
-                            {formatDateTime(activity.createdAt)}
+                            {formatActivityTimestamp(activity.createdAt)}
                           </td>
                           {user?.isSuperAdmin && (
                             <td className="px-6 py-4 whitespace-nowrap text-sm">
-                              {activity.userId && typeof activity.userId === 'object' && activity.userId.email ? (
-                                <div className="flex items-center gap-2">
-                                  <UserIcon className="w-4 h-4 text-gray-400" />
-                                  <span className="text-ars-body">
-                                    {activity.userId.firstName || ''} {activity.userId.lastName || ''}
-                                  </span>
-                                  <span className="text-gray-400 text-xs">
-                                    ({activity.userId.email})
-                                  </span>
-                                </div>
-                              ) : activity.userId ? (
-                                <div className="flex items-center gap-2">
-                                  <UserIcon className="w-4 h-4 text-gray-400" />
-                                  <span className="text-gray-400 text-xs">
-                                    User ID: {typeof activity.userId === 'string' ? activity.userId.slice(-8) : 'Unknown'}
-                                  </span>
-                                </div>
-                              ) : (
-                                <span className="text-gray-400 italic">System</span>
-                              )}
+                              <span className={activityActorLabel(activity) === 'System' ? 'text-gray-400 italic' : 'text-ars-body'}>
+                                {activityActorLabel(activity)}
+                              </span>
                             </td>
                           )}
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -774,6 +739,8 @@ export function Activities() {
             </>
           )}
         </div>
+
+        {!loading && !error && <p className="mt-4 text-sm text-ars-body" role="status">{total} matching activities</p>}
 
         {/* Pagination */}
         {!loading && total > 0 && totalPages > 1 && (

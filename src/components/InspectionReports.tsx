@@ -217,7 +217,7 @@ export function InspectionReports({ archived = false }: { archived?: boolean }) 
                     {isAdmin && <button type="button" className="text-[#0969a9] font-semibold" onClick={() => setDetailsTarget(inspection._id)}>Edit Report Details</button>}
                     {isAdmin && <button type="button" className="text-[#0969a9] font-semibold" onClick={() => setAssociationTarget(inspection)}>Correct Customer / Machine</button>}
                     {archived ? (
-                      <button type="button" className="text-[#383838] font-semibold" onClick={() => void restoreInspection(inspection._id).then(load)}>
+                      <button type="button" className="text-[#383838] font-semibold" onClick={() => void restoreInspection(inspection._id).then(load).catch((error) => setMessage(error instanceof Error ? error.message : 'The inspection could not be restored'))}>
                         Restore
                       </button>
                     ) : (
@@ -281,7 +281,7 @@ export function InspectionReports({ archived = false }: { archived?: boolean }) 
             <p className="mt-2 text-sm text-slate-600">It leaves the active list and stays available under Archived, with its status, answers, signatures, photos and linked job kept. Restore it before creating or linking a new job.</p>
             <div className="mt-5 flex justify-end gap-3">
               <button type="button" className="rounded-lg border px-4 py-2 text-sm font-bold" onClick={() => setArchiveTarget(null)}>Cancel</button>
-              <button type="button" className="rounded-lg bg-[#f7c12b] px-4 py-2 text-sm font-bold" onClick={() => void archiveInspection(archiveTarget._id).then(() => { setArchiveTarget(null); setMessage('Inspection archived.'); return load(); })}>Archive</button>
+              <button type="button" className="rounded-lg bg-[#f7c12b] px-4 py-2 text-sm font-bold" onClick={() => void archiveInspection(archiveTarget._id).then(() => { setArchiveTarget(null); setMessage('Inspection archived.'); return load(); }).catch((error) => { setArchiveTarget(null); setMessage(error instanceof Error ? error.message : 'The inspection could not be archived'); })}>Archive</button>
             </div>
           </div>
         </div>

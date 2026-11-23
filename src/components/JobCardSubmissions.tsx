@@ -341,7 +341,7 @@ export function JobCardSubmissions() {
                         Edit
                       </button>
                       {view === 'archived' ? (
-                        <button type="button" onClick={() => void restoreJobCardSubmission(submission._id).then(load)} className="px-4 py-2 rounded-[6px] border text-sm font-semibold">Restore</button>
+                        <button type="button" onClick={() => void restoreJobCardSubmission(submission._id).then(load).catch((error) => setError(error instanceof Error ? error.message : 'The job card could not be restored'))} className="px-4 py-2 rounded-[6px] border text-sm font-semibold">Restore</button>
                       ) : (
                         <button type="button" onClick={() => setArchiveTarget(submission)} className="px-4 py-2 rounded-[6px] border text-sm font-semibold">Archive</button>
                       )}
@@ -370,7 +370,7 @@ export function JobCardSubmissions() {
             <p className="mt-2 text-sm text-slate-600">It leaves the active list. The job, machine history and technician completion stay unchanged.</p>
             <div className="mt-5 flex justify-end gap-3">
               <button type="button" className="rounded-lg border px-4 py-2 text-sm font-bold" onClick={() => setArchiveTarget(null)}>Cancel</button>
-              <button type="button" className="rounded-lg bg-[#f7c12b] px-4 py-2 text-sm font-bold" onClick={() => void archiveJobCardSubmission(archiveTarget._id).then(() => { setArchiveTarget(null); return load(); })}>Archive</button>
+              <button type="button" className="rounded-lg bg-[#f7c12b] px-4 py-2 text-sm font-bold" onClick={() => void archiveJobCardSubmission(archiveTarget._id).then(() => { setArchiveTarget(null); return load(); }).catch((error) => { setArchiveTarget(null); setError(error instanceof Error ? error.message : 'The job card could not be archived'); })}>Archive</button>
             </div>
           </div>
         </div>

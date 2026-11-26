@@ -1553,3 +1553,37 @@
   }
 
 }
+
+@media print {
+  body:has(.checklist-reading-report) * {
+    visibility: hidden;
+  }
+
+  .checklist-reading-report,
+  .checklist-reading-report * {
+    visibility: visible;
+  }
+
+  .checklist-reading-report {
+    position: absolute !important;
+    inset: 0;
+    overflow: visible !important;
+    background: white !important;
+  }
+
+  .checklist-report-toolbar {
+    display: none !important;
+  }
+
+  .checklist-report-sheet {
+    box-shadow: none !important;
+    margin: 0 !important;
+    max-width: none !important;
+  }
+
+  .checklist-report-item,
+  .checklist-report-photo {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

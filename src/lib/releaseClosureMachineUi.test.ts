@@ -42,9 +42,9 @@ test('active canonical machine retains immutable RSR upload, view, and download 
 });
 
 test('archived rows withhold operational controls but retain retained-document access', () => {
-  assert.match(machinesSource, /!isReadOnlyMachine && rsrContext/);
-  assert.match(machinesSource, /!isReadOnlyMachine && machine\.cashCustomer/);
-  assert.match(machinesSource, /!isReadOnlyMachine && machine\._id/);
+  assert.match(machinesSource, /!isReadOnlyMachine && !officeArchived && rsrContext/);
+  assert.match(machinesSource, /!isReadOnlyMachine && !officeArchived && machine\.cashCustomer/);
+  assert.match(machinesSource, /!isReadOnlyMachine && !officeArchived && machine\._id/);
   assert.match(machinesSource, /handleViewRSR\(rsr, rsrContext\)/);
   assert.match(machinesSource, /handleDownloadRSR\(rsr, rsrContext\)/);
 });

@@ -6,6 +6,7 @@
 import { resolveApiBaseUrl } from './resolveApiBaseUrl';
 import { openReportDocument } from './openReportDocument';
 import type { TechnicianActivityResult } from './technicianActivity';
+import type { StoredReadingSchedule } from './readingReminderSchedule';
 export function getTechnicianActivity(): Promise<TechnicianActivityResult> {
   return apiRequest('/api/technician-activity');
 }
@@ -1071,8 +1072,12 @@ export interface Machine {
   whatsAppNumber?: string;
   /** How often (in days) to send a reading reminder. Default: 30 */
   readingFrequencyDays?: number;
+  /** Missing schedule retains the legacy day interval and reminder history. */
+  readingReminderSchedule?: StoredReadingSchedule | null;
   /** Whether WhatsApp reading reminders are enabled for this machine */
   whatsAppRemindersEnabled?: boolean;
+  /** Quantum checklist. Missing or false means the machine is off. */
+  checklistEnabled?: boolean;
   /** Stamped when an hour reading is approved */
   lastReadingReceivedAt?: string;
   /** Stamped when a WhatsApp reading reminder is sent */
@@ -1182,7 +1187,7 @@ export interface ErrorMachineRow {
 }
 
 export interface ContactReminderFieldChange {
-  field: 'contactPerson' | 'whatsAppNumber' | 'readingFrequencyDays' | 'whatsAppRemindersEnabled';
+  field: 'contactPerson' | 'whatsAppNumber' | 'readingFrequencyDays' | 'whatsAppRemindersEnabled' | 'readingReminderSchedule' | 'checklistEnabled';
   oldValue: string | number | boolean | null;
   newValue: string | number | boolean | null;
 }
@@ -1335,10 +1340,11 @@ export async function assignReadingEscalationAdminCode(
   });
 }
 
-export async function exportCustomerMaster(): Promise<void> {
+export async function exportCustomerMaster(options?: { includeArchived?: boolean }): Promise<void> {
   const token = getAuthToken();
   if (!token) throw new Error('No authentication token found');
-  const response = await fetch(`${apiBase()}/api/customer-master/export`, {
+  const query = options?.includeArchived ? '?includeArchived=true' : '';
+  const response = await fetch(`${apiBase()}/api/customer-master/export${query}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) {
@@ -1394,11 +1400,22 @@ export interface CustomerMasterPreviewRow {
   currentStatus: 'Active' | 'Archive' | null;
   proposedStatus: 'Active' | 'Archive' | null;
   archiveImpact: CustomerMasterArchiveImpact | null;
+  fieldConflicts?: Array<{field:string;label:string;original:string|null;current:string;proposed:string;resolution?:'keep'|'excel';requiresReview:boolean;reason:string}>;
 }
+
+export interface CustomerMasterResolution {customerId:string;field:string;choice:'keep'|'excel';expectedCurrent:string}
 
 export interface CustomerMasterPreview {
   previewOnly: true;
   applyAvailable: boolean;
+  strictV2?: boolean;
+  fieldLevel?: boolean;
+  baseline?: {trusted:boolean;reason:string;data?:{id:string;lineageId:string}};
+  resolutions?: CustomerMasterResolution[];
+  recipients?: {
+    summary: { totalRows: number; additions: number; updates: number; deactivations: number; unchanged: number; invalid: number; conflicts: number };
+    rows: Array<{rowNumber:number;customerId:string;customerName:string;recipientId:string|null;recipientName:string;outcome:CustomerMasterPreviewOutcome;action:'add'|'update'|'deactivate'|'unchanged';messages:string[];changes:CustomerMasterPreviewChange[]}>;
+  };
   recordsToChange: number;
   workbookSha256: string;
   planFingerprint: string;
@@ -1423,11 +1440,12 @@ export interface CustomerMasterPreview {
   }>;
 }
 
-export async function previewCustomerMaster(file: File): Promise<CustomerMasterPreview> {
+export async function previewCustomerMaster(file: File,resolutions:CustomerMasterResolution[]=[]): Promise<CustomerMasterPreview> {
   const token = getAuthToken();
   if (!token) throw new Error('No authentication token found');
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('resolutions',JSON.stringify(resolutions));
   const response = await fetch(`${apiBase()}/api/customer-master/preview`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
@@ -1443,7 +1461,10 @@ export async function previewCustomerMaster(file: File): Promise<CustomerMasterP
 
 export interface CustomerMasterApplyResult {
   recordsChanged: number;
+  recipientsChanged?: number;
+  appliedRecipientIds?: string[];
   alreadyApplied: boolean;
+  recovered?: boolean;
   approvalId: string | null;
   mode: 'transaction' | 'ordered' | 'none';
   appliedCustomerIds: string[];
@@ -1458,6 +1479,7 @@ export async function applyCustomerMaster(file: File, preview: CustomerMasterPre
   formData.append('confirm', 'APPROVE AND APPLY');
   formData.append('workbookSha256', preview.workbookSha256);
   formData.append('planFingerprint', preview.planFingerprint);
+  formData.append('resolutions',JSON.stringify(preview.resolutions||[]));
   const response = await fetch(`${apiBase()}/api/customer-master/apply`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
@@ -1465,9 +1487,26 @@ export async function applyCustomerMaster(file: File, preview: CustomerMasterPre
   });
   const body = await response.json().catch(() => ({ error: { message: 'Customer Master apply failed' } }));
   if (!response.ok) {
-    throw new Error(body.error?.message || 'Customer Master apply failed');
+    throw Object.assign(new Error(body.error?.message || 'Customer Master apply failed'), {report:body.data});
   }
   return body.data;
+}
+
+export async function recoverCustomerMaster(approvalId: string): Promise<{restoredCustomers:string[];restoredRecipients?:string[];skippedFields:Array<{reason:string}>}> {
+  const response = await fetch(`${apiBase()}/api/customer-master/recover`, {
+    method:'POST',headers:{Authorization:`Bearer ${getAuthToken()}`,'Content-Type':'application/json'},
+    body:JSON.stringify({approvalId,confirm:'RESTORE PREVIOUS VALUES'}),
+  });
+  const body=await response.json();
+  if(!response.ok)throw new Error(body.error?.message || 'Customer Master recovery failed');
+  return body.data;
+}
+
+export async function downloadCustomerMasterWorkingCopy(file:File,preview:CustomerMasterPreview,result:CustomerMasterApplyResult):Promise<void>{
+  const form=new FormData();form.append('file',file);form.append('planFingerprint',preview.planFingerprint);form.append('resolutions',JSON.stringify(preview.resolutions||[]));if(result.approvalId)form.append('approvalId',result.approvalId);
+  const response=await fetch(`${apiBase()}/api/customer-master/working-copy`,{method:'POST',headers:{Authorization:`Bearer ${getAuthToken()}`},body:form});
+  if(!response.ok){const body=await response.json();throw new Error(body.error?.message||'Updated working workbook could not be downloaded');}
+  const url=URL.createObjectURL(await response.blob()),link=document.createElement('a');link.href=url;link.download='customer-master-working-copy.xlsx';document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
 }
 
 export async function exportCustomerAdminCodes(
@@ -6892,6 +6931,8 @@ export interface PublicMachineForScan {
   serviceType: 'hours' | 'date';
   serviceDue: boolean;
   acceptingReadings?: boolean;
+  /** Authoritative Quantum checklist gate. Missing or false means the page stays unchanged. */
+  checklistEnabled?: boolean;
 }
 
 export type MachineReadingSubmissionStatus = 'pending' | 'approved' | 'rejected';
@@ -6927,6 +6968,18 @@ export interface MachineReadingSubmission {
   verificationNote?: string;
   rejectionReason?: string;
   approvedHours?: number;
+  checklist?: {
+    questionnaire?: string;
+    items?: Array<{
+      id: string;
+      prompt: string;
+      answer: "ok" | "not-ok" | string;
+      explanation?: string;
+    }>;
+    operatorName?: string;
+    outOfCommission?: boolean;
+    outOfCommissionReason?: string;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -6984,8 +7037,9 @@ export async function submitPublicMachineReading(
     submitterName?: string;
     submitterPhone?: string;
     submitterEmail?: string;
+    checklist?: unknown;
   },
-): Promise<{ reference: string; submissionId: string; status: string }> {
+): Promise<{ reference: string; submissionId: string; status: string; checklistSaved?: boolean }> {
   const form = new FormData();
   form.append('submittedHours', String(payload.submittedHours));
   form.append('photo', payload.photo);
@@ -6994,6 +7048,7 @@ export async function submitPublicMachineReading(
   if (payload.submitterName) form.append('submitterName', payload.submitterName);
   if (payload.submitterPhone) form.append('submitterPhone', payload.submitterPhone);
   if (payload.submitterEmail) form.append('submitterEmail', payload.submitterEmail);
+  if (payload.checklist) form.append('checklist', JSON.stringify(payload.checklist));
 
   const url = `${apiBase()}/api/public/machine-readings/${encodeURIComponent(token)}`;
   const response = await fetch(url, {
@@ -7033,14 +7088,20 @@ export async function getPublicMachineReadingHistory(
 }
 
 /**
- * Lists submissions in the verification queue.
- * Requires machines.verifyReadings.
+ * Lists submissions in the verification queue with optional server search/paging.
+ * Without page/limit, retains the full legacy response used by dashboard counts.
  */
 export async function listMachineReadingSubmissions(
   status: 'pending' | 'approved' | 'rejected' | 'all' = 'pending',
-): Promise<{ submissions: MachineReadingSubmission[] }> {
-  return apiRequest<{ submissions: MachineReadingSubmission[] }>(
-    `/api/machine-reading-submissions?status=${status}`,
+  options: { search?: string; page?: number; limit?: number } = {},
+  signal?: AbortSignal,
+): Promise<{ submissions: MachineReadingSubmission[]; pagination?: { page: number; limit: number; total: number; pages: number } }> {
+  const params = new URLSearchParams({ status });
+  if (options.search?.trim()) params.set('search', options.search.trim());
+  if (options.page !== undefined) params.set('page', String(options.page));
+  if (options.limit !== undefined) params.set('limit', String(options.limit));
+  return apiRequest<{ submissions: MachineReadingSubmission[]; pagination?: { page: number; limit: number; total: number; pages: number } }>(
+    `/api/machine-reading-submissions?${params.toString()}`, { signal },
   );
 }
 
@@ -7099,8 +7160,12 @@ export interface NotificationRecipientRecord {
   displayName: string;
   group: 'global' | 'customer';
   customerId?: string | null;
+  customerName?: string | null;
+  customerMissing?: boolean;
   active: boolean;
+  updatedAt?: string;
   subscriptions: NotificationSubscriptionChoice[];
+  mirrorSyncWarning?: string;
   audit?: Array<{ at: string; actorId: string; action: string; detail: string }>;
 }
 
@@ -7134,12 +7199,18 @@ export function saveJobCardMachineAssociation(id: string, body: { revision: numb
   return apiRequest(`/api/job-card-submissions/${id}/machine-association`, { method: 'POST', body: JSON.stringify(body) });
 }
 
-export function getNotificationRecipients(): Promise<{
+export function getNotificationRecipients(scope?: { group: 'global' | 'customer'; customerId?: string }): Promise<{
   dryRun: boolean;
   types: Array<{ typeId: string; label: string }>;
   recipients: NotificationRecipientRecord[];
+  mirrorSyncWarning?: string;
 }> {
-  return apiRequest('/api/notification-recipients');
+  const query = new URLSearchParams();
+  if (scope) {
+    query.set('group', scope.group);
+    if (scope.group === 'customer' && scope.customerId) query.set('customerId', scope.customerId);
+  }
+  return apiRequest(`/api/notification-recipients${query.size ? `?${query}` : ''}`);
 }
 
 export function getInspectionAssociation(id: string): Promise<{
@@ -7166,7 +7237,8 @@ export function saveNotificationRecipient(body: {
   customerId?: string | null;
   active?: boolean;
   enabledTypeIds: string[];
-}, id?: string): Promise<{ recipient: NotificationRecipientRecord }> {
+  updatedAt?: string;
+}, id?: string): Promise<{ recipient: NotificationRecipientRecord; mirrorSyncWarning?: string }> {
   return apiRequest(id ? `/api/notification-recipients/${id}` : '/api/notification-recipients', {
     method: id ? 'PUT' : 'POST',
     body: JSON.stringify(body),

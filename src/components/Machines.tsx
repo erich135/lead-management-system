@@ -47,6 +47,8 @@ import {
   generalExportProtectedPrefix,
 } from '../lib/machineContactReminderExport';
 import { copyWhatsAppRemindersEnabled } from '../lib/machineWhatsAppReminders';
+import { readingScheduleDraftForMachine, readingScheduleEditPayload, readingScheduleLabel } from '../lib/readingReminderSchedule';
+import { ReadingReminderScheduleFields } from './ReadingReminderScheduleFields';
 import {
   Search,
   Building2,
@@ -124,6 +126,7 @@ export function Machines() {
 
   // Edit state
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
+  const [reminderScheduleDraft, setReminderScheduleDraft] = useState(readingScheduleDraftForMachine());
   // Load Hours is edited as raw input text; loadHoursPayload() turns it into number | null on save.
   const [editForm, setEditForm] = useState<Partial<Omit<Machine, 'loadHours'>> & { loadHours?: string | number | null }>({});
   const [saving, setSaving] = useState(false);
@@ -450,7 +453,9 @@ export function Machines() {
       whatsAppNumber: (machine as any).whatsAppNumber || '',
       readingFrequencyDays: (machine as any).readingFrequencyDays || 30,
       whatsAppRemindersEnabled: copyWhatsAppRemindersEnabled(machine),
+      checklistEnabled: machine.checklistEnabled === true,
     } as any);
+    setReminderScheduleDraft(readingScheduleDraftForMachine(machine));
   };
 
   const handleFindCanonicalMachine = (machine: Machine) => {
@@ -488,6 +493,7 @@ export function Machines() {
       if (payload.contactPerson) payload.contactPerson = payload.contactPerson.trim();
       if (payload.whatsAppNumber) payload.whatsAppNumber = payload.whatsAppNumber.trim();
       payload.readingFrequencyDays = Number(payload.readingFrequencyDays) || 30;
+      Object.assign(payload, readingScheduleEditPayload(reminderScheduleDraft, editingMachine));
       if (!payload.cashCustomer) delete payload.cashCustomer;
       if (!payload.currentLocation) delete payload.currentLocation;
       // Load Hours: blank clears the value (null); otherwise send the number as entered (0 and decimals allowed).
@@ -647,7 +653,7 @@ export function Machines() {
       const response = await getMachines(params);
       const rows = response.machines || [];
       const stamp = new Date().toISOString().split('T')[0];
-      const buffer = contactReminderXlsxArrayBuffer(rows);
+      const buffer = await contactReminderXlsxArrayBuffer(rows);
       const blob = new Blob([buffer], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
@@ -1854,17 +1860,7 @@ export function Machines() {
                                   </p>
                                 )}
                               </div>
-                              <div>
-                                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Reading Frequency (days)</label>
-                                <input
-                                  type="number"
-                                  min={1}
-                                  value={(editForm as any).readingFrequencyDays || 30}
-                                  onChange={(e) => setEditForm({ ...editForm, readingFrequencyDays: parseInt(e.target.value) || 30 } as any)}
-                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                                <p className="text-xs text-slate-400 mt-0.5">Days between reading reminders</p>
-                              </div>
+                              <ReadingReminderScheduleFields value={reminderScheduleDraft} onChange={setReminderScheduleDraft} />
                               <div className="md:col-span-3">
                                 <label className="flex items-center gap-3 cursor-pointer select-none">
                                   <div className="relative">
@@ -1880,6 +1876,25 @@ export function Machines() {
                                   <div>
                                     <p className="text-sm font-medium text-slate-700">WhatsApp reminders enabled</p>
                                     <p className="text-xs text-slate-400">Disable if customer no longer requires reminders</p>
+                                  </div>
+                                </label>
+                              </div>
+                              <div className="md:col-span-3">
+                                <label className="flex items-center gap-3 cursor-pointer select-none">
+                                  <div className="relative">
+                                    <input
+                                      type="checkbox"
+                                      className="sr-only"
+                                      aria-label="Checklist"
+                                      checked={(editForm as any).checklistEnabled === true}
+                                      onChange={(e) => setEditForm({ ...editForm, checklistEnabled: e.target.checked } as any)}
+                                    />
+                                    <div className={`w-10 h-6 rounded-full transition-colors ${(editForm as any).checklistEnabled === true ? 'bg-green-500' : 'bg-slate-300'}`} />
+                                    <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${(editForm as any).checklistEnabled === true ? 'translate-x-4' : ''}`} />
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium text-slate-700">Checklist</p>
+                                    <p className="text-xs text-slate-400">{(editForm as any).checklistEnabled === true ? 'Enabled for this machine only' : 'Disabled. Existing machines stay off until switched on here.'}</p>
                                   </div>
                                 </label>
                               </div>
@@ -1935,6 +1950,10 @@ export function Machines() {
                                 <div className="text-xs font-semibold text-slate-400 uppercase">Service Type</div>
                                 <div className="text-sm font-medium text-slate-800 mt-0.5 capitalize">{machine.serviceType || 'Hours'}</div>
                               </div>
+                              <div>
+                                <div className="text-xs font-semibold text-slate-400 uppercase">Checklist</div>
+                                <div className="text-sm font-medium text-slate-800 mt-0.5">{machine.checklistEnabled === true ? 'Enabled' : 'Disabled'}</div>
+                              </div>
                               {machine.serviceType === 'date' ? (
                                 <>
                                   <div>
@@ -1987,8 +2006,8 @@ export function Machines() {
                                       </div>
                                     )}
                                     <div>
-                                      <div className="text-xs font-semibold text-slate-400 uppercase">Reading Frequency</div>
-                                      <div className="text-sm font-medium text-slate-800 mt-0.5">{(machine as any).readingFrequencyDays || 30} days</div>
+                                      <div className="text-xs font-semibold text-slate-400 uppercase">Reading Schedule</div>
+                                      <div className="text-sm font-medium text-slate-800 mt-0.5">{readingScheduleLabel(machine)}</div>
                                     </div>
                                   </div>
                                 </div>

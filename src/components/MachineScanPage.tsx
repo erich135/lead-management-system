@@ -19,6 +19,15 @@ import {
   type PublicMachineForScan,
   type PublicReadingHistoryEntry,
 } from '../lib/api';
+import {
+  QUANTUM_CHECKLIST_QUESTIONS,
+  buildQuantumChecklistPayload,
+  checklistIsEnabled,
+  emptyQuantumChecklistDraft,
+  quantumChecklistValidationError,
+  type QuantumChecklistDraft,
+  type QuantumChecklistPayload,
+} from './quantumChecklist';
 
 type Phase = 'loading' | 'capture' | 'submitting' | 'confirmed' | 'error';
 
@@ -49,6 +58,9 @@ export function MachineScanPage() {
   const [submitterEmail, setSubmitterEmail] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [reference, setReference] = useState<string | null>(null);
+  const [checklist, setChecklist] = useState<QuantumChecklistDraft>(emptyQuantumChecklistDraft);
+  const [checklistPreview, setChecklistPreview] = useState<QuantumChecklistPayload | null>(null);
+  const [checklistSaved, setChecklistSaved] = useState(false);
 
   // In-browser camera state
   const [showCamera, setShowCamera] = useState(false);
@@ -177,10 +189,21 @@ export function MachineScanPage() {
       setSubmitError('Please enter a valid email address, or leave it blank.');
       return;
     }
+    const checklistOn = checklistIsEnabled(machine?.checklistEnabled);
+    const checklistPayload = checklistOn
+      ? buildQuantumChecklistPayload(machine?.id || '', true, checklist)
+      : null;
+    if (checklistOn) {
+      const checklistError = quantumChecklistValidationError(checklist);
+      if (checklistError || !checklistPayload) {
+        setSubmitError(checklistError || 'Complete the generator checklist.');
+        return;
+      }
+    }
 
     setPhase('submitting');
     try {
-      const { reference: ref } = await submitPublicMachineReading(token, {
+      const refResult = await submitPublicMachineReading(token, {
         submittedHours: hoursNum,
         photo,
         faultReported,
@@ -188,8 +211,16 @@ export function MachineScanPage() {
         submitterName: submitterName.trim() || undefined,
         submitterPhone: submitterPhone.trim() || undefined,
         submitterEmail: emailTrimmed || undefined,
+        checklist: checklistPayload || undefined,
       });
-      setReference(ref);
+      if (checklistPayload && !refResult.checklistSaved) {
+        setSubmitError('The checklist was not saved. Please try again. Nothing was confirmed.');
+        setPhase('capture');
+        return;
+      }
+      setChecklistSaved(Boolean(refResult.checklistSaved));
+      setChecklistPreview(checklistPayload);
+      setReference(refResult.reference);
       setPhase('confirmed');
     } catch (err: any) {
       setSubmitError(err?.message || 'Submission failed. Please try again.');
@@ -233,7 +264,9 @@ export function MachineScanPage() {
           <CheckCircle2 className="w-16 h-16 text-emerald-500 mb-4" />
           <h2 className="text-xl font-semibold text-slate-800 mb-1">Thank you!</h2>
           <p className="text-sm text-slate-600 mb-4 max-w-xs">
-            Your reading has been received. An ARS team member will review it shortly.
+            {checklistSaved
+              ? 'Your hour reading and generator checklist were saved. They are awaiting ARS verification.'
+              : 'Your reading has been received. An ARS team member will review it shortly.'}
           </p>
           <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
             <p className="text-xs uppercase text-slate-500 font-semibold mb-1">Reference</p>
@@ -245,6 +278,23 @@ export function MachineScanPage() {
               <p className="text-xs text-amber-800">
                 The fault you reported has been flagged. Our service team will contact you.
               </p>
+            </div>
+          )}
+          {checklistPreview && (
+            <div className="mt-4 w-full max-w-sm text-left border border-slate-200 rounded-lg p-3">
+              <p className="text-sm font-semibold text-slate-800">Checklist saved with this reading</p>
+              <p className="text-xs text-slate-600 mt-1">
+                Office review of these answers arrives in the next package. The reference above is this submission.
+              </p>
+              <p className="text-xs text-slate-700 mt-2">Operator: {checklistPreview.operatorName}</p>
+              <p className="text-xs text-slate-700">
+                Out of commission: {checklistPreview.outOfCommission ? `Yes — ${checklistPreview.outOfCommissionReason}` : 'No'}
+              </p>
+              <ol className="mt-2 space-y-1 text-xs text-slate-700 list-decimal pl-4">
+                {checklistPreview.items.map((item) => (
+                  <li key={item.id}>{item.prompt}: {item.answer === 'ok' ? 'OK' : `Not OK — ${item.explanation}`}</li>
+                ))}
+              </ol>
             </div>
           )}
         </div>
@@ -506,6 +556,10 @@ export function MachineScanPage() {
           </div>
         </details>
 
+        {checklistIsEnabled(machine.checklistEnabled) && (
+          <QuantumChecklistFields draft={checklist} onChange={setChecklist} />
+        )}
+
         {submitError && (
           <div className="flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
             <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
@@ -530,6 +584,113 @@ export function MachineScanPage() {
         )}
       </form>
     </Shell>
+  );
+}
+
+function QuantumChecklistFields({
+  draft,
+  onChange,
+}: {
+  draft: QuantumChecklistDraft;
+  onChange: (draft: QuantumChecklistDraft) => void;
+}) {
+  function setItem(id: string, patch: Partial<QuantumChecklistDraft['items'][number]>) {
+    onChange({
+      ...draft,
+      items: draft.items.map((item) => {
+        if (item.id !== id) return item;
+        const next = { ...item, ...patch };
+        if (next.answer === 'ok') next.explanation = '';
+        return next;
+      }),
+    });
+  }
+
+  return (
+    <section className="border border-slate-200 rounded-lg p-3 space-y-4" aria-label="Generator checklist">
+      <div>
+        <h2 className="text-base font-semibold text-slate-800">Generator checklist</h2>
+        <p className="text-xs text-slate-500 mt-1">Answer every item. A Not OK answer needs an explanation.</p>
+      </div>
+      <ol className="space-y-4">
+        {QUANTUM_CHECKLIST_QUESTIONS.map((question, index) => {
+          const item = draft.items.find((entry) => entry.id === question.id);
+          return (
+            <li key={question.id} className="space-y-2">
+              <p className="text-sm font-medium text-slate-800">{index + 1}. {question.prompt}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  aria-pressed={item?.answer === 'ok'}
+                  onClick={() => setItem(question.id, { answer: 'ok' })}
+                  className={`min-h-[44px] rounded-lg border px-3 py-2 text-sm font-semibold ${item?.answer === 'ok' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-300'}`}
+                >
+                  OK
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={item?.answer === 'not-ok'}
+                  onClick={() => setItem(question.id, { answer: 'not-ok' })}
+                  className={`min-h-[44px] rounded-lg border px-3 py-2 text-sm font-semibold ${item?.answer === 'not-ok' ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-slate-700 border-slate-300'}`}
+                >
+                  Not OK
+                </button>
+              </div>
+              {item?.answer === 'not-ok' && (
+                <textarea
+                  aria-label={`Explanation for ${question.prompt}`}
+                  value={item.explanation}
+                  onChange={(event) => setItem(question.id, { explanation: event.target.value })}
+                  placeholder="What is not OK?"
+                  rows={2}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                />
+              )}
+            </li>
+          );
+        })}
+      </ol>
+      <label className="block text-sm font-semibold text-slate-700">
+        Operator name <span className="text-red-500">*</span>
+        <input
+          aria-label="Operator name"
+          value={draft.operatorName}
+          onChange={(event) => onChange({ ...draft, operatorName: event.target.value })}
+          className="mt-1 w-full px-3 py-3 border border-slate-300 rounded-lg text-base font-normal"
+        />
+      </label>
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-semibold text-slate-700">Generator out of commission <span className="text-red-500">*</span></legend>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            aria-pressed={draft.outOfCommission === false}
+            onClick={() => onChange({ ...draft, outOfCommission: false, outOfCommissionReason: '' })}
+            className={`min-h-[44px] rounded-lg border px-3 py-2 text-sm font-semibold ${draft.outOfCommission === false ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-700 border-slate-300'}`}
+          >
+            No
+          </button>
+          <button
+            type="button"
+            aria-pressed={draft.outOfCommission === true}
+            onClick={() => onChange({ ...draft, outOfCommission: true })}
+            className={`min-h-[44px] rounded-lg border px-3 py-2 text-sm font-semibold ${draft.outOfCommission === true ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-700 border-slate-300'}`}
+          >
+            Yes
+          </button>
+        </div>
+        {draft.outOfCommission === true && (
+          <textarea
+            aria-label="Reason the generator is out of commission"
+            value={draft.outOfCommissionReason}
+            onChange={(event) => onChange({ ...draft, outOfCommissionReason: event.target.value })}
+            placeholder="Reason"
+            rows={2}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+          />
+        )}
+      </fieldset>
+    </section>
   );
 }
 

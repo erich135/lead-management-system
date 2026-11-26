@@ -25,7 +25,7 @@ test('1 QR Readings is visible to every authenticated user, not gated on a permi
     dashboardSource.slice(dashboardSource.indexOf('to="/pending-machine-readings"') - 200, dashboardSource.indexOf('to="/pending-machine-readings"')),
     /hasPermission\('machines\.verifyReadings'\)/,
   );
-  assert.match(mobileNavSource, /const canVerifyReadings = canAccessMachineReadingWorkflow\(user\);/);
+  assert.match(mobileNavSource, /const canVerifyReadings\s*=\s*canAccessMachineReadingWorkflow\(user\)\s*(?:;|\|\|)/);
 });
 
 test('2 Verify Readings tab on the Machines page is visible to every authenticated user', () => {

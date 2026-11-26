@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   CheckCircle2,
   XCircle,
@@ -8,6 +8,10 @@ import {
   Image as ImageIcon,
   RefreshCw,
   Clock,
+  Search,
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import {
   approveMachineReadingSubmission,
@@ -18,6 +22,8 @@ import {
 } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { canAccessMachineReadingWorkflow } from '../lib/readingAccess';
+import { ChecklistReadingReport } from './ChecklistReadingReport';
+import { checklistDetailsStartOpen, checklistReportDocument, checklistReview, correctedApprovedHours, type ChecklistReview } from './officeReadingReview';
 
 type Tab = 'pending' | 'approved' | 'rejected';
 
@@ -32,30 +38,75 @@ export function PendingMachineReadings() {
   const { user } = useAuth();
   const canVerify = canAccessMachineReadingWorkflow(user);
 
-  const [tab, setTab] = useState<Tab>('pending');
+  const [query, setQuery] = useState({ tab: 'pending' as Tab, search: '', page: 1 });
+  const { tab, page } = query;
+  const [searchText, setSearchText] = useState('');
+  const [pagination, setPagination] = useState({ total: 0, pages: 1, limit: 20 });
+  const [reloadKey, setReloadKey] = useState(0);
+  const requestNumber = useRef(0);
+  const activeRequest = useRef<AbortController | null>(null);
+  const searchPending = searchText.trim() !== query.search;
   const [items, setItems] = useState<MachineReadingSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
   const [previewSub, setPreviewSub] = useState<MachineReadingSubmission | null>(null);
 
-  const load = async () => {
+  const invalidateRequest = () => {
+    requestNumber.current += 1;
+    activeRequest.current?.abort();
     setLoading(true);
     setError(null);
-    try {
-      const { submissions } = await listMachineReadingSubmissions(tab);
-      setItems(submissions);
-    } catch (e: any) {
-      setError(e?.message || 'Failed to load submissions');
-    } finally {
-      setLoading(false);
-    }
   };
 
   useEffect(() => {
-    if (canVerify) load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, canVerify]);
+    if (searchText.trim() === query.search) return;
+    const timer = window.setTimeout(() => {
+      setQuery(previous => ({ ...previous, search: searchText.trim(), page: 1 }));
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [searchText, query.search]);
+
+  useEffect(() => {
+    if (!canVerify) return;
+    setLoading(true);
+    setError(null);
+    if (searchPending) return;
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    const request = ++requestNumber.current;
+    void listMachineReadingSubmissions(query.tab, { search: query.search, page: query.page, limit: 20 }, controller.signal)
+      .then(({ submissions, pagination: result }) => {
+        if (request !== requestNumber.current || controller.signal.aborted) return;
+        if (!result) throw new Error('Unable to load the submission list. Refresh and try again.');
+        if (query.page > result.pages) {
+          requestNumber.current += 1;
+          setQuery(previous => ({ ...previous, page: Math.max(1, result.pages) }));
+          return;
+        }
+        setItems(submissions);
+        setPagination(result);
+      })
+      .catch((e: unknown) => {
+        if (request !== requestNumber.current || controller.signal.aborted) return;
+        setError(e instanceof Error ? e.message : 'Failed to load submissions');
+      })
+      .finally(() => {
+        if (request === requestNumber.current && !controller.signal.aborted) setLoading(false);
+      });
+    return () => { controller.abort(); if (request === requestNumber.current) requestNumber.current += 1; };
+  }, [query, canVerify, searchPending, reloadKey]);
+
+  const changeSearch = (value: string) => {
+    if (value.trim() !== query.search) { invalidateRequest(); setLoading(true); }
+    setSearchText(value);
+  };
+  const clearSearch = () => {
+    invalidateRequest();
+    setSearchText('');
+    setQuery(previous => ({ ...previous, search: '', page: 1 }));
+  };
+  const refresh = () => { invalidateRequest(); setReloadKey(previous => previous + 1); };
 
   if (!canVerify) {
     return (
@@ -81,6 +132,7 @@ export function PendingMachineReadings() {
       });
       setItems((prev) => prev.filter((s) => s._id !== sub._id));
       setPreviewSub(null);
+      setReloadKey(previous => previous + 1);
     } catch (e: any) {
       alert(e?.message || 'Failed to approve');
     } finally {
@@ -96,6 +148,7 @@ export function PendingMachineReadings() {
       await rejectMachineReadingSubmission(sub._id, reason.trim());
       setItems((prev) => prev.filter((s) => s._id !== sub._id));
       setPreviewSub(null);
+      setReloadKey(previous => previous + 1);
     } catch (e: any) {
       alert(e?.message || 'Failed to reject');
     } finally {
@@ -113,19 +166,38 @@ export function PendingMachineReadings() {
           </p>
         </div>
         <button
-          onClick={load}
-          className="inline-flex items-center gap-2 px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"
+          onClick={refresh}
+          disabled={loading}
+          className="inline-flex items-center gap-2 px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50"
         >
           <RefreshCw className="w-4 h-4" /> Refresh
         </button>
       </div>
 
-      {/* Tabs */}
+      <div className="mb-4">
+        <label htmlFor="machine-reading-search" className="block text-sm font-medium text-slate-700 mb-1">Search submissions</label>
+        <div className="relative">
+          <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" aria-hidden="true" />
+          <input id="machine-reading-search" type="search" maxLength={200} value={searchText}
+            onChange={event => changeSearch(event.target.value)}
+            placeholder="Customer, machine, serial, asset, ID, reference or hours"
+            className="w-full pl-10 pr-12 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          {searchText && <button type="button" onClick={clearSearch} aria-label="Clear search"
+            className="absolute right-2 top-1 p-2 text-slate-500 hover:text-slate-800 rounded"><X className="w-4 h-4" /></button>}
+        </div>
+      </div>
+
+      {/* Tabs retain the same search text and reset only the result page. */}
       <div className="flex border-b border-slate-200 mb-4">
         {(['pending', 'approved', 'rejected'] as Tab[]).map((t) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => {
+              if (t === tab && !searchPending) return;
+              invalidateRequest();
+              setQuery(previous => ({ ...previous, tab: t, search: searchText.trim(), page: 1 }));
+            }}
+            aria-pressed={tab === t}
             className={`px-4 py-2 text-sm font-medium capitalize border-b-2 transition ${
               tab === t
                 ? 'border-blue-600 text-blue-700'
@@ -140,6 +212,7 @@ export function PendingMachineReadings() {
       {loading && (
         <div className="flex items-center justify-center py-16 text-slate-400">
           <Loader2 className="w-6 h-6 animate-spin" />
+          <span className="sr-only">Loading submissions</span>
         </div>
       )}
 
@@ -152,7 +225,7 @@ export function PendingMachineReadings() {
       {!loading && !error && items.length === 0 && (
         <div className="text-center py-16 text-slate-400">
           <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-slate-300" />
-          <p className="text-sm">No {tab} submissions.</p>
+          <p className="text-sm">{query.search ? `No ${tab} submissions match “${query.search}”.` : `No ${tab} submissions.`}</p>
         </div>
       )}
 
@@ -169,6 +242,23 @@ export function PendingMachineReadings() {
               tab={tab}
             />
           ))}
+        </div>
+      )}
+
+      {!loading && !error && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4 text-sm text-slate-600">
+          <p role="status" aria-live="polite">
+            {pagination.total === 0 ? '0' : `${(page - 1) * pagination.limit + 1}–${Math.min(page * pagination.limit, pagination.total)}`} of {pagination.total} {tab} {query.search ? 'matches' : 'submissions'}
+          </p>
+          {pagination.total > 0 && <nav aria-label="Submission pages" className="flex items-center gap-3">
+            <button type="button" aria-label="Previous page" disabled={page <= 1}
+              onClick={() => { invalidateRequest(); setQuery(previous => ({ ...previous, page: previous.page - 1 })); }}
+              className="p-2 border rounded-lg disabled:opacity-40 hover:bg-slate-50"><ChevronLeft className="w-4 h-4" /></button>
+            <span>Page {page} of {pagination.pages}</span>
+            <button type="button" aria-label="Next page" disabled={page >= pagination.pages}
+              onClick={() => { invalidateRequest(); setQuery(previous => ({ ...previous, page: previous.page + 1 })); }}
+              className="p-2 border rounded-lg disabled:opacity-40 hover:bg-slate-50"><ChevronRight className="w-4 h-4" /></button>
+          </nav>}
         </div>
       )}
 
@@ -191,8 +281,12 @@ interface CardProps {
 function SubmissionCard({ submission, busy, onApprove, onReject, onPreview, tab }: CardProps) {
   const machine = submission.machine;
   const delta = submission.submittedHours - submission.previousHours;
+  const approvedReading = correctedApprovedHours(submission);
+  const review = checklistReview(submission.checklist);
+  const report = checklistReportDocument(submission);
   const [editing, setEditing] = useState(false);
   const [editHours, setEditHours] = useState(String(submission.submittedHours));
+  const [reportMode, setReportMode] = useState<null | 'view' | 'print'>(null);
 
   return (
     <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
@@ -207,6 +301,8 @@ function SubmissionCard({ submission, busy, onApprove, onReject, onPreview, tab 
           <img
             src={getMachineReadingPhotoUrl(submission._id)}
             alt="Hour meter"
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover"
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).style.display = 'none';
@@ -218,6 +314,7 @@ function SubmissionCard({ submission, busy, onApprove, onReject, onPreview, tab 
         {/* Details */}
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-baseline gap-2 mb-1">
+            <span className="text-xs font-medium text-slate-500" title={`Submission ID: ${submission._id}`}>ARS-{submission._id.slice(-6).toUpperCase()}</span>
             <h3 className="font-semibold text-slate-800 truncate">
               {machine?.make} {machine?.model}
             </h3>
@@ -240,6 +337,12 @@ function SubmissionCard({ submission, busy, onApprove, onReject, onPreview, tab 
               value={`${submission.submittedHours.toLocaleString()} hrs`}
               highlight
             />
+            {approvedReading !== null && (
+              <Metric
+                label="Approved"
+                value={`${approvedReading.toLocaleString()} hrs`}
+              />
+            )}
             <Metric
               label="Delta"
               value={`${delta >= 0 ? '+' : ''}${delta.toLocaleString()}`}
@@ -267,6 +370,27 @@ function SubmissionCard({ submission, busy, onApprove, onReject, onPreview, tab 
               From: {submission.submitterName || '—'}{' '}
               {submission.submitterPhone && `· ${submission.submitterPhone}`}
             </p>
+          )}
+
+          {review && <ChecklistPanel review={review} />}
+
+          {report && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setReportMode('view')}
+                className="px-3 py-1.5 border border-slate-300 hover:bg-slate-50 text-sm font-medium rounded"
+              >
+                View Report
+              </button>
+              <button
+                type="button"
+                onClick={() => setReportMode('print')}
+                className="px-3 py-1.5 border border-slate-300 hover:bg-slate-50 text-sm font-medium rounded"
+              >
+                Print
+              </button>
+            </div>
           )}
 
           {tab !== 'pending' && (
@@ -298,8 +422,12 @@ function SubmissionCard({ submission, busy, onApprove, onReject, onPreview, tab 
                     value={editHours}
                     min={machine?.machineHours ?? 0}
                     onChange={(e) => setEditHours(e.target.value)}
+                    aria-label="Corrected hour reading"
                     className="w-32 px-3 py-1.5 border border-slate-300 rounded text-sm"
                   />
+                  <span className="text-xs text-slate-500">
+                    Submitted reading remains {submission.submittedHours.toLocaleString()} hrs
+                  </span>
                   <button
                     onClick={() => {
                       const n = Number(editHours);
@@ -347,6 +475,68 @@ function SubmissionCard({ submission, busy, onApprove, onReject, onPreview, tab 
           )}
         </div>
       </div>
+      {report && reportMode && (
+        <ChecklistReadingReport
+          submissionId={submission._id}
+          report={report}
+          printOnOpen={reportMode === 'print'}
+          onClose={() => setReportMode(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ChecklistPanel({ review }: { review: ChecklistReview }) {
+  const [open, setOpen] = useState(() => checklistDetailsStartOpen(review));
+  return (
+    <div className="mt-3 border border-slate-200 rounded-lg">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 rounded-lg"
+      >
+        <span className="font-semibold text-slate-800">Checklist</span>
+        <span className="ml-2 text-slate-500">
+          {review.notOkCount > 0 ? `${review.notOkCount} Not OK` : 'All OK'}
+          {review.operatorName ? ` · ${review.operatorName}` : ''}
+        </span>
+      </button>
+      {open && (
+        <div className="px-3 pb-3 space-y-2">
+          <ol className="space-y-2">
+            {review.items.map((item, index) => (
+              <li key={item.id} className="text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-slate-800">
+                    {index + 1}. {item.prompt}
+                  </span>
+                  <span
+                    className={`shrink-0 font-semibold ${
+                      item.answer === 'not-ok' ? 'text-amber-700' : 'text-emerald-700'
+                    }`}
+                  >
+                    {item.answer === 'not-ok' ? 'Not OK' : 'OK'}
+                  </span>
+                </div>
+                {item.answer === 'not-ok' && item.explanation && (
+                  <p className="mt-1 text-amber-900 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                    {item.explanation}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ol>
+          <p className="text-sm text-slate-700">
+            <span className="font-semibold">Out of commission:</span>{' '}
+            {review.outOfCommission ? 'Yes' : 'No'}
+            {review.outOfCommission && review.outOfCommissionReason
+              ? ` — ${review.outOfCommissionReason}`
+              : ''}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

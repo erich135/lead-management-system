@@ -31,7 +31,6 @@ import {
   X,
   Eye,
 } from 'lucide-react';
-import { NotificationRecipients } from './NotificationRecipients';
 import {
   getScheduledReports,
   createScheduledReport,
@@ -486,7 +485,6 @@ export function ScheduledReports({ allUsers }: ScheduledReportsProps) {
   if (loading) {
     return (
       <div className="space-y-6">
-        <NotificationRecipients />
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 text-ars-primary animate-spin" />
         </div>
@@ -496,9 +494,6 @@ export function ScheduledReports({ allUsers }: ScheduledReportsProps) {
 
   return (
     <div>
-      <div className="mb-6">
-        <NotificationRecipients />
-      </div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>

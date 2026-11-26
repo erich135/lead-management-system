@@ -83,6 +83,7 @@ import {
   exportCustomerMaster,
   previewCustomerMaster,
   applyCustomerMaster,
+  downloadCustomerMasterWorkingCopy,
   type CustomerMasterApplyResult,
   type CustomerMasterPreview,
   type ReadingEscalationAdminCodeOption,
@@ -134,6 +135,7 @@ import {
 } from 'lucide-react';
 import { ChangelogViewer } from './ChangelogViewer';
 import { ScheduledReports } from './ScheduledReports';
+import { ArchivedCustomerNotificationRecipients, NotificationRecipients } from './NotificationRecipients';
 
 export function SystemManagement() {
   const { isSuperAdmin, hasPermission } = useAuth();
@@ -146,7 +148,7 @@ export function SystemManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditingUser, setIsEditingUser] = useState(false);
-  const [activeTab, setActiveTab] = useState<'users' | 'imports' | 'reference' | 'changelog' | 'group-permissions' | 'scheduled-reports'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'imports' | 'reference' | 'changelog' | 'group-permissions' | 'scheduled-reports' | 'notifications'>('users');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 20;
@@ -235,16 +237,21 @@ export function SystemManagement() {
   const [showArchivedCustomers, setShowArchivedCustomers] = useState(false);
   const [archivedCustomers, setArchivedCustomers] = useState<Customer[]>([]);
   const [loadingArchivedCustomers, setLoadingArchivedCustomers] = useState(false);
+  const [archivedRecipientCustomerId, setArchivedRecipientCustomerId] = useState<string | null>(null);
   const [readingAdminCodes, setReadingAdminCodes] = useState<ReadingEscalationAdminCodeOption[]>([]);
   const [readingAdminGaps, setReadingAdminGaps] = useState<Array<{ customerId: string; customerName: string; reason: string }>>([]);
   const [readingAdminDraft, setReadingAdminDraft] = useState('');
   const [exportingCustomerMaster, setExportingCustomerMaster] = useState(false);
+  const [includeArchivedCustomers, setIncludeArchivedCustomers] = useState(false);
   const [previewingCustomerMaster, setPreviewingCustomerMaster] = useState(false);
   const [applyingCustomerMaster, setApplyingCustomerMaster] = useState(false);
   const [customerMasterPreview, setCustomerMasterPreview] = useState<CustomerMasterPreview | null>(null);
   const [customerMasterFile, setCustomerMasterFile] = useState<File | null>(null);
   const [customerMasterApplyResult, setCustomerMasterApplyResult] = useState<CustomerMasterApplyResult | null>(null);
   const customerMasterFileRef = useRef<HTMLInputElement>(null);
+  const customerMasterApplyInFlight = useRef(false);
+  const customerMasterReviewInFlight = useRef(false);
+  const [customerMasterRefreshWarning,setCustomerMasterRefreshWarning]=useState<string|null>(null);
   // Invite user state
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [inviteFormData, setInviteFormData] = useState({
@@ -1493,7 +1500,7 @@ alert((response as any).message || 'User invited successfully');
 
         {/* Tabs */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
-          <div className="flex border-b border-gray-200">
+          <div className="flex flex-wrap border-b border-gray-200">
             <button
               onClick={() => setActiveTab('users')}
               className={`flex-1 px-6 py-4 font-semibold transition-all ${
@@ -1559,6 +1566,14 @@ alert((response as any).message || 'User invited successfully');
                 Changelog
               </div>
             </button>
+            {isSuperAdmin && (
+              <button
+                onClick={() => setActiveTab('notifications')}
+                className={`flex-1 px-6 py-4 font-semibold transition-all ${activeTab === 'notifications' ? 'text-ars-primary border-b-2 border-ars-primary bg-blue-50' : 'text-ars-body hover:text-ars-heading hover:bg-gray-50'}`}
+              >
+                <div className="flex items-center justify-center gap-2"><Mail className="w-5 h-5" />Notifications</div>
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('scheduled-reports')}
               className={`flex-1 px-6 py-4 font-semibold transition-all ${
@@ -4836,7 +4851,7 @@ alert((response as any).message || 'User invited successfully');
                           onClick={async () => {
                             setExportingCustomerMaster(true);
                             try {
-                              await exportCustomerMaster();
+                              await exportCustomerMaster({ includeArchived: includeArchivedCustomers });
                             } catch (err: any) {
                               alert(err.message || 'Failed to export Customer Master');
                             } finally {
@@ -4848,9 +4863,18 @@ alert((response as any).message || 'User invited successfully');
                           <Download className="w-4 h-4" />
                           {exportingCustomerMaster ? 'EXPORTING...' : 'Export Customer Master'}
                         </button>
+                        <label className="flex items-center gap-2 text-sm text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={includeArchivedCustomers}
+                            disabled={exportingCustomerMaster}
+                            onChange={(event) => setIncludeArchivedCustomers(event.target.checked)}
+                          />
+                          Include Archived Customers
+                        </label>
                         <button
                           type="button"
-                          disabled={previewingCustomerMaster}
+                          disabled={previewingCustomerMaster || applyingCustomerMaster}
                           onClick={() => customerMasterFileRef.current?.click()}
                           className="px-3 py-2 border border-[#0969a9] text-[#0969a9] rounded-[8px] font-bold text-[13px] hover:bg-blue-50 transition-colors flex items-center gap-2 disabled:opacity-50"
                         >
@@ -4867,10 +4891,14 @@ alert((response as any).message || 'User invited successfully');
                             event.target.value = '';
                             if (!file) return;
                             setPreviewingCustomerMaster(true);
+                            setCustomerMasterPreview(null);
+                            setCustomerMasterFile(null);
                             setCustomerMasterApplyResult(null);
+                            setCustomerMasterRefreshWarning(null);
                             try {
+                              const nextPreview = await previewCustomerMaster(file);
                               setCustomerMasterFile(file);
-                              setCustomerMasterPreview(await previewCustomerMaster(file));
+                              setCustomerMasterPreview(nextPreview);
                             } catch (err: any) {
                               alert(err.message || 'Failed to preview Customer Master');
                             } finally {
@@ -4879,26 +4907,38 @@ alert((response as any).message || 'User invited successfully');
                           }}
                         />
                       </div>
-                      <p className="mt-1 text-xs text-slate-500">Exports every Active and Archived customer. Import previews the workbook. Customer records change only after you confirm the preview.</p>
+                      <p className="mt-1 text-xs text-slate-500">Exports Active customers and their recipients by default. Select Include Archived Customers to include archived records. Import previews customer and recipient changes separately. Records change only after you confirm a valid preview.</p>
+                      {customerMasterRefreshWarning && <p className="mt-2 text-sm text-amber-800">{customerMasterRefreshWarning}</p>}
                       {customerMasterPreview && (
                         <CustomerMasterPreviewPanel
+                          key={customerMasterPreview.planFingerprint}
                           preview={customerMasterPreview}
-                          applying={applyingCustomerMaster}
+                          applying={applyingCustomerMaster||previewingCustomerMaster}
                           applyResult={customerMasterApplyResult}
+                          onResolve={async resolutions=>{
+                            if(!customerMasterFile||customerMasterReviewInFlight.current||customerMasterApplyInFlight.current)return;
+                            customerMasterReviewInFlight.current=true;setPreviewingCustomerMaster(true);
+                            try{setCustomerMasterPreview(await previewCustomerMaster(customerMasterFile,resolutions));}
+                            finally{customerMasterReviewInFlight.current=false;setPreviewingCustomerMaster(false);}
+                          }}
+                          onWorkingCopy={async()=>{if(customerMasterFile&&customerMasterApplyResult)await downloadCustomerMasterWorkingCopy(customerMasterFile,customerMasterPreview,customerMasterApplyResult);}}
                           onApply={async () => {
+                            if(customerMasterApplyInFlight.current)return;
                             if (!customerMasterFile || !customerMasterPreview) {
                               throw new Error('Preview the workbook again before applying it');
                             }
                             setApplyingCustomerMaster(true);
+                            customerMasterApplyInFlight.current=true;
                             try {
                               const result = await applyCustomerMaster(customerMasterFile, customerMasterPreview);
                               setCustomerMasterApplyResult(result);
                               if (result.recordsChanged > 0) {
-                                const customersResponse = await getCustomers({ limit: 10000 });
-                                setCustomers(customersResponse.customers || []);
+                                try{const customersResponse = await getCustomers({ limit: 10000 });setCustomers(customersResponse.customers || []);}
+                                catch{setCustomerMasterRefreshWarning('Import was saved. The customer list could not refresh; reload the list before continuing.');}
                               }
                             } finally {
                               setApplyingCustomerMaster(false);
+                              customerMasterApplyInFlight.current=false;
                             }
                           }}
                           onClose={() => {
@@ -4942,6 +4982,8 @@ alert((response as any).message || 'User invited successfully');
                           <X className="w-4 h-4" />
                         </button>
                       </div>
+                      <h5 className="mb-3 font-semibold text-ars-heading">Customer Details</h5>
+                      {editingCustomer && <p className="mb-3 break-all font-mono text-xs text-gray-500">Customer ID: {editingCustomer._id}</p>}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="md:col-span-2">
                           <label className="block text-sm font-semibold text-ars-body mb-1">Customer Name *</label>
@@ -4961,46 +5003,6 @@ alert((response as any).message || 'User invited successfully');
                             onChange={e => editingCustomer ? setEditingCustomer({ ...editingCustomer, address: e.target.value } as any) : setNewCustomer({ ...newCustomer, address: e.target.value })}
                             className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
                             placeholder="Physical or postal address"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-ars-body mb-1">Phone Number</label>
-                          <input
-                            type="text"
-                            value={editingCustomer ? ((editingCustomer as any).phone || '') : newCustomer.phone}
-                            onChange={e => editingCustomer ? setEditingCustomer({ ...editingCustomer, ...{ phone: e.target.value } } as any) : setNewCustomer({ ...newCustomer, phone: e.target.value })}
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
-                            placeholder="e.g., 011 123 4567"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-ars-body mb-1">Email Address</label>
-                          <input
-                            type="email"
-                            value={editingCustomer ? ((editingCustomer as any).email || '') : newCustomer.email}
-                            onChange={e => editingCustomer ? setEditingCustomer({ ...editingCustomer, ...{ email: e.target.value } } as any) : setNewCustomer({ ...newCustomer, email: e.target.value })}
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
-                            placeholder="e.g., accounts@customer.co.za"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-ars-body mb-1">Contact Person</label>
-                          <input
-                            type="text"
-                            value={editingCustomer ? (editingCustomer.defaultContactPerson || '') : newCustomer.defaultContactPerson}
-                            onChange={e => editingCustomer ? setEditingCustomer({ ...editingCustomer, defaultContactPerson: e.target.value }) : setNewCustomer({ ...newCustomer, defaultContactPerson: e.target.value })}
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
-                            placeholder="e.g., John Smith"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-ars-body mb-1">WhatsApp Number</label>
-                          <input
-                            type="text"
-                            value={editingCustomer ? (editingCustomer.defaultWhatsAppNumber || '') : newCustomer.defaultWhatsAppNumber}
-                            onChange={e => editingCustomer ? setEditingCustomer({ ...editingCustomer, defaultWhatsAppNumber: e.target.value }) : setNewCustomer({ ...newCustomer, defaultWhatsAppNumber: e.target.value })}
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
-                            placeholder="e.g., +27821234567"
                           />
                         </div>
                         {editingCustomer && (
@@ -5060,6 +5062,49 @@ alert((response as any).message || 'User invited successfully');
                             </div>
                           </div>
                         )}
+                      </div>
+                      <h5 className="mb-3 mt-5 font-semibold text-ars-heading">Contact Information</h5>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-ars-body mb-1">Phone Number</label>
+                          <input
+                            type="text"
+                            value={editingCustomer ? ((editingCustomer as any).phone || '') : newCustomer.phone}
+                            onChange={e => editingCustomer ? setEditingCustomer({ ...editingCustomer, ...{ phone: e.target.value } } as any) : setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                            placeholder="e.g., 011 123 4567"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-ars-body mb-1">Email Address</label>
+                          <input
+                            type="email"
+                            value={editingCustomer ? ((editingCustomer as any).email || '') : newCustomer.email}
+                            onChange={e => editingCustomer ? setEditingCustomer({ ...editingCustomer, ...{ email: e.target.value } } as any) : setNewCustomer({ ...newCustomer, email: e.target.value })}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                            placeholder="e.g., accounts@customer.co.za"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-ars-body mb-1">Contact Person</label>
+                          <input
+                            type="text"
+                            value={editingCustomer ? (editingCustomer.defaultContactPerson || '') : newCustomer.defaultContactPerson}
+                            onChange={e => editingCustomer ? setEditingCustomer({ ...editingCustomer, defaultContactPerson: e.target.value }) : setNewCustomer({ ...newCustomer, defaultContactPerson: e.target.value })}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                            placeholder="e.g., John Smith"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-ars-body mb-1">WhatsApp Number</label>
+                          <input
+                            type="text"
+                            value={editingCustomer ? (editingCustomer.defaultWhatsAppNumber || '') : newCustomer.defaultWhatsAppNumber}
+                            onChange={e => editingCustomer ? setEditingCustomer({ ...editingCustomer, defaultWhatsAppNumber: e.target.value }) : setNewCustomer({ ...newCustomer, defaultWhatsAppNumber: e.target.value })}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-ars-primary focus:border-transparent text-[15px]"
+                            placeholder="e.g., +27821234567"
+                          />
+                        </div>
                         <div className="md:col-span-2">
                           <label className="block text-sm font-semibold text-ars-body mb-1">Reading Escalation Admin Code</label>
                           {isSuperAdmin ? (
@@ -5147,6 +5192,21 @@ alert((response as any).message || 'User invited successfully');
                           CANCEL
                         </button>
                       </div>
+                      <div className="mt-5">
+                        {isSuperAdmin && editingCustomer ? (
+                          <NotificationRecipients scope={{ group: 'customer', customerId: editingCustomer._id }} />
+                        ) : (
+                          <section className="rounded-xl border border-gray-200 bg-white p-4">
+                            <h5 className="font-semibold text-ars-heading">Notification Recipients</h5>
+                            <p className="mt-1 text-sm text-gray-600">{editingCustomer ? 'Notification recipients are managed by a super administrator.' : 'Save this customer first to receive its permanent Customer ID. Then reopen Edit Customer to add notification recipients.'}</p>
+                          </section>
+                        )}
+                      </div>
+                      <section className="mt-5 rounded-xl border border-gray-200 bg-white p-4">
+                        <h5 className="font-semibold text-ars-heading">Customer Status and History</h5>
+                        <p className="mt-1 text-sm text-gray-700">Status: {editingCustomer ? editingCustomer.isActive === false ? 'Archived' : 'Active' : 'New customer (not saved)'}</p>
+                        <p className="mt-1 text-xs text-gray-500">Archive and restore remain available in the customer list. They retain the Customer ID, linked Jobs, Machines and documents. Recorded trading-name history remains visible in Customer Details.</p>
+                      </section>
                     </div>
                   )}
 
@@ -5158,6 +5218,7 @@ alert((response as any).message || 'User invited successfully');
                         <div key={c._id} className="flex items-start justify-between p-4 bg-gray-50 rounded-xl border border-gray-200 gap-4">
                           <div className="flex-1 min-w-0">
                             <p className="font-semibold text-ars-heading">{c.name}</p>
+                            <p className="mt-0.5 break-all font-mono text-xs text-gray-400">Customer ID: {c._id}</p>
                             {matchingTradingName(c, customerSearch) ? (
                               <p className="text-xs font-medium text-[#0969a9]">Trading name: {matchingTradingName(c, customerSearch)}</p>
                             ) : null}
@@ -5243,27 +5304,45 @@ alert((response as any).message || 'User invited successfully');
                       ) : (
                         <div className="space-y-2">
                           {archivedCustomers.map(c => (
-                            <div key={c._id} className="flex items-start justify-between p-4 bg-orange-50 rounded-xl border border-orange-200 gap-4 opacity-75">
-                              <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-ars-heading line-through">{c.name}</p>
-                                <p className="text-xs text-orange-600 mt-0.5">Archived</p>
+                            <div key={c._id} className="p-4 bg-orange-50 rounded-xl border border-orange-200">
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-ars-heading line-through">{c.name}</p>
+                                  <p className="text-xs text-orange-600 mt-0.5">Archived</p>
+                                  <p className="mt-1 break-all font-mono text-xs text-gray-500">Customer ID: {c._id}</p>
+                                </div>
+                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                  {isSuperAdmin && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setArchivedRecipientCustomerId(archivedRecipientCustomerId === c._id ? null : c._id)}
+                                      aria-expanded={archivedRecipientCustomerId === c._id}
+                                      className="rounded border border-orange-300 px-3 py-2 text-xs font-semibold text-[#0969a9]"
+                                    >
+                                      {archivedRecipientCustomerId === c._id ? 'Hide Recipients' : 'Notification Recipients'}
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        const res = await updateCustomer(c._id, { isActive: true });
+                                        setArchivedCustomers(prev => prev.filter(x => x._id !== c._id));
+                                        setCustomers(prev => [...prev, res.customer]);
+                                      } catch (err: any) {
+                                        alert(err.message || 'Failed to restore customer');
+                                      }
+                                    }}
+                                    className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors flex-shrink-0 flex items-center gap-1 text-xs font-semibold"
+                                    title="Restore customer"
+                                  >
+                                    <RotateCcw className="w-4 h-4" />
+                                    RESTORE
+                                  </button>
+                                </div>
                               </div>
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    const res = await updateCustomer(c._id, { isActive: true });
-                                    setArchivedCustomers(prev => prev.filter(x => x._id !== c._id));
-                                    setCustomers(prev => [...prev, res.customer]);
-                                  } catch (err: any) {
-                                    alert(err.message || 'Failed to restore customer');
-                                  }
-                                }}
-                                className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors flex-shrink-0 flex items-center gap-1 text-xs font-semibold"
-                                title="Restore customer"
-                              >
-                                <RotateCcw className="w-4 h-4" />
-                                RESTORE
-                              </button>
+                              {isSuperAdmin && archivedRecipientCustomerId === c._id && (
+                                <ArchivedCustomerNotificationRecipients customerId={c._id} />
+                              )}
                             </div>
                           ))}
                         </div>
@@ -5282,6 +5361,14 @@ alert((response as any).message || 'User invited successfully');
         {activeTab === 'changelog' && (
           <div className="space-y-6">
             <ChangelogViewer />
+          </div>
+        )}
+
+        {activeTab === 'notifications' && isSuperAdmin && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold text-gray-900">Notifications</h3>
+            <p className="text-sm text-gray-600">Manage Global ARS recipients here. Customer-specific recipients are under Customers → Edit Customer → Notification Recipients. Scheduled Reports keep their own recipients and schedules.</p>
+            <NotificationRecipients scope={{ group: 'global' }} />
           </div>
         )}
 

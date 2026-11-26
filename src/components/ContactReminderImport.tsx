@@ -32,7 +32,9 @@ function fieldLabel(field: string): string {
   switch (field) {
     case 'contactPerson': return 'Contact Person';
     case 'whatsAppNumber': return 'WhatsApp Number';
-    case 'readingFrequencyDays': return 'Reading Frequency (Days)';
+    case 'readingFrequencyDays': return 'Interval (Days)';
+    case 'readingReminderSchedule': return 'Reading Schedule';
+    case 'checklistEnabled': return 'Checklist Enabled';
     case 'whatsAppRemindersEnabled': return 'Reminders Enabled';
     case 'customerId': return 'Customer ID';
     case 'cashCustomer': return 'Cash Customer';
@@ -107,7 +109,7 @@ export function ContactReminderImport({ onClose, onImportComplete }: Props) {
             <div>
               <h2 className="text-lg font-bold text-slate-800">Import Contact Reminders</h2>
               <p className="text-xs text-slate-500">
-                {step === 'upload' && 'Updates only contact person, WhatsApp, frequency and reminder flag'}
+                {step === 'upload' && 'Updates contact details, reading schedules, reminders and checklist settings'}
                 {step === 'review' && 'Review the dry-run. Nothing has been written yet.'}
                 {step === 'importing' && 'Applying confirmed contact-reminder changes…'}
                 {step === 'done' && 'Contact reminder import complete'}
@@ -126,7 +128,8 @@ export function ContactReminderImport({ onClose, onImportComplete }: Props) {
                 Rows are matched only by <span className="font-semibold">Machine ID</span>.
                 Serial numbers, customers, hours, service dates and RSR documents are never changed.
                 Use a fresh Contact Reminders export — earlier workbooks without baseline columns will be rejected.
-                Non-empty values in the four editable columns overwrite the current values.
+                Non-empty contact, schedule, reminder and checklist values overwrite the current settings.
+                Checklist and reminders are independent. Legacy numeric reading frequencies are supported.
                 Blank cells leave the database values unchanged. Use <span className="font-mono">CLEAR</span> to wipe Contact Person or WhatsApp Number.
               </div>
               <div
@@ -204,7 +207,7 @@ export function ContactReminderImport({ onClose, onImportComplete }: Props) {
                   onChange={(event) => setAcknowledged(event.target.checked)}
                 />
                 <span>
-                  I have reviewed this dry-run. Only the four contact-reminder fields will be updated for the
+                  I have reviewed this dry-run. Only the contact, schedule, reminder and checklist settings shown will be updated for the
                   {' '}{dryRun.summary.changing} changing row{dryRun.summary.changing === 1 ? '' : 's'}.
                   Invalid rows will not be imported.
                 </span>

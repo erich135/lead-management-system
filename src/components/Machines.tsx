@@ -36,6 +36,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { canAccessMachineReadingWorkflow } from '../lib/readingAccess';
 import { loadHoursPayload } from '../lib/loadHours';
 import { MachineQrPanel } from './MachineQrPanel';
+import { BulkMachineQrPrint } from './BulkMachineQrPrint';
 import { MachineActivityHistory } from './MachineActivityHistory';
 import { MachineRSRMetadataEditModal } from './MachineRSRMetadataEditModal';
 import { PendingMachineReadings } from './PendingMachineReadings';
@@ -112,6 +113,7 @@ export function Machines() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
+  const [showBulkQrPrint, setShowBulkQrPrint] = useState(false);
   const [ownershipFilter, setOwnershipFilter] = useState<'ars_rental' | 'customer' | '' | 'archived'>('ars_rental');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [machineTypes, setMachineTypes] = useState<MachineType[]>([]);
@@ -1173,6 +1175,9 @@ export function Machines() {
           </div>
         </div>
       </div>
+
+      {showBulkQrPrint && <BulkMachineQrPrint customers={customers} onClose={() => setShowBulkQrPrint(false)} />}
+      {canManageMachines && <button type="button" onClick={() => setShowBulkQrPrint(true)} className="mb-4 inline-flex items-center gap-2 rounded-lg bg-slate-800 px-4 py-3 text-white"><QrCode className="w-4 h-4" />Bulk Print QR Codes</button>}
 
       {jobRsrSuccess && (
         <div className="mb-6 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
